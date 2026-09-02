@@ -1,3 +1,5 @@
+import { HourWindow, PriceSensitivity } from '@shared/types';
+
 export class ProfileResponseIdentityDto {
   givenName!: string | null;
   middleName?: string | null;
@@ -24,6 +26,13 @@ export class ProfileResponseTravelDocumentDto {
 export class ProfileResponsePreferencesDto {
   seatPreference?: string | null;
   classPreference?: string | null;
+  preferredAirlines?: string[];
+  blacklistedAirlines?: string[];
+  preferredDepartureWindow?: HourWindow | null;
+  preferredArrivalWindow?: HourWindow | null;
+  maxStops?: number | null;
+  priceSensitivity?: PriceSensitivity | null;
+  requiresCheckedBaggage?: boolean | null;
 }
 
 export class ProfileResponseDto {

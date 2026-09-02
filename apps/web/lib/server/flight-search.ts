@@ -2,9 +2,14 @@ import 'server-only';
 import * as NextAuth from 'next-auth';
 import { z } from 'zod';
 import {
+  FlightMatchResultSchema,
+  FlightSearchMatchLevelCountsSchema,
   FlightSearchOfferViewSchema,
   FlightSearchQuerySchema,
+  type DimensionScore,
+  type FlightSearchMeta,
   type FlightSearchOutcome,
+  type FlightSearchOfferView,
   type FlightSearchQuery,
   type FlightSearchSegmentView,
   type FlightSearchSliceView,
@@ -52,7 +57,7 @@ const CabinMismatchDetailSchema = z
   })
   .strict();
 
-const UpstreamOfferSchema = z
+const UpstreamOfferBaseSchema = z
   .object({
     id: LocalOfferIdSchema,
     duffelOfferId: z.string().min(1),
@@ -76,26 +81,117 @@ const UpstreamOfferSchema = z
   })
   .strict();
 
-const UpstreamSearchSchema = z
+const UpstreamMatchedOfferSchema = UpstreamOfferBaseSchema.extend({
+  matchResult: FlightMatchResultSchema,
+}).strict();
+
+const UpstreamRankedOfferSchema = UpstreamOfferBaseSchema.extend({
+  matchResult: z.null(),
+}).strict();
+
+const UpstreamSearchMetaBaseSchema = z
   .object({
-    results: z.array(UpstreamOfferSchema),
-    meta: z
-      .object({
-        totalResults: z.number().int().min(0).optional(),
-        searchHash: z.string().min(1).optional(),
-        cached: z.boolean().optional(),
-        requestedCabinClass: CabinClassSchema.optional(),
-      })
-      .strict()
-      .optional(),
+    totalResults: z.number().int().min(0),
+    searchHash: z.string(),
+    cached: z.boolean(),
+    requestedCabinClass: z.string(),
   })
   .strict();
+
+const UpstreamMatchedSearchSchema = z
+  .object({
+    mode: z.literal('MATCHED'),
+    results: z.array(UpstreamMatchedOfferSchema).max(20),
+    meta: UpstreamSearchMetaBaseSchema.extend({
+      scoringVersion: z.literal('flight-match-v1'),
+      eligibleCount: z.number().int().min(0),
+      matchLevelCounts: FlightSearchMatchLevelCountsSchema,
+    }).strict(),
+  })
+  .strict();
+
+const UpstreamRankedSearchSchema = z
+  .object({
+    mode: z.literal('RANKED'),
+    results: z.array(UpstreamRankedOfferSchema).max(20),
+    meta: UpstreamSearchMetaBaseSchema.extend({ scoringVersion: z.null() }).strict(),
+  })
+  .strict();
+
+const UpstreamSearchBaseSchema = z.discriminatedUnion('mode', [
+  UpstreamMatchedSearchSchema,
+  UpstreamRankedSearchSchema,
+]);
+const UpstreamSearchSchema = UpstreamSearchBaseSchema.superRefine(
+  validateMatchedSearchCardinality,
+);
 const UpstreamSelectionSchema = z.object({ id: LocalOfferIdSchema }).passthrough();
 
-type UpstreamOffer = z.infer<typeof UpstreamOfferSchema>;
+type UpstreamOffer =
+  | z.infer<typeof UpstreamMatchedOfferSchema>
+  | z.infer<typeof UpstreamRankedOfferSchema>;
 type UpstreamSegment = z.infer<typeof UpstreamSegmentSchema>;
 
 type FetchResult = { ok: true; response: Response } | { ok: false };
+
+function validateMatchedSearchCardinality(
+  response: z.infer<typeof UpstreamSearchBaseSchema>,
+  context: z.RefinementCtx,
+): void {
+  if (response.mode !== 'MATCHED') return;
+
+  let eligibleCount = 0;
+  const matchLevelCounts = { STRONG: 0, GOOD: 0, FAIR: 0, WEAK: 0 };
+  for (let index = 0; index < response.results.length; index += 1) {
+    const offer = response.results[index];
+    if (offer.matchResult.eligibility.eligible) {
+      eligibleCount += 1;
+      if (offer.matchResult.matchLevel !== null) {
+        matchLevelCounts[offer.matchResult.matchLevel] += 1;
+      }
+
+      if (offer.matchResult.breakdown.length === 0) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['results', index, 'matchResult', 'breakdown'],
+          message: 'breakdown must not be empty for eligible match result',
+        });
+      } else {
+        const sum = offer.matchResult.breakdown.reduce(
+          (total: number, item: DimensionScore): number => total + item.weight,
+          0,
+        );
+        const roundedSum = Math.round(sum * 1_000_000) / 1_000_000;
+        if (roundedSum !== 1) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['results', index, 'matchResult', 'breakdown'],
+            message: `Active breakdown weights must sum to 1.000000, received ${roundedSum}`,
+          });
+        }
+      }
+    }
+  }
+
+  if (response.meta.eligibleCount !== eligibleCount) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['meta', 'eligibleCount'],
+      message: `eligibleCount must equal ${eligibleCount}`,
+    });
+  }
+
+  const matchLevels: Array<keyof typeof matchLevelCounts> = ['STRONG', 'GOOD', 'FAIR', 'WEAK'];
+  for (const matchLevel of matchLevels) {
+    if (response.meta.matchLevelCounts[matchLevel] !== matchLevelCounts[matchLevel]) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['meta', 'matchLevelCounts', matchLevel],
+        message: `${matchLevel} count must equal ${matchLevelCounts[matchLevel]}`,
+      });
+    }
+  }
+}
 
 export async function searchFlights(query: FlightSearchQuery): Promise<FlightSearchOutcome> {
   const parsedQuery = FlightSearchQuerySchema.safeParse(query);
@@ -148,7 +244,9 @@ export async function searchFlights(query: FlightSearchQuery): Promise<FlightSea
       );
     }
 
-    const offers = parsedPayload.data.results.map(mapOffer);
+    const offers = parsedPayload.data.results.map(
+      (offer: UpstreamOffer): FlightSearchOfferView => mapOffer(offer),
+    );
     const validatedOffers = z.array(FlightSearchOfferViewSchema).safeParse(offers);
     if (!validatedOffers.success) {
       return searchFailure(
@@ -160,8 +258,9 @@ export async function searchFlights(query: FlightSearchQuery): Promise<FlightSea
 
     return {
       ok: true,
+      mode: parsedPayload.data.mode,
       offers: validatedOffers.data,
-      meta: createSearchMeta(validatedOffers.data),
+      meta: createSearchMeta(validatedOffers.data, parsedPayload.data.meta),
     };
   } catch {
     return searchFailure(
@@ -219,6 +318,7 @@ export async function selectFlightOffer(offerId: string): Promise<FlightSelectio
 
 async function getAccessToken(): Promise<string | null> {
   try {
+    // Handle both ESM and CJS NextAuth module exports depending on runtime bundler environment
     const sessionFn =
       typeof NextAuth.getServerSession === 'function'
         ? NextAuth.getServerSession
@@ -230,6 +330,7 @@ async function getAccessToken(): Promise<string | null> {
     if (!sessionFn) return null;
     const session: unknown = await sessionFn(authOptions);
     if (!session || typeof session !== 'object' || !('accessToken' in session)) return null;
+    // Extract custom accessToken property from authenticated session object
     const token = (session as { accessToken?: unknown }).accessToken;
     return typeof token === 'string' && token.length > 0 ? token : null;
   } catch {
@@ -243,7 +344,7 @@ async function fetchWithRetry(pathname: string, init: RequestInit): Promise<Fetc
 
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const timeout = setTimeout((): void => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
       const response = await fetch(`${apiUrl()}${pathname}`, {
         ...init,
@@ -268,7 +369,7 @@ function apiUrl(): string {
   return configuredUrl.replace(/\/+$/, '');
 }
 
-function mapOffer(offer: UpstreamOffer) {
+function mapOffer(offer: UpstreamOffer): FlightSearchOfferView {
   return {
     id: offer.id,
     price: offer.price,
@@ -285,6 +386,7 @@ function mapOffer(offer: UpstreamOffer) {
       mapSlice(offer.segments, offer.duration, offer.stops),
       ...(offer.returnSegments ? [mapSlice(offer.returnSegments)] : []),
     ],
+    matchResult: offer.matchResult ?? null,
   };
 }
 
@@ -308,7 +410,9 @@ function mapSlice(
         ),
     ),
     stops: stops ?? Math.max(segments.length - 1, 0),
-    segments: segments.map(mapSegment),
+    segments: segments.map(
+      (segment: UpstreamSegment): FlightSearchSegmentView => mapSegment(segment),
+    ),
   };
 }
 
@@ -325,11 +429,14 @@ function mapSegment(segment: UpstreamSegment): FlightSearchSegmentView {
   };
 }
 
-function createSearchMeta(offers: z.infer<typeof FlightSearchOfferViewSchema>[]) {
-  const prices = offers.map((offer) => offer.price);
+function createSearchMeta(
+  offers: FlightSearchOfferView[],
+  upstreamMeta?: z.infer<typeof UpstreamSearchSchema>['meta'],
+): FlightSearchMeta {
+  const prices = offers.map((offer: FlightSearchOfferView): number => offer.price);
   const airlines: string[] = [];
   const seenAirlines = new Set<string>();
-  offers.forEach((offer) => {
+  offers.forEach((offer: FlightSearchOfferView): void => {
     if (!seenAirlines.has(offer.airline)) {
       seenAirlines.add(offer.airline);
       airlines.push(offer.airline);
@@ -341,6 +448,19 @@ function createSearchMeta(offers: z.infer<typeof FlightSearchOfferViewSchema>[])
     minPrice: prices.length === 0 ? null : Math.min(...prices),
     maxPrice: prices.length === 0 ? null : Math.max(...prices),
     airlines,
+    ...(upstreamMeta?.scoringVersion !== undefined
+      ? { scoringVersion: upstreamMeta.scoringVersion }
+      : {}),
+    ...(upstreamMeta &&
+    'eligibleCount' in upstreamMeta &&
+    upstreamMeta.eligibleCount !== undefined
+      ? { eligibleCount: upstreamMeta.eligibleCount }
+      : {}),
+    ...(upstreamMeta &&
+    'matchLevelCounts' in upstreamMeta &&
+    upstreamMeta.matchLevelCounts !== undefined
+      ? { matchLevelCounts: upstreamMeta.matchLevelCounts }
+      : {}),
   };
 }
 
@@ -351,7 +471,9 @@ function duration(minutes: number): string {
 }
 
 function delay(milliseconds: number): Promise<void> {
-  return new Promise((resolve: () => void) => setTimeout(resolve, milliseconds));
+  return new Promise((resolve: () => void): void => {
+    setTimeout(resolve, milliseconds);
+  });
 }
 
 function searchFailure(

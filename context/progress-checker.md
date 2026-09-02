@@ -6,14 +6,265 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Authenticated Booking Dashboard (Feature 021) — 100% COMPLETE across all 6 Phases (Tasks T001–T049)
-**Last completed:** Phase 6 (T044–T049): Visual/privacy audit, architecture sync, progress checker sync, full automated quickstart gate matrix (67/67 shared contract, 36/36 API unit/controller, 7/7 API E2E, 39/39 web loader/routing, 20/20 Playwright browser acceptance, 20/20 CI contract, 60/60 smoke units, ESLint/TypeScript/Next.js build green with exit code 0), manual acceptance walkthrough, and tasks ledger reconciliation (2026-08-30).
-**In progress:** None (Feature 021 complete and ready for PR merge).
-**Next:** Feature 022 or next planned milestone.
+**Feature:** Flight Match Scoring (Feature 022) — Phase 5 / Slice 2: Match UI Components & Presentation Slices (T050–T052)
+**Last completed:** T050–T052: Implemented FlightMatchBadge, FlightMatchBreakdown, FlightRankingBanner, and FlightResultsControls with full accessibility, semantic styling, policy dimension ordering, and 39/39 passing unit tests.
+**Previous completed:** T046–T049: Enforced strict mode-tagged Next.js server parsing, provider-ID rejection/stripping, local-ID and order preservation, complete allowlisted explanation copy, malformed-parameter fallbacks, and HTML-safe dynamic interpolation.
+**In progress:** None.
+**Next:** Task T053 [US3] — Drive provider-blind ordered cards and default MATCHED order.
 
 ---
 
 ## Progress by Feature
+
+### [ ] Feature: Flight Match Scoring (Feature 022)
+
+- [x] Phase 5 / Slice 2: Match UI Components & Presentation Slices (T050–T052) (2026-09-02):
+  - T050: Implemented `FlightMatchBadge.tsx` supporting eligible score (0-100) and level pill (`STRONG`, `GOOD`, `FAIR`, `WEAK`) with semantic token styling, null-handling, and accessible ineligible warning badge with constraint violation reason.
+  - T051: Implemented `FlightMatchBreakdown.tsx` with accessible `<details><summary>` disclosure, strictly ordered dimensions (`PRICE` -> `AIRLINE` -> `ARRIVAL_SCHEDULE` -> `STOPS` -> `CABIN` -> `DEPARTURE_SCHEDULE` -> `BAGGAGE` -> `DURATION`), semantic signal styling (POSITIVE, NEUTRAL, NEGATIVE), formatted explanation copy, prominent violation list for ineligible results, and verified selection invariant.
+  - T052: Implemented `FlightRankingBanner.tsx` (renders only in `RANKED` mode, copy directing to profile preferences with accessible CTA link, strictly 0 score claims) and `FlightResultsControls.tsx` (mode-specific default sorts: `BEST_MATCH` vs `RECOMMENDED`, objective sort options: Price, Duration, Stops, Departure Time).
+  - Verification: 39/39 tests PASS in `apps/web/tests/flight-match-scoring.spec.ts` via `tsx --test`; `pnpm --filter @web/frontend lint` (0 errors, 0 warnings); `pnpm --filter @web/frontend typecheck` (exit code 0).
+  - Parallel dual-axis code review completed with zero spec gaps and all standards suggestions resolved.
+  - Commits: `9a935ec` (T050-T052 implementation), `5fc4878` (standards cleanup).
+
+- [x] Phase 5 / Slice 1: Server Boundary & Explanation Safety (T046–T049) (2026-09-02):
+  - T046 replaced the temporary untagged-response fallback with an exact `MATCHED | RANKED` discriminated upstream schema. MATCHED offers require valid non-null match results and complete `flight-match-v1` counts; RANKED offers require null match results and null scoring version.
+  - T047 added explicit boundary coverage for case-insensitive provider-prefixed ID rejection, recursive `duffelOfferId` absence, byte-for-byte local-ID/order preservation, dimension bounds, eligible breakdown weight integrity summing to 1.000000, and max 20 offer cardinality.
+  - T048 added pure `formatExplanation(Explanation): string` coverage for all 24 allowlisted keys and 25 valid outputs, including both direct and multi-stop relative copy.
+  - T049 added total runtime handling for unknown keys, prototype-inherited property names (`toString`, `__proto__`, etc.), missing/null/non-object/wrong-typed parameters, family-specific safe fallbacks, and ordered HTML-entity escaping for dynamic airline/window text.
+  - Characterization fixture alignment: updated `search-seam.characterization.spec.ts` fixture to supply valid `mode: 'RANKED'`, `matchResult: null`, and complete `meta` to conform with `UpstreamRankedSearchSchema`.
+  - Independent slice verification: server seam 40/40 PASS; explanation formatter 18/18 PASS; web TypeScript and Next lint completed without errors or warnings.
+  - Commits: `4caedb6` (T046), `b01bf66` (T047), `2ea9e45` (T048), `a9312fa` (T049), `2241dd6` (fix wave).
+
+- [x] Phase 4 / Task T045: Cache & Regression Verification for RANKED Mode (2026-09-02):
+  - In `apps/api/test/flights-search.e2e-spec.ts`, verified that `mode: RANKED` searches (cold start searches without preferences) preserve all system invariants:
+    1. DB Upserts on Cache Miss & Hit: Verified `FlightOffer` and `OfferRecovery` records are properly created/upserted in Prisma on cache miss AND cache hit; unpersonalized cold-start searches populate `SearchHistory`, `FlightOffer`, and `OfferRecovery` with correct `searchHash` and `duffelOfferId`.
+    2. Raw Cache Invariants: Verified raw Duffel results cached in Redis under `flights:raw:${searchHash}`; verified second identical search is a cache hit (`cached: true`), makes zero external Duffel API calls (`sdkSpy` not called), and does not increment monthly budget counter.
+    3. HTTP Headers & Security: Verified response headers include `Cache-Control: private, no-store` and exclude `ETag`.
+    4. Rate Limiting, Airport Validation & Error Boundaries: Verified 429 `RATE_LIMIT_EXCEEDED` on budget exhaustion; 400 Bad Request on missing origin/destination, invalid IATA code syntax, non-existent airport in DB, same origin/destination, invalid passenger counts (0 adults, 10 adults, >9 total, infants > adults), past departure date, return date before departure; and 502 `UPSTREAM_UNAVAILABLE` on Duffel API failure.
+  - All E2E tests in `apps/api/test/flights-search.e2e-spec.ts` passing 12/12, exit 0 (`35.442 s`).
+  - TypeScript `tsc --noEmit` and ESLint passed with 0 errors/warnings.
+
+- [x] Phase 4 / Task T044: Cold-Start API E2E Contract Test Suite (2026-09-02):
+  - Added comprehensive E2E tests for authenticated `POST /api/flights/search` in unpersonalized / cold-start conditions:
+    1. Empty Traveler Profile: 200 `mode: RANKED`, `meta.scoringVersion: null`, `meta.eligibleCount`/`matchLevelCounts` omitted, `Cache-Control: private, no-store`, no `ETag`, all offers `matchResult: null`.
+    2. Missing Profile Row (no DB record): 200 `mode: RANKED`, `matchResult: null` across all offers.
+    3. Empty Offers (0 returned from Duffel): 200 `mode: RANKED`, `results: []`, `totalResults: 0`, clean meta.
+    4. Stable 5-Tier Category Order: Multi-attribute tie fixture verifying strict ordering: `stops asc` -> `price asc` -> `duration asc` -> `red-eye penalty asc` -> `originalIndex asc`.
+  - Full E2E suite passed: 13/13 tests PASS (`apps/api/test/flights-match-scoring.e2e-spec.ts`, exit 0).
+  - TypeScript `tsc --noEmit` and ESLint passed with 0 errors/warnings.
+
+- [x] Phase 4 / Tasks T040 & T041: Category Ranker & Invariants (2026-09-02):
+  - Verified 5-tier objective cold-start sorting (stops > price > duration > red-eye penalty > originalIndex) in `CategoryRankerService`.
+  - Added degenerate set handling (`[]` -> `[]`, `[single]` -> `[single]`) with fresh array reference guarantees (`expect(result).not.toBe(input)`).
+  - Added multi-attribute tie testing across all permutations preserving supplier `originalIndex`.
+  - Added deep frozen input non-mutation assertions with `Object.freeze`.
+  - Verified `FlightMatchModule` provider registration and export isolation.
+  - All test suites passing (258/258 tests across 4 suites in `src/flight-match/`, exit code 0; `tsc` and `eslint` clean).
+
+- [x] Schedule Variance Formula Fix (2026-09-02):
+  - Fixed `computeEffectiveWeights` variance detection for `ARRIVAL_SCHEDULE` and `DEPARTURE_SCHEDULE` in `apps/api/src/flight-match/flight-match-scorer.service.ts` to use canonical decay `round6(clamp(1 - dist / SCHEDULE_SHOULDER_HOURS, 0, 1))` instead of decaying at half the rate and jumping from 0.5 to 0.0 at 6 hours.
+  - Added unit tests in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` proving zero-variance collapse occurs when all offers fall 6+ hours outside the preferred window.
+  - Full flight-match test suites passed (234/234 unit tests, 3/3 performance benchmark tests, 110/110 shared tests, ESLint clean, and tsc noEmit clean).
+
+- [x] Phase 11 / Convergence Closure (T084–T085) (2026-09-02):
+  - T084 RED was the missing `validateMatchedScalarAndCardinalityConstraints` helper; the focused endpoint test then passed 1/1, exit 0 (`25.442 s`). The full `flights-match-scoring.e2e-spec.ts` passed 9/9, exit 0 (`34.933 s`).
+  - T084 validates SearchMeta scalar types and non-negative integer counts; offer string, airport, date-time, integer, numeric, currency, nullable, cabin, and cabin-match constraints; outbound/return segment cardinalities and segment scalar/enum constraints; and an exercised downgraded-cabin mismatch array with exact keys, non-negative integer index, leg/cabin enums, and string route.
+  - T085 reproduced the unchanged strict scorer p95 assertion failure in one of five pre-optimization sequential runs: p95 `1.7384`, `9.4300` (failed), `1.4173`, `2.0238`, and `2.6624 ms`.
+  - `FlightMatchScorerService` now memoizes normalized readonly airline-code arrays through a `WeakMap`, eliminating repeated normalization allocations while retaining value-based scoring and allowing unused arrays to be collected.
+  - Full performance verification passed 3/3, exit 0 (`43.232 s`): scorer p95 `0.6448 ms`, warmed orchestrator p95 `3.2457 ms`, and every ordered full match result remained identical across 1,000 passes.
+  - Five post-optimization sequential focused benchmark runs passed at p95 `0.7729`, `0.7593`, `1.4886`, `3.1792`, and `1.4080 ms`, all strictly below the unchanged 5 ms threshold.
+  - Controller/service/scorer/performance verification passed 175/175, exit 0 (`58.481 s`); scorer p95 was `1.1631 ms` and warmed orchestrator p95 was `1.6303 ms`.
+  - `& '.\node_modules\.bin\tsc.CMD' -p tsconfig.json --noEmit` from `apps/api` passed with exit 0; `git diff --check` passed with exit 0. The equivalent documented pnpm recursive exec command could not resolve `tsc` in this checkout, so the installed workspace binary supplied the typecheck evidence.
+
+- [x] Phase 10 / Convergence Closure (T080–T083) (2026-09-02):
+  - Focused convergence E2E: strict MATCHED schema, agent-warmed cache recovery/detail, and public-schema table scan passed 3/3, exit 0 (`39.094 s`).
+  - Full `flights-match-scoring.e2e-spec.ts` passed 8/8, exit 0 (`34.353 s`).
+  - Controller/service/performance verification passed 18/18, exit 0 (`69.61 s`); scorer p95 was `1.0299 ms` and warmed orchestrator p95 was `1.8188 ms`.
+  - T080 validates exact allowed keys throughout the trusted MATCHED response, both match-result union branches, integer final scores, all dimension score/weight/contribution values within `0..1`, and primitive-only explanation parameters without a schema dependency.
+  - T081 queries every PostgreSQL base table in the `public` schema and rejects score-, scoring-, match-score-, or flight-match-specific table names.
+  - T082 warms the shared raw Duffel cache through `DuffelService.searchFlights(..., 'agent')`, proves the browser search is a cache hit with no second supplier search, verifies write-behind `FlightOffer`/`OfferRecovery`, and resolves the selected local ID through the authenticated public detail endpoint. Only Duffel SDK create/get boundaries are mocked.
+  - T083 adds a separate deterministic assertion that compares ordered offer IDs plus the complete match result—including weights, breakdowns, explanations, eligibility, score/level, and metadata—for each of 1,000 passes; the existing benchmark assertion is unchanged.
+  - API TypeScript and `git diff --check` verification are recorded in the convergence report.
+
+- [x] Phase 3 / Task T038: Flight Match Scoring E2E Coverage (2026-09-02):
+  - `& '.\node_modules\.bin\jest.CMD' --runInBand src/flights/flights.service.spec.ts src/flights/flights.controller.spec.ts src/flight-match/flight-match.performance.spec.ts` from `apps/api`: 17/17 tests passed, exit 0.
+  - `& '.\node_modules\.bin\jest.CMD' --config '.\test\jest-e2e.json' --runInBand test/flights-match-scoring.e2e-spec.ts` from `apps/api`: 5/5 tests passed, exit 0.
+  - `& '.\node_modules\.bin\tsc.CMD' -p tsconfig.json --noEmit` from `apps/api`: exit 0.
+  - E2E fixtures mock only the external Duffel SDK, seed three deterministic offers, and prove the public search API's complete MATCHED contract with private/no-store and no ETag.
+  - Repeated identical searches preserve ordered offer IDs, scores, dimension contributions, and active weights while making exactly one Duffel SDK call.
+  - A blacklisted VN offer remains selectable/visible after eligible results with null score/level, an empty breakdown, and one structured `BLACKLISTED_AIRLINE` violation.
+  - Updating the profile from VN to SQ after a raw-cache hit rescales the same raw results immediately (`cached: true`) with one Duffel SDK call; the ordered score projection changes.
+  - Post-write-behind checks scan `FlightOffer`, `SearchHistory`, `OfferRecovery`, PostgreSQL column metadata, and Redis keys/values and find no persisted scoring result, score-specific cache namespace, or serialized match result.
+
+- [x] Phase 3 / Task T037: Search Headers, ETag Stripping, DTO Mapping & Audit Telemetry (2026-09-01):
+  - `& '.\node_modules\.bin\jest.CMD' --runInBand src/flights/flights.controller.spec.ts src/flights/flights.service.spec.ts` from `apps/api`: 15/15 tests passed, exit 0.
+  - `& '.\node_modules\.bin\tsc.CMD' -p tsconfig.json --noEmit` from `apps/api`: exit 0.
+  - `& '.\node_modules\.bin\jest.CMD' --config test/jest-e2e.json --runInBand flights-search.e2e-spec.ts` from `apps/api`: 11/11 tests passed, exit 0.
+  - Implemented `@Res({ passthrough: true }) res: Response` in `FlightsController.search`:
+    - Sets header `Cache-Control: private, no-store`.
+    - Removes `ETag` header defensively if `removeHeader` is available.
+    - Delegates to `flightsService.search(userId, body, traceId, correlationId)`.
+  - Updated DTOs in `apps/api/src/flights/dto/search-flight.dto.ts` per `flight-search.openapi.yaml`:
+    - Root response `FlightSearchResponseDto`: `mode: 'MATCHED' | 'RANKED' = 'MATCHED'`, `results`, `meta`.
+    - `FlightSearchResponseMetaDto`: `totalResults`, `searchHash`, `cached`, `requestedCabinClass`, optional `scoringVersion`, `eligibleCount`, `matchLevelCounts`.
+    - `FlightOfferDto`: `matchResult!: FlightMatchResult | null`, `duffelOfferId!: string`.
+  - Implemented safe Audit Telemetry in `FlightsService.search`:
+    - Emits `search.completed` audit log via `auditService.createLog(this.prisma, ...)` with safe parameters: `origin`, `destination`, `departureDate`, `returnDate`, `adults`, `children`, `infants`, `cabinClass`, `mode`, `resultCount`, `eligibleCount`, `duration`, `searchHash`.
+    - Strictly omits customer PII and raw provider payloads.
+    - Retains `flight_search` audit log to preserve backward compatibility for existing assertions.
+
+- [x] Phase 3 / Task T039: Latency Benchmark Suite (2026-09-01):
+
+  - `& '.\node_modules\.bin\jest.CMD' --runInBand src/flight-match/flight-match.performance.spec.ts` from `apps/api`: 2/2 tests passed, exit 0.
+  - `& '.\node_modules\.bin\tsc.CMD' -p tsconfig.json --noEmit` from `apps/api`: exit 0.
+  - Part 1: Scorer Benchmark (1,000 deterministic passes, 20 offers):
+    - `mean: 0.74 ms`, `p50: 0.47 ms`, `p90: 0.98 ms`, `p95: 1.66 ms` (strictly under 5 ms target).
+    - 100% deterministic identical outputs (scores, order, activeWeights) verified across all 1,000 repeats.
+  - Part 2: Warmed Orchestrator Overhead Benchmark (50 warmup, 200 measured passes, 20 raw Duffel offers):
+    - `mean: 1.73 ms`, `p50: 1.31 ms`, `p90: 2.55 ms`, `p95: 3.70 ms` (strictly under 10 ms target).
+  - Performance optimizations in `FlightMatchScorerService`:
+    - Fast path for single/empty airline code normalization avoiding set allocations.
+    - Precomputed airline sets passed to `checkEligibility` and `scoreAirline` to eliminate redundant regex and Set construction.
+    - Early-exiting, allocation-free variance checks in `resolveWeights` avoiding intermediate array allocations.
+
+- [x] Phase 3 / Slice 6: Search Orchestrator Core & Module Wiring (T033–T035) (2026-09-01):
+  - `& '.\node_modules\.bin\jest.CMD' --runInBand src/flights/flight-search-orchestrator.service.spec.ts src/flights/flights-module-wiring.spec.ts src/flight-match/` from `apps/api`: 255/255 tests passed, exit 0.
+  - `& '.\node_modules\.bin\tsc.CMD' -p tsconfig.json --noEmit` from `apps/api`: exit 0.
+  - `pnpm exec eslint "apps/api/src/flight-match/**/*.ts" "apps/api/src/flights/**/*.ts" --max-warnings 0`: exit 0.
+  - Implemented `FlightSearchOrchestratorService`:
+    - Step 1: Normalization: Discards malformed offers via `normalizeFlightOffers()`, caps to first 20 canonical valid offers (`maxItems: 20`), and preserves `originalIndex` to raw offer mapping.
+    - Step 2: Profile Fetch: Calls `profileService.getScoringPreferences(userId)` once if userId non-empty; falls back to default empty preferences with zero DB calls when userId is null/undefined/empty.
+    - Step 3: Query Cabin Precedence: Query `cabinClass` strictly overrides `profile.classPreference` if profile preference exists; if profile preference is null, query cabin remains supplier filter and personalized cabin dimension stays inactive.
+    - Step 4: Scorer Invocation: Delegates canonical offers and effective preferences to `FlightMatchScorerService.scoreAll()`.
+    - Raw-Cache Hit Rescoring: Re-runs `scoreAll()` against requesting user's profile when `cached: true`; enforces zero score persistence to database or cache.
+    - Aggregate Metadata Generation: Assembles `SearchMeta` (`totalResults: canonicalOffers.length`, `searchHash`, `cached`, `requestedCabinClass`, `scoringVersion: 'flight-match-v1'`, `eligibleCount`, `matchLevelCounts: { STRONG, GOOD, FAIR, WEAK }`). Excludes ineligible offers from bucket counts.
+    - Invalid Offer Tracking: Logs warning telemetry on dropped offers (`droppedCount`, `rejectionCounts`, `searchHash`) without failing search.
+  - Wired NestJS Modules:
+    - `FlightMatchModule`: Pure zero-infrastructure module (`imports: []`), registers and exports `FlightMatchScorerService`.
+    - `FlightsModule`: Imports `FlightMatchModule` and `ProfileModule`, registers and exports `FlightSearchOrchestratorService`.
+    - Verified acyclic module graph and clean NestJS dependency injection via `flights-module-wiring.spec.ts`.
+
+- [x] Phase 3 / Slice 5: Breakdown Order, Metadata & Stable Multi-Attribute Tie-Breaking (T032) (2026-09-01):
+  - `& '.\node_modules\.bin\jest.CMD' --runInBand src/flight-match/flight-match-scorer.service.spec.ts` from `apps/api`: 157/157 tests passed, exit 0.
+  - `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`: exit 0.
+  - `pnpm exec eslint "apps/api/src/flight-match/**/*.ts" --max-warnings 0`: exit 0.
+  - Implemented `scoreAll(offers, preferences)` in `FlightMatchScorerService`:
+    - Resolved `activeWeights` via `resolveWeights(offers, preferences)`.
+    - Computed medians and minStops across eligible offers only.
+    - Strictly ordered dimension breakdown per `POLICY_DIMENSION_ORDER` (1. PRICE -> 2. AIRLINE -> 3. ARRIVAL_SCHEDULE -> 4. STOPS -> 5. CABIN -> 6. DEPARTURE_SCHEDULE -> 7. BAGGAGE -> 8. DURATION).
+    - Verified dimension weights match activeWeights and contributions match `round6(score * weight)`.
+    - Attached metadata `{ scoringVersion: 'flight-match-v1', activeWeights }` to both eligible and ineligible offer results.
+    - Ineligible offers: `score: null`, `matchLevel: null`, `breakdown: []`, positioned after all eligible offers.
+    - Implemented 7-tier tie-breaking ladder: 1. eligible before ineligible -> 2. score descending -> 3. stops ascending -> 4. price ascending -> 5. duration ascending -> 6. departure red-eye penalty ascending -> 7. originalIndex ascending.
+    - Verified each layer of the tie-breaking ladder in isolation.
+    - Stably ordered multiple ineligible offers by `originalIndex` at the end.
+    - Handled degenerate sets: empty array returns `[]`, single offer returns sorted 1-element array, all-ineligible returns preserved `originalIndex` order.
+    - Deep freeze immutability verified with zero mutation across input arrays and objects.
+
+- [x] Phase 3 / Slice 4: Dimension Contributions, Final Score & Match Level Buckets (T031) (2026-09-01):
+  - `& '.\node_modules\.bin\jest.CMD' --runInBand src/flight-match/flight-match-scorer.service.spec.ts` from `apps/api`: 143/143 tests passed, exit 0.
+  - `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`: exit 0.
+  - `pnpm exec eslint "apps/api/src/flight-match/**/*.ts" --max-warnings 0`: exit 0.
+  - Implemented `computeContribution(subScore, effectiveWeight)`, `computeFinalScore(breakdown)`, `getMatchLevel(score)`, and `computeScoreResult(breakdown)` in `FlightMatchScorerService`:
+    - Dimension contributions calculated at exact 6-decimal precision: `round6(subScore * effectiveWeight)`.
+    - Total score computation: `clamp(roundHalfAwayFromZero(round6(sum(contribution) * 100)), 0, 100)`.
+    - Half-away-from-zero rounding behavior verified on exact .5 contribution percentages.
+    - Clamping behavior verified for negative sums (< 0 clamped to 0) and overflow sums (> 100 clamped to 100).
+    - Exact match level bucket boundary tests passed:
+      - STRONG: 75–100 (74.49 -> 74 GOOD vs 74.5 -> 75 STRONG, 75 STRONG, 100 STRONG).
+      - GOOD: 50–74 (49.49 -> 49 FAIR vs 49.5 -> 50 GOOD, 50 GOOD, 74 GOOD).
+      - FAIR: 25–49 (24.49 -> 24 WEAK vs 24.5 -> 25 FAIR, 25 FAIR, 49 FAIR).
+      - WEAK: 0–24 (0 WEAK, 24 WEAK).
+    - Ineligible offers verified: score: null, matchLevel: null, breakdown: [].
+    - Zero mutation under `deepFreeze` across all contribution, score, and level calculations.
+
+
+- [x] Phase 3 / Slice 3: Weight Resolution, Baseline Collapse Fallback & Degenerate Sets (T029–T030) (2026-09-01):
+  - `& '.\node_modules\.bin\jest.CMD' --runInBand src/flight-match/flight-match-scorer.service.spec.ts` from `apps/api`: 123/123 tests passed, exit 0.
+  - `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`: exit 0.
+  - Implemented `resolveWeights(offers, preferences)` in `FlightMatchScorerService`:
+    - Transfers unprovided/missing personalized dimensions to the baseline target pool.
+    - Evaluates sub-score variance across eligible offers for multi-offer sets (>= 2 offers).
+    - Caps personalized redistributed weights at their base weights; unallocated amounts flow to baseline target pool.
+    - Cancels collapse when all baseline dimensions (PRICE, STOPS, DURATION) have zero variance, distributing the entire baseline target in 20:12:8 ratio.
+    - Proves the airline-only personalization golden fixture: 0.425000 / 0.255000 / 0.170000 / 0.150000 totaling exact 1.000000.
+    - Assigns any 6-decimal rounding remainder deterministically to highest-priority active baseline dimension (PRICE > STOPS > DURATION).
+    - Handles degenerate sets: single eligible offer (no zero-variance collapse), all ineligible offers (retains offers with null score and empty breakdown, resolveWeights returns BASE_WEIGHTS), empty offers array (returns empty array / BASE_WEIGHTS), and mixed eligible/ineligible offers (ineligible offers excluded from activeWeights and medians/variance).
+    - Preserves immutability and purity under `Object.freeze`.
+
+- [x] Phase 3 / Slice 2: Discrete & Personalized Dimension Scoring (T026–T028) (2026-09-01):
+  - `& '.\node_modules\.bin\jest.CMD' --runInBand src/flight-match/flight-match-scorer.service.spec.ts` from `apps/api`: 88/88 tests passed, exit 0.
+  - `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`: exit 0.
+  - `pnpm exec eslint "apps/api/src/flight-match/flight-match-scorer.service.ts" "apps/api/src/flight-match/flight-match-scorer.service.spec.ts" --max-warnings 0`: exit 0.
+  - Implemented public dimension calculators in `FlightMatchScorerService`: `scorePrice` (signed percentDiff explanation), `scoreStops` (maxStops within/exceeds preference and relative minStops), `scoreAirline` (preferred and neutral), `scoreCabin` (exact, adjacent, mismatch), `scoreDepartureSchedule` / `scoreArrivalSchedule` (standard, overnight, 6-hour linear shoulder decay, near/outside window), and `scoreBaggage` (checked_included, checked_missing, not_required).
+  - Maintained pure boundary invariants: zero DB/Redis/HTTP/logging calls, zero mutation under `Object.freeze`, round6 sub-score and contribution precision, and canonical signal thresholds.
+
+- [x] Phase 3 / Slice 1: Eligibility, Visible Ineligible Results, and PRICE/DURATION Curves (T023–T025) (2026-09-01):
+  - `& '.\\node_modules\\.bin\\jest.CMD' --runInBand src/flight-match/flight-match-scorer.service.spec.ts` from `apps/api`: 21/21 tests passed, exit 0.
+  - `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`: exit 1 on Windows because the bare `tsc` executable was not found; the equivalent `& '.\\node_modules\\.bin\\tsc.CMD' -p tsconfig.json --noEmit` from `apps/api` completed with exit 0.
+  - PRICE sensitivity and provisional contribution/aggregate scaffolding landed under this slice plan; T026/T031 completion coverage plus remaining dimensions, redistribution, sorting, and service/module registration remain pending.
+
+- [x] Phase 2 / Slice 4: Browser Profile Contract, Quality Gate & Documentation (T020–T022) (2026-09-01):
+  - The browser response guard preserves legacy profiles where scoring fields are absent or explicitly `null`, passing API-validated departure/arrival windows (including overnight windows), price sensitivity, identity/contact/document sections, revisions, and timestamps through unchanged.
+  - Browser serialization preserves canonical airline arrays plus falsy-but-meaningful `maxStops: 0` and `requiresCheckedBaggage: false`, and sends explicit `null` values to clear each scoring preference.
+  - Privacy and persistence boundaries remain intact: browser profile contracts expose no provider identifiers, and migration E2E confirms nullable preference additions without score persistence.
+  - Verified: Prisma schema validation and Prisma Client generation; shared contracts (110 tests); profile service/controller units (71 tests); profile migration E2E (1 test); offer normalizer/policy units (147 tests); web profile contracts (28 tests); API and web TypeScript typechecks (all exit 0). On Windows, the two `pnpm exec` CLI invocations required the equivalent installed `.CMD` shim after the mandated commands could not resolve their bare executables.
+
+- [x] Phase 2 / Slice 2: Profile Service Projection & E2E API Verification (T011–T013) (2026-08-31):
+  - **T011: Internal Scoring Preferences Projection (`apps/api/src/profile/profile.service.ts`, `apps/api/src/profile/profile.service.spec.ts`)**:
+    - Implemented `getScoringPreferences(userId)` returning allowlisted `ScoringPreferences` (`preferredAirlines`, `blacklistedAirlines`, `classPreference`, `preferredDepartureWindow`, `preferredArrivalWindow`, `maxStops`, `priceSensitivity`, `requiresCheckedBaggage`).
+    - Enforced booking readiness feature flag independence (`getScoringPreferences` operates regardless of `FEATURE_FLAG_BOOKING_READINESS`).
+    - Handled missing profiles safely returning default empty arrays and `null` values.
+    - Guaranteed zero PII projection (excludes passport, dates of birth, emails, phones, and addresses).
+    - Added bounded PII-safe `TRAVELER_PROFILE_SCORING_WINDOW_INTEGRITY_FAILURES` metric counter when stored window JSON contains unknown keys or invalid ranges.
+  - **T012: Profile Service Persistence, Mapping & Safe Audit (`apps/api/src/profile/profile.service.ts`, `apps/api/src/profile/profile.service.spec.ts`)**:
+    - Unified scoring preferences extraction across `getProfile()` and `getScoringPreferences()`.
+    - Mapped incoming preference updates into Prisma write payload while preserving omitted fields.
+    - Supported explicit `null` updates to clear preferences using `Prisma.DbNull`.
+    - Maintained optimistic concurrency CAS revision check (`revision === expectedRevision`), throwing `PROFILE_UPDATE_CONFLICT` (409) on mismatch or concurrent database collision.
+    - Recorded changed-field audit telemetry safely (`changedFields: ['preferences']`) with zero raw preference or PII payload logging.
+  - **T013: Extended Profile API E2E Test Suite (`apps/api/test/profile.e2e-spec.ts`)**:
+    - Verified authenticated `GET /api/profile` and `PATCH /api/profile` flows.
+    - Verified persistence of canonical flight match preferences including airline arrays, stops, baggage, sensitivity, and overnight windows (`{ start: 22, end: 6 }`).
+    - Verified explicit `null` clearing of flight match preferences.
+    - Verified optimistic revision CAS conflict rejection (409).
+    - Verified negative privacy guarantees: zero plaintext passport, contact sentinels, or preference sentinels in audit logs or error responses.
+  - **Verification Evidence**:
+    - Profile Unit Tests: 29/29 PASS (`apps/api/src/profile/profile.service.spec.ts`).
+    - Profile E2E Tests: 9/9 PASS (`apps/api/test/profile.e2e-spec.ts`).
+    - Shared Types Tests: 110/110 PASS (`pnpm --filter @shared/types test`).
+    - TypeScript Typecheck: 0 errors (`tsc --noEmit`).
+    - ESLint: 0 errors, 0 warnings.
+    - CI Contract Tests: 20/20 PASS (`tests/ci/ci-workflow.contract.test.mjs`).
+
+- [x] Phase 2 / Slice 1: Database Migration & Profile DTO Validation (T007–T010) (2026-08-31):
+  - **T007: Additive Prisma Migration (`apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/20260831000000_add_flight_match_preferences/migration.sql`)**:
+    - Added 5 nullable columns to `TravelerProfile` (`preferredDepartureWindow: Json?`, `preferredArrivalWindow: Json?`, `maxStops: Int?`, `priceSensitivity: String?`, `requiresCheckedBaggage: Boolean?`).
+    - Verified null-default behavior on all new columns for existing rows without rewriting existing profile records.
+  - **T008: Migration Invariants & Revision Safety (`apps/api/test/traveler-profile-flight-match-migration.e2e-spec.ts`)**:
+    - Verified existing profile `revision` numbers are strictly preserved during migration.
+    - Verified exactly 0 new tables are created (no `flight_match_scores` table).
+    - Verified exactly 0 score columns are added to `bookings` or `flights`.
+  - **T009: DTO Validation for Schedule Windows (`apps/api/src/profile/dto/update-profile.dto.ts`, `apps/api/src/profile/profile.controller.spec.ts`)**:
+    - Added nested `HourWindowDto` with `@IsInt()`, `@Min(0)`, `@Max(23)` for `start` and `end`.
+    - Supported overnight windows where `start > end` (e.g. `{ start: 22, end: 6 }`).
+    - Rejected unknown extra properties, non-integer hours, floats, and strings.
+    - Allowed explicit `null` to clear preferences.
+  - **T010: DTO Validation for Sensitivity, Baggage, Stops & Canonical Airlines (`apps/api/src/profile/dto/update-profile.dto.ts`, `apps/api/src/profile/dto/profile-response.dto.ts`, `apps/api/src/profile/profile.controller.spec.ts`)**:
+    - Validated `maxStops`: nullable integer `0..8`.
+    - Validated `priceSensitivity`: `@IsIn(['BUDGET', 'MODERATE', 'FLEXIBLE'])` with case/trim normalization.
+    - Validated `requiresCheckedBaggage`: nullable boolean.
+    - Canonicalized `preferredAirlines` and `blacklistedAirlines`: trimmed, uppercased to 2-3 char IATA/ICAO format (`/^[A-Z0-9]{2,3}$/`), and deduplicated arrays.
+    - Mapped all 5 fields cleanly into `ProfileResponseDto` using `@shared/types`.
+    - Automated tests: 42/42 controller tests PASS (`src/profile/profile.controller.spec.ts`), 1/1 migration E2E test PASS (`test/traveler-profile-flight-match-migration.e2e-spec.ts`), strict TypeScript `tsc` exit code 0.
+
+- [x] Phase 1: Setup — Strict Shared Contracts (T001–T006) (2026-08-31):
+  - **T001–T004: Shared Types and Schemas (`packages/shared/src/types/`)**:
+    - Implemented strict Zod contracts and types for `HourWindow`, `PriceSensitivity`, `CarrierCodeSchema`, `canonicalizeCarrierCodes`, `MaxStopsSchema`, `RequiresCheckedBaggageSchema`, `FlightMatchResult`, `DimensionScore`, `ExplanationSchema`, and `FlightSearchOfferViewSchema`.
+    - Shared contract test suite: 110/110 tests PASS (`pnpm --filter @shared/types test`).
+  - **T005–T006: Server-side Tolerant Parser & Boundary Contracts (`apps/web/lib/server/flight-search.ts`, `specs/022-flight-match-scoring/contracts/flight-search.openapi.yaml`)**:
+    - Handled legacy search response as `RANKED` and future mode-tagged results.
+    - Reconciled trusted Nest boundary with provider-blind shared boundary.
 
 ### [x] Feature: Authenticated Booking Dashboard (Feature 021)
 

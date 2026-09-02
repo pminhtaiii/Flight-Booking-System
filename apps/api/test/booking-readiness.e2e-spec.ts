@@ -73,12 +73,12 @@ async function bootstrapReadinessApp(featureFlag: 'true' | 'false'): Promise<Boo
   })
     .overrideProvider(ConfigService)
     .useValue({
-      get: (key: string) => {
+      get: (key: string, defaultValue?: unknown) => {
         if (key === 'FEATURE_FLAG_BOOKING_READINESS') {
           return featureFlag;
         }
 
-        return process.env[key];
+        return process.env[key] ?? defaultValue;
       },
     })
     .compile();

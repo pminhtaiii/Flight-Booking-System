@@ -978,3 +978,40 @@ Feature 019 restructures high-leverage boundaries without changing public produc
   - **Clean Umbrella Module Composition**: Refactored `AgentGatewayModule` into an umbrella composition module importing and re-exporting capability submodules (`AttestedFlightSearchModule`, `AgentBookingReadinessModule`, `SafeBookingReadModule`, `TravelerPreferencesModule`, `AgentAuthModule`, `AgentToolAuditModule`) alongside external consumer providers (`SelectionAttestationService`, `BookingAgentProjectionService`). Eliminated unused `CacheModule` and empty `controllers` array.
   - **Zero Production References**: Monorepo static audit confirmed exactly 0 remaining references to `AgentGatewayService` and `AgentGatewayController`.
   - **Comprehensive Verification**: 7 capability unit suites (82/82 tests PASS), 3 gateway/characterization E2E suites (75/75 tests PASS), full Python agent pytest suite (455/455 tests PASS), and clean ESLint/TypeScript compilation across the entire monorepo.
+
+---
+
+## Feature 022 — Flight Match Scoring Architecture
+
+### Pure Domain Boundary & Search Orchestrator
+
+1. **`FlightMatchModule` (Pure Domain Module)**:
+   - Clean NestJS module with zero infrastructure imports (`imports: []`), maintaining absolute isolation from database, Redis, HTTP, or profile dependencies.
+   - Registers and exports `FlightMatchScorerService` (`apps/api/src/flight-match/flight-match-scorer.service.ts`), providing deterministic policy evaluation across 8 dimensions (PRICE, AIRLINE, ARRIVAL_SCHEDULE, STOPS, CABIN, DEPARTURE_SCHEDULE, BAGGAGE, DURATION) with 6-decimal precision and tie-breaking.
+   - Registers and exports `CategoryRankerService` (`apps/api/src/flight-match/category-ranker.service.ts`), providing deterministic 5-tier objective sorting for cold-start (unpersonalized) search results: `stops` asc > `price` asc > `duration` asc > `departure red-eye penalty` asc > `originalIndex` asc.
+
+2. **`FlightSearchOrchestratorService` (`apps/api/src/flights/flight-search-orchestrator.service.ts`)**:
+   - Canonical orchestration service registered and exported by `FlightsModule`.
+   - Normalizes raw supplier offers via `normalizeFlightOffers()`, safely dropping malformed offers and selecting the first 20 valid canonical offers (`maxItems: 20`).
+   - Fetches traveler scoring preferences via `profileService.getScoringPreferences(userId)` exactly once per search; falls back to default empty preferences with zero DB calls when unauthenticated or empty.
+   - Evaluates pure truth table `hasEffectivePreferences(preferences: ScoringPreferences): boolean`. Evaluates `true` if any preference field is present (`preferredAirlines.length > 0`, `blacklistedAirlines.length > 0`, `classPreference !== null`, `preferredDepartureWindow !== null`, `preferredArrivalWindow !== null`, `maxStops !== null`, `priceSensitivity !== null`, `requiresCheckedBaggage !== null`); returns `false` (Cold Start) if all fields are null or empty arrays.
+   - **Cold Start (`mode: 'RANKED'`)**: When `hasEffectivePreferences` is `false`, bypasses `FlightMatchScorerService.scoreAll()` entirely (zero scorer overhead), applies deterministic 5-tier objective ordering via `CategoryRankerService.rank()`, emits `mode: 'RANKED'` with `matchResult: null` on all offers, and sets `meta.scoringVersion: null` with omitted `eligibleCount` and `matchLevelCounts`.
+   - **Personalized Search (`mode: 'MATCHED'`)**: When `hasEffectivePreferences` is `true`, executes `FlightMatchScorerService.scoreAll(canonicalOffers, effectivePreferences)`.
+   - Enforces query cabin precedence: if user has a stored `classPreference`, `query.cabinClass` strictly overrides it for that search run. If stored preference is null, query cabin remains a supplier filter and does not activate the personalized dimension.
+   - Re-scores cached supplier offers on raw-cache hits (`cached: true`) against the requesting user's profile, enforcing the zero-score-persistence invariant (scores are never written to Prisma or Redis).
+   - Assembles `SearchMeta` aggregate metadata: `totalResults`, `searchHash`, `cached`, `requestedCabinClass`, optional `scoringVersion: 'flight-match-v1'`, `eligibleCount`, and `matchLevelCounts: { STRONG, GOOD, FAIR, WEAK }`. Ineligible offers (`matchLevel: null`) are excluded from bucket counts.
+   - Logs warning telemetry on dropped offers (`droppedCount`, `rejectionCounts`, `searchHash`) without failing the search.
+
+3. **Module Dependency Graph**:
+   - `FlightMatchModule`: `imports: []` $\rightarrow$ `exports: [FlightMatchScorerService, CategoryRankerService]`.
+   - `FlightsModule`: `imports: [..., FlightMatchModule, ProfileModule]` $\rightarrow$ `exports: [FlightsService, FlightSearchOrchestratorService]`.
+   - Zero circular dependencies across `FlightsModule`, `FlightMatchModule`, and `ProfileModule`.
+
+4. **Search HTTP Boundary (`FlightsController`)**:
+   - Both public search aliases return `FlightSearchResponseDto` through Nest's passthrough response path, preserving direct controller invocation and DTO serialization.
+   - The controller sets `Cache-Control: private, no-store`, removes any existing `ETag`, and uses a response-local Express application view that omits only the `etag fn` setting during final JSON serialization. No global Express ETag setting is mutated, so unrelated concurrent responses retain their normal behavior.
+
+5. **Next.js Server Seam & Explanation Safety (`apps/web/lib/server/flight-search.ts`, `apps/web/components/search/flight-match-explanations.ts`)**:
+   - The trusted NestJS-to-Next.js search response is parsed as an exact Zod discriminated union. Untagged legacy responses are rejected; `MATCHED` requires valid non-null match results plus `flight-match-v1` aggregate metadata, while `RANKED` requires `matchResult: null` and `scoringVersion: null`.
+   - The seam rejects raw provider-prefixed public IDs case-insensitively, validates dimension values and six-decimal active-weight totals through the shared match schema, preserves local opaque IDs and upstream order, and uses an explicit browser-safe projection that strips `duffelOfferId`.
+   - `formatExplanation(explanation: Explanation): string` is a pure allowlisted formatter for all 24 explanation keys. It uses only approved primitive parameters, returns deterministic English copy, falls back safely for unknown or malformed runtime inputs, and HTML-escapes dynamic airline/window strings without React, DOM APIs, or `dangerouslySetInnerHTML`.

@@ -101,7 +101,7 @@ describe('Rollback Matrix & Database Row Integrity (E2E)', () => {
     })
       .overrideProvider(ConfigService)
       .useValue({
-        get: (key: string): string | undefined => {
+        get: (key: string, defaultValue?: unknown): unknown => {
           if (key in configOverrides) return configOverrides[key];
           if (key === 'FEATURE_FLAG_CHAT_HANDOFF_ISSUE') return 'false';
           if (key === 'FEATURE_FLAG_CHAT_HANDOFF_ACCEPT') return 'true';
@@ -114,7 +114,7 @@ describe('Rollback Matrix & Database Row Integrity (E2E)', () => {
           if (key === 'ATTESTATION_SECRET') return 'test-attestation-secret';
           if (key === 'CHAT_ENCRYPTION_KEY') return chatEncryptionKey;
           if (key === 'ENCRYPTION_KEY') return encryptionKey;
-          return process.env[key];
+          return process.env[key] ?? defaultValue;
         },
       })
       .compile();

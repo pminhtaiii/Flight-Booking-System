@@ -1,11 +1,16 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Prisma } from '@prisma/client';
 import { ProfileService } from './profile.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { EncryptionService } from '../common/encryption.service';
 import { AuditService } from '../audit/audit.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import {
+  BookingReadinessMetricsService,
+  BOOKING_READINESS_METRIC_COUNTERS,
+} from '../common/observability/booking-readiness.metrics';
 
 describe('ProfileService', () => {
   let service: ProfileService;
@@ -13,6 +18,7 @@ describe('ProfileService', () => {
   let encryptionService: EncryptionService;
   let auditService: AuditService;
   let configService: ConfigService;
+  let metricsService: { increment: jest.Mock };
   let dbProfile: any = null;
 
   beforeAll(async () => {
@@ -56,6 +62,12 @@ describe('ProfileService', () => {
             },
           },
         },
+        {
+          provide: BookingReadinessMetricsService,
+          useValue: {
+            increment: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
@@ -64,6 +76,7 @@ describe('ProfileService', () => {
     encryptionService = module.get<EncryptionService>(EncryptionService);
     auditService = module.get<AuditService>(AuditService);
     configService = module.get<ConfigService>(ConfigService);
+    metricsService = module.get(BookingReadinessMetricsService);
   });
 
   beforeEach(() => {
@@ -125,6 +138,155 @@ describe('ProfileService', () => {
     jest.restoreAllMocks();
   });
 
+  describe('Scoring Preferences Projection', () => {
+    it('returns empty scoring preferences without requiring the booking readiness flag', async () => {
+      jest.spyOn(configService, 'get').mockReturnValue('false');
+
+      await expect(service.getScoringPreferences('user-123')).resolves.toEqual({
+        preferredAirlines: [],
+        blacklistedAirlines: [],
+        classPreference: null,
+        preferredDepartureWindow: null,
+        preferredArrivalWindow: null,
+        maxStops: null,
+        priceSensitivity: null,
+        requiresCheckedBaggage: null,
+      });
+    });
+
+    it('selects only scoring columns and never projects profile PII', async () => {
+      dbProfile = {
+        id: 'profile-123',
+        userId: 'user-123',
+        revision: 4,
+        preferredAirlines: ['SQ'],
+        blacklistedAirlines: ['XX'],
+        classPreference: 'BUSINESS',
+        preferredDepartureWindow: { start: 8, end: 12 },
+        preferredArrivalWindow: { start: 18, end: 22 },
+        maxStops: 1,
+        priceSensitivity: 'MODERATE',
+        requiresCheckedBaggage: true,
+        passportNumber: 'SECRET-PASSPORT',
+        email: 'private@example.com',
+        phoneNumber: '+123456789',
+        address: 'private address',
+      };
+
+      const result = await service.getScoringPreferences('user-123');
+
+      expect(prisma.travelerProfile.findUnique).toHaveBeenCalledWith({
+        where: { userId: 'user-123' },
+        select: {
+          preferredAirlines: true,
+          blacklistedAirlines: true,
+          classPreference: true,
+          preferredDepartureWindow: true,
+          preferredArrivalWindow: true,
+          maxStops: true,
+          priceSensitivity: true,
+          requiresCheckedBaggage: true,
+        },
+      });
+      expect(result).toEqual({
+        preferredAirlines: ['SQ'],
+        blacklistedAirlines: ['XX'],
+        classPreference: 'BUSINESS',
+        preferredDepartureWindow: { start: 8, end: 12 },
+        preferredArrivalWindow: { start: 18, end: 22 },
+        maxStops: 1,
+        priceSensitivity: 'MODERATE',
+        requiresCheckedBaggage: true,
+      });
+      expect(JSON.stringify(result)).not.toContain('SECRET-PASSPORT');
+      expect(JSON.stringify(result)).not.toContain('private@example.com');
+      expect(encryptionService.decryptBound).not.toHaveBeenCalled();
+      expect(encryptionService.decrypt).not.toHaveBeenCalled();
+    });
+
+    it('preserves ordinary and overnight hour windows', async () => {
+      dbProfile = {
+        userId: 'user-123',
+        preferredAirlines: [],
+        blacklistedAirlines: [],
+        classPreference: null,
+        preferredDepartureWindow: { start: 22, end: 6 },
+        preferredArrivalWindow: { start: 9, end: 17 },
+        maxStops: null,
+        priceSensitivity: null,
+        requiresCheckedBaggage: null,
+      };
+
+      await expect(service.getScoringPreferences('user-123')).resolves.toMatchObject({
+        preferredDepartureWindow: { start: 22, end: 6 },
+        preferredArrivalWindow: { start: 9, end: 17 },
+      });
+    });
+
+    it('fails closed to null for malformed stored hour windows', async () => {
+      dbProfile = {
+        userId: 'user-123',
+        preferredAirlines: [],
+        blacklistedAirlines: [],
+        classPreference: null,
+        preferredDepartureWindow: { start: '22', end: 6 },
+        preferredArrivalWindow: { start: 24, end: 17 },
+        maxStops: null,
+        priceSensitivity: null,
+        requiresCheckedBaggage: null,
+      };
+
+      await expect(service.getScoringPreferences('user-123')).resolves.toMatchObject({
+        preferredDepartureWindow: null,
+        preferredArrivalWindow: null,
+      });
+    });
+
+    it('fails closed when a stored hour window contains an unknown key', async () => {
+      dbProfile = {
+        userId: 'user-123',
+        preferredAirlines: [],
+        blacklistedAirlines: [],
+        classPreference: null,
+        preferredDepartureWindow: { start: 8, end: 12, timezone: 'UTC' },
+        preferredArrivalWindow: null,
+        maxStops: null,
+        priceSensitivity: null,
+        requiresCheckedBaggage: null,
+      };
+
+      await expect(service.getScoringPreferences('user-123')).resolves.toMatchObject({
+        preferredDepartureWindow: null,
+      });
+    });
+
+    it('increments the bounded integrity counter once per malformed stored window', async () => {
+      dbProfile = {
+        userId: 'user-123',
+        preferredAirlines: [],
+        blacklistedAirlines: [],
+        classPreference: null,
+        preferredDepartureWindow: { start: 8, end: 12, timezone: 'UTC' },
+        preferredArrivalWindow: { start: 24, end: 12 },
+        maxStops: null,
+        priceSensitivity: null,
+        requiresCheckedBaggage: null,
+      };
+
+      await service.getScoringPreferences('user-123');
+
+      expect(metricsService.increment).toHaveBeenCalledTimes(2);
+      expect(metricsService.increment).toHaveBeenNthCalledWith(
+        1,
+        BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_SCORING_WINDOW_INTEGRITY_FAILURES,
+      );
+      expect(metricsService.increment).toHaveBeenNthCalledWith(
+        2,
+        BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_SCORING_WINDOW_INTEGRITY_FAILURES,
+      );
+    });
+  });
+
   describe('Feature Flag', () => {
     it('throws NotFoundException when FEATURE_FLAG_BOOKING_READINESS is false', async () => {
       jest.spyOn(configService, 'get').mockReturnValue('false');
@@ -133,6 +295,126 @@ describe('ProfileService', () => {
       await expect(service.updateProfile('user-123', { expectedRevision: 1 })).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  describe('Scoring Preference Public Profile Mapping', () => {
+    it('returns stored scoring preferences from the public profile read', async () => {
+      dbProfile = {
+        id: 'profile-123',
+        userId: 'user-123',
+        revision: 3,
+        preferredAirlines: ['VN'],
+        blacklistedAirlines: ['AA'],
+        preferredDepartureWindow: { start: 22, end: 6 },
+        preferredArrivalWindow: { start: 9, end: 17 },
+        maxStops: 1,
+        priceSensitivity: 'FLEXIBLE',
+        requiresCheckedBaggage: false,
+      };
+
+      await expect(service.getProfile('user-123')).resolves.toMatchObject({
+        preferences: {
+          seatPreference: null,
+          classPreference: null,
+          preferredAirlines: ['VN'],
+          blacklistedAirlines: ['AA'],
+          preferredDepartureWindow: { start: 22, end: 6 },
+          preferredArrivalWindow: { start: 9, end: 17 },
+          maxStops: 1,
+          priceSensitivity: 'FLEXIBLE',
+          requiresCheckedBaggage: false,
+        },
+      });
+    });
+
+    it('persists only supplied preference keys and preserves omitted preferences', async () => {
+      dbProfile = {
+        id: 'profile-123',
+        userId: 'user-123',
+        revision: 3,
+        seatPreference: 'AISLE',
+        classPreference: 'BUSINESS',
+        preferredAirlines: ['VN'],
+        blacklistedAirlines: ['AA'],
+        preferredDepartureWindow: { start: 22, end: 6 },
+        preferredArrivalWindow: { start: 9, end: 17 },
+        maxStops: 2,
+        priceSensitivity: 'BUDGET',
+        requiresCheckedBaggage: true,
+      };
+
+      const result = await service.updateProfile('user-123', {
+        expectedRevision: 3,
+        preferences: {
+          preferredAirlines: ['SQ'],
+          maxStops: null,
+          requiresCheckedBaggage: false,
+        },
+      });
+
+      expect(prisma.travelerProfile.update).toHaveBeenCalledWith({
+        where: { userId: 'user-123', revision: 3 },
+        data: expect.objectContaining({
+          preferredAirlines: ['SQ'],
+          maxStops: null,
+          requiresCheckedBaggage: false,
+          revision: { increment: 1 },
+        }),
+      });
+      expect((prisma.travelerProfile.update as jest.Mock).mock.calls[0][0].data).not.toHaveProperty(
+        'seatPreference',
+      );
+      expect(result.preferences).toMatchObject({
+        seatPreference: 'AISLE',
+        classPreference: 'BUSINESS',
+        preferredAirlines: ['SQ'],
+        blacklistedAirlines: ['AA'],
+        preferredDepartureWindow: { start: 22, end: 6 },
+        preferredArrivalWindow: { start: 9, end: 17 },
+        maxStops: null,
+        priceSensitivity: 'BUDGET',
+        requiresCheckedBaggage: false,
+      });
+    });
+
+    it('clears every preference field when preferences is explicitly null', async () => {
+      dbProfile = {
+        id: 'profile-123',
+        userId: 'user-123',
+        revision: 3,
+        seatPreference: 'AISLE',
+        classPreference: 'BUSINESS',
+        preferredAirlines: ['VN'],
+        blacklistedAirlines: ['AA'],
+        preferredDepartureWindow: { start: 22, end: 6 },
+        preferredArrivalWindow: { start: 9, end: 17 },
+        maxStops: 2,
+        priceSensitivity: 'BUDGET',
+        requiresCheckedBaggage: true,
+      };
+
+      const result = await service.updateProfile('user-123', {
+        expectedRevision: 3,
+        preferences: null,
+      });
+
+      expect(prisma.travelerProfile.update).toHaveBeenCalledWith({
+        where: { userId: 'user-123', revision: 3 },
+        data: expect.objectContaining({
+          seatPreference: null,
+          classPreference: null,
+          preferredAirlines: [],
+          blacklistedAirlines: [],
+          preferredDepartureWindow: Prisma.DbNull,
+          preferredArrivalWindow: Prisma.DbNull,
+          maxStops: null,
+          priceSensitivity: null,
+          requiresCheckedBaggage: null,
+          revision: { increment: 1 },
+        }),
+      });
+      expect(result.preferences).toBeNull();
     });
   });
 
@@ -194,6 +476,59 @@ describe('ProfileService', () => {
       ).rejects.toThrow(ConflictException);
 
       expect(prisma.travelerProfile.update).not.toHaveBeenCalled();
+    });
+
+    it('returns PROFILE_UPDATE_CONFLICT for stale revisions and CAS races', async () => {
+      dbProfile = { id: 'profile-123', userId: 'user-123', revision: 2 };
+
+      let staleRevisionError: unknown;
+      try {
+        await service.updateProfile('user-123', { expectedRevision: 1 });
+      } catch (error) {
+        staleRevisionError = error;
+      }
+
+      expect(staleRevisionError).toBeInstanceOf(ConflictException);
+      if (!(staleRevisionError instanceof ConflictException)) {
+        throw staleRevisionError;
+      }
+      expect(staleRevisionError.getResponse()).toMatchObject({
+        message: 'PROFILE_UPDATE_CONFLICT',
+      });
+
+      dbProfile = { id: 'profile-123', userId: 'user-123', revision: 1 };
+      const p2025Error = Object.assign(new Error('Record to update not found'), { code: 'P2025' });
+      jest.spyOn(prisma.travelerProfile, 'update').mockRejectedValueOnce(p2025Error);
+
+      let raceError: unknown;
+      try {
+        await service.updateProfile('user-123', { expectedRevision: 1 });
+      } catch (error) {
+        raceError = error;
+      }
+
+      expect(raceError).toBeInstanceOf(ConflictException);
+      if (!(raceError instanceof ConflictException)) {
+        throw raceError;
+      }
+      expect(raceError.getResponse()).toMatchObject({ message: 'PROFILE_UPDATE_CONFLICT' });
+
+      dbProfile = null;
+      const p2002Error = Object.assign(new Error('Unique constraint failed'), { code: 'P2002' });
+      jest.spyOn(prisma.travelerProfile, 'create').mockRejectedValueOnce(p2002Error);
+
+      let createRaceError: unknown;
+      try {
+        await service.updateProfile('user-123', { expectedRevision: 0 });
+      } catch (error) {
+        createRaceError = error;
+      }
+
+      expect(createRaceError).toBeInstanceOf(ConflictException);
+      if (!(createRaceError instanceof ConflictException)) {
+        throw createRaceError;
+      }
+      expect(createRaceError.getResponse()).toMatchObject({ message: 'PROFILE_UPDATE_CONFLICT' });
     });
 
     it('throws ConflictException (409) if the profile does not exist but client expected non-zero revision', async () => {
@@ -394,6 +729,34 @@ describe('ProfileService', () => {
       expect(metadataString).not.toContain('1990-01-01');
 
       expect(metadata.changedFields).toContain('identity');
+    });
+
+    it('records only a preference section marker and revision for scoring preference updates', async () => {
+      dbProfile = { id: 'profile-123', userId: 'user-123', revision: 3 };
+
+      await service.updateProfile('user-123', {
+        expectedRevision: 3,
+        preferences: {
+          preferredAirlines: ['VN'],
+          blacklistedAirlines: ['AA'],
+          preferredDepartureWindow: { start: 22, end: 6 },
+          preferredArrivalWindow: { start: 9, end: 17 },
+          maxStops: 1,
+          priceSensitivity: 'FLEXIBLE',
+          requiresCheckedBaggage: true,
+        },
+      });
+
+      const call = (auditService.createLog as jest.Mock).mock.calls[0];
+      const metadata = call[1].metadata;
+
+      expect(metadata).toEqual({ changedFields: ['preferences'], revision: 4 });
+      const metadataString = JSON.stringify(metadata);
+      expect(metadataString).not.toContain('VN');
+      expect(metadataString).not.toContain('AA');
+      expect(metadataString).not.toContain('22');
+      expect(metadataString).not.toContain('FLEXIBLE');
+      expect(metadataString).not.toContain('true');
     });
 
     it('wraps profile mutation and audit log insertion in a single transaction', async () => {

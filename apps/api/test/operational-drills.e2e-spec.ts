@@ -47,11 +47,11 @@ describe('Operational Runbook Drills (E2E)', () => {
     })
       .overrideProvider(ConfigService)
       .useValue({
-        get: (key: string) => {
+        get: (key: string, defaultValue?: unknown) => {
           if (key in configOverrides) return configOverrides[key];
           if (key === 'FEATURE_FLAG_CHAT_HANDOFF_ACCEPT') return 'true';
           if (key === 'FEATURE_FLAG_CHAT_HANDOFF_ISSUE') return 'true';
-          return process.env[key];
+          return process.env[key] ?? defaultValue;
         },
       })
       .compile();

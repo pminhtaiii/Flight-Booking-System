@@ -43,6 +43,7 @@ const searchFixtureOffer = {
     },
   ],
   returnSegments: null,
+  matchResult: null,
 };
 
 async function startFlightSearchFixture(): Promise<void> {
@@ -59,7 +60,19 @@ async function startFlightSearchFixture(): Promise<void> {
     response.setHeader('Content-Type', 'application/json');
 
     if (request.method === 'POST' && pathname === '/api/flights/search') {
-      response.end(JSON.stringify({ results: [searchFixtureOffer] }));
+      response.end(
+        JSON.stringify({
+          mode: 'RANKED',
+          results: [searchFixtureOffer],
+          meta: {
+            totalResults: 1,
+            searchHash: 'char-search-hash-123',
+            cached: false,
+            requestedCabinClass: 'economy',
+            scoringVersion: null,
+          },
+        }),
+      );
       return;
     }
 

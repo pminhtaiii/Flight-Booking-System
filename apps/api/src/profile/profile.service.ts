@@ -1,6 +1,6 @@
 import { Injectable, ConflictException, NotFoundException, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Prisma } from '@prisma/client';
+import { Prisma, TravelerProfile } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { EncryptionService } from '@/common/encryption.service';
 import { AuditService } from '@/audit/audit.service';
@@ -10,6 +10,111 @@ import {
 } from '@/common/observability/booking-readiness.metrics';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ProfileResponseDto } from './dto/profile-response.dto';
+
+export type ScoringPreferences = {
+  preferredAirlines: string[];
+  blacklistedAirlines: string[];
+  classPreference: string | null;
+  preferredDepartureWindow: { start: number; end: number } | null;
+  preferredArrivalWindow: { start: number; end: number } | null;
+  maxStops: number | null;
+  priceSensitivity: 'BUDGET' | 'MODERATE' | 'FLEXIBLE' | null;
+  requiresCheckedBaggage: boolean | null;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isPrismaErrorWithCode(err: unknown, code: string): boolean {
+  if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === code) {
+    return true;
+  }
+  if (isRecord(err) && err.code === code) {
+    return true;
+  }
+  return false;
+}
+
+function parseHourWindow(
+  value: Prisma.JsonValue | null | undefined,
+): { start: number; end: number } | null {
+  if (!isRecord(value)) return null;
+
+  const ownKeys = Reflect.ownKeys(value);
+  if (ownKeys.length !== 2 || !ownKeys.includes('start') || !ownKeys.includes('end')) {
+    return null;
+  }
+
+  const { start, end } = value;
+  if (
+    typeof start !== 'number' ||
+    typeof end !== 'number' ||
+    !Number.isInteger(start) ||
+    !Number.isInteger(end) ||
+    start < 0 ||
+    start > 23 ||
+    end < 0 ||
+    end > 23
+  ) {
+    return null;
+  }
+  return { start, end };
+}
+
+function parsePriceSensitivity(
+  value: string | null | undefined,
+): ScoringPreferences['priceSensitivity'] {
+  return value === 'BUDGET' || value === 'MODERATE' || value === 'FLEXIBLE' ? value : null;
+}
+
+function extractScoringPreferences(
+  dbProfile: {
+    preferredAirlines?: unknown;
+    blacklistedAirlines?: unknown;
+    classPreference?: string | null;
+    preferredDepartureWindow?: Prisma.JsonValue | null;
+    preferredArrivalWindow?: Prisma.JsonValue | null;
+    maxStops?: number | null;
+    priceSensitivity?: string | null;
+    requiresCheckedBaggage?: boolean | null;
+  },
+  onWindowIntegrityFailure?: () => void,
+): ScoringPreferences {
+  const priceSensitivity = parsePriceSensitivity(dbProfile.priceSensitivity);
+  const preferredDepartureWindow = parseHourWindow(dbProfile.preferredDepartureWindow);
+  const preferredArrivalWindow = parseHourWindow(dbProfile.preferredArrivalWindow);
+
+  if (
+    dbProfile.preferredDepartureWindow !== null &&
+    dbProfile.preferredDepartureWindow !== undefined &&
+    preferredDepartureWindow === null
+  ) {
+    onWindowIntegrityFailure?.();
+  }
+  if (
+    dbProfile.preferredArrivalWindow !== null &&
+    dbProfile.preferredArrivalWindow !== undefined &&
+    preferredArrivalWindow === null
+  ) {
+    onWindowIntegrityFailure?.();
+  }
+
+  return {
+    preferredAirlines: Array.isArray(dbProfile.preferredAirlines)
+      ? (dbProfile.preferredAirlines as string[])
+      : [],
+    blacklistedAirlines: Array.isArray(dbProfile.blacklistedAirlines)
+      ? (dbProfile.blacklistedAirlines as string[])
+      : [],
+    classPreference: dbProfile.classPreference ?? null,
+    preferredDepartureWindow,
+    preferredArrivalWindow,
+    maxStops: dbProfile.maxStops ?? null,
+    priceSensitivity,
+    requiresCheckedBaggage: dbProfile.requiresCheckedBaggage ?? null,
+  };
+}
 
 @Injectable()
 export class ProfileService {
@@ -142,11 +247,22 @@ export class ProfileService {
         }
       : null;
 
-    const hasPrefs = dbProfile.seatPreference || dbProfile.classPreference;
+    const scoringPrefs = extractScoringPreferences(dbProfile);
+    const hasPrefs =
+      Boolean(dbProfile.seatPreference) ||
+      Boolean(scoringPrefs.classPreference) ||
+      scoringPrefs.preferredAirlines.length > 0 ||
+      scoringPrefs.blacklistedAirlines.length > 0 ||
+      scoringPrefs.preferredDepartureWindow !== null ||
+      scoringPrefs.preferredArrivalWindow !== null ||
+      scoringPrefs.maxStops !== null ||
+      scoringPrefs.priceSensitivity !== null ||
+      scoringPrefs.requiresCheckedBaggage !== null;
+
     const preferences = hasPrefs
       ? {
           seatPreference: dbProfile.seatPreference || null,
-          classPreference: dbProfile.classPreference || null,
+          ...scoringPrefs,
         }
       : null;
 
@@ -161,6 +277,41 @@ export class ProfileService {
     };
   }
 
+  async getScoringPreferences(userId: string): Promise<ScoringPreferences> {
+    const dbProfile = await this.prisma.travelerProfile.findUnique({
+      where: { userId },
+      select: {
+        preferredAirlines: true,
+        blacklistedAirlines: true,
+        classPreference: true,
+        preferredDepartureWindow: true,
+        preferredArrivalWindow: true,
+        maxStops: true,
+        priceSensitivity: true,
+        requiresCheckedBaggage: true,
+      },
+    });
+
+    if (!dbProfile) {
+      return {
+        preferredAirlines: [],
+        blacklistedAirlines: [],
+        classPreference: null,
+        preferredDepartureWindow: null,
+        preferredArrivalWindow: null,
+        maxStops: null,
+        priceSensitivity: null,
+        requiresCheckedBaggage: null,
+      };
+    }
+
+    return extractScoringPreferences(dbProfile, () => {
+      this.metricsService?.increment(
+        BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_SCORING_WINDOW_INTEGRITY_FAILURES,
+      );
+    });
+  }
+
   async updateProfile(
     userId: string,
     updateDto: UpdateProfileDto,
@@ -173,7 +324,7 @@ export class ProfileService {
       where: { userId },
     });
 
-    const data: any = {};
+    const data: Prisma.TravelerProfileUncheckedUpdateInput = {};
 
     // Map fields
     if (updateDto.identity !== undefined) {
@@ -234,9 +385,48 @@ export class ProfileService {
       if (updateDto.preferences === null) {
         data.seatPreference = null;
         data.classPreference = null;
+        data.preferredAirlines = [];
+        data.blacklistedAirlines = [];
+        data.preferredDepartureWindow = Prisma.DbNull;
+        data.preferredArrivalWindow = Prisma.DbNull;
+        data.maxStops = null;
+        data.priceSensitivity = null;
+        data.requiresCheckedBaggage = null;
       } else {
-        data.seatPreference = updateDto.preferences.seatPreference;
-        data.classPreference = updateDto.preferences.classPreference;
+        const hasPreference = (key: string): boolean =>
+          Object.prototype.hasOwnProperty.call(updateDto.preferences, key);
+
+        if (hasPreference('seatPreference')) {
+          data.seatPreference = updateDto.preferences.seatPreference;
+        }
+        if (hasPreference('classPreference')) {
+          data.classPreference = updateDto.preferences.classPreference;
+        }
+        if (hasPreference('preferredAirlines')) {
+          data.preferredAirlines = updateDto.preferences.preferredAirlines ?? [];
+        }
+        if (hasPreference('blacklistedAirlines')) {
+          data.blacklistedAirlines = updateDto.preferences.blacklistedAirlines ?? [];
+        }
+        if (hasPreference('preferredDepartureWindow')) {
+          const window = updateDto.preferences.preferredDepartureWindow;
+          data.preferredDepartureWindow =
+            window ? { start: window.start, end: window.end } : Prisma.DbNull;
+        }
+        if (hasPreference('preferredArrivalWindow')) {
+          const window = updateDto.preferences.preferredArrivalWindow;
+          data.preferredArrivalWindow =
+            window ? { start: window.start, end: window.end } : Prisma.DbNull;
+        }
+        if (hasPreference('maxStops')) {
+          data.maxStops = updateDto.preferences.maxStops;
+        }
+        if (hasPreference('priceSensitivity')) {
+          data.priceSensitivity = updateDto.preferences.priceSensitivity;
+        }
+        if (hasPreference('requiresCheckedBaggage')) {
+          data.requiresCheckedBaggage = updateDto.preferences.requiresCheckedBaggage;
+        }
       }
     }
 
@@ -246,7 +436,7 @@ export class ProfileService {
     if (updateDto.travelDocument !== undefined) changedFields.push('travelDocument');
     if (updateDto.preferences !== undefined) changedFields.push('preferences');
 
-    let updatedProfile: any;
+    let updatedProfile: TravelerProfile;
 
     await this.prisma.$transaction(async (tx) => {
       if (!currentProfile) {
@@ -258,21 +448,16 @@ export class ProfileService {
           throw new ConflictException('PROFILE_UPDATE_CONFLICT');
         }
 
-        data.userId = userId;
-        data.revision = 1;
-
         try {
           updatedProfile = await tx.travelerProfile.create({
-            data,
+            data: {
+              ...(data as Prisma.TravelerProfileUncheckedCreateInput),
+              userId,
+              revision: 1,
+            },
           });
-        } catch (err: any) {
-          if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-            this.metricsService?.increment(
-              BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS,
-            );
-            throw new ConflictException('PROFILE_UPDATE_CONFLICT');
-          }
-          if (err?.code === 'P2002') {
+        } catch (err: unknown) {
+          if (isPrismaErrorWithCode(err, 'P2002')) {
             this.metricsService?.increment(
               BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS,
             );
@@ -309,14 +494,8 @@ export class ProfileService {
             where: { userId, revision: updateDto.expectedRevision },
             data,
           });
-        } catch (err: any) {
-          if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
-            this.metricsService?.increment(
-              BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS,
-            );
-            throw new ConflictException('PROFILE_UPDATE_CONFLICT');
-          }
-          if (err?.code === 'P2025') {
+        } catch (err: unknown) {
+          if (isPrismaErrorWithCode(err, 'P2025')) {
             this.metricsService?.increment(
               BOOKING_READINESS_METRIC_COUNTERS.TRAVELER_PROFILE_CONFLICTS,
             );

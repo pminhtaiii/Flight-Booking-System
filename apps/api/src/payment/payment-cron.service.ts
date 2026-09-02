@@ -65,7 +65,8 @@ export class PaymentCronService {
     const start = Date.now();
     this.logger.log('Starting authorization expiry sweep...');
 
-    const expireMinutes = this.configService.get<number>('PAYMENT_AUTH_EXPIRE_MINUTES', 60);
+    const rawExpireMinutes = this.configService.get<number>('PAYMENT_AUTH_EXPIRE_MINUTES', 60);
+    const expireMinutes = Number.isFinite(Number(rawExpireMinutes)) ? Number(rawExpireMinutes) : 60;
     const cutoff = new Date(Date.now() - expireMinutes * 60 * 1000);
 
     let expiredCount = 0;

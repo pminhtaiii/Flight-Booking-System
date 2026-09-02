@@ -44,3 +44,6 @@ graphify-out/
 
 # Package manager local store
 .pnpm-store/
+
+# Local instruction goals
+GOAL.md

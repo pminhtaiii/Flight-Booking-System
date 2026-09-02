@@ -22,12 +22,12 @@ description: "Dependency-ordered implementation tasks for deterministic flight m
 
 **Purpose**: Make the cross-service contract explicit before any producer or consumer changes.
 
-- [ ] T001 Drive MATCHED eligibility/score/level/breakdown schemas one behavior at a time through RED → GREEN in `packages/shared/src/types/flight-search.types.spec.ts` and `packages/shared/src/types/flight-search.types.ts`
-- [ ] T002 Drive RANKED nullability, active-weight precision, key-specific explanation parameters, and provider-ID rejection one behavior at a time through RED → GREEN in `packages/shared/src/types/flight-search.types.spec.ts` and `packages/shared/src/types/flight-search.types.ts`
-- [ ] T003 Drive hour-window and price-sensitivity contracts one behavior at a time through RED → GREEN in `packages/shared/src/types/traveler-profile.types.spec.ts` and `packages/shared/src/types/traveler-profile.types.ts`
-- [ ] T004 Drive airline canonicalization, max-stops, and tri-state baggage contracts one behavior at a time through RED → GREEN and export them in `packages/shared/src/types/traveler-profile.types.spec.ts`, `packages/shared/src/types/traveler-profile.types.ts`, `packages/shared/src/types/index.ts`, and `packages/shared/src/index.ts`
-- [ ] T005 Drive legacy-response-as-RANKED and future mode-tagged upstream parsing through RED → GREEN before producer work in `apps/web/lib/server/flight-search.spec.ts` and `apps/web/lib/server/flight-search.ts`
-- [ ] T006 Run the shared/web contract gates and reconcile the trusted Nest boundary in `specs/022-flight-match-scoring/contracts/flight-search.openapi.yaml` with the provider-blind shared boundary
+- [x] T001 Drive MATCHED eligibility/score/level/breakdown schemas one behavior at a time through RED → GREEN in `packages/shared/src/types/flight-search.types.spec.ts` and `packages/shared/src/types/flight-search.types.ts`
+- [x] T002 Drive RANKED nullability, active-weight precision, key-specific explanation parameters, and provider-ID rejection one behavior at a time through RED → GREEN in `packages/shared/src/types/flight-search.types.spec.ts` and `packages/shared/src/types/flight-search.types.ts`
+- [x] T003 Drive hour-window and price-sensitivity contracts one behavior at a time through RED → GREEN in `packages/shared/src/types/traveler-profile.types.spec.ts` and `packages/shared/src/types/traveler-profile.types.ts`
+- [x] T004 Drive airline canonicalization, max-stops, and tri-state baggage contracts one behavior at a time through RED → GREEN and export them in `packages/shared/src/types/traveler-profile.types.spec.ts`, `packages/shared/src/types/traveler-profile.types.ts`, `packages/shared/src/types/index.ts`, and `packages/shared/src/index.ts`
+- [x] T005 Drive legacy-response-as-RANKED and future mode-tagged upstream parsing through RED → GREEN before producer work in `apps/web/lib/server/flight-search.spec.ts` and `apps/web/lib/server/flight-search.ts`
+- [x] T006 Run the shared/web contract gates and reconcile the trusted Nest boundary in `specs/022-flight-match-scoring/contracts/flight-search.openapi.yaml` with the provider-blind shared boundary
 
 **Checkpoint**: Strict shared contracts compile and reject provider/PII expansion before persistence or runtime work begins.
 
@@ -39,22 +39,22 @@ description: "Dependency-ordered implementation tasks for deterministic flight m
 
 **⚠️ CRITICAL**: No user-story orchestration begins until this phase is complete.
 
-- [ ] T007 Drive additive null-default/existing-row migration through RED → GREEN in `apps/api/test/traveler-profile-flight-match-migration.e2e-spec.ts`, `apps/api/prisma/schema.prisma`, and `apps/api/prisma/migrations/<timestamp>_add_flight_match_preferences/migration.sql`
-- [ ] T008 Drive revision preservation and absence of any score table/column through RED → GREEN in `apps/api/test/traveler-profile-flight-match-migration.e2e-spec.ts` and the same additive migration
-- [ ] T009 Drive hour-window/overnight/unknown-key DTO validation through RED → GREEN in `apps/api/src/profile/profile.controller.spec.ts` and `apps/api/src/profile/dto/update-profile.dto.ts`
-- [ ] T010 Drive max-stops, sensitivity, baggage, airline canonicalization, and response DTO behavior through RED → GREEN in `apps/api/src/profile/profile.controller.spec.ts`, `apps/api/src/profile/dto/update-profile.dto.ts`, and `apps/api/src/profile/dto/profile-response.dto.ts`
-- [ ] T011 Drive missing-profile, owner-scoped, readiness-flag-independent `getScoringPreferences()` through RED → GREEN in `apps/api/src/profile/profile.service.spec.ts` and `apps/api/src/profile/profile.service.ts`
-- [ ] T012 Drive revision-CAS atomic update/clear, mapping, and safe changed-field audit behavior through RED → GREEN in `apps/api/src/profile/profile.service.spec.ts` and `apps/api/src/profile/profile.service.ts`
-- [ ] T013 Extend owned profile API E2E coverage for the scoring fields and airline arrays in `apps/api/test/profile.e2e-spec.ts`
-- [ ] T014 [P] Define immutable supplier-independent inputs, scoring preferences, eligibility, dimension, result, and internal orchestration types in `apps/api/src/flight-match/flight-match.types.ts`
-- [ ] T015 Drive canonical order, local IDs, full-itinerary aggregates, outbound local-clock facts, carrier codes, longest cabin, and checked bags one behavior at a time through RED → GREEN in `apps/api/src/flights/flight-offer-normalizer.spec.ts` and `apps/api/src/flights/flight-offer-normalizer.ts`
-- [ ] T016 Drive malformed-offer rejection, first-valid-currency selection, mixed-currency dropping, rejection counts, and all-invalid empty output through RED → GREEN in `apps/api/src/flights/flight-offer-normalizer.spec.ts` and `apps/api/src/flights/flight-offer-normalizer.ts`
-- [ ] T017 Drive policy version, exact weights, cabin order, sensitivity multipliers, buckets, red-eye hours, and explanation allowlist one behavior at a time through RED → GREEN in `apps/api/src/flight-match/flight-match.policy.spec.ts` and `apps/api/src/flight-match/flight-match.policy.ts`
-- [ ] T018 Drive clamp, round6, half-away final rounding, signal thresholds, circular-hour distance, and deterministic median helpers one behavior at a time through RED → GREEN in `apps/api/src/flight-match/flight-match.policy.spec.ts` and `apps/api/src/flight-match/flight-match.policy.ts`
-- [ ] T019 Create the zero-import NestJS module scaffold in `apps/api/src/flight-match/flight-match.module.ts`; provider registration is completed only after each pure service exists
-- [ ] T020 Drive legacy-null/window/sensitivity browser profile parsing through RED → GREEN in `apps/web/lib/profile.spec.ts`, `apps/web/lib/profile-contract.ts`, and `apps/web/lib/profile.ts`
-- [ ] T021 Drive airline/max-stops/baggage profile serialization and clearing through RED → GREEN in `apps/web/lib/profile.spec.ts`, `apps/web/lib/profile-contract.ts`, and `apps/web/lib/profile.ts`
-- [ ] T022 Run Prisma validation/generation, shared tests, profile unit/API tests, and normalizer/policy tests from `specs/022-flight-match-scoring/quickstart.md`
+- [x] T007 Drive additive null-default/existing-row migration through RED → GREEN in `apps/api/test/traveler-profile-flight-match-migration.e2e-spec.ts`, `apps/api/prisma/schema.prisma`, and `apps/api/prisma/migrations/<timestamp>_add_flight_match_preferences/migration.sql`
+- [x] T008 Drive revision preservation and absence of any score table/column through RED → GREEN in `apps/api/test/traveler-profile-flight-match-migration.e2e-spec.ts` and the same additive migration
+- [x] T009 Drive hour-window/overnight/unknown-key DTO validation through RED → GREEN in `apps/api/src/profile/profile.controller.spec.ts` and `apps/api/src/profile/dto/update-profile.dto.ts`
+- [x] T010 Drive max-stops, sensitivity, baggage, airline canonicalization, and response DTO behavior through RED → GREEN in `apps/api/src/profile/profile.controller.spec.ts`, `apps/api/src/profile/dto/update-profile.dto.ts`, and `apps/api/src/profile/dto/profile-response.dto.ts`
+- [x] T011 Drive missing-profile, owner-scoped, readiness-flag-independent `getScoringPreferences()` through RED → GREEN in `apps/api/src/profile/profile.service.spec.ts` and `apps/api/src/profile/profile.service.ts`
+- [x] T012 Drive revision-CAS atomic update/clear, mapping, and safe changed-field audit behavior through RED → GREEN in `apps/api/src/profile/profile.service.spec.ts` and `apps/api/src/profile/profile.service.ts`
+- [x] T013 Extend owned profile API E2E coverage for the scoring fields and airline arrays in `apps/api/test/profile.e2e-spec.ts`
+- [x] T014 [P] Define immutable supplier-independent inputs, scoring preferences, eligibility, dimension, result, and internal orchestration types in `apps/api/src/flight-match/flight-match.types.ts`
+- [x] T015 Drive canonical order, local IDs, full-itinerary aggregates, outbound local-clock facts, carrier codes, longest cabin, and checked bags one behavior at a time through RED → GREEN in `apps/api/src/flights/flight-offer-normalizer.spec.ts` and `apps/api/src/flights/flight-offer-normalizer.ts`
+- [x] T016 Drive malformed-offer rejection, first-valid-currency selection, mixed-currency dropping, rejection counts, and all-invalid empty output through RED → GREEN in `apps/api/src/flights/flight-offer-normalizer.spec.ts` and `apps/api/src/flights/flight-offer-normalizer.ts`
+- [x] T017 Drive policy version, exact weights, cabin order, sensitivity multipliers, buckets, red-eye hours, and explanation allowlist one behavior at a time through RED → GREEN in `apps/api/src/flight-match/flight-match.policy.spec.ts` and `apps/api/src/flight-match/flight-match.policy.ts`
+- [x] T018 Drive clamp, round6, half-away final rounding, signal thresholds, circular-hour distance, and deterministic median helpers one behavior at a time through RED → GREEN in `apps/api/src/flight-match/flight-match.policy.spec.ts` and `apps/api/src/flight-match/flight-match.policy.ts`
+- [x] T019 Create the zero-import NestJS module scaffold in `apps/api/src/flight-match/flight-match.module.ts`; provider registration is completed only after each pure service exists
+- [x] T020 Drive legacy-null/window/sensitivity browser profile parsing through RED → GREEN in `apps/web/lib/profile.spec.ts`, `apps/web/lib/profile-contract.ts`, and `apps/web/lib/profile.ts`
+- [x] T021 Drive airline/max-stops/baggage profile serialization and clearing through RED → GREEN in `apps/web/lib/profile.spec.ts`, `apps/web/lib/profile-contract.ts`, and `apps/web/lib/profile.ts`
+- [x] T022 Run Prisma validation/generation, shared tests, profile unit/API tests, and normalizer/policy tests from `specs/022-flight-match-scoring/quickstart.md`
 
 **Checkpoint**: Existing profiles remain valid, current profile CAS/security invariants hold, and raw Duffel data can be normalized without the scorer knowing Duffel.
 
@@ -68,29 +68,29 @@ description: "Dependency-ordered implementation tasks for deterministic flight m
 
 ### Eligibility and dimension scoring
 
-- [ ] T023 [US1] Drive blacklist precedence across all carriers and stable violation explanations through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
-- [ ] T024 [US1] Drive ineligible visibility, eligible-only references, duplicate-code handling, and frozen-input non-mutation one behavior at a time through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
-- [ ] T025 [US1] Drive odd/even median PRICE and DURATION curves plus exact signal thresholds one behavior at a time through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
-- [ ] T026 [US1] Drive sensitivity-modified PRICE and preference/relative STOPS behavior through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
-- [ ] T027 [US1] Drive AIRLINE neutral/preferred and effective-query CABIN exact/adjacent/mismatch behavior through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
-- [ ] T028 [US1] Drive overnight/boundary/shoulder schedules and baggage true/false/null behavior through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
+- [x] T023 [US1] Drive blacklist precedence across all carriers and stable violation explanations through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
+- [x] T024 [US1] Drive ineligible visibility, eligible-only references, duplicate-code handling, and frozen-input non-mutation one behavior at a time through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
+- [x] T025 [US1] Drive odd/even median PRICE and DURATION curves plus exact signal thresholds one behavior at a time through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
+- [x] T026 [US1] Drive sensitivity-modified PRICE and preference/relative STOPS behavior through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
+- [x] T027 [US1] Drive AIRLINE neutral/preferred and effective-query CABIN exact/adjacent/mismatch behavior through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
+- [x] T028 [US1] Drive overnight/boundary/shoulder schedules and baggage true/false/null behavior through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
 
 ### Weight resolution and final ranking
 
-- [ ] T029 [US1] Drive missing-personalized transfer, zero-variance redistribution, caps, and exact 1.000000 totals through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
-- [ ] T030 [US1] Drive full-baseline-collapse against the entire transferred target using the airline-only 0.425/0.255/0.170/0.150 fixture plus single/all-ineligible fallbacks through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
-- [ ] T031 [US1] Drive contribution precision, half-away rounding, and exact 24/25/49/50/74/75 match buckets through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
-- [ ] T032 [US1] Drive breakdown/metadata order, eligible-first score order, objective tie-breaks, and original-index stability through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
+- [x] T029 [US1] Drive missing-personalized transfer, zero-variance redistribution, caps, and exact 1.000000 totals through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
+- [x] T030 [US1] Drive full-baseline-collapse against the entire transferred target using the airline-only 0.425/0.255/0.170/0.150 fixture plus single/all-ineligible fallbacks through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
+- [x] T031 [US1] Drive contribution precision, half-away rounding, and exact 24/25/49/50/74/75 match buckets through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
+- [x] T032 [US1] Drive breakdown/metadata order, eligible-first score order, objective tie-breaks, and original-index stability through RED → GREEN in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` and `apps/api/src/flight-match/flight-match-scorer.service.ts`
 
 ### Canonical search orchestration
 
-- [ ] T033 [US1] Drive canonical-first-20 normalization, one profile read, query-cabin precedence, and scorer invocation through RED → GREEN in `apps/api/src/flights/flight-search-orchestrator.service.spec.ts` and `apps/api/src/flights/flight-search-orchestrator.service.ts`
-- [ ] T034 [US1] Drive current-profile rescoring on raw-cache hits, invalid-offer counts, aggregate metadata, and no score persistence through RED → GREEN in `apps/api/src/flights/flight-search-orchestrator.service.spec.ts` and `apps/api/src/flights/flight-search-orchestrator.service.ts`
-- [ ] T035 [US1] Register/export `FlightMatchScorerService`, register/export the orchestrator, and add acyclic `ProfileModule`/`FlightMatchModule` imports in `apps/api/src/flight-match/flight-match.module.ts` and `apps/api/src/flights/flights.module.ts`
-- [ ] T036 [US1] Drive cache-hit/miss upsert of missing `FlightOffer`/`OfferRecovery`, including agent-warmed raw cache followed by browser selection, through RED → GREEN in `apps/api/src/flights/flights.service.spec.ts` and `apps/api/src/flights/flights.service.ts`
-- [ ] T037 [US1] Drive history/audit preservation, PII-safe mode/meta response, trusted DTO serialization, and private/no-store search headers with ETag removal through RED → GREEN in `apps/api/src/flights/flights.service.spec.ts`, `apps/api/src/flights/flights.controller.spec.ts`, `apps/api/src/flights/flights.service.ts`, `apps/api/src/flights/flights.controller.ts`, and `apps/api/src/flights/dto/search-flight.dto.ts`
-- [ ] T038 [US1] Add MATCHED contract, private/no-store headers, repeated-run parity, blacklist visibility, raw-cache rescoring, no-extra-Duffel-call, and no-score-storage E2E coverage in `apps/api/test/flights-match-scoring.e2e-spec.ts`
-- [ ] T039 [US1] Add and run the deterministic 1,000-repeat and warmed 20-offer p95 benchmark in `apps/api/src/flight-match/flight-match.performance.spec.ts`
+- [x] T033 [US1] Drive canonical-first-20 normalization, one profile read, query-cabin precedence, and scorer invocation through RED → GREEN in `apps/api/src/flights/flight-search-orchestrator.service.spec.ts` and `apps/api/src/flights/flight-search-orchestrator.service.ts`
+- [x] T034 [US1] Drive current-profile rescoring on raw-cache hits, invalid-offer counts, aggregate metadata, and no score persistence through RED → GREEN in `apps/api/src/flights/flight-search-orchestrator.service.spec.ts` and `apps/api/src/flights/flight-search-orchestrator.service.ts`
+- [x] T035 [US1] Register/export `FlightMatchScorerService`, register/export the orchestrator, and add acyclic `ProfileModule`/`FlightMatchModule` imports in `apps/api/src/flight-match/flight-match.module.ts` and `apps/api/src/flights/flights.module.ts`
+- [x] T036 [US1] Drive cache-hit/miss upsert of missing `FlightOffer`/`OfferRecovery`, including agent-warmed raw cache followed by browser selection, through RED → GREEN in `apps/api/src/flights/flights.service.spec.ts` and `apps/api/src/flights/flights.service.ts`
+- [x] T037 [US1] Drive history/audit preservation, PII-safe mode/meta response, trusted DTO serialization, and private/no-store search headers with ETag removal through RED → GREEN in `apps/api/src/flights/flights.service.spec.ts`, `apps/api/src/flights/flights.controller.spec.ts`, `apps/api/src/flights/flights.service.ts`, `apps/api/src/flights/flights.controller.ts`, and `apps/api/src/flights/dto/search-flight.dto.ts`
+- [x] T038 [US1] Add MATCHED contract, private/no-store headers, repeated-run parity, blacklist visibility, raw-cache rescoring, no-extra-Duffel-call, and no-score-storage E2E coverage in `apps/api/test/flights-match-scoring.e2e-spec.ts`
+- [x] T039 [US1] Add and run the deterministic 1,000-repeat and warmed 20-offer p95 benchmark in `apps/api/src/flight-match/flight-match.performance.spec.ts`
 
 **Checkpoint**: Personalized browser API searches are a deployable MVP with exact deterministic policy evidence and unchanged Duffel budget behavior.
 
@@ -102,16 +102,12 @@ description: "Dependency-ordered implementation tasks for deterministic flight m
 
 **Independent Test**: Search a deliberately conflicting fixed offer set with no profile preferences and verify scorer non-invocation, RANKED mode, null results, and stops → price → duration → red-eye → original-index order.
 
-- [ ] T040 [US2] Drive stops-price-duration-red-eye-original-index category ordering through RED → GREEN in `apps/api/src/flight-match/category-ranker.service.spec.ts` and `apps/api/src/flight-match/category-ranker.service.ts`
-- [ ] T041 [US2] Drive empty/single/stable ties and frozen-input non-mutation through RED → GREEN in `apps/api/src/flight-match/category-ranker.service.spec.ts` and `apps/api/src/flight-match/category-ranker.service.ts`
-- [ ] T042 [US2] Drive the personalization truth table for nulls, empty arrays, blacklist/maxStops/sensitivity-only, class-with-query, and false baggage through RED → GREEN in `apps/api/src/flights/flight-search-orchestrator.service.spec.ts` and `apps/api/src/flights/flight-search-orchestrator.service.ts`
-- [ ] T043 [US2] Drive scorer non-invocation, RANKED mode, null match results, and ranker registration through RED → GREEN in `apps/api/src/flights/flight-search-orchestrator.service.spec.ts`, `apps/api/src/flights/flight-search-orchestrator.service.ts`, and `apps/api/src/flight-match/flight-match.module.ts`
-- [ ] T044 [US2] Add empty-profile, missing-profile, empty-offer, and stable cold-start API E2E coverage in `apps/api/test/flights-match-scoring.e2e-spec.ts`
-- [ ] T045 [US2] Prove cached/uncached RANKED searches preserve persistence/upserts, agent-warmed-cache browser selection, budget, rate-limit, and error behavior in `apps/api/test/flights-search.e2e-spec.ts`
-
-**Checkpoint**: Existing travelers without preferences receive honest objective ranking and the scorer is not invoked.
-
----
+- [x] T040 [US2] Drive stops-price-duration-red-eye-original-index category ordering through RED → GREEN in `apps/api/src/flight-match/category-ranker.service.spec.ts` and `apps/api/src/flight-match/category-ranker.service.ts`
+- [x] T041 [US2] Drive empty/single/stable ties and frozen-input non-mutation through RED → GREEN in `apps/api/src/flight-match/category-ranker.service.spec.ts` and `apps/api/src/flight-match/category-ranker.service.ts`
+- [x] T042 [US2] Drive the personalization truth table for nulls, empty arrays, blacklist/maxStops/sensitivity-only, class-with-query, and false baggage through RED → GREEN in `apps/api/src/flights/flight-search-orchestrator.service.spec.ts` and `apps/api/src/flights/flight-search-orchestrator.service.ts`
+- [x] T043 [US2] Drive scorer non-invocation, RANKED mode, null match results, and ranker registration through RED → GREEN in `apps/api/src/flights/flight-search-orchestrator.service.spec.ts`, `apps/api/src/flights/flight-search-orchestrator.service.ts`, and `apps/api/src/flight-match/flight-match.module.ts`
+- [x] T044 [US2] Add empty-profile, missing-profile, empty-offer, and stable cold-start API E2E coverage in `apps/api/test/flights-match-scoring.e2e-spec.ts`
+- [x] T045 [US2] Prove cached/uncached RANKED searches preserve persistence/upserts, agent-warmed-cache browser selection, budget, rate-limit, and error behavior in `apps/api/test/flights-search.e2e-spec.ts`
 
 ## Phase 5: User Story 3 — Understand and Configure Matching (Priority: P3)
 
@@ -121,16 +117,16 @@ description: "Dependency-ordered implementation tasks for deterministic flight m
 
 ### Server boundary and explanation safety
 
-- [ ] T046 [US3] Drive the post-producer required mode/match contract and removal of the temporary legacy fallback through RED → GREEN in `apps/web/lib/server/flight-search.spec.ts` and `apps/web/lib/server/flight-search.ts`
-- [ ] T047 [US3] Drive malformed breakdown/unknown-parameter/provider-ID rejection and local-ID preservation through RED → GREEN in `apps/web/lib/server/flight-search.spec.ts` and `apps/web/lib/server/flight-search.ts`
-- [ ] T048 [US3] Drive allowlisted airline/time/window/percentage/stop copy and primitive formatting through RED → GREEN in `apps/web/components/search/flight-match-explanations.spec.ts` and `apps/web/components/search/flight-match-explanations.ts`
-- [ ] T049 [US3] Drive unknown-key fallback, missing/wrong parameter handling, and HTML-injection safety through RED → GREEN in `apps/web/components/search/flight-match-explanations.spec.ts` and `apps/web/components/search/flight-match-explanations.ts`
+- [X] T046 [US3] Drive the post-producer required mode/match contract and removal of the temporary legacy fallback through RED → GREEN in `apps/web/lib/server/flight-search.spec.ts` and `apps/web/lib/server/flight-search.ts`
+- [X] T047 [US3] Drive malformed breakdown/unknown-parameter/provider-ID rejection and local-ID preservation through RED → GREEN in `apps/web/lib/server/flight-search.spec.ts` and `apps/web/lib/server/flight-search.ts`
+- [X] T048 [US3] Drive allowlisted airline/time/window/percentage/stop copy and primitive formatting through RED → GREEN in `apps/web/components/search/flight-match-explanations.spec.ts` and `apps/web/components/search/flight-match-explanations.ts`
+- [X] T049 [US3] Drive unknown-key fallback, missing/wrong parameter handling, and HTML-injection safety through RED → GREEN in `apps/web/components/search/flight-match-explanations.spec.ts` and `apps/web/components/search/flight-match-explanations.ts`
 
 ### Mode and profile vertical slices
 
-- [ ] T050 [US3] Drive MATCHED score/level presentation through one Playwright RED → GREEN slice in `apps/web/tests/flight-match-scoring.spec.ts` and `apps/web/components/search/FlightMatchBadge.tsx`
-- [ ] T051 [US3] Drive expandable dimension/constraint copy and ineligible-but-selectable behavior through RED → GREEN in `apps/web/tests/flight-match-scoring.spec.ts` and `apps/web/components/search/FlightMatchBreakdown.tsx`
-- [ ] T052 [US3] Drive RANKED no-score claims, profile CTA, and objective sort controls through RED → GREEN in `apps/web/tests/flight-match-scoring.spec.ts`, `apps/web/components/search/FlightRankingBanner.tsx`, and `apps/web/components/search/FlightResultsControls.tsx`
+- [X] T050 [US3] Drive MATCHED score/level presentation through one Playwright RED → GREEN slice in `apps/web/tests/flight-match-scoring.spec.ts` and `apps/web/components/search/FlightMatchBadge.tsx`
+- [x] T051 [US3] Drive expandable dimension/constraint copy and ineligible-but-selectable behavior through RED → GREEN in `apps/web/tests/flight-match-scoring.spec.ts` and `apps/web/components/search/FlightMatchBreakdown.tsx`
+- [x] T052 [US3] Drive RANKED no-score claims, profile CTA, and objective sort controls through RED → GREEN in `apps/web/tests/flight-match-scoring.spec.ts`, `apps/web/components/search/FlightRankingBanner.tsx`, and `apps/web/components/search/FlightResultsControls.tsx`
 - [ ] T053 [US3] Drive provider-blind ordered cards and default MATCHED order through RED → GREEN in `apps/web/tests/flight-match-scoring.spec.ts`, `apps/web/components/search/FlightResultCard.tsx`, and `apps/web/components/search/FlightResults.tsx`
 - [ ] T054 [US3] Drive full outcome/mode retention and result composition through RED → GREEN in `apps/web/tests/flight-match-scoring.spec.ts` and `apps/web/components/search/SearchFormClient.tsx`
 - [ ] T055 [US3] Drive class-profile prefill with submitted-query precedence through RED → GREEN in `apps/web/tests/flight-match-scoring.spec.ts`, `apps/web/app/search/page.tsx`, and `apps/web/components/search/SearchFormClient.tsx`
@@ -279,3 +275,23 @@ Task B: T064 strict score-free Python snapshot invariant tests
 - Generated `.js` duplicates are not implementation targets unless the existing package build explicitly regenerates them.
 - Do not add a scoring feature flag, score table, score Redis key, LLM scorer, ninth dimension, direct agent scorer import, or direct Python ordering logic.
 - Context files are updated after feature verification, not during partial implementation.
+
+## Phase 8: Convergence
+
+- [x] T078 Make stored scoring-window reads reject unknown JSON keys and emit a bounded PII-safe integrity counter per `data-model.md` persistence invariants
+
+## Phase 9: Convergence
+
+- [x] T079 Prevent unallowlisted profile-service error messages from reaching the browser per SC-005 / T021 zero-PII/auth-error invariant (partial)
+
+## Phase 10: Convergence
+
+- [x] T080 Add strict schema-equivalent MATCHED response assertions for dimension bounds, integer scores, exact object keys, and primitive explanation parameters per T038 / `contracts/flight-search.openapi.yaml` (partial)
+- [x] T081 Assert PostgreSQL contains no score- or scoring-specific table anywhere in the public schema per FR-023 / T038 zero-score-persistence invariant (partial)
+- [x] T082 Add an agent-warmed raw-cache followed by browser offer recovery/detail scenario per T036 / plan Phase 3 cache-hit selection requirement (partial)
+- [x] T083 Assert full match-result output parity across every one of the 1,000 benchmark repetitions per SC-001 / T039 deterministic repeatability requirement (partial)
+
+## Phase 11: Convergence
+
+- [x] T084 Complete schema-equivalent MATCHED response validation for remaining OpenAPI scalar types, formats, enums, minima, mismatch-detail shapes, and array cardinalities per T038 / T080 (partial)
+- [x] T085 Eliminate scorer benchmark flakiness while retaining the strict warmed 20-offer p95 `< 5 ms` threshold per T039 / workflow Rule 4 (partial)
