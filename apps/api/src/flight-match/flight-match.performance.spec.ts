@@ -2,6 +2,7 @@ import { DuffelOffer } from '@/duffel/duffel.types';
 import { ProfileService } from '@/profile/profile.service';
 import { FlightSearchOrchestratorService, OrchestratorParams } from '@/flights/flight-search-orchestrator.service';
 import { FlightMatchScorerService } from './flight-match-scorer.service';
+import { CategoryRankerService } from './category-ranker.service';
 import type { FlightMatchInput, ScoringPreferences } from './flight-match.types';
 
 function calculatePercentile(samples: readonly number[], percentile: number): number {
@@ -539,6 +540,7 @@ describe('Flight Match Performance Benchmark Suite (T039)', () => {
       const orchestratorService = new FlightSearchOrchestratorService(
         mockProfileService as unknown as ProfileService,
         scorerService,
+        new CategoryRankerService(),
       );
 
       const params: OrchestratorParams = {

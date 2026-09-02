@@ -207,6 +207,30 @@ describe('Flights Search (E2E)', () => {
         .expect(400);
     });
 
+    it('should return 400 Bad Request when origin or destination airport does not exist in database', async () => {
+      await request(app.getHttpServer())
+        .post('/api/flights/search')
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({
+          origin: 'XYZ',
+          destination: 'SGN',
+          departureDate: '2026-07-15',
+          adults: 1,
+        })
+        .expect(400);
+
+      await request(app.getHttpServer())
+        .post('/api/flights/search')
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({
+          origin: 'HAN',
+          destination: 'XYZ',
+          departureDate: '2026-07-15',
+          adults: 1,
+        })
+        .expect(400);
+    });
+
     it('should return 400 Bad Request when origin and destination are the same', async () => {
       await request(app.getHttpServer())
         .post('/api/flights/search')
@@ -428,7 +452,7 @@ describe('Flights Search (E2E)', () => {
       sdkSpy.mockRestore();
     });
 
-    it('should perform a successful one-way search, mock DuffelService, verify return structure, async DB writes, and audit logs', async () => {
+    it('should perform a successful one-way search in RANKED mode (cold start), verify return structure, security headers, Redis cache, DB writes, and audit logs', async () => {
       const res = await request(app.getHttpServer())
         .post('/api/flights/search')
         .set('Authorization', `Bearer ${jwtToken}`)
@@ -440,7 +464,12 @@ describe('Flights Search (E2E)', () => {
         })
         .expect(200);
 
-      // Verify return structure (results, meta)
+      // Verify HTTP Headers & Security Invariants
+      expect(res.headers['cache-control']).toBe('private, no-store');
+      expect(res.headers['etag']).toBeUndefined();
+
+      // Verify return structure (mode, results, meta)
+      expect(res.body.mode).toBe('RANKED');
       expect(res.body).toHaveProperty('results');
       expect(res.body).toHaveProperty('meta');
       expect(res.body.results).toBeInstanceOf(Array);
@@ -460,6 +489,7 @@ describe('Flights Search (E2E)', () => {
       expect(offer.currency).toBe('USD');
       expect(offer.fareClass).toBe('Economy');
       expect(offer.baggageAllowance).toContain('1');
+      expect(offer.matchResult).toBeNull();
 
       const segment = offer.segments[0];
       expect(segment.carrierCode).toBe('VN');
@@ -474,7 +504,16 @@ describe('Flights Search (E2E)', () => {
 
       expect(res.body.meta.totalResults).toBe(1);
       expect(res.body.meta.cached).toBe(false);
+      expect(res.body.meta.scoringVersion).toBeNull();
       expect(res.body.meta).toHaveProperty('searchHash');
+      const searchHash = res.body.meta.searchHash;
+
+      // Verify raw Duffel results cached in Redis under flights:raw:${searchHash}
+      const rawCached = await cacheService.get(`flights:raw:${searchHash}`);
+      expect(rawCached).toBeDefined();
+      const parsedRaw = JSON.parse(rawCached!);
+      expect(parsedRaw.id).toBe('or_mock_123');
+      expect(parsedRaw.offers[0].id).toBe('off_mock_123');
 
       // Verify async DB writes (FlightOffer, SearchHistory, OfferRecovery)
       await waitFor(async () => {
@@ -490,18 +529,20 @@ describe('Flights Search (E2E)', () => {
         expect(history!.cabinClass).toBe('economy');
         expect(history!.resultCount).toBe(1);
         expect(Number(history!.minPrice)).toBe(125.5);
+        expect(history!.searchHash).toBe(searchHash);
 
         const offers = await prisma.flightOffer.findMany({
-          where: { searchHash: history!.searchHash },
+          where: { searchHash },
         });
         expect(offers.length).toBe(1);
         expect(offers[0].duffelOfferId).toBe('off_mock_123');
+        expect(offers[0].id).toBe(offer.id);
 
         const recovery = await prisma.offerRecovery.findUnique({
           where: { id: offers[0].id },
         });
         expect(recovery).toBeDefined();
-        expect(recovery!.searchHash).toBe(history!.searchHash);
+        expect(recovery!.searchHash).toBe(searchHash);
       });
 
       // Verify audit logs
@@ -516,9 +557,15 @@ describe('Flights Search (E2E)', () => {
       // No PII leak
       expect(metadata.email).toBeUndefined();
       expect(metadata.password).toBeUndefined();
+
+      const searchCompletedLog = await prisma.auditLog.findFirst({
+        where: { userId, action: 'search.completed' },
+      });
+      expect(searchCompletedLog).toBeDefined();
+      expect((searchCompletedLog!.metadata as Record<string, unknown>).mode).toBe('RANKED');
     });
 
-    it('should verify cache hit on repeated searches, bypassing DuffelService and not incrementing budget', async () => {
+    it('should verify cache hit on repeated searches in RANKED mode, preserving DB upserts, headers, and zero external calls', async () => {
       // First Search (Cache Miss)
       const res1 = await request(app.getHttpServer())
         .post('/api/flights/search')
@@ -531,8 +578,17 @@ describe('Flights Search (E2E)', () => {
         })
         .expect(200);
 
+      expect(res1.headers['cache-control']).toBe('private, no-store');
+      expect(res1.headers['etag']).toBeUndefined();
+      expect(res1.body.mode).toBe('RANKED');
       expect(res1.body.meta.cached).toBe(false);
       expect(sdkSpy).toHaveBeenCalledTimes(1);
+
+      const searchHash = res1.body.meta.searchHash;
+
+      // Verify Redis raw cache exists
+      const rawCached = await cacheService.get(`flights:raw:${searchHash}`);
+      expect(rawCached).toBeDefined();
 
       // Get budget key value
       const year = new Date().getFullYear();
@@ -555,11 +611,34 @@ describe('Flights Search (E2E)', () => {
         })
         .expect(200);
 
+      expect(res2.headers['cache-control']).toBe('private, no-store');
+      expect(res2.headers['etag']).toBeUndefined();
+      expect(res2.body.mode).toBe('RANKED');
       expect(res2.body.meta.cached).toBe(true);
+      expect(res2.body.meta.searchHash).toBe(searchHash);
       expect(sdkSpy).not.toHaveBeenCalled();
 
       const budgetValAfter = await cacheService.get(budgetKey);
       expect(budgetValAfter).toBe(budgetValBefore);
+
+      // Verify DB records on Cache Hit: SearchHistory should record the second search, and FlightOffer / OfferRecovery remain valid
+      await waitFor(async () => {
+        const histories = await prisma.searchHistory.findMany({
+          where: { userId, searchHash },
+        });
+        expect(histories.length).toBe(2);
+
+        const offers = await prisma.flightOffer.findMany({
+          where: { searchHash },
+        });
+        expect(offers.length).toBe(1);
+        expect(offers[0].duffelOfferId).toBe('off_mock_123');
+
+        const recoveries = await prisma.offerRecovery.findMany({
+          where: { searchHash },
+        });
+        expect(recoveries.length).toBe(1);
+      });
     });
 
     it('should return 429 TOO MANY REQUESTS when the search budget is exhausted', async () => {

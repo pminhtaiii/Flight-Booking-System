@@ -104,10 +104,10 @@ description: "Dependency-ordered implementation tasks for deterministic flight m
 
 - [x] T040 [US2] Drive stops-price-duration-red-eye-original-index category ordering through RED → GREEN in `apps/api/src/flight-match/category-ranker.service.spec.ts` and `apps/api/src/flight-match/category-ranker.service.ts`
 - [x] T041 [US2] Drive empty/single/stable ties and frozen-input non-mutation through RED → GREEN in `apps/api/src/flight-match/category-ranker.service.spec.ts` and `apps/api/src/flight-match/category-ranker.service.ts`
-- [ ] T042 [US2] Drive the personalization truth table for nulls, empty arrays, blacklist/maxStops/sensitivity-only, class-with-query, and false baggage through RED → GREEN in `apps/api/src/flights/flight-search-orchestrator.service.spec.ts` and `apps/api/src/flights/flight-search-orchestrator.service.ts`
-- [ ] T043 [US2] Drive scorer non-invocation, RANKED mode, null match results, and ranker registration through RED → GREEN in `apps/api/src/flights/flight-search-orchestrator.service.spec.ts`, `apps/api/src/flights/flight-search-orchestrator.service.ts`, and `apps/api/src/flight-match/flight-match.module.ts`
-- [ ] T044 [US2] Add empty-profile, missing-profile, empty-offer, and stable cold-start API E2E coverage in `apps/api/test/flights-match-scoring.e2e-spec.ts`
-- [ ] T045 [US2] Prove cached/uncached RANKED searches preserve persistence/upserts, agent-warmed-cache browser selection, budget, rate-limit, and error behavior in `apps/api/test/flights-search.e2e-spec.ts`
+- [x] T042 [US2] Drive the personalization truth table for nulls, empty arrays, blacklist/maxStops/sensitivity-only, class-with-query, and false baggage through RED → GREEN in `apps/api/src/flights/flight-search-orchestrator.service.spec.ts` and `apps/api/src/flights/flight-search-orchestrator.service.ts`
+- [x] T043 [US2] Drive scorer non-invocation, RANKED mode, null match results, and ranker registration through RED → GREEN in `apps/api/src/flights/flight-search-orchestrator.service.spec.ts`, `apps/api/src/flights/flight-search-orchestrator.service.ts`, and `apps/api/src/flight-match/flight-match.module.ts`
+- [x] T044 [US2] Add empty-profile, missing-profile, empty-offer, and stable cold-start API E2E coverage in `apps/api/test/flights-match-scoring.e2e-spec.ts`
+- [x] T045 [US2] Prove cached/uncached RANKED searches preserve persistence/upserts, agent-warmed-cache browser selection, budget, rate-limit, and error behavior in `apps/api/test/flights-search.e2e-spec.ts`
 
 ## Phase 5: User Story 3 — Understand and Configure Matching (Priority: P3)
 

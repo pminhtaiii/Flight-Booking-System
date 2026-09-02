@@ -1,6 +1,7 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
+import { Prisma } from '@prisma/client';
 import request from 'supertest';
 import { AppModule } from '@/app.module';
 import { CacheService } from '@/cache/cache.service';
@@ -493,6 +494,58 @@ function validateMatchedSchemaEquivalent(value: unknown): void {
   }
 }
 
+function expectRankedOfferShape(offer: Record<string, unknown>): void {
+  for (const key of [
+    'id', 'duffelOfferId', 'airline', 'flightNumber', 'departureAirport', 'arrivalAirport',
+    'departureTime', 'arrivalTime', 'duration', 'stops', 'price', 'currency', 'fareClass',
+    'baggageAllowance', 'requestedCabinClass', 'cabinClassMatch', 'cabinMismatchDetails',
+    'segments', 'returnSegments', 'matchResult',
+  ]) expect(offer).toHaveProperty(key);
+
+  expect(offer.id).toMatch(/^[0-9a-f-]{36}$/i);
+  expect(typeof offer.duffelOfferId).toBe('string');
+  expect(typeof offer.price).toBe('number');
+  expect(offer.price).toBeGreaterThan(0);
+  expect(typeof offer.duration).toBe('number');
+  expect(offer.duration).toBeGreaterThan(0);
+  expect(offer.stops).toEqual(expect.any(Number));
+  expect(offer.stops).toBeGreaterThanOrEqual(0);
+  expect(offer.currency).toMatch(/^[A-Z]{3}$/);
+  expect(offer.segments).toEqual(expect.any(Array));
+  expect((offer.segments as unknown[]).length).toBeGreaterThan(0);
+  expect(offer.returnSegments).toBeNull();
+  expect(offer.matchResult).toBeNull();
+
+  for (const segment of offer.segments as Record<string, unknown>[]) {
+    validateSegmentScalarConstraints(segment);
+  }
+}
+
+function validateRankedSchemaEquivalent(value: unknown): void {
+  expectExactKeys(value, ['mode', 'results', 'meta']);
+  expect(value.mode).toBe('RANKED');
+  expect(Array.isArray(value.results)).toBe(true);
+
+  expectExactKeys(value.meta, [
+    'totalResults',
+    'searchHash',
+    'cached',
+    'requestedCabinClass',
+    'scoringVersion',
+  ]);
+  expect(value.meta.scoringVersion).toBeNull();
+  expect(value.meta.eligibleCount).toBeUndefined();
+  expect(value.meta.matchLevelCounts).toBeUndefined();
+  expectIntegerAtLeast(value.meta.totalResults, 0);
+  expect(typeof value.meta.searchHash).toBe('string');
+  expect(typeof value.meta.cached).toBe('boolean');
+  expect(typeof value.meta.requestedCabinClass).toBe('string');
+
+  for (const rawOffer of value.results as unknown[]) {
+    expectRankedOfferShape(rawOffer as Record<string, unknown>);
+  }
+}
+
 function expectNoScoringPersistenceTables(tables: readonly { readonly table_name: string }[]): void {
   const scoringTablePattern = /(?:^|_)(?:flight_match(?:es)?|match_scores?|scores?|scoring)(?:_|$)/i;
   expect(tables.map(({ table_name }) => table_name).filter((name) => scoringTablePattern.test(name)))
@@ -802,5 +855,160 @@ describe('Flight match scoring (E2E)', (): void => {
     `;
 
     expectNoScoringPersistenceTables(publicTables);
+  });
+
+  it('returns 200 mode RANKED with matchResult null and clean meta for authenticated user with empty traveler profile', async (): Promise<void> => {
+    await prisma.travelerProfile.update({
+      where: { userId: await testUserId() },
+      data: {
+        preferredAirlines: [],
+        blacklistedAirlines: [],
+        classPreference: null,
+        preferredDepartureWindow: Prisma.DbNull,
+        preferredArrivalWindow: Prisma.DbNull,
+        maxStops: null,
+        priceSensitivity: null,
+        requiresCheckedBaggage: null,
+      },
+    });
+
+    const response = await search().expect(200);
+
+    expect(response.headers['cache-control']).toBe('private, no-store');
+    expect(response.headers.etag).toBeUndefined();
+    validateRankedSchemaEquivalent(response.body);
+    expect(response.body.mode).toBe('RANKED');
+    expect(response.body.results).toHaveLength(3);
+    expect(response.body.meta.scoringVersion).toBeNull();
+    expect(response.body.meta.eligibleCount).toBeUndefined();
+    expect(response.body.meta.matchLevelCounts).toBeUndefined();
+    for (const offer of response.body.results as Record<string, unknown>[]) {
+      expect(offer.matchResult).toBeNull();
+    }
+  });
+
+  it('returns 200 mode RANKED with matchResult null for authenticated user with no traveler profile row', async (): Promise<void> => {
+    await prisma.travelerProfile.deleteMany({
+      where: { userId: await testUserId() },
+    });
+
+    const response = await search().expect(200);
+
+    expect(response.headers['cache-control']).toBe('private, no-store');
+    expect(response.headers.etag).toBeUndefined();
+    validateRankedSchemaEquivalent(response.body);
+    expect(response.body.mode).toBe('RANKED');
+    expect(response.body.results).toHaveLength(3);
+    expect(response.body.meta.scoringVersion).toBeNull();
+    expect(response.body.meta.eligibleCount).toBeUndefined();
+    expect(response.body.meta.matchLevelCounts).toBeUndefined();
+    for (const offer of response.body.results as Record<string, unknown>[]) {
+      expect(offer.matchResult).toBeNull();
+    }
+  });
+
+  it('returns 200 mode RANKED with empty results array and totalResults 0 when search returns 0 offers', async (): Promise<void> => {
+    await prisma.travelerProfile.update({
+      where: { userId: await testUserId() },
+      data: {
+        preferredAirlines: [],
+        blacklistedAirlines: [],
+        classPreference: null,
+        preferredDepartureWindow: Prisma.DbNull,
+        preferredArrivalWindow: Prisma.DbNull,
+        maxStops: null,
+        priceSensitivity: null,
+        requiresCheckedBaggage: null,
+      },
+    });
+    duffelSpy.mockResolvedValueOnce({
+      data: { id: 'or_empty_offers', offers: [], slices: [], passengers: [] },
+    } as unknown as never);
+
+    const response = await search().expect(200);
+
+    expect(response.headers['cache-control']).toBe('private, no-store');
+    expect(response.headers.etag).toBeUndefined();
+    expect(response.body.mode).toBe('RANKED');
+    expect(response.body.results).toEqual([]);
+    expect(response.body.meta).toEqual(expect.objectContaining({
+      totalResults: 0,
+      scoringVersion: null,
+      cached: false,
+      requestedCabinClass: 'economy',
+    }));
+    expect(response.body.meta.eligibleCount).toBeUndefined();
+    expect(response.body.meta.matchLevelCounts).toBeUndefined();
+  });
+
+  it('strictly orders cold-start search results by the stable 5-tier category order', async (): Promise<void> => {
+    await prisma.travelerProfile.update({
+      where: { userId: await testUserId() },
+      data: {
+        preferredAirlines: [],
+        blacklistedAirlines: [],
+        classPreference: null,
+        preferredDepartureWindow: Prisma.DbNull,
+        preferredArrivalWindow: Prisma.DbNull,
+        maxStops: null,
+        priceSensitivity: null,
+        requiresCheckedBaggage: null,
+      },
+    });
+
+    const tieOffers = [
+      // Offer A (idx 0): 1 stop, $100, 120 min, 10:00 (daytime) -> tier 1 (stops) places it 6th
+      createOffer({
+        id: 'off_tie_a', carrierCode: 'VN', carrierName: 'Vietnam Airlines', flightNumber: '101',
+        price: '100.00', departureAt: '2026-10-15T10:00:00', arrivalAt: '2026-10-15T14:30:00', duration: 'PT2H00M', stops: 1,
+      }),
+      // Offer B (idx 1): 0 stops, $200, 120 min, 10:00 (daytime) -> tier 2 (price) places it 5th
+      createOffer({
+        id: 'off_tie_b', carrierCode: 'VN', carrierName: 'Vietnam Airlines', flightNumber: '102',
+        price: '200.00', departureAt: '2026-10-15T10:00:00', arrivalAt: '2026-10-15T12:00:00', duration: 'PT2H00M', stops: 0,
+      }),
+      // Offer C (idx 2): 0 stops, $100, 180 min, 10:00 (daytime) -> tier 3 (duration) places it 4th
+      createOffer({
+        id: 'off_tie_c', carrierCode: 'VN', carrierName: 'Vietnam Airlines', flightNumber: '103',
+        price: '100.00', departureAt: '2026-10-15T10:00:00', arrivalAt: '2026-10-15T13:00:00', duration: 'PT3H00M', stops: 0,
+      }),
+      // Offer D (idx 3): 0 stops, $100, 120 min, 02:00 (red-eye) -> tier 4 (red-eye penalty) places it 3rd
+      createOffer({
+        id: 'off_tie_d', carrierCode: 'VN', carrierName: 'Vietnam Airlines', flightNumber: '104',
+        price: '100.00', departureAt: '2026-10-15T02:00:00', arrivalAt: '2026-10-15T04:00:00', duration: 'PT2H00M', stops: 0,
+      }),
+      // Offer E (idx 4): 0 stops, $100, 120 min, 10:00 (daytime) -> tier 5 (index 4 < 5) places it 1st
+      createOffer({
+        id: 'off_tie_e', carrierCode: 'VN', carrierName: 'Vietnam Airlines', flightNumber: '105',
+        price: '100.00', departureAt: '2026-10-15T10:00:00', arrivalAt: '2026-10-15T12:00:00', duration: 'PT2H00M', stops: 0,
+      }),
+      // Offer F (idx 5): 0 stops, $100, 120 min, 10:00 (daytime) -> tier 5 (index 5 > 4) places it 2nd
+      createOffer({
+        id: 'off_tie_f', carrierCode: 'VN', carrierName: 'Vietnam Airlines', flightNumber: '106',
+        price: '100.00', departureAt: '2026-10-15T10:00:00', arrivalAt: '2026-10-15T12:00:00', duration: 'PT2H00M', stops: 0,
+      }),
+    ];
+
+    duffelSpy.mockResolvedValueOnce({
+      data: { id: 'or_tie_test', offers: tieOffers, slices: tieOffers[0].slices, passengers: tieOffers[0].passengers },
+    } as unknown as never);
+
+    const response = await search().expect(200);
+
+    expect(response.headers['cache-control']).toBe('private, no-store');
+    expect(response.headers.etag).toBeUndefined();
+    expect(response.body.mode).toBe('RANKED');
+    expect(response.body.results).toHaveLength(6);
+    validateRankedSchemaEquivalent(response.body);
+
+    const resultOfferIds = (response.body.results as Array<{ duffelOfferId: string }>).map((r) => r.duffelOfferId);
+    expect(resultOfferIds).toEqual([
+      'off_tie_e',
+      'off_tie_f',
+      'off_tie_d',
+      'off_tie_c',
+      'off_tie_b',
+      'off_tie_a',
+    ]);
   });
 });

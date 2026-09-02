@@ -6,17 +6,35 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Flight Match Scoring (Feature 022) — Task T040 & T041: Category Ranker & Degenerate Sets / Ties / Invariants
-**Last completed:** Task T040 & T041: Verified 5-tier objective sorting criteria in `CategoryRankerService`, degenerate empty/single offer sets, multi-attribute ties with input permutations, deep frozen input immutability, and `FlightMatchModule` registration and isolation.
-**Previous completed:** Schedule Variance Formula Fix (2026-09-02) and Phase 11 convergence tasks T084–T085.
+**Feature:** Flight Match Scoring (Feature 022) — Task T045: Cache & Regression Verification for RANKED Mode
+**Last completed:** Task T045: Verified that `mode: RANKED` searches preserve all system invariants (DB writes/upserts on cache miss/hit, Redis raw caching under `searchHash`, 0 external Duffel API calls & budget unchanged on cache hit, security headers `Cache-Control: private, no-store` / no `ETag`, rate limiting 429, airport validation 400, and upstream error 502).
+**Previous completed:** Task T044: Added comprehensive cold-start E2E contract test coverage in `apps/api/test/flights-match-scoring.e2e-spec.ts`.
 **In progress:** None.
-**Next:** Task T042 [US2] — Personalization truth table in `FlightSearchOrchestratorService`.
+**Next:** Task T046 [US3] — Backend Profile CRUD & DTOs for 8 scoring preference dimensions.
 
 ---
 
 ## Progress by Feature
 
 ### [ ] Feature: Flight Match Scoring (Feature 022)
+
+- [x] Phase 4 / Task T045: Cache & Regression Verification for RANKED Mode (2026-09-02):
+  - In `apps/api/test/flights-search.e2e-spec.ts`, verified that `mode: RANKED` searches (cold start searches without preferences) preserve all system invariants:
+    1. DB Upserts on Cache Miss & Hit: Verified `FlightOffer` and `OfferRecovery` records are properly created/upserted in Prisma on cache miss AND cache hit; unpersonalized cold-start searches populate `SearchHistory`, `FlightOffer`, and `OfferRecovery` with correct `searchHash` and `duffelOfferId`.
+    2. Raw Cache Invariants: Verified raw Duffel results cached in Redis under `flights:raw:${searchHash}`; verified second identical search is a cache hit (`cached: true`), makes zero external Duffel API calls (`sdkSpy` not called), and does not increment monthly budget counter.
+    3. HTTP Headers & Security: Verified response headers include `Cache-Control: private, no-store` and exclude `ETag`.
+    4. Rate Limiting, Airport Validation & Error Boundaries: Verified 429 `RATE_LIMIT_EXCEEDED` on budget exhaustion; 400 Bad Request on missing origin/destination, invalid IATA code syntax, non-existent airport in DB, same origin/destination, invalid passenger counts (0 adults, 10 adults, >9 total, infants > adults), past departure date, return date before departure; and 502 `UPSTREAM_UNAVAILABLE` on Duffel API failure.
+  - All E2E tests in `apps/api/test/flights-search.e2e-spec.ts` passing 12/12, exit 0 (`35.442 s`).
+  - TypeScript `tsc --noEmit` and ESLint passed with 0 errors/warnings.
+
+- [x] Phase 4 / Task T044: Cold-Start API E2E Contract Test Suite (2026-09-02):
+  - Added comprehensive E2E tests for authenticated `POST /api/flights/search` in unpersonalized / cold-start conditions:
+    1. Empty Traveler Profile: 200 `mode: RANKED`, `meta.scoringVersion: null`, `meta.eligibleCount`/`matchLevelCounts` omitted, `Cache-Control: private, no-store`, no `ETag`, all offers `matchResult: null`.
+    2. Missing Profile Row (no DB record): 200 `mode: RANKED`, `matchResult: null` across all offers.
+    3. Empty Offers (0 returned from Duffel): 200 `mode: RANKED`, `results: []`, `totalResults: 0`, clean meta.
+    4. Stable 5-Tier Category Order: Multi-attribute tie fixture verifying strict ordering: `stops asc` -> `price asc` -> `duration asc` -> `red-eye penalty asc` -> `originalIndex asc`.
+  - Full E2E suite passed: 13/13 tests PASS (`apps/api/test/flights-match-scoring.e2e-spec.ts`, exit 0).
+  - TypeScript `tsc --noEmit` and ESLint passed with 0 errors/warnings.
 
 - [x] Phase 4 / Tasks T040 & T041: Category Ranker & Invariants (2026-09-02):
   - Verified 5-tier objective cold-start sorting (stops > price > duration > red-eye penalty > originalIndex) in `CategoryRankerService`.
