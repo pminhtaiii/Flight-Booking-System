@@ -1,22 +1,24 @@
 import type { Explanation } from '@shared/types';
 
-const CONSTANT_COPY: Partial<Record<Explanation['key'], string>> = {
-  'match.price.at_median': 'At median price',
-  'match.airline.neutral': 'Standard airline match',
-  'match.arrival.near_window': 'Arrives near preferred window',
-  'match.arrival.outside_window': 'Arrives outside preferred window',
-  'match.cabin.exact': 'Matches requested cabin',
-  'match.cabin.adjacent': 'Adjacent cabin class',
-  'match.cabin.mismatch': 'Cabin mismatch',
-  'match.departure.near_window': 'Departs near preferred window',
-  'match.departure.outside_window': 'Departs outside preferred window',
-  'match.baggage.checked_included': 'Checked bag included',
-  'match.baggage.checked_missing': 'Checked bag not included',
-  'match.baggage.not_required': 'No baggage requirement',
-  'match.duration.below_median': 'Shorter than median duration',
-  'match.duration.at_median': 'Median duration',
-  'match.duration.above_median': 'Longer than median duration',
-};
+const CONSTANT_COPY: Readonly<Record<string, string>> = Object.freeze(
+  Object.assign(Object.create(null), {
+    'match.price.at_median': 'At median price',
+    'match.airline.neutral': 'Standard airline match',
+    'match.arrival.near_window': 'Arrives near preferred window',
+    'match.arrival.outside_window': 'Arrives outside preferred window',
+    'match.cabin.exact': 'Matches requested cabin',
+    'match.cabin.adjacent': 'Adjacent cabin class',
+    'match.cabin.mismatch': 'Cabin mismatch',
+    'match.departure.near_window': 'Departs near preferred window',
+    'match.departure.outside_window': 'Departs outside preferred window',
+    'match.baggage.checked_included': 'Checked bag included',
+    'match.baggage.checked_missing': 'Checked bag not included',
+    'match.baggage.not_required': 'No baggage requirement',
+    'match.duration.below_median': 'Shorter than median duration',
+    'match.duration.at_median': 'Median duration',
+    'match.duration.above_median': 'Longer than median duration',
+  }),
+);
 
 type RuntimeParams = Record<string, unknown>;
 
@@ -49,6 +51,17 @@ function escapeText(value: string): string {
     .replaceAll("'", '&#39;');
 }
 
+function formatScheduleWindow(
+  actionPrefix: 'Arrives' | 'Departs',
+  windowStart: unknown,
+  windowEnd: unknown,
+): string {
+  if (isScheduleBound(windowStart) && isScheduleBound(windowEnd)) {
+    return `${actionPrefix} within preferred window (${escapeText(String(windowStart))}:00–${escapeText(String(windowEnd))}:00)`;
+  }
+  return `${actionPrefix} within preferred window`;
+}
+
 export function formatExplanation(explanation: Explanation): string {
   const rawParams: unknown = explanation.params;
   const params = isRuntimeParams(rawParams) ? rawParams : {};
@@ -67,9 +80,7 @@ export function formatExplanation(explanation: Explanation): string {
         ? `Matches preferred airline (${escapeText(params.airline)})`
         : 'Matches preferred airline';
     case 'match.arrival.in_window':
-      return isScheduleBound(params.windowStart) && isScheduleBound(params.windowEnd)
-        ? `Arrives within preferred window (${escapeText(String(params.windowStart))}:00–${escapeText(String(params.windowEnd))}:00)`
-        : 'Arrives within preferred window';
+      return formatScheduleWindow('Arrives', params.windowStart, params.windowEnd);
     case 'match.stops.within_preference':
       return isStopCount(params.stops)
         ? `Within preferred stops (${params.stops} stops)`
@@ -85,9 +96,7 @@ export function formatExplanation(explanation: Explanation): string {
           : `${params.stops} stops`
         : 'Flight with stops';
     case 'match.departure.in_window':
-      return isScheduleBound(params.windowStart) && isScheduleBound(params.windowEnd)
-        ? `Departs within preferred window (${escapeText(String(params.windowStart))}:00–${escapeText(String(params.windowEnd))}:00)`
-        : 'Departs within preferred window';
+      return formatScheduleWindow('Departs', params.windowStart, params.windowEnd);
     case 'constraint.airline.blacklisted':
       return isNonEmptyString(params.airline)
         ? `Blacklisted airline (${escapeText(params.airline)})`

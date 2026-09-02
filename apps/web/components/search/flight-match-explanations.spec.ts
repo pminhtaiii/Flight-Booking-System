@@ -5,73 +5,66 @@ import type { Explanation } from '@shared/types';
 
 import { formatExplanation } from './flight-match-explanations';
 
-describe('formatExplanation', () => {
-  it('falls back for an unknown runtime explanation key', () => {
+// Testing runtime malformation requires bypassing Explanation compile-time typing because the server boundary or external data may supply unexpected runtime shapes.
+function assertExplanationFallback(explanation: unknown, expected: string): void {
+  const result = formatExplanation(explanation as Explanation);
+  assert.equal(result, expected);
+  assert.equal(result.includes('undefined'), false);
+  assert.equal(result.includes('NaN'), false);
+  assert.equal(result.includes('[object Object]'), false);
+}
+
+describe('formatExplanation', (): void => {
+  it('falls back for an unknown runtime explanation key', (): void => {
     const explanation = {
       key: 'match.unknown.runtime_key',
       params: {},
-    } as unknown as Explanation;
+    };
 
-    assert.equal(formatExplanation(explanation), 'Match criterion');
+    assertExplanationFallback(explanation, 'Match criterion');
   });
 
-  it('uses the price fallback for unusable runtime percentage parameters', () => {
-    const explanations = [
-      { key: 'match.price.below_median' },
-      { key: 'match.price.below_median', params: null },
-      { key: 'match.price.below_median', params: 'invalid' },
-      { key: 'match.price.below_median', params: { percentDiff: '12' } },
-      { key: 'match.price.below_median', params: { percentDiff: Number.NaN } },
-      { key: 'match.price.above_median', params: { percentDiff: Number.POSITIVE_INFINITY } },
-    ] as unknown as Explanation[];
+  it('falls back to Match criterion for object prototype property names as explanation keys', (): void => {
+    const prototypeKeys = ['toString', 'valueOf', 'constructor', '__proto__', 'isPrototypeOf'];
+    for (const key of prototypeKeys) {
+      const explanation = { key, params: {} };
+      assertExplanationFallback(explanation, 'Match criterion');
+    }
+  });
 
-    const expected = [
-      'Below median price',
-      'Below median price',
-      'Below median price',
-      'Below median price',
-      'Below median price',
-      'Above median price',
+  it('uses the price fallback for unusable runtime percentage parameters', (): void => {
+    const testCases: Array<[unknown, string]> = [
+      [{ key: 'match.price.below_median' }, 'Below median price'],
+      [{ key: 'match.price.below_median', params: null }, 'Below median price'],
+      [{ key: 'match.price.below_median', params: 'invalid' }, 'Below median price'],
+      [{ key: 'match.price.below_median', params: { percentDiff: '12' } }, 'Below median price'],
+      [{ key: 'match.price.below_median', params: { percentDiff: Number.NaN } }, 'Below median price'],
+      [{ key: 'match.price.above_median', params: { percentDiff: Number.POSITIVE_INFINITY } }, 'Above median price'],
     ];
 
-    explanations.forEach((explanation, index) => {
-      const result = formatExplanation(explanation);
-      assert.equal(result, expected[index]);
-      assert.equal(result.includes('undefined'), false);
-      assert.equal(result.includes('NaN'), false);
-      assert.equal(result.includes('[object Object]'), false);
+    testCases.forEach(([explanation, expected]: [unknown, string]): void => {
+      assertExplanationFallback(explanation, expected);
     });
   });
 
-  it('uses the airline fallback for unusable runtime airline parameters', () => {
-    const explanations = [
-      { key: 'match.airline.preferred', params: {} },
-      { key: 'match.airline.preferred', params: { airline: '' } },
-      { key: 'match.airline.preferred', params: { airline: 42 } },
-      { key: 'constraint.airline.blacklisted', params: { airline: {} } },
-    ] as unknown as Explanation[];
-
-    const expected = [
-      'Matches preferred airline',
-      'Matches preferred airline',
-      'Matches preferred airline',
-      'Blacklisted airline',
+  it('uses the airline fallback for unusable runtime airline parameters', (): void => {
+    const testCases: Array<[unknown, string]> = [
+      [{ key: 'match.airline.preferred', params: {} }, 'Matches preferred airline'],
+      [{ key: 'match.airline.preferred', params: { airline: '' } }, 'Matches preferred airline'],
+      [{ key: 'match.airline.preferred', params: { airline: 42 } }, 'Matches preferred airline'],
+      [{ key: 'constraint.airline.blacklisted', params: { airline: {} } }, 'Blacklisted airline'],
     ];
 
-    explanations.forEach((explanation, index) => {
-      const result = formatExplanation(explanation);
-      assert.equal(result, expected[index]);
-      assert.equal(result.includes('undefined'), false);
-      assert.equal(result.includes('NaN'), false);
-      assert.equal(result.includes('[object Object]'), false);
+    testCases.forEach(([explanation, expected]: [unknown, string]): void => {
+      assertExplanationFallback(explanation, expected);
     });
   });
 
-  it('escapes preferred airline text before interpolation', () => {
-    const explanation = {
+  it('escapes preferred airline text before interpolation', (): void => {
+    const explanation: Explanation = {
       key: 'match.airline.preferred',
       params: { airline: '<img src=x onerror=alert(1)>' },
-    } as unknown as Explanation;
+    };
 
     assert.equal(
       formatExplanation(explanation),
@@ -79,44 +72,33 @@ describe('formatExplanation', () => {
     );
   });
 
-  it('uses the schedule fallback for unusable runtime window bounds', () => {
-    const explanations = [
-      { key: 'match.arrival.in_window' },
-      { key: 'match.arrival.in_window', params: null },
-      { key: 'match.arrival.in_window', params: 'invalid' },
-      { key: 'match.arrival.in_window', params: { windowStart: '', windowEnd: 10 } },
-      {
-        key: 'match.arrival.in_window',
-        params: { windowStart: Number.NaN, windowEnd: Number.POSITIVE_INFINITY },
-      },
-      { key: 'match.departure.in_window', params: { windowStart: {}, windowEnd: 10 } },
-      { key: 'match.departure.in_window', params: { windowStart: 8, windowEnd: false } },
-    ] as unknown as Explanation[];
-
-    const expected = [
-      'Arrives within preferred window',
-      'Arrives within preferred window',
-      'Arrives within preferred window',
-      'Arrives within preferred window',
-      'Arrives within preferred window',
-      'Departs within preferred window',
-      'Departs within preferred window',
+  it('uses the schedule fallback for unusable runtime window bounds', (): void => {
+    const testCases: Array<[unknown, string]> = [
+      [{ key: 'match.arrival.in_window' }, 'Arrives within preferred window'],
+      [{ key: 'match.arrival.in_window', params: null }, 'Arrives within preferred window'],
+      [{ key: 'match.arrival.in_window', params: 'invalid' }, 'Arrives within preferred window'],
+      [{ key: 'match.arrival.in_window', params: { windowStart: '', windowEnd: 10 } }, 'Arrives within preferred window'],
+      [
+        {
+          key: 'match.arrival.in_window',
+          params: { windowStart: Number.NaN, windowEnd: Number.POSITIVE_INFINITY },
+        },
+        'Arrives within preferred window',
+      ],
+      [{ key: 'match.departure.in_window', params: { windowStart: {}, windowEnd: 10 } }, 'Departs within preferred window'],
+      [{ key: 'match.departure.in_window', params: { windowStart: 8, windowEnd: false } }, 'Departs within preferred window'],
     ];
 
-    explanations.forEach((explanation, index) => {
-      const result = formatExplanation(explanation);
-      assert.equal(result, expected[index]);
-      assert.equal(result.includes('undefined'), false);
-      assert.equal(result.includes('NaN'), false);
-      assert.equal(result.includes('[object Object]'), false);
+    testCases.forEach(([explanation, expected]: [unknown, string]): void => {
+      assertExplanationFallback(explanation, expected);
     });
   });
 
-  it('escapes every HTML-sensitive character in a schedule bound', () => {
-    const explanation = {
+  it('escapes every HTML-sensitive character in a schedule bound', (): void => {
+    const explanation: Explanation = {
       key: 'match.arrival.in_window',
       params: { windowStart: '&<>"\'', windowEnd: 10 },
-    } as unknown as Explanation;
+    };
 
     const result = formatExplanation(explanation);
     assert.equal(result, 'Arrives within preferred window (&amp;&lt;&gt;&quot;&#39;:00–10:00)');
@@ -126,45 +108,27 @@ describe('formatExplanation', () => {
     assert.equal(result.includes("'"), false);
   });
 
-  it('uses the stops fallback for unusable runtime stop parameters', () => {
-    const explanations = [
-      { key: 'match.stops.within_preference' },
-      { key: 'match.stops.within_preference', params: null },
-      { key: 'match.stops.within_preference', params: 'invalid' },
-      { key: 'match.stops.within_preference', params: { stops: -1 } },
-      { key: 'match.stops.within_preference', params: { stops: 1.5 } },
-      { key: 'match.stops.exceeds_preference', params: { stops: 2 } },
-      { key: 'match.stops.exceeds_preference', params: { stops: 2, maxStops: -1 } },
-      { key: 'match.stops.exceeds_preference', params: { stops: 2, maxStops: '1' } },
-      { key: 'match.stops.exceeds_preference', params: { stops: '2', maxStops: 1 } },
-      { key: 'match.stops.relative', params: { stops: Number.NaN } },
-      { key: 'match.stops.relative', params: { stops: {} } },
-    ] as unknown as Explanation[];
-
-    const expected = [
-      'Within preferred stops',
-      'Within preferred stops',
-      'Within preferred stops',
-      'Within preferred stops',
-      'Within preferred stops',
-      'Exceeds preferred stops',
-      'Exceeds preferred stops',
-      'Exceeds preferred stops',
-      'Exceeds preferred stops',
-      'Flight with stops',
-      'Flight with stops',
+  it('uses the stops fallback for unusable runtime stop parameters', (): void => {
+    const testCases: Array<[unknown, string]> = [
+      [{ key: 'match.stops.within_preference' }, 'Within preferred stops'],
+      [{ key: 'match.stops.within_preference', params: null }, 'Within preferred stops'],
+      [{ key: 'match.stops.within_preference', params: 'invalid' }, 'Within preferred stops'],
+      [{ key: 'match.stops.within_preference', params: { stops: -1 } }, 'Within preferred stops'],
+      [{ key: 'match.stops.within_preference', params: { stops: 1.5 } }, 'Within preferred stops'],
+      [{ key: 'match.stops.exceeds_preference', params: { stops: 2 } }, 'Exceeds preferred stops'],
+      [{ key: 'match.stops.exceeds_preference', params: { stops: 2, maxStops: -1 } }, 'Exceeds preferred stops'],
+      [{ key: 'match.stops.exceeds_preference', params: { stops: 2, maxStops: '1' } }, 'Exceeds preferred stops'],
+      [{ key: 'match.stops.exceeds_preference', params: { stops: '2', maxStops: 1 } }, 'Exceeds preferred stops'],
+      [{ key: 'match.stops.relative', params: { stops: Number.NaN } }, 'Flight with stops'],
+      [{ key: 'match.stops.relative', params: { stops: {} } }, 'Flight with stops'],
     ];
 
-    explanations.forEach((explanation, index) => {
-      const result = formatExplanation(explanation);
-      assert.equal(result, expected[index]);
-      assert.equal(result.includes('undefined'), false);
-      assert.equal(result.includes('NaN'), false);
-      assert.equal(result.includes('[object Object]'), false);
+    testCases.forEach(([explanation, expected]: [unknown, string]): void => {
+      assertExplanationFallback(explanation, expected);
     });
   });
 
-  it('formats a price below-median explanation', () => {
+  it('formats a price below-median explanation', (): void => {
     const explanation: Explanation = {
       key: 'match.price.below_median',
       params: { percentDiff: 12 },
@@ -173,7 +137,7 @@ describe('formatExplanation', () => {
     assert.equal(formatExplanation(explanation), '12% below median price');
   });
 
-  it('formats at- and above-median price explanations', () => {
+  it('formats at- and above-median price explanations', (): void => {
     const explanations: Array<[Explanation, string]> = [
       [
         { key: 'match.price.at_median', params: {} },
@@ -190,7 +154,7 @@ describe('formatExplanation', () => {
     }
   });
 
-  it('formats airline preference explanations', () => {
+  it('formats airline preference explanations', (): void => {
     const explanations: Array<[Explanation, string]> = [
       [
         { key: 'match.airline.preferred', params: { airline: 'SkyJet' } },
@@ -204,7 +168,7 @@ describe('formatExplanation', () => {
     }
   });
 
-  it('formats arrival window explanations', () => {
+  it('formats arrival window explanations', (): void => {
     const explanations: Array<[Explanation, string]> = [
       [
         {
@@ -228,7 +192,7 @@ describe('formatExplanation', () => {
     }
   });
 
-  it('formats stops preference and relative explanations', () => {
+  it('formats stops preference and relative explanations', (): void => {
     const explanations: Array<[Explanation, string]> = [
       [
         { key: 'match.stops.within_preference', params: { stops: 1 } },
@@ -250,7 +214,7 @@ describe('formatExplanation', () => {
     }
   });
 
-  it('formats cabin match explanations', () => {
+  it('formats cabin match explanations', (): void => {
     const explanations: Array<[Explanation, string]> = [
       [{ key: 'match.cabin.exact', params: {} }, 'Matches requested cabin'],
       [{ key: 'match.cabin.adjacent', params: {} }, 'Adjacent cabin class'],
@@ -262,7 +226,7 @@ describe('formatExplanation', () => {
     }
   });
 
-  it('formats departure window explanations', () => {
+  it('formats departure window explanations', (): void => {
     const explanations: Array<[Explanation, string]> = [
       [
         {
@@ -286,7 +250,7 @@ describe('formatExplanation', () => {
     }
   });
 
-  it('formats baggage explanations', () => {
+  it('formats baggage explanations', (): void => {
     const explanations: Array<[Explanation, string]> = [
       [
         { key: 'match.baggage.checked_included', params: {} },
@@ -304,7 +268,7 @@ describe('formatExplanation', () => {
     }
   });
 
-  it('formats duration explanations', () => {
+  it('formats duration explanations', (): void => {
     const explanations: Array<[Explanation, string]> = [
       [
         { key: 'match.duration.below_median', params: {} },
@@ -322,7 +286,7 @@ describe('formatExplanation', () => {
     }
   });
 
-  it('formats a blacklisted-airline constraint explanation', () => {
+  it('formats a blacklisted-airline constraint explanation', (): void => {
     const explanation: Explanation = {
       key: 'constraint.airline.blacklisted',
       params: { airline: 'Unsafe Air' },
