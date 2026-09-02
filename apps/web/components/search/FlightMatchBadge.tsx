@@ -8,10 +8,10 @@ export type FlightMatchBadgeProps = {
 };
 
 const LEVEL_STYLES: Readonly<Record<MatchLevel, string>> = Object.freeze({
-  STRONG: 'text-emerald-700 bg-emerald-50 border-emerald-200',
-  GOOD: 'text-sky-700 bg-sky-50 border-sky-200',
-  FAIR: 'text-amber-700 bg-amber-50 border-amber-200',
-  WEAK: 'text-slate-600 bg-slate-100 border-slate-200',
+  STRONG: 'text-text-match-strong bg-bg-match-strong border-text-match-strong/30',
+  GOOD: 'text-text-match-good bg-bg-match-good border-text-match-good/30',
+  FAIR: 'text-text-match-fair bg-bg-match-fair border-text-match-fair/30',
+  WEAK: 'text-text-match-weak bg-bg-match-weak border-text-match-weak/30',
 });
 
 const LEVEL_LABELS: Readonly<Record<MatchLevel, string>> = Object.freeze({
@@ -21,7 +21,7 @@ const LEVEL_LABELS: Readonly<Record<MatchLevel, string>> = Object.freeze({
   WEAK: 'Weak Match',
 });
 
-const INELIGIBLE_STYLES = 'text-rose-700 bg-rose-50 border-rose-200';
+const INELIGIBLE_STYLES = 'text-text-cancelled bg-bg-cancelled border-danger-border';
 const BASE_BADGE_STYLES = 'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium';
 
 export function FlightMatchBadge({ matchResult, className }: FlightMatchBadgeProps): React.JSX.Element | null {

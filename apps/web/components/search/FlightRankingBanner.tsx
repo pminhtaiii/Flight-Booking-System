@@ -15,7 +15,7 @@ export function FlightRankingBanner({
   }
 
   const containerClasses = [
-    'flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 text-xs sm:text-sm text-slate-700',
+    'flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-card-border bg-card p-4 text-xs sm:text-sm text-text-secondary',
     className,
   ]
     .filter(Boolean)
@@ -26,7 +26,7 @@ export function FlightRankingBanner({
       <div className="flex items-start sm:items-center gap-2.5">
         <svg
           aria-hidden="true"
-          className="h-5 w-5 shrink-0 text-slate-500 mt-0.5 sm:mt-0"
+          className="h-5 w-5 shrink-0 text-text-muted mt-0.5 sm:mt-0"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -45,7 +45,7 @@ export function FlightRankingBanner({
       </div>
       <Link
         href="/profile"
-        className="inline-flex items-center self-start sm:self-auto shrink-0 font-semibold text-sky-700 underline underline-offset-2 hover:text-sky-800 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-1 rounded"
+        className="inline-flex items-center self-start sm:self-auto shrink-0 font-semibold text-accent underline underline-offset-2 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 rounded"
       >
         Update Preferences
       </Link>

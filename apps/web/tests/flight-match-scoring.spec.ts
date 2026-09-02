@@ -89,54 +89,54 @@ describe('FlightMatchBadge (T050)', (): void => {
   });
 
   describe('Eligible presentation with semantic styling', (): void => {
-    it('renders STRONG match level with emerald semantic classes and 85% score', (): void => {
+    it('renders STRONG match level with semantic classes and 85% score', (): void => {
       const result = mockEligibleResult(85, 'STRONG');
       const html = renderToStaticMarkup(
         React.createElement(FlightMatchBadge, { matchResult: result }),
       );
 
-      assert.match(html, /text-emerald-700/);
-      assert.match(html, /bg-emerald-50/);
-      assert.match(html, /border-emerald-200/);
+      assert.match(html, /text-text-match-strong/);
+      assert.match(html, /bg-bg-match-strong/);
+      assert.match(html, /border-text-match-strong\/30/);
       assert.match(html, /85%/);
       assert.match(html, /Strong Match/i);
     });
 
-    it('renders GOOD match level with sky semantic classes and 65% score', (): void => {
+    it('renders GOOD match level with semantic classes and 65% score', (): void => {
       const result = mockEligibleResult(65, 'GOOD');
       const html = renderToStaticMarkup(
         React.createElement(FlightMatchBadge, { matchResult: result }),
       );
 
-      assert.match(html, /text-sky-700/);
-      assert.match(html, /bg-sky-50/);
-      assert.match(html, /border-sky-200/);
+      assert.match(html, /text-text-match-good/);
+      assert.match(html, /bg-bg-match-good/);
+      assert.match(html, /border-text-match-good\/30/);
       assert.match(html, /65%/);
       assert.match(html, /Good Match/i);
     });
 
-    it('renders FAIR match level with amber semantic classes and 40% score', (): void => {
+    it('renders FAIR match level with semantic classes and 40% score', (): void => {
       const result = mockEligibleResult(40, 'FAIR');
       const html = renderToStaticMarkup(
         React.createElement(FlightMatchBadge, { matchResult: result }),
       );
 
-      assert.match(html, /text-amber-700/);
-      assert.match(html, /bg-amber-50/);
-      assert.match(html, /border-amber-200/);
+      assert.match(html, /text-text-match-fair/);
+      assert.match(html, /bg-bg-match-fair/);
+      assert.match(html, /border-text-match-fair\/30/);
       assert.match(html, /40%/);
       assert.match(html, /Fair Match/i);
     });
 
-    it('renders WEAK match level with slate semantic classes and 15% score', (): void => {
+    it('renders WEAK match level with semantic classes and 15% score', (): void => {
       const result = mockEligibleResult(15, 'WEAK');
       const html = renderToStaticMarkup(
         React.createElement(FlightMatchBadge, { matchResult: result }),
       );
 
-      assert.match(html, /text-slate-600/);
-      assert.match(html, /bg-slate-100/);
-      assert.match(html, /border-slate-200/);
+      assert.match(html, /text-text-match-weak/);
+      assert.match(html, /bg-bg-match-weak/);
+      assert.match(html, /border-text-match-weak\/30/);
       assert.match(html, /15%/);
       assert.match(html, /Weak Match/i);
     });
@@ -163,6 +163,9 @@ describe('FlightMatchBadge (T050)', (): void => {
 
       assert.match(html, /aria-label="Flight violates preference: Blacklisted airline"/);
       assert.match(html, /Blacklisted airline/);
+      assert.match(html, /text-text-cancelled/);
+      assert.match(html, /bg-bg-cancelled/);
+      assert.match(html, /border-danger-border/);
       assert.doesNotMatch(html, /#/); // Never use hardcoded hex
     });
 
@@ -412,12 +415,12 @@ describe('FlightMatchBreakdown (T051)', (): void => {
         React.createElement(FlightMatchBreakdown, { matchResult: result }),
       );
 
-      // Emerald for POSITIVE
-      assert.match(html, /text-emerald-700|bg-emerald-50/);
-      // Slate for NEUTRAL
-      assert.match(html, /text-slate-600|bg-slate-100/);
-      // Rose for NEGATIVE
-      assert.match(html, /text-rose-700|bg-rose-50/);
+      // Semantic tokens for POSITIVE
+      assert.match(html, /text-text-match-strong|bg-bg-match-strong/);
+      // Semantic tokens for NEUTRAL
+      assert.match(html, /text-text-secondary|bg-background/);
+      // Semantic tokens for NEGATIVE
+      assert.match(html, /text-text-cancelled|bg-bg-cancelled/);
       // No hardcoded hex
       assert.doesNotMatch(html, /#[0-9a-fA-F]{3,6}/);
     });
@@ -448,7 +451,8 @@ describe('FlightMatchBreakdown (T051)', (): void => {
 
       assert.match(html, /<details/);
       assert.match(html, /Blacklisted airline \(Spirit\)/);
-      assert.match(html, /text-rose-700|bg-rose-50|border-rose-200/);
+      assert.match(html, /text-text-cancelled|bg-bg-cancelled|border-danger-border/);
+      assert.match(html, /focus-visible:ring-accent/);
       assert.doesNotMatch(html, /#[0-9a-fA-F]{3,6}/);
     });
   });
@@ -591,6 +595,11 @@ describe('FlightRankingBanner (T052)', (): void => {
       const html = renderToStaticMarkup(
         React.createElement(FlightRankingBanner, { mode: 'RANKED' }),
       );
+      assert.match(html, /border-card-border/);
+      assert.match(html, /bg-card/);
+      assert.match(html, /text-text-secondary/);
+      assert.match(html, /text-accent/);
+      assert.match(html, /focus-visible:ring-accent/);
       assert.doesNotMatch(html, /#[0-9a-fA-F]{3,6}/);
     });
   });
@@ -699,6 +708,12 @@ describe('FlightResultsControls (T052)', (): void => {
       const html = renderToStaticMarkup(
         React.createElement(FlightResultsControls, { mode: 'MATCHED' }),
       );
+      assert.match(html, /text-text-secondary/);
+      assert.match(html, /border-secondary-border/);
+      assert.match(html, /bg-card/);
+      assert.match(html, /text-text-primary/);
+      assert.match(html, /focus:border-accent/);
+      assert.match(html, /focus:ring-accent/);
       assert.doesNotMatch(html, /#[0-9a-fA-F]{3,6}/);
     });
   });

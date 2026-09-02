@@ -32,17 +32,17 @@ const DIMENSION_LABELS: Readonly<Record<FlightMatchDimension, string>> = Object.
 
 const SIGNAL_STYLES = Object.freeze({
   POSITIVE: {
-    badge: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+    badge: 'text-text-match-strong bg-bg-match-strong border-text-match-strong/30',
     label: 'Positive',
     path: 'M5 13l4 4L19 7',
   },
   NEUTRAL: {
-    badge: 'text-slate-600 bg-slate-100 border-slate-200',
+    badge: 'text-text-secondary bg-background border-card-border',
     label: 'Neutral',
     path: 'M5 12h14',
   },
   NEGATIVE: {
-    badge: 'text-rose-700 bg-rose-50 border-rose-200',
+    badge: 'text-text-cancelled bg-bg-cancelled border-danger-border/30',
     label: 'Negative',
     path: 'M6 18L18 6M6 6l12 12',
   },
@@ -65,18 +65,18 @@ export function FlightMatchBreakdown({
   if (!matchResult.eligibility.eligible) {
     return (
       <details className={combinedContainerClass}>
-        <summary className="cursor-pointer select-none font-medium text-rose-700 hover:text-rose-800 focus:outline-none">
+        <summary className="cursor-pointer select-none font-medium text-text-cancelled hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 rounded">
           {label}
         </summary>
         <div
           role="region"
           aria-label="Constraint violations"
-          className="mt-2 space-y-2 rounded-md border border-rose-200 bg-rose-50 p-3 text-rose-800"
+          className="mt-2 space-y-2 rounded-md border border-danger-border bg-bg-cancelled p-3 text-text-cancelled"
         >
-          <div className="font-semibold text-rose-900">Preference constraints not met:</div>
+          <div className="font-semibold text-text-cancelled">Preference constraints not met:</div>
           <ul className="list-inside list-disc space-y-1">
             {matchResult.eligibility.violations.map((violation, index) => (
-              <li key={index} className="text-rose-800">
+              <li key={index} className="text-text-cancelled">
                 <span>{formatExplanation(violation.explanation)}</span>
               </li>
             ))}
@@ -94,17 +94,17 @@ export function FlightMatchBreakdown({
 
   return (
     <details className={combinedContainerClass}>
-      <summary className="cursor-pointer select-none font-medium text-slate-700 hover:text-slate-900 focus:outline-none">
+      <summary className="cursor-pointer select-none font-medium text-text-secondary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 rounded">
         {label}
       </summary>
       <div
         role="region"
         aria-label="Flight match breakdown"
-        className="mt-2 space-y-2 rounded-md border border-slate-200 bg-slate-50 p-3"
+        className="mt-2 space-y-2 rounded-md border border-card-border bg-card p-3"
       >
-        <div className="flex items-center justify-between border-b border-slate-200 pb-1.5 text-slate-500">
-          <span className="font-semibold text-slate-700">Match Dimension</span>
-          <span className="font-semibold text-slate-700">Evaluation</span>
+        <div className="flex items-center justify-between border-b border-card-border pb-1.5 text-text-muted">
+          <span className="font-semibold text-text-secondary">Match Dimension</span>
+          <span className="font-semibold text-text-secondary">Evaluation</span>
         </div>
         <ul className="space-y-1.5">
           {sortedBreakdown.map((item) => {
@@ -119,8 +119,8 @@ export function FlightMatchBreakdown({
                 className="flex items-center justify-between gap-2 text-xs"
               >
                 <div className="flex flex-col">
-                  <span className="font-medium text-slate-800">{dimensionTitle}</span>
-                  <span className="text-slate-500">{explanationText}</span>
+                  <span className="font-medium text-text-primary">{dimensionTitle}</span>
+                  <span className="text-text-muted">{explanationText}</span>
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
                   <span
@@ -143,7 +143,7 @@ export function FlightMatchBreakdown({
                     </svg>
                     <span>{signalConfig.label}</span>
                   </span>
-                  <span className="w-8 text-right font-mono text-xs font-semibold text-slate-700">
+                  <span className="w-8 text-right font-mono text-xs font-semibold text-text-secondary">
                     {scorePercent}%
                   </span>
                 </div>

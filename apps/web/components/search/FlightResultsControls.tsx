@@ -56,7 +56,7 @@ export function FlightResultsControls({
 
   return (
     <div className={containerClasses}>
-      <div className="text-sm font-medium text-slate-700">
+      <div className="text-sm font-medium text-text-secondary">
         {typeof totalResults === 'number' && (
           <span>
             {totalResults} {totalResults === 1 ? 'flight found' : 'flights found'}
@@ -65,7 +65,7 @@ export function FlightResultsControls({
       </div>
 
       <div className="flex items-center gap-2 self-end sm:self-auto">
-        <label htmlFor="flight-sort-select" className="text-xs font-medium text-slate-600">
+        <label htmlFor="flight-sort-select" className="text-xs font-medium text-text-secondary">
           Sort by
         </label>
         <select
@@ -75,7 +75,7 @@ export function FlightResultsControls({
           onChange={(event) => {
             onSortChange?.(event.target.value as FlightSortOption);
           }}
-          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 shadow-sm transition focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+          className="rounded-md border border-secondary-border bg-card px-3 py-1.5 text-xs font-medium text-text-primary shadow-sm transition focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
         >
           {options.map((option) => (
             <option key={option.value} value={option.value}>
