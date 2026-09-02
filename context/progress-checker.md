@@ -23,6 +23,7 @@ Update this file after every completed feature. Any AI agent reading this should
   - T047 added explicit boundary coverage for case-insensitive provider-prefixed ID rejection, recursive `duffelOfferId` absence, byte-for-byte local-ID/order preservation, dimension bounds, eligible breakdown weight integrity summing to 1.000000, and max 20 offer cardinality.
   - T048 added pure `formatExplanation(Explanation): string` coverage for all 24 allowlisted keys and 25 valid outputs, including both direct and multi-stop relative copy.
   - T049 added total runtime handling for unknown keys, prototype-inherited property names (`toString`, `__proto__`, etc.), missing/null/non-object/wrong-typed parameters, family-specific safe fallbacks, and ordered HTML-entity escaping for dynamic airline/window text.
+  - Characterization fixture alignment: updated `search-seam.characterization.spec.ts` fixture to supply valid `mode: 'RANKED'`, `matchResult: null`, and complete `meta` to conform with `UpstreamRankedSearchSchema`.
   - Independent slice verification: server seam 40/40 PASS; explanation formatter 18/18 PASS; web TypeScript and Next lint completed without errors or warnings.
   - Commits: `4caedb6` (T046), `b01bf66` (T047), `2ea9e45` (T048), `a9312fa` (T049), `2241dd6` (fix wave).
 
