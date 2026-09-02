@@ -1,9 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { CABIN_RANK, CabinClass } from '@/flight-match/flight-match.policy';
 import { DuffelOffer } from '@/duffel/duffel.types';
-import { ScoredOffer, ScoringPreferences } from '@/flight-match/flight-match.types';
+import { RankedOffer, ScoredOffer, ScoringPreferences } from '@/flight-match/flight-match.types';
 import { ProfileService } from '@/profile/profile.service';
 import { FlightMatchScorerService } from '@/flight-match/flight-match-scorer.service';
+import { CategoryRankerService } from '@/flight-match/category-ranker.service';
 import { normalizeFlightOffers } from './flight-offer-normalizer';
 
 export interface OrchestratorParams {
@@ -25,7 +26,7 @@ export interface OrchestratorParams {
 
 export interface OrchestratedFlightResult {
   readonly rawOffer: DuffelOffer;
-  readonly scoredOffer: ScoredOffer;
+  readonly scoredOffer: ScoredOffer | RankedOffer;
 }
 
 export interface SearchMeta {
@@ -33,9 +34,9 @@ export interface SearchMeta {
   readonly searchHash: string;
   readonly cached: boolean;
   readonly requestedCabinClass: string;
-  readonly scoringVersion: 'flight-match-v1';
-  readonly eligibleCount: number;
-  readonly matchLevelCounts: {
+  readonly scoringVersion: 'flight-match-v1' | null;
+  readonly eligibleCount?: number;
+  readonly matchLevelCounts?: {
     readonly STRONG: number;
     readonly GOOD: number;
     readonly FAIR: number;
@@ -44,7 +45,7 @@ export interface SearchMeta {
 }
 
 export interface OrchestratedSearchResponse {
-  readonly mode: 'MATCHED';
+  readonly mode: 'MATCHED' | 'RANKED';
   readonly results: readonly OrchestratedFlightResult[];
   readonly meta: SearchMeta;
   readonly droppedCount: number;
@@ -57,6 +58,35 @@ export function normalizeCabinClass(cabin: string | null | undefined): CabinClas
   return key in CABIN_RANK ? (key as CabinClass) : null;
 }
 
+export function hasEffectivePreferences(preferences: ScoringPreferences): boolean {
+  if (!preferences) return false;
+  if (preferences.preferredAirlines && preferences.preferredAirlines.length > 0) return true;
+  if (preferences.blacklistedAirlines && preferences.blacklistedAirlines.length > 0) return true;
+  if (
+    preferences.classPreference !== null &&
+    preferences.classPreference !== undefined &&
+    preferences.classPreference.trim() !== ''
+  ) {
+    return true;
+  }
+  if (preferences.preferredDepartureWindow !== null && preferences.preferredDepartureWindow !== undefined) {
+    return true;
+  }
+  if (preferences.preferredArrivalWindow !== null && preferences.preferredArrivalWindow !== undefined) {
+    return true;
+  }
+  if (preferences.maxStops !== null && preferences.maxStops !== undefined) {
+    return true;
+  }
+  if (preferences.priceSensitivity !== null && preferences.priceSensitivity !== undefined) {
+    return true;
+  }
+  if (preferences.requiresCheckedBaggage !== null && preferences.requiresCheckedBaggage !== undefined) {
+    return true;
+  }
+  return false;
+}
+
 @Injectable()
 export class FlightSearchOrchestratorService {
   private readonly logger = new Logger(FlightSearchOrchestratorService.name);
@@ -64,6 +94,7 @@ export class FlightSearchOrchestratorService {
   constructor(
     private readonly profileService: ProfileService,
     private readonly scorer: FlightMatchScorerService,
+    private readonly categoryRanker: CategoryRankerService,
   ) {}
 
   async orchestrateSearch(params: OrchestratorParams): Promise<OrchestratedSearchResponse> {
@@ -124,6 +155,35 @@ export class FlightSearchOrchestratorService {
       ...profilePrefs,
       classPreference: effectiveClassPreference,
     };
+
+    const hasPersonalization = hasEffectivePreferences(effectivePreferences);
+
+    if (!hasPersonalization) {
+      const rankedOffers = this.categoryRanker.rank(canonicalOffers);
+      const results: OrchestratedFlightResult[] = rankedOffers.map((offer) => ({
+        rawOffer: params.rawOffers[offer.originalIndex],
+        scoredOffer: {
+          offer,
+          matchResult: null,
+        },
+      }));
+
+      const meta: SearchMeta = {
+        totalResults: canonicalOffers.length,
+        searchHash: params.searchHash,
+        cached: params.cached,
+        requestedCabinClass: params.query.cabinClass || 'economy',
+        scoringVersion: null,
+      };
+
+      return {
+        mode: 'RANKED',
+        results,
+        meta,
+        droppedCount: normalized.droppedCount,
+        rejectionCounts: normalized.rejectionCounts,
+      };
+    }
 
     const scoredOffers = this.scorer.scoreAll(canonicalOffers, effectivePreferences);
 
