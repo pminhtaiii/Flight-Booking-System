@@ -20,11 +20,11 @@ Update this file after every completed feature. Any AI agent reading this should
 
 - [x] Phase 5 / Slice 1: Server Boundary & Explanation Safety (T046–T049) (2026-09-02):
   - T046 replaced the temporary untagged-response fallback with an exact `MATCHED | RANKED` discriminated upstream schema. MATCHED offers require valid non-null match results and complete `flight-match-v1` counts; RANKED offers require null match results and null scoring version.
-  - T047 added explicit boundary coverage for case-insensitive provider-prefixed ID rejection, recursive `duffelOfferId` absence, byte-for-byte local-ID/order preservation, dimension bounds, and six-decimal active-weight totals.
+  - T047 added explicit boundary coverage for case-insensitive provider-prefixed ID rejection, recursive `duffelOfferId` absence, byte-for-byte local-ID/order preservation, dimension bounds, eligible breakdown weight integrity summing to 1.000000, and max 20 offer cardinality.
   - T048 added pure `formatExplanation(Explanation): string` coverage for all 24 allowlisted keys and 25 valid outputs, including both direct and multi-stop relative copy.
-  - T049 added total runtime handling for unknown keys, missing/null/non-object/wrong-typed parameters, family-specific safe fallbacks, and ordered HTML-entity escaping for dynamic airline/window text.
-  - Independent slice verification: server seam 34/34 PASS; explanation formatter 17/17 PASS; web TypeScript and Next lint completed without errors or warnings.
-  - Commits: `4caedb6` (T046), `b01bf66` (T047), `2ea9e45` (T048), `a9312fa` (T049).
+  - T049 added total runtime handling for unknown keys, prototype-inherited property names (`toString`, `__proto__`, etc.), missing/null/non-object/wrong-typed parameters, family-specific safe fallbacks, and ordered HTML-entity escaping for dynamic airline/window text.
+  - Independent slice verification: server seam 40/40 PASS; explanation formatter 18/18 PASS; web TypeScript and Next lint completed without errors or warnings.
+  - Commits: `4caedb6` (T046), `b01bf66` (T047), `2ea9e45` (T048), `a9312fa` (T049), `2241dd6` (fix wave).
 
 - [x] Phase 4 / Task T045: Cache & Regression Verification for RANKED Mode (2026-09-02):
   - In `apps/api/test/flights-search.e2e-spec.ts`, verified that `mode: RANKED` searches (cold start searches without preferences) preserve all system invariants:

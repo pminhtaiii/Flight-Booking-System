@@ -318,6 +318,7 @@ export async function selectFlightOffer(offerId: string): Promise<FlightSelectio
 
 async function getAccessToken(): Promise<string | null> {
   try {
+    // Handle both ESM and CJS NextAuth module exports depending on runtime bundler environment
     const sessionFn =
       typeof NextAuth.getServerSession === 'function'
         ? NextAuth.getServerSession
@@ -329,6 +330,7 @@ async function getAccessToken(): Promise<string | null> {
     if (!sessionFn) return null;
     const session: unknown = await sessionFn(authOptions);
     if (!session || typeof session !== 'object' || !('accessToken' in session)) return null;
+    // Extract custom accessToken property from authenticated session object
     const token = (session as { accessToken?: unknown }).accessToken;
     return typeof token === 'string' && token.length > 0 ? token : null;
   } catch {
