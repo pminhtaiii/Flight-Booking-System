@@ -63,8 +63,8 @@ function formatScheduleWindow(
 }
 
 export function formatExplanation(explanation: Explanation): string {
-  const rawParams: unknown = explanation.params;
-  const params = isRuntimeParams(rawParams) ? rawParams : {};
+  const candidateParams: unknown = explanation.params;
+  const params = isRuntimeParams(candidateParams) ? candidateParams : {};
 
   switch (explanation.key) {
     case 'match.price.below_median':
