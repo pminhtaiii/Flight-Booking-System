@@ -6,17 +6,25 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Flight Match Scoring (Feature 022) — Task T045: Cache & Regression Verification for RANKED Mode
-**Last completed:** Task T045: Verified that `mode: RANKED` searches preserve all system invariants (DB writes/upserts on cache miss/hit, Redis raw caching under `searchHash`, 0 external Duffel API calls & budget unchanged on cache hit, security headers `Cache-Control: private, no-store` / no `ETag`, rate limiting 429, airport validation 400, and upstream error 502).
-**Previous completed:** Task T044: Added comprehensive cold-start E2E contract test coverage in `apps/api/test/flights-match-scoring.e2e-spec.ts`.
+**Feature:** Flight Match Scoring (Feature 022) — Phase 5 / Slice 1: Server Boundary & Explanation Safety (T046–T049)
+**Last completed:** T046–T049: Enforced strict mode-tagged Next.js server parsing, provider-ID rejection/stripping, local-ID and order preservation, complete allowlisted explanation copy, malformed-parameter fallbacks, and HTML-safe dynamic interpolation.
+**Previous completed:** Task T045: Verified that `mode: RANKED` searches preserve cache, database write-behind, budget, security-header, validation, and upstream-error invariants.
 **In progress:** None.
-**Next:** Task T046 [US3] — Backend Profile CRUD & DTOs for 8 scoring preference dimensions.
+**Next:** Task T050 [US3] — Drive MATCHED score/level presentation through the first Playwright/UI vertical slice.
 
 ---
 
 ## Progress by Feature
 
 ### [ ] Feature: Flight Match Scoring (Feature 022)
+
+- [x] Phase 5 / Slice 1: Server Boundary & Explanation Safety (T046–T049) (2026-09-02):
+  - T046 replaced the temporary untagged-response fallback with an exact `MATCHED | RANKED` discriminated upstream schema. MATCHED offers require valid non-null match results and complete `flight-match-v1` counts; RANKED offers require null match results and null scoring version.
+  - T047 added explicit boundary coverage for case-insensitive provider-prefixed ID rejection, recursive `duffelOfferId` absence, byte-for-byte local-ID/order preservation, dimension bounds, and six-decimal active-weight totals.
+  - T048 added pure `formatExplanation(Explanation): string` coverage for all 24 allowlisted keys and 25 valid outputs, including both direct and multi-stop relative copy.
+  - T049 added total runtime handling for unknown keys, missing/null/non-object/wrong-typed parameters, family-specific safe fallbacks, and ordered HTML-entity escaping for dynamic airline/window text.
+  - Independent slice verification: server seam 34/34 PASS; explanation formatter 17/17 PASS; web TypeScript and Next lint completed without errors or warnings.
+  - Commits: `4caedb6` (T046), `b01bf66` (T047), `2ea9e45` (T048), `a9312fa` (T049).
 
 - [x] Phase 4 / Task T045: Cache & Regression Verification for RANKED Mode (2026-09-02):
   - In `apps/api/test/flights-search.e2e-spec.ts`, verified that `mode: RANKED` searches (cold start searches without preferences) preserve all system invariants:
