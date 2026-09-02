@@ -284,9 +284,7 @@ export class FlightMatchScorerService {
             const h = o.outboundArrivalHour;
             if (isHourInWindow(h, window)) return 1.0;
             const dist = hourDistanceToWindow(h, window);
-            return dist <= SCHEDULE_SHOULDER_HOURS
-              ? round6(1 - (dist / SCHEDULE_SHOULDER_HOURS) * 0.5)
-              : 0.0;
+            return round6(clamp(1 - dist / SCHEDULE_SHOULDER_HOURS, 0, 1));
           };
           const first = getScore(eligibleOffers[0]);
           for (let i = 1; i < eligibleOffers.length; i++) {
@@ -320,9 +318,7 @@ export class FlightMatchScorerService {
             const h = o.outboundDepartureHour;
             if (isHourInWindow(h, window)) return 1.0;
             const dist = hourDistanceToWindow(h, window);
-            return dist <= SCHEDULE_SHOULDER_HOURS
-              ? round6(1 - (dist / SCHEDULE_SHOULDER_HOURS) * 0.5)
-              : 0.0;
+            return round6(clamp(1 - dist / SCHEDULE_SHOULDER_HOURS, 0, 1));
           };
           const first = getScore(eligibleOffers[0]);
           for (let i = 1; i < eligibleOffers.length; i++) {

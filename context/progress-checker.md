@@ -6,17 +6,83 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Flight Match Scoring (Feature 022) — Phase 1, Phase 2, and Phase 3 / Slices 1–6 Complete (Tasks T001–T035)
-**Last completed:** Phase 3 / Slice 6 (T033–T035): Implemented `FlightSearchOrchestratorService` core normalization (canonical first 20), profile scoring fetch, query cabin precedence override, raw-cache hit rescoring, metadata aggregation (`SearchMeta`), invalid offer telemetry, and zero score persistence. Wired NestJS modules (`FlightMatchModule` exporting `FlightMatchScorerService`, `FlightsModule` importing `FlightMatchModule` and `ProfileModule` and exporting `FlightSearchOrchestratorService`), with acyclic dependency graph verification and 255/255 passing tests (2026-09-01).
-**Previous completed:** Phase 3 / Slice 5 (T032): Implemented dimension breakdown ordering strictly adhering to canonical `POLICY_DIMENSION_ORDER`, metadata inclusion (`scoringVersion: 'flight-match-v1'`, `activeWeights`), and multi-attribute 7-tier tie-breaking ranking in `FlightMatchScorerService.scoreAll()`, with isolated tie-breaking layer coverage, ineligible offer handling, degenerate cases, deep freeze immutability, and 157/157 passing tests (2026-09-01).
-**In progress:** None — Phase 3 / Slice 6 (T033–T035) is complete. Consumer delegation & verification (T036–T039) remain pending.
-**Next:** Phase 3 / User Story 1 (T036–T039): FlightsService cache upsert / delegation (T036), DTO / controller / headers (T037), and API/E2E verification & benchmark (T038–T039).
+**Feature:** Flight Match Scoring (Feature 022) — Schedule Variance Formula Fix
+**Last completed:** Fixed schedule variance formula divergence for ARRIVAL_SCHEDULE and DEPARTURE_SCHEDULE to use canonical shoulder decay rate `round6(clamp(1 - dist / SCHEDULE_SHOULDER_HOURS, 0, 1))`. Added zero-variance collapse unit tests for 6+ hour window distance.
+**Previous completed:** Phase 11 convergence tasks T084–T085: complete MATCHED OpenAPI scalar/format/cardinality coverage and stable strict warmed 20-offer scorer p95 below 5 ms (2026-09-02).
+**In progress:** None.
+**Next:** Ready for final review.
 
 ---
 
 ## Progress by Feature
 
 ### [ ] Feature: Flight Match Scoring (Feature 022)
+
+- [x] Schedule Variance Formula Fix (2026-09-02):
+  - Fixed `computeEffectiveWeights` variance detection for `ARRIVAL_SCHEDULE` and `DEPARTURE_SCHEDULE` in `apps/api/src/flight-match/flight-match-scorer.service.ts` to use canonical decay `round6(clamp(1 - dist / SCHEDULE_SHOULDER_HOURS, 0, 1))` instead of decaying at half the rate and jumping from 0.5 to 0.0 at 6 hours.
+  - Added unit tests in `apps/api/src/flight-match/flight-match-scorer.service.spec.ts` proving zero-variance collapse occurs when all offers fall 6+ hours outside the preferred window.
+  - Full flight-match test suites passed (234/234 unit tests, 3/3 performance benchmark tests, 110/110 shared tests, ESLint clean, and tsc noEmit clean).
+
+- [x] Phase 11 / Convergence Closure (T084–T085) (2026-09-02):
+  - T084 RED was the missing `validateMatchedScalarAndCardinalityConstraints` helper; the focused endpoint test then passed 1/1, exit 0 (`25.442 s`). The full `flights-match-scoring.e2e-spec.ts` passed 9/9, exit 0 (`34.933 s`).
+  - T084 validates SearchMeta scalar types and non-negative integer counts; offer string, airport, date-time, integer, numeric, currency, nullable, cabin, and cabin-match constraints; outbound/return segment cardinalities and segment scalar/enum constraints; and an exercised downgraded-cabin mismatch array with exact keys, non-negative integer index, leg/cabin enums, and string route.
+  - T085 reproduced the unchanged strict scorer p95 assertion failure in one of five pre-optimization sequential runs: p95 `1.7384`, `9.4300` (failed), `1.4173`, `2.0238`, and `2.6624 ms`.
+  - `FlightMatchScorerService` now memoizes normalized readonly airline-code arrays through a `WeakMap`, eliminating repeated normalization allocations while retaining value-based scoring and allowing unused arrays to be collected.
+  - Full performance verification passed 3/3, exit 0 (`43.232 s`): scorer p95 `0.6448 ms`, warmed orchestrator p95 `3.2457 ms`, and every ordered full match result remained identical across 1,000 passes.
+  - Five post-optimization sequential focused benchmark runs passed at p95 `0.7729`, `0.7593`, `1.4886`, `3.1792`, and `1.4080 ms`, all strictly below the unchanged 5 ms threshold.
+  - Controller/service/scorer/performance verification passed 175/175, exit 0 (`58.481 s`); scorer p95 was `1.1631 ms` and warmed orchestrator p95 was `1.6303 ms`.
+  - `& '.\node_modules\.bin\tsc.CMD' -p tsconfig.json --noEmit` from `apps/api` passed with exit 0; `git diff --check` passed with exit 0. The equivalent documented pnpm recursive exec command could not resolve `tsc` in this checkout, so the installed workspace binary supplied the typecheck evidence.
+
+- [x] Phase 10 / Convergence Closure (T080–T083) (2026-09-02):
+  - Focused convergence E2E: strict MATCHED schema, agent-warmed cache recovery/detail, and public-schema table scan passed 3/3, exit 0 (`39.094 s`).
+  - Full `flights-match-scoring.e2e-spec.ts` passed 8/8, exit 0 (`34.353 s`).
+  - Controller/service/performance verification passed 18/18, exit 0 (`69.61 s`); scorer p95 was `1.0299 ms` and warmed orchestrator p95 was `1.8188 ms`.
+  - T080 validates exact allowed keys throughout the trusted MATCHED response, both match-result union branches, integer final scores, all dimension score/weight/contribution values within `0..1`, and primitive-only explanation parameters without a schema dependency.
+  - T081 queries every PostgreSQL base table in the `public` schema and rejects score-, scoring-, match-score-, or flight-match-specific table names.
+  - T082 warms the shared raw Duffel cache through `DuffelService.searchFlights(..., 'agent')`, proves the browser search is a cache hit with no second supplier search, verifies write-behind `FlightOffer`/`OfferRecovery`, and resolves the selected local ID through the authenticated public detail endpoint. Only Duffel SDK create/get boundaries are mocked.
+  - T083 adds a separate deterministic assertion that compares ordered offer IDs plus the complete match result—including weights, breakdowns, explanations, eligibility, score/level, and metadata—for each of 1,000 passes; the existing benchmark assertion is unchanged.
+  - API TypeScript and `git diff --check` verification are recorded in the convergence report.
+
+- [x] Phase 3 / Task T038: Flight Match Scoring E2E Coverage (2026-09-02):
+  - `& '.\node_modules\.bin\jest.CMD' --runInBand src/flights/flights.service.spec.ts src/flights/flights.controller.spec.ts src/flight-match/flight-match.performance.spec.ts` from `apps/api`: 17/17 tests passed, exit 0.
+  - `& '.\node_modules\.bin\jest.CMD' --config '.\test\jest-e2e.json' --runInBand test/flights-match-scoring.e2e-spec.ts` from `apps/api`: 5/5 tests passed, exit 0.
+  - `& '.\node_modules\.bin\tsc.CMD' -p tsconfig.json --noEmit` from `apps/api`: exit 0.
+  - E2E fixtures mock only the external Duffel SDK, seed three deterministic offers, and prove the public search API's complete MATCHED contract with private/no-store and no ETag.
+  - Repeated identical searches preserve ordered offer IDs, scores, dimension contributions, and active weights while making exactly one Duffel SDK call.
+  - A blacklisted VN offer remains selectable/visible after eligible results with null score/level, an empty breakdown, and one structured `BLACKLISTED_AIRLINE` violation.
+  - Updating the profile from VN to SQ after a raw-cache hit rescales the same raw results immediately (`cached: true`) with one Duffel SDK call; the ordered score projection changes.
+  - Post-write-behind checks scan `FlightOffer`, `SearchHistory`, `OfferRecovery`, PostgreSQL column metadata, and Redis keys/values and find no persisted scoring result, score-specific cache namespace, or serialized match result.
+
+- [x] Phase 3 / Task T037: Search Headers, ETag Stripping, DTO Mapping & Audit Telemetry (2026-09-01):
+  - `& '.\node_modules\.bin\jest.CMD' --runInBand src/flights/flights.controller.spec.ts src/flights/flights.service.spec.ts` from `apps/api`: 15/15 tests passed, exit 0.
+  - `& '.\node_modules\.bin\tsc.CMD' -p tsconfig.json --noEmit` from `apps/api`: exit 0.
+  - `& '.\node_modules\.bin\jest.CMD' --config test/jest-e2e.json --runInBand flights-search.e2e-spec.ts` from `apps/api`: 11/11 tests passed, exit 0.
+  - Implemented `@Res({ passthrough: true }) res: Response` in `FlightsController.search`:
+    - Sets header `Cache-Control: private, no-store`.
+    - Removes `ETag` header defensively if `removeHeader` is available.
+    - Delegates to `flightsService.search(userId, body, traceId, correlationId)`.
+  - Updated DTOs in `apps/api/src/flights/dto/search-flight.dto.ts` per `flight-search.openapi.yaml`:
+    - Root response `FlightSearchResponseDto`: `mode: 'MATCHED' | 'RANKED' = 'MATCHED'`, `results`, `meta`.
+    - `FlightSearchResponseMetaDto`: `totalResults`, `searchHash`, `cached`, `requestedCabinClass`, optional `scoringVersion`, `eligibleCount`, `matchLevelCounts`.
+    - `FlightOfferDto`: `matchResult!: FlightMatchResult | null`, `duffelOfferId!: string`.
+  - Implemented safe Audit Telemetry in `FlightsService.search`:
+    - Emits `search.completed` audit log via `auditService.createLog(this.prisma, ...)` with safe parameters: `origin`, `destination`, `departureDate`, `returnDate`, `adults`, `children`, `infants`, `cabinClass`, `mode`, `resultCount`, `eligibleCount`, `duration`, `searchHash`.
+    - Strictly omits customer PII and raw provider payloads.
+    - Retains `flight_search` audit log to preserve backward compatibility for existing assertions.
+
+- [x] Phase 3 / Task T039: Latency Benchmark Suite (2026-09-01):
+
+  - `& '.\node_modules\.bin\jest.CMD' --runInBand src/flight-match/flight-match.performance.spec.ts` from `apps/api`: 2/2 tests passed, exit 0.
+  - `& '.\node_modules\.bin\tsc.CMD' -p tsconfig.json --noEmit` from `apps/api`: exit 0.
+  - Part 1: Scorer Benchmark (1,000 deterministic passes, 20 offers):
+    - `mean: 0.74 ms`, `p50: 0.47 ms`, `p90: 0.98 ms`, `p95: 1.66 ms` (strictly under 5 ms target).
+    - 100% deterministic identical outputs (scores, order, activeWeights) verified across all 1,000 repeats.
+  - Part 2: Warmed Orchestrator Overhead Benchmark (50 warmup, 200 measured passes, 20 raw Duffel offers):
+    - `mean: 1.73 ms`, `p50: 1.31 ms`, `p90: 2.55 ms`, `p95: 3.70 ms` (strictly under 10 ms target).
+  - Performance optimizations in `FlightMatchScorerService`:
+    - Fast path for single/empty airline code normalization avoiding set allocations.
+    - Precomputed airline sets passed to `checkEligibility` and `scoreAirline` to eliminate redundant regex and Set construction.
+    - Early-exiting, allocation-free variance checks in `resolveWeights` avoiding intermediate array allocations.
 
 - [x] Phase 3 / Slice 6: Search Orchestrator Core & Module Wiring (T033–T035) (2026-09-01):
   - `& '.\node_modules\.bin\jest.CMD' --runInBand src/flights/flight-search-orchestrator.service.spec.ts src/flights/flights-module-wiring.spec.ts src/flight-match/` from `apps/api`: 255/255 tests passed, exit 0.

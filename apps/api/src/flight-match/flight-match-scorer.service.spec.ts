@@ -1643,6 +1643,54 @@ describe('FlightMatchScorerService STOPS dimension and price sensitivity (T026)'
         expect(sumWeights(weights)).toBe(1.000000);
       });
 
+      it('collapses ARRIVAL_SCHEDULE when all eligible offers fall 6+ hours outside preferredArrivalWindow (score 0.0)', () => {
+        const prefs = preferences({
+          ...fullPreferences,
+          preferredArrivalWindow: { start: 14, end: 18 },
+        });
+        const offers = [
+          offer({ ...offerA, outboundArrivalHour: 0 }), // dist: 6 -> score 0.0
+          offer({ ...offerB, outboundArrivalHour: 4 }), // dist: 10 -> score 0.0
+        ];
+        const weights = scorer.resolveWeights(offers, prefs);
+
+        // Both offers score 0.0 for arrival schedule -> zero variance -> ARRIVAL_SCHEDULE collapses to 0
+        expect(weights.ARRIVAL_SCHEDULE).toBe(0);
+        expect(weights.AIRLINE).toBe(0.15);
+        expect(weights.CABIN).toBe(0.10);
+        expect(weights.DEPARTURE_SCHEDULE).toBe(0.10);
+        expect(weights.BAGGAGE).toBe(0.10);
+        // Baseline target pool = 0.40 + 0.15 = 0.55
+        expect(weights.PRICE).toBe(0.275);
+        expect(weights.STOPS).toBe(0.165);
+        expect(weights.DURATION).toBe(0.11);
+        expect(sumWeights(weights)).toBe(1.000000);
+      });
+
+      it('collapses DEPARTURE_SCHEDULE when all eligible offers fall 6+ hours outside preferredDepartureWindow (score 0.0)', () => {
+        const prefs = preferences({
+          ...fullPreferences,
+          preferredDepartureWindow: { start: 9, end: 12 },
+        });
+        const offers = [
+          offer({ ...offerA, outboundDepartureHour: 3 }), // dist: 6 -> score 0.0
+          offer({ ...offerB, outboundDepartureHour: 23 }), // dist: 10 -> score 0.0
+        ];
+        const weights = scorer.resolveWeights(offers, prefs);
+
+        // Both offers score 0.0 for departure schedule -> zero variance -> DEPARTURE_SCHEDULE collapses to 0
+        expect(weights.DEPARTURE_SCHEDULE).toBe(0);
+        expect(weights.AIRLINE).toBe(0.15);
+        expect(weights.ARRIVAL_SCHEDULE).toBe(0.15);
+        expect(weights.CABIN).toBe(0.10);
+        expect(weights.BAGGAGE).toBe(0.10);
+        // Baseline target pool = 0.40 + 0.10 = 0.50
+        expect(weights.PRICE).toBe(0.25);
+        expect(weights.STOPS).toBe(0.15);
+        expect(weights.DURATION).toBe(0.10);
+        expect(sumWeights(weights)).toBe(1.000000);
+      });
+
       it('cancels collapse when all baseline dimensions are zero-variance and distributes full target in 20:12:8 ratio', () => {
         // Both offers have identical price, stops, duration
         const offers = [
