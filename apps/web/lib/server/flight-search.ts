@@ -7,6 +7,7 @@ import {
   FlightSearchOfferViewSchema,
   FlightSearchQuerySchema,
   type FlightSearchOutcome,
+  type FlightSearchOfferView,
   type FlightSearchQuery,
   type FlightSearchSegmentView,
   type FlightSearchSliceView,
@@ -300,7 +301,7 @@ function apiUrl(): string {
   return configuredUrl.replace(/\/+$/, '');
 }
 
-function mapOffer(offer: UpstreamOffer) {
+function mapOffer(offer: UpstreamOffer): FlightSearchOfferView {
   return {
     id: offer.id,
     price: offer.price,
