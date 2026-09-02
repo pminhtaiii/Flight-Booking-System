@@ -6,17 +6,25 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Flight Match Scoring (Feature 022) — Schedule Variance Formula Fix
-**Last completed:** Fixed schedule variance formula divergence for ARRIVAL_SCHEDULE and DEPARTURE_SCHEDULE to use canonical shoulder decay rate `round6(clamp(1 - dist / SCHEDULE_SHOULDER_HOURS, 0, 1))`. Added zero-variance collapse unit tests for 6+ hour window distance.
-**Previous completed:** Phase 11 convergence tasks T084–T085: complete MATCHED OpenAPI scalar/format/cardinality coverage and stable strict warmed 20-offer scorer p95 below 5 ms (2026-09-02).
+**Feature:** Flight Match Scoring (Feature 022) — Task T040 & T041: Category Ranker & Degenerate Sets / Ties / Invariants
+**Last completed:** Task T040 & T041: Verified 5-tier objective sorting criteria in `CategoryRankerService`, degenerate empty/single offer sets, multi-attribute ties with input permutations, deep frozen input immutability, and `FlightMatchModule` registration and isolation.
+**Previous completed:** Schedule Variance Formula Fix (2026-09-02) and Phase 11 convergence tasks T084–T085.
 **In progress:** None.
-**Next:** Ready for final review.
+**Next:** Task T042 [US2] — Personalization truth table in `FlightSearchOrchestratorService`.
 
 ---
 
 ## Progress by Feature
 
 ### [ ] Feature: Flight Match Scoring (Feature 022)
+
+- [x] Phase 4 / Tasks T040 & T041: Category Ranker & Invariants (2026-09-02):
+  - Verified 5-tier objective cold-start sorting (stops > price > duration > red-eye penalty > originalIndex) in `CategoryRankerService`.
+  - Added degenerate set handling (`[]` -> `[]`, `[single]` -> `[single]`) with fresh array reference guarantees (`expect(result).not.toBe(input)`).
+  - Added multi-attribute tie testing across all permutations preserving supplier `originalIndex`.
+  - Added deep frozen input non-mutation assertions with `Object.freeze`.
+  - Verified `FlightMatchModule` provider registration and export isolation.
+  - All test suites passing (258/258 tests across 4 suites in `src/flight-match/`, exit code 0; `tsc` and `eslint` clean).
 
 - [x] Schedule Variance Formula Fix (2026-09-02):
   - Fixed `computeEffectiveWeights` variance detection for `ARRIVAL_SCHEDULE` and `DEPARTURE_SCHEDULE` in `apps/api/src/flight-match/flight-match-scorer.service.ts` to use canonical decay `round6(clamp(1 - dist / SCHEDULE_SHOULDER_HOURS, 0, 1))` instead of decaying at half the rate and jumping from 0.5 to 0.0 at 6 hours.

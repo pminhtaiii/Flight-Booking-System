@@ -5,6 +5,7 @@ import type {
   PriceSensitivity,
   ExplanationKey,
 } from '@shared/types';
+import type { FlightMatchInput } from './flight-match.types';
 
 /** Canonical scoring policy version tag for flight match scoring v1. */
 export const SCORING_POLICY_VERSION = 'flight-match-v1' as const;
@@ -298,4 +299,43 @@ export function hourDistanceToWindow(hour: number, window: HourWindow): number {
     circularHourDistance(hour, window.end),
   );
 }
+
+/**
+ * Deterministic 5-tier objective comparison for flight offers:
+ * 1. stops ascending (direct/nonstop first)
+ * 2. price ascending (cheapest first)
+ * 3. duration ascending (shortest first)
+ * 4. departure red-eye penalty ascending (daytime 0 before red-eye 1)
+ * 5. originalIndex ascending (stable supplier tie-breaker)
+ */
+export function compareObjectiveTiers(
+  a: FlightMatchInput,
+  b: FlightMatchInput,
+): number {
+  // Tier 1: stops ascending
+  if (a.stops !== b.stops) {
+    return a.stops - b.stops;
+  }
+
+  // Tier 2: price ascending
+  if (a.price !== b.price) {
+    return a.price - b.price;
+  }
+
+  // Tier 3: duration ascending
+  if (a.duration !== b.duration) {
+    return a.duration - b.duration;
+  }
+
+  // Tier 4: departure red-eye penalty ascending
+  const aPenalty = getRedEyePenalty(a.outboundDepartureHour);
+  const bPenalty = getRedEyePenalty(b.outboundDepartureHour);
+  if (aPenalty !== bPenalty) {
+    return aPenalty - bPenalty;
+  }
+
+  // Tier 5: originalIndex ascending (stable supplier tie-breaker)
+  return a.originalIndex - b.originalIndex;
+}
+
 
