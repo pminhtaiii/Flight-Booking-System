@@ -24,7 +24,7 @@ Update this file after every completed feature. Any AI agent reading this should
   - Added multi-attribute tie testing across all permutations preserving supplier `originalIndex`.
   - Added deep frozen input non-mutation assertions with `Object.freeze`.
   - Verified `FlightMatchModule` provider registration and export isolation.
-  - All test suites passing (253/253 tests across 4 suites in `src/flight-match/`, exit code 0; `tsc` and `eslint` clean).
+  - All test suites passing (258/258 tests across 4 suites in `src/flight-match/`, exit code 0; `tsc` and `eslint` clean).
 
 - [x] Schedule Variance Formula Fix (2026-09-02):
   - Fixed `computeEffectiveWeights` variance detection for `ARRIVAL_SCHEDULE` and `DEPARTURE_SCHEDULE` in `apps/api/src/flight-match/flight-match-scorer.service.ts` to use canonical decay `round6(clamp(1 - dist / SCHEDULE_SHOULDER_HOURS, 0, 1))` instead of decaying at half the rate and jumping from 0.5 to 0.0 at 6 hours.

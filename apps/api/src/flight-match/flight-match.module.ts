@@ -5,7 +5,7 @@ import { CategoryRankerService } from './category-ranker.service';
 /**
  * Clean NestJS module scaffold for pure flight match scoring and category ranking.
  * Zero external infrastructure imports (no Prisma, no HTTP, no Redis, no cache, no profile, no duffel).
- * Providers (FlightMatchScorerService, CategoryRankerService) are registered in Phase 3 when implementations exist.
+ * Registers and exports FlightMatchScorerService and CategoryRankerService.
  */
 @Module({
   imports: [],
