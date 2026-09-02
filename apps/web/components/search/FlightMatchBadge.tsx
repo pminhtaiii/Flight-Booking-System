@@ -22,6 +22,7 @@ const LEVEL_LABELS: Readonly<Record<MatchLevel, string>> = Object.freeze({
 });
 
 const INELIGIBLE_STYLES = 'text-rose-700 bg-rose-50 border-rose-200';
+const BASE_BADGE_STYLES = 'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium';
 
 export function FlightMatchBadge({ matchResult, className }: FlightMatchBadgeProps): React.JSX.Element | null {
   if (!matchResult) {
@@ -34,7 +35,7 @@ export function FlightMatchBadge({ matchResult, className }: FlightMatchBadgePro
     const ariaLabel = `Flight violates preference: ${violationReason}`;
 
     const combinedClasses = [
-      'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium',
+      BASE_BADGE_STYLES,
       INELIGIBLE_STYLES,
       className,
     ]
@@ -72,7 +73,7 @@ export function FlightMatchBadge({ matchResult, className }: FlightMatchBadgePro
   const ariaLabel = `${score}% match - ${levelLabel}`;
 
   const combinedClasses = [
-    'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium',
+    BASE_BADGE_STYLES,
     levelStyle,
     className,
   ]

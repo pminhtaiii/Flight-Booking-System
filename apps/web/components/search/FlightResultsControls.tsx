@@ -12,8 +12,8 @@ export type FlightSortOption =
 
 export type FlightResultsControlsProps = {
   mode: 'MATCHED' | 'RANKED';
-  sortBy?: string;
-  onSortChange?: (option: string) => void;
+  sortBy?: FlightSortOption;
+  onSortChange?: (option: FlightSortOption) => void;
   className?: string;
   totalResults?: number;
 };
@@ -73,7 +73,7 @@ export function FlightResultsControls({
           aria-label="Sort flight results"
           value={activeSort}
           onChange={(event) => {
-            onSortChange?.(event.target.value);
+            onSortChange?.(event.target.value as FlightSortOption);
           }}
           className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 shadow-sm transition focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
         >

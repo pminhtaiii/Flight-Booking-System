@@ -1,5 +1,5 @@
 import React from 'react';
-import type { DimensionSignal, FlightMatchDimension, FlightMatchResult } from '@shared/types';
+import type { FlightMatchDimension, FlightMatchResult } from '@shared/types';
 import { formatExplanation } from './flight-match-explanations';
 
 export type FlightMatchBreakdownProps = {
@@ -30,70 +30,23 @@ const DIMENSION_LABELS: Readonly<Record<FlightMatchDimension, string>> = Object.
   DURATION: 'Duration',
 });
 
-const SIGNAL_STYLES: Readonly<
-  Record<
-    DimensionSignal,
-    {
-      badge: string;
-      label: string;
-    }
-  >
-> = Object.freeze({
+const SIGNAL_STYLES = Object.freeze({
   POSITIVE: {
     badge: 'text-emerald-700 bg-emerald-50 border-emerald-200',
     label: 'Positive',
+    path: 'M5 13l4 4L19 7',
   },
   NEUTRAL: {
     badge: 'text-slate-600 bg-slate-100 border-slate-200',
     label: 'Neutral',
+    path: 'M5 12h14',
   },
   NEGATIVE: {
     badge: 'text-rose-700 bg-rose-50 border-rose-200',
     label: 'Negative',
+    path: 'M6 18L18 6M6 6l12 12',
   },
 });
-
-function SignalIcon({ signal }: { signal: DimensionSignal }): React.JSX.Element {
-  if (signal === 'POSITIVE') {
-    return (
-      <svg
-        aria-hidden="true"
-        className="h-3 w-3 shrink-0"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-      </svg>
-    );
-  }
-
-  if (signal === 'NEGATIVE') {
-    return (
-      <svg
-        aria-hidden="true"
-        className="h-3 w-3 shrink-0"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-      </svg>
-    );
-  }
-
-  return (
-    <svg
-      aria-hidden="true"
-      className="h-3 w-3 shrink-0"
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 12h14" />
-    </svg>
-  );
-}
 
 export function FlightMatchBreakdown({
   matchResult,
@@ -171,10 +124,23 @@ export function FlightMatchBreakdown({
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
                   <span
-                    className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-2xs font-medium ${signalConfig.badge}`}
+                    className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-xs font-medium ${signalConfig.badge}`}
                     aria-label={`Signal: ${signalConfig.label}`}
                   >
-                    <SignalIcon signal={item.signal} />
+                    <svg
+                      aria-hidden="true"
+                      className="h-3 w-3 shrink-0"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2.5}
+                        d={signalConfig.path}
+                      />
+                    </svg>
                     <span>{signalConfig.label}</span>
                   </span>
                   <span className="w-8 text-right font-mono text-xs font-semibold text-slate-700">
