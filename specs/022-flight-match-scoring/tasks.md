@@ -102,8 +102,8 @@ description: "Dependency-ordered implementation tasks for deterministic flight m
 
 **Independent Test**: Search a deliberately conflicting fixed offer set with no profile preferences and verify scorer non-invocation, RANKED mode, null results, and stops → price → duration → red-eye → original-index order.
 
-- [ ] T040 [US2] Drive stops-price-duration-red-eye-original-index category ordering through RED → GREEN in `apps/api/src/flight-match/category-ranker.service.spec.ts` and `apps/api/src/flight-match/category-ranker.service.ts`
-- [ ] T041 [US2] Drive empty/single/stable ties and frozen-input non-mutation through RED → GREEN in `apps/api/src/flight-match/category-ranker.service.spec.ts` and `apps/api/src/flight-match/category-ranker.service.ts`
+- [x] T040 [US2] Drive stops-price-duration-red-eye-original-index category ordering through RED → GREEN in `apps/api/src/flight-match/category-ranker.service.spec.ts` and `apps/api/src/flight-match/category-ranker.service.ts`
+- [x] T041 [US2] Drive empty/single/stable ties and frozen-input non-mutation through RED → GREEN in `apps/api/src/flight-match/category-ranker.service.spec.ts` and `apps/api/src/flight-match/category-ranker.service.ts`
 - [ ] T042 [US2] Drive the personalization truth table for nulls, empty arrays, blacklist/maxStops/sensitivity-only, class-with-query, and false baggage through RED → GREEN in `apps/api/src/flights/flight-search-orchestrator.service.spec.ts` and `apps/api/src/flights/flight-search-orchestrator.service.ts`
 - [ ] T043 [US2] Drive scorer non-invocation, RANKED mode, null match results, and ranker registration through RED → GREEN in `apps/api/src/flights/flight-search-orchestrator.service.spec.ts`, `apps/api/src/flights/flight-search-orchestrator.service.ts`, and `apps/api/src/flight-match/flight-match.module.ts`
 - [ ] T044 [US2] Add empty-profile, missing-profile, empty-offer, and stable cold-start API E2E coverage in `apps/api/test/flights-match-scoring.e2e-spec.ts`

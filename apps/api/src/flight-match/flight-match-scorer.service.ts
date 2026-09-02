@@ -4,11 +4,11 @@ import {
   BASE_WEIGHTS,
   calculateMedian,
   clamp,
+  compareObjectiveTiers,
   determineSignal,
   getCabinAdjacency,
   getMatchLevel,
   getPriceSensitivityMultiplier,
-  getRedEyePenalty,
   hourDistanceToWindow,
   isHourInWindow,
   round6,
@@ -559,25 +559,7 @@ export class FlightMatchScorerService {
         return bScore - aScore;
       }
 
-      if (a.offer.stops !== b.offer.stops) {
-        return a.offer.stops - b.offer.stops;
-      }
-
-      if (a.offer.price !== b.offer.price) {
-        return a.offer.price - b.offer.price;
-      }
-
-      if (a.offer.duration !== b.offer.duration) {
-        return a.offer.duration - b.offer.duration;
-      }
-
-      const aPenalty = getRedEyePenalty(a.offer.outboundDepartureHour);
-      const bPenalty = getRedEyePenalty(b.offer.outboundDepartureHour);
-      if (aPenalty !== bPenalty) {
-        return aPenalty - bPenalty;
-      }
-
-      return a.offer.originalIndex - b.offer.originalIndex;
+      return compareObjectiveTiers(a.offer, b.offer);
     });
   }
 

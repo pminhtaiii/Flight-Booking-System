@@ -28,8 +28,10 @@ import {
   circularHourDistance,
   isHourInWindow,
   hourDistanceToWindow,
+  compareObjectiveTiers,
   type HourWindow,
 } from './flight-match.policy';
+import type { FlightMatchInput } from './flight-match.types';
 
 describe('FlightMatchPolicy (T017)', () => {
   describe('Policy Version', () => {
@@ -644,4 +646,57 @@ describe('FlightMatchPolicy Helpers & Math (T018)', () => {
       });
     });
   });
+
+  describe('compareObjectiveTiers', () => {
+    const makeOffer = (overrides: Partial<FlightMatchInput> = {}): FlightMatchInput => ({
+      id: 'test-offer',
+      price: 200,
+      currency: 'USD',
+      stops: 0,
+      duration: 120,
+      outboundDepartureHour: 10,
+      outboundArrivalHour: 12,
+      carrierCodes: ['VN'],
+      cabinClass: 'economy',
+      hasCheckedBaggage: true,
+      originalIndex: 0,
+      ...overrides,
+    });
+
+    it('orders by stops ascending', () => {
+      const a = makeOffer({ stops: 0 });
+      const b = makeOffer({ stops: 1 });
+      expect(compareObjectiveTiers(a, b)).toBeLessThan(0);
+      expect(compareObjectiveTiers(b, a)).toBeGreaterThan(0);
+    });
+
+    it('orders by price ascending when stops are equal', () => {
+      const a = makeOffer({ stops: 0, price: 100 });
+      const b = makeOffer({ stops: 0, price: 200 });
+      expect(compareObjectiveTiers(a, b)).toBeLessThan(0);
+      expect(compareObjectiveTiers(b, a)).toBeGreaterThan(0);
+    });
+
+    it('orders by duration ascending when stops and price are equal', () => {
+      const a = makeOffer({ stops: 0, price: 100, duration: 100 });
+      const b = makeOffer({ stops: 0, price: 100, duration: 150 });
+      expect(compareObjectiveTiers(a, b)).toBeLessThan(0);
+      expect(compareObjectiveTiers(b, a)).toBeGreaterThan(0);
+    });
+
+    it('orders daytime ahead of red-eye when stops, price, duration are equal', () => {
+      const daytime = makeOffer({ stops: 0, price: 100, duration: 100, outboundDepartureHour: 9 });
+      const redeye = makeOffer({ stops: 0, price: 100, duration: 100, outboundDepartureHour: 3 });
+      expect(compareObjectiveTiers(daytime, redeye)).toBeLessThan(0);
+      expect(compareObjectiveTiers(redeye, daytime)).toBeGreaterThan(0);
+    });
+
+    it('orders by originalIndex when all other tiers are equal', () => {
+      const a = makeOffer({ stops: 0, price: 100, duration: 100, outboundDepartureHour: 9, originalIndex: 1 });
+      const b = makeOffer({ stops: 0, price: 100, duration: 100, outboundDepartureHour: 9, originalIndex: 5 });
+      expect(compareObjectiveTiers(a, b)).toBeLessThan(0);
+      expect(compareObjectiveTiers(b, a)).toBeGreaterThan(0);
+    });
+  });
 });
+

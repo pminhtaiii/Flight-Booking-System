@@ -988,6 +988,7 @@ Feature 019 restructures high-leverage boundaries without changing public produc
 1. **`FlightMatchModule` (Pure Domain Module)**:
    - Clean NestJS module with zero infrastructure imports (`imports: []`), maintaining absolute isolation from database, Redis, HTTP, or profile dependencies.
    - Registers and exports `FlightMatchScorerService` (`apps/api/src/flight-match/flight-match-scorer.service.ts`), providing deterministic policy evaluation across 8 dimensions (PRICE, AIRLINE, ARRIVAL_SCHEDULE, STOPS, CABIN, DEPARTURE_SCHEDULE, BAGGAGE, DURATION) with 6-decimal precision and tie-breaking.
+   - Registers and exports `CategoryRankerService` (`apps/api/src/flight-match/category-ranker.service.ts`), providing deterministic 5-tier objective sorting for cold-start (unpersonalized) search results: `stops` asc > `price` asc > `duration` asc > `departure red-eye penalty` asc > `originalIndex` asc.
 
 2. **`FlightSearchOrchestratorService` (`apps/api/src/flights/flight-search-orchestrator.service.ts`)**:
    - Canonical orchestration service registered and exported by `FlightsModule`.
@@ -999,7 +1000,7 @@ Feature 019 restructures high-leverage boundaries without changing public produc
    - Logs warning telemetry on dropped offers (`droppedCount`, `rejectionCounts`, `searchHash`) without failing the search.
 
 3. **Module Dependency Graph**:
-   - `FlightMatchModule`: `imports: []` $\rightarrow$ `exports: [FlightMatchScorerService]`.
+   - `FlightMatchModule`: `imports: []` $\rightarrow$ `exports: [FlightMatchScorerService, CategoryRankerService]`.
    - `FlightsModule`: `imports: [..., FlightMatchModule, ProfileModule]` $\rightarrow$ `exports: [FlightsService, FlightSearchOrchestratorService]`.
    - Zero circular dependencies across `FlightsModule`, `FlightMatchModule`, and `ProfileModule`.
 
