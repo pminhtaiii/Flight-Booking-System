@@ -1,34 +1,44 @@
 'use client';
 
-import { type FormEvent, useState } from 'react';
+import React, { type FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { FlightSearchOfferView, FlightSearchQuery } from '@shared/types';
-import { searchFlightsAction, selectFlightOfferAction } from '@/app/search/actions';
+import type {
+  FlightSearchMeta,
+  FlightSearchOfferView,
+  FlightSearchOutcome,
+  FlightSearchQuery,
+  FlightSelectionOutcome,
+} from '@shared/types';
+import { FlightResultsControls, type FlightSortOption } from './FlightResultsControls';
+import { FlightResults } from './FlightResults';
+import { isCabinClass } from '@/lib/search-prefill';
 
-const isCabinClass = (value: string): value is FlightSearchQuery['cabinClass'] =>
-  value === 'economy' || value === 'premium_economy' || value === 'business' || value === 'first';
-
-const formatDuration = (duration: string): string => {
-  const match = /^P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?$/.exec(duration);
-  if (!match || match.slice(1).every((value: string | undefined): boolean => value === undefined))
-    return duration;
-
-  const [days, hours, minutes, seconds] = match
-    .slice(1)
-    .map((value: string | undefined): number => Number(value ?? 0));
-  if (![days, hours, minutes, seconds].every(Number.isFinite)) return duration;
-
-  const totalMinutes = days * 1_440 + hours * 60 + minutes + Math.ceil(seconds / 60);
-  if (!Number.isSafeInteger(totalMinutes)) return duration;
-
-  return `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`;
-};
-
-type SearchFormClientProps = {
+export type SearchFormClientProps = {
   initialValues?: Partial<FlightSearchQuery>;
+  initialOutcome?: FlightSearchOutcome | null;
+  initialSortBy?: FlightSortOption;
+  onSearchAction?: (query: FlightSearchQuery) => Promise<FlightSearchOutcome>;
+  onSelectAction?: (offerId: string) => Promise<FlightSelectionOutcome>;
+  onNavigate?: (url: string) => void;
 };
 
-export function SearchFormClient({ initialValues }: SearchFormClientProps): JSX.Element {
+function useSafeRouter(): { push: (url: string) => void } | null {
+  try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    return useRouter();
+  } catch {
+    return null;
+  }
+}
+
+export function SearchFormClient({
+  initialValues,
+  initialOutcome,
+  initialSortBy,
+  onSearchAction,
+  onSelectAction,
+  onNavigate,
+}: SearchFormClientProps): JSX.Element {
   const [origin, setOrigin] = useState(initialValues?.origin ?? '');
   const [destination, setDestination] = useState(initialValues?.destination ?? '');
   const [departureDate, setDepartureDate] = useState(initialValues?.departureDate ?? '');
@@ -39,16 +49,30 @@ export function SearchFormClient({ initialValues }: SearchFormClientProps): JSX.
     initialValues?.cabinClass ?? 'economy',
   );
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [offers, setOffers] = useState<FlightSearchOfferView[]>([]);
+  const [error, setError] = useState<string | null>(
+    initialOutcome && !initialOutcome.ok ? initialOutcome.message : null,
+  );
+  const [mode, setMode] = useState<'MATCHED' | 'RANKED' | null>(
+    initialOutcome && initialOutcome.ok ? (initialOutcome.mode ?? null) : null,
+  );
+  const [offers, setOffers] = useState<FlightSearchOfferView[]>(
+    initialOutcome && initialOutcome.ok ? initialOutcome.offers : [],
+  );
+  const [meta, setMeta] = useState<FlightSearchMeta | null>(
+    initialOutcome && initialOutcome.ok ? initialOutcome.meta : null,
+  );
+  const [sortBy, setSortBy] = useState<FlightSortOption | undefined>(initialSortBy);
   const [bookingOfferId, setBookingOfferId] = useState<string | null>(null);
-  const router = useRouter();
+  const router = useSafeRouter();
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
     setLoading(true);
     setError(null);
+    setMode(null);
     setOffers([]);
+    setMeta(null);
+    setSortBy(undefined);
 
     try {
       const query: FlightSearchQuery = {
@@ -61,15 +85,32 @@ export function SearchFormClient({ initialValues }: SearchFormClientProps): JSX.
         infants: Number(infants),
         cabinClass,
       };
-      const outcome = await searchFlightsAction(query);
+
+      const searchAction =
+        onSearchAction ??
+        (async (q: FlightSearchQuery): Promise<FlightSearchOutcome> => {
+          const { searchFlightsAction } = await import('@/app/search/actions');
+          return searchFlightsAction(q);
+        });
+
+      const outcome = await searchAction(query);
 
       if (outcome.ok) {
+        setMode(outcome.mode ?? null);
         setOffers(outcome.offers);
+        setMeta(outcome.meta);
+        setSortBy(undefined);
       } else {
         setError(outcome.message);
+        setMode(null);
+        setOffers([]);
+        setMeta(null);
       }
     } catch {
       setError('Failed to connect to the search service.');
+      setMode(null);
+      setOffers([]);
+      setMeta(null);
     } finally {
       setLoading(false);
     }
@@ -79,10 +120,23 @@ export function SearchFormClient({ initialValues }: SearchFormClientProps): JSX.
     setBookingOfferId(offerId);
     setError(null);
     try {
-      const outcome = await selectFlightOfferAction(offerId);
+      const selectAction =
+        onSelectAction ??
+        (async (id: string): Promise<FlightSelectionOutcome> => {
+          const { selectFlightOfferAction } = await import('@/app/search/actions');
+          return selectFlightOfferAction(id);
+        });
+
+      const outcome = await selectAction(offerId);
 
       if (outcome.ok) {
-        router.push(outcome.checkoutPath);
+        if (onNavigate) {
+          onNavigate(outcome.checkoutPath);
+        } else if (router) {
+          router.push(outcome.checkoutPath);
+        } else if (typeof window !== 'undefined') {
+          window.location.href = outcome.checkoutPath;
+        }
       } else {
         setError(outcome.message);
       }
@@ -241,73 +295,27 @@ export function SearchFormClient({ initialValues }: SearchFormClientProps): JSX.
         </div>
       )}
 
-      {offers.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-xl font-bold text-text-primary">Flight Offers</h2>
-          <div className="space-y-4">
-            {offers.map((offer) => (
-              <div
-                key={offer.id}
-                className="card flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
-              >
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-text-primary">{offer.airline}</span>
-                    <span className="text-xs text-text-muted font-normal">
-                      Flight {offer.flightNumber}
-                    </span>
-                  </div>
-                  <div className="flex gap-8 text-sm">
-                    <div>
-                      <p className="font-semibold text-text-primary">{offer.origin}</p>
-                      <p className="text-xs text-text-secondary">
-                        {new Date(offer.departureAt).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-center justify-center">
-                      <span className="text-xs text-text-muted">
-                        {offer.stops === 0 ? 'Non-stop' : `${offer.stops} stops`}
-                      </span>
-                      <div className="w-16 h-0.5 bg-secondary-border my-1"></div>
-                      <span className="text-xs text-text-muted">
-                        {formatDuration(offer.duration)}
-                      </span>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-text-primary">{offer.destination}</p>
-                      <p className="text-xs text-text-secondary">
-                        {new Date(offer.arrivalAt).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex flex-row md:flex-col items-end justify-between w-full md:w-auto gap-4 pt-4 md:pt-0 border-t md:border-t-0 border-secondary-border">
-                  <div>
-                    <span className="text-2xl font-bold text-text-primary">
-                      {offer.price} {offer.currency}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => handleBook(offer.id)}
-                    disabled={bookingOfferId !== null}
-                    className="btn-primary"
-                  >
-                    {bookingOfferId === offer.id ? 'Loading...' : 'Book'}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+      {mode && offers.length > 0 && (
+        <FlightResultsControls
+          mode={mode}
+          totalResults={offers.length}
+          sortBy={sortBy}
+          onSortChange={setSortBy}
+        />
       )}
 
-      {!loading && !error && offers.length === 0 && (
+      {(mode !== null || offers.length > 0) && (
+        <FlightResults
+          offers={offers}
+          mode={mode ?? undefined}
+          meta={meta}
+          sortBy={sortBy}
+          onSelectFlight={handleBook}
+          bookingOfferId={bookingOfferId}
+        />
+      )}
+
+      {!loading && !error && !mode && offers.length === 0 && (
         <div className="card text-center p-8">
           <p className="text-text-secondary">
             No flight offers search results yet. Enter search criteria and search.

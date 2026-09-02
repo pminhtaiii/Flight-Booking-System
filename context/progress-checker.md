@@ -6,17 +6,24 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Flight Match Scoring (Feature 022) — Phase 5 / Slice 2: Match UI Components & Presentation Slices (T050–T052)
-**Last completed:** T050–T052: Implemented FlightMatchBadge, FlightMatchBreakdown, FlightRankingBanner, and FlightResultsControls with full accessibility, semantic styling, policy dimension ordering, and 39/39 passing unit tests.
-**Previous completed:** T046–T049: Enforced strict mode-tagged Next.js server parsing, provider-ID rejection/stripping, local-ID and order preservation, complete allowlisted explanation copy, malformed-parameter fallbacks, and HTML-safe dynamic interpolation.
+**Feature:** Flight Match Scoring (Feature 022) — Phase 5 / Slice 3: Search Form Integration & Result Composition (T053–T055)
+**Last completed:** T053–T055: Implemented FlightResultCard (provider-blind details, embedded badge & breakdown), FlightResults (canonical order preservation, client-side sorting), SearchFormClient (mode retention, controls & banner composition), and SearchPage (profile cabin prefill with URL query precedence).
+**Previous completed:** T050–T052: Implemented FlightMatchBadge, FlightMatchBreakdown, FlightRankingBanner, and FlightResultsControls with full accessibility, semantic styling, policy dimension ordering, and 39/39 passing unit tests.
 **In progress:** None.
-**Next:** Task T053 [US3] — Drive provider-blind ordered cards and default MATCHED order.
+**Next:** Tasks T056–T057 [US3] — Drive profile form controls (airline/window save/clear, maxStops, sensitivity, baggage, atomic invalid rejection).
 
 ---
 
 ## Progress by Feature
 
 ### [ ] Feature: Flight Match Scoring (Feature 022)
+
+- [x] Phase 5 / Slice 3: Search Form Integration & Result Composition (T053–T055) (2026-09-02):
+  - T053: Implemented `FlightResultCard.tsx` (displays airline, flight number, departure/arrival airports, times, formatted duration, stops, price, currency, cabin class, baggage allowance; embeds `FlightMatchBadge` and `FlightMatchBreakdown` when `matchResult` present; provider-blind invariant using only deterministic local IDs; interactive selection button) and `FlightResults.tsx` (preserves canonical server order by default; client-side re-sorting for `PRICE`, `DURATION`, `STOPS`, and `DEPARTURE_TIME`; integrates `FlightRankingBanner` in RANKED mode; handles empty states).
+  - T054: Refactored `SearchFormClient.tsx` to retain full search outcome state (`mode: 'MATCHED' | 'RANKED' | null`, `offers`, `meta`, `sortBy`), render `FlightRankingBanner` when `RANKED`, render `FlightResultsControls` with mode-specific defaults (`BEST_MATCH` vs `RECOMMENDED`), and cleanly compose `<FlightResults>`.
+  - T055: Implemented profile cabin prefill in `apps/web/app/search/page.tsx` via `fetchProfileCabinPreference()` / `getInitialValues()`, prefilling search form with saved `classPreference` when URL query param is missing, and strictly prioritizing explicit URL `?cabinClass=` query parameters over profile preferences.
+  - Verification: 81/81 unit tests PASS in `apps/web/tests/flight-match-scoring.spec.ts`; `pnpm --filter @web/frontend lint` (0 errors, 0 warnings); `pnpm --filter @web/frontend typecheck` (exit code 0).
+  - Dual-axis code review completed with zero spec gaps and all standards suggestions resolved.
 
 - [x] Phase 5 / Slice 2: Match UI Components & Presentation Slices (T050–T052) (2026-09-02):
   - T050: Implemented `FlightMatchBadge.tsx` supporting eligible score (0-100) and level pill (`STRONG`, `GOOD`, `FAIR`, `WEAK`) with semantic token styling, null-handling, and accessible ineligible warning badge with constraint violation reason.

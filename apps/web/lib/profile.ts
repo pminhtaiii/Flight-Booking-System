@@ -12,12 +12,7 @@ export type {
 } from './profile-contract';
 
 function getApiUrl(): string {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-
-  if (!apiUrl || !apiUrl.trim()) {
-    throw new Error('NEXT_PUBLIC_API_URL is required but not configured.');
-  }
-
+  const apiUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
   return apiUrl.trim().replace(/\/+$/, '');
 }
 
@@ -84,3 +79,41 @@ export function updateProfile(
 }
 
 export const updateTravelerProfile = updateProfile;
+
+export async function fetchProfileCabinPreference(
+  sessionOrToken?: unknown,
+): Promise<string | null> {
+  try {
+    let token: string | null = null;
+    if (typeof sessionOrToken === 'string' && sessionOrToken.length > 0) {
+      token = sessionOrToken;
+    } else if (
+      sessionOrToken &&
+      typeof sessionOrToken === 'object' &&
+      'accessToken' in sessionOrToken
+    ) {
+      // Type assertion safe after checking 'accessToken' property presence on session object
+      const candidate = (sessionOrToken as { accessToken?: unknown }).accessToken;
+      if (typeof candidate === 'string' && candidate.length > 0) {
+        token = candidate;
+      }
+    } else if (sessionOrToken === undefined) {
+      const { getServerSession } = await import('next-auth');
+      const { authOptions } = await import('./auth');
+      const session = await getServerSession(authOptions);
+      if (session && typeof session === 'object' && 'accessToken' in session) {
+        // Type assertion safe after verifying NextAuth session has accessToken property
+        const candidate = (session as { accessToken?: unknown }).accessToken;
+        if (typeof candidate === 'string' && candidate.length > 0) {
+          token = candidate;
+        }
+      }
+    }
+
+    if (!token) return null;
+    const profile = await fetchProfile(token);
+    return profile?.preferences?.classPreference ?? null;
+  } catch {
+    return null;
+  }
+}
