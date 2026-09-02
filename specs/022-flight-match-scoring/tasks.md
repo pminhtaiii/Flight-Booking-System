@@ -124,9 +124,9 @@ description: "Dependency-ordered implementation tasks for deterministic flight m
 
 ### Mode and profile vertical slices
 
-- [ ] T050 [US3] Drive MATCHED score/level presentation through one Playwright RED → GREEN slice in `apps/web/tests/flight-match-scoring.spec.ts` and `apps/web/components/search/FlightMatchBadge.tsx`
-- [ ] T051 [US3] Drive expandable dimension/constraint copy and ineligible-but-selectable behavior through RED → GREEN in `apps/web/tests/flight-match-scoring.spec.ts` and `apps/web/components/search/FlightMatchBreakdown.tsx`
-- [ ] T052 [US3] Drive RANKED no-score claims, profile CTA, and objective sort controls through RED → GREEN in `apps/web/tests/flight-match-scoring.spec.ts`, `apps/web/components/search/FlightRankingBanner.tsx`, and `apps/web/components/search/FlightResultsControls.tsx`
+- [X] T050 [US3] Drive MATCHED score/level presentation through one Playwright RED → GREEN slice in `apps/web/tests/flight-match-scoring.spec.ts` and `apps/web/components/search/FlightMatchBadge.tsx`
+- [x] T051 [US3] Drive expandable dimension/constraint copy and ineligible-but-selectable behavior through RED → GREEN in `apps/web/tests/flight-match-scoring.spec.ts` and `apps/web/components/search/FlightMatchBreakdown.tsx`
+- [x] T052 [US3] Drive RANKED no-score claims, profile CTA, and objective sort controls through RED → GREEN in `apps/web/tests/flight-match-scoring.spec.ts`, `apps/web/components/search/FlightRankingBanner.tsx`, and `apps/web/components/search/FlightResultsControls.tsx`
 - [ ] T053 [US3] Drive provider-blind ordered cards and default MATCHED order through RED → GREEN in `apps/web/tests/flight-match-scoring.spec.ts`, `apps/web/components/search/FlightResultCard.tsx`, and `apps/web/components/search/FlightResults.tsx`
 - [ ] T054 [US3] Drive full outcome/mode retention and result composition through RED → GREEN in `apps/web/tests/flight-match-scoring.spec.ts` and `apps/web/components/search/SearchFormClient.tsx`
 - [ ] T055 [US3] Drive class-profile prefill with submitted-query precedence through RED → GREEN in `apps/web/tests/flight-match-scoring.spec.ts`, `apps/web/app/search/page.tsx`, and `apps/web/components/search/SearchFormClient.tsx`

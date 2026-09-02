@@ -6,17 +6,25 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Flight Match Scoring (Feature 022) — Phase 5 / Slice 1: Server Boundary & Explanation Safety (T046–T049)
-**Last completed:** T046–T049: Enforced strict mode-tagged Next.js server parsing, provider-ID rejection/stripping, local-ID and order preservation, complete allowlisted explanation copy, malformed-parameter fallbacks, and HTML-safe dynamic interpolation.
-**Previous completed:** Task T045: Verified that `mode: RANKED` searches preserve cache, database write-behind, budget, security-header, validation, and upstream-error invariants.
+**Feature:** Flight Match Scoring (Feature 022) — Phase 5 / Slice 2: Match UI Components & Presentation Slices (T050–T052)
+**Last completed:** T050–T052: Implemented FlightMatchBadge, FlightMatchBreakdown, FlightRankingBanner, and FlightResultsControls with full accessibility, semantic styling, policy dimension ordering, and 39/39 passing unit tests.
+**Previous completed:** T046–T049: Enforced strict mode-tagged Next.js server parsing, provider-ID rejection/stripping, local-ID and order preservation, complete allowlisted explanation copy, malformed-parameter fallbacks, and HTML-safe dynamic interpolation.
 **In progress:** None.
-**Next:** Task T050 [US3] — Drive MATCHED score/level presentation through the first Playwright/UI vertical slice.
+**Next:** Task T053 [US3] — Drive provider-blind ordered cards and default MATCHED order.
 
 ---
 
 ## Progress by Feature
 
 ### [ ] Feature: Flight Match Scoring (Feature 022)
+
+- [x] Phase 5 / Slice 2: Match UI Components & Presentation Slices (T050–T052) (2026-09-02):
+  - T050: Implemented `FlightMatchBadge.tsx` supporting eligible score (0-100) and level pill (`STRONG`, `GOOD`, `FAIR`, `WEAK`) with semantic token styling, null-handling, and accessible ineligible warning badge with constraint violation reason.
+  - T051: Implemented `FlightMatchBreakdown.tsx` with accessible `<details><summary>` disclosure, strictly ordered dimensions (`PRICE` -> `AIRLINE` -> `ARRIVAL_SCHEDULE` -> `STOPS` -> `CABIN` -> `DEPARTURE_SCHEDULE` -> `BAGGAGE` -> `DURATION`), semantic signal styling (POSITIVE, NEUTRAL, NEGATIVE), formatted explanation copy, prominent violation list for ineligible results, and verified selection invariant.
+  - T052: Implemented `FlightRankingBanner.tsx` (renders only in `RANKED` mode, copy directing to profile preferences with accessible CTA link, strictly 0 score claims) and `FlightResultsControls.tsx` (mode-specific default sorts: `BEST_MATCH` vs `RECOMMENDED`, objective sort options: Price, Duration, Stops, Departure Time).
+  - Verification: 39/39 tests PASS in `apps/web/tests/flight-match-scoring.spec.ts` via `tsx --test`; `pnpm --filter @web/frontend lint` (0 errors, 0 warnings); `pnpm --filter @web/frontend typecheck` (exit code 0).
+  - Parallel dual-axis code review completed with zero spec gaps and all standards suggestions resolved.
+  - Commits: `9a935ec` (T050-T052 implementation), `5fc4878` (standards cleanup).
 
 - [x] Phase 5 / Slice 1: Server Boundary & Explanation Safety (T046–T049) (2026-09-02):
   - T046 replaced the temporary untagged-response fallback with an exact `MATCHED | RANKED` discriminated upstream schema. MATCHED offers require valid non-null match results and complete `flight-match-v1` counts; RANKED offers require null match results and null scoring version.

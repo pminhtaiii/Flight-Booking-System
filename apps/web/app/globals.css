@@ -71,6 +71,8 @@
   /* Match Score Colors */
   --theme-bg-match-strong: #ECFDF5;
   --theme-text-match-strong: #009966;
+  --theme-bg-match-good: #F0F9FF;
+  --theme-text-match-good: #0284C7;
   --theme-bg-match-fair: #EFF6FF;
   --theme-text-match-fair: #2563EB;
   --theme-bg-match-weak: #FFF7ED;
@@ -78,6 +80,7 @@
   --theme-gradient-end: #633BF7;
   --theme-agent-bubble-border: #ECEFF5;
   --theme-match-bar-strong: #10B981;
+  --theme-match-bar-good: #38BDF8;
   --theme-match-bar-fair: #61A8FF;
   --theme-match-bar-weak: #FF8904;
   --theme-user-bubble-shadow: rgba(124, 92, 252, 0.15);
@@ -155,6 +158,8 @@
   /* Match Score Colors */
   --theme-bg-match-strong: #065F46;
   --theme-text-match-strong: #34D399;
+  --theme-bg-match-good: rgba(3, 105, 161, 0.4);
+  --theme-text-match-good: #7DD3FC;
   --theme-bg-match-fair: #1E3A8A;
   --theme-text-match-fair: #60A5FA;
   --theme-bg-match-weak: #7C2D12;
@@ -162,6 +167,7 @@
   --theme-gradient-end: #512FD6;
   --theme-agent-bubble-border: #1F2937;
   --theme-match-bar-strong: #10B981;
+  --theme-match-bar-good: #38BDF8;
   --theme-match-bar-fair: #61A8FF;
   --theme-match-bar-weak: #FF8904;
   --theme-user-bubble-shadow: rgba(0, 0, 0, 0.4);
@@ -271,6 +277,8 @@
   /* Match Score Colors */
   --color-bg-match-strong: var(--theme-bg-match-strong);
   --color-text-match-strong: var(--theme-text-match-strong);
+  --color-bg-match-good: var(--theme-bg-match-good);
+  --color-text-match-good: var(--theme-text-match-good);
   --color-bg-match-fair: var(--theme-bg-match-fair);
   --color-text-match-fair: var(--theme-text-match-fair);
   --color-bg-match-weak: var(--theme-bg-match-weak);
@@ -278,6 +286,7 @@
   --color-gradient-end: var(--theme-gradient-end);
   --color-agent-bubble-border: var(--theme-agent-bubble-border);
   --color-match-bar-strong: var(--theme-match-bar-strong);
+  --color-match-bar-good: var(--theme-match-bar-good);
   --color-match-bar-fair: var(--theme-match-bar-fair);
   --color-match-bar-weak: var(--theme-match-bar-weak);
   --color-user-bubble-shadow: var(--theme-user-bubble-shadow);
