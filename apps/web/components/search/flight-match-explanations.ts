@@ -18,26 +18,80 @@ const CONSTANT_COPY: Partial<Record<Explanation['key'], string>> = {
   'match.duration.above_median': 'Longer than median duration',
 };
 
+type RuntimeParams = Record<string, unknown>;
+
+function isRuntimeParams(value: unknown): value is RuntimeParams {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0;
+}
+
+function isScheduleBound(value: unknown): value is string | number {
+  return isNonEmptyString(value) || isFiniteNumber(value);
+}
+
+function isStopCount(value: unknown): value is number {
+  return isFiniteNumber(value) && Number.isInteger(value) && value >= 0;
+}
+
+function escapeText(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
 export function formatExplanation(explanation: Explanation): string {
+  const rawParams: unknown = explanation.params;
+  const params = isRuntimeParams(rawParams) ? rawParams : {};
+
   switch (explanation.key) {
     case 'match.price.below_median':
-      return `${explanation.params.percentDiff}% below median price`;
+      return isFiniteNumber(params.percentDiff)
+        ? `${params.percentDiff}% below median price`
+        : 'Below median price';
     case 'match.price.above_median':
-      return `${explanation.params.percentDiff}% above median price`;
+      return isFiniteNumber(params.percentDiff)
+        ? `${params.percentDiff}% above median price`
+        : 'Above median price';
     case 'match.airline.preferred':
-      return `Matches preferred airline (${explanation.params.airline})`;
+      return isNonEmptyString(params.airline)
+        ? `Matches preferred airline (${escapeText(params.airline)})`
+        : 'Matches preferred airline';
     case 'match.arrival.in_window':
-      return `Arrives within preferred window (${explanation.params.windowStart}:00–${explanation.params.windowEnd}:00)`;
+      return isScheduleBound(params.windowStart) && isScheduleBound(params.windowEnd)
+        ? `Arrives within preferred window (${escapeText(String(params.windowStart))}:00–${escapeText(String(params.windowEnd))}:00)`
+        : 'Arrives within preferred window';
     case 'match.stops.within_preference':
-      return `Within preferred stops (${explanation.params.stops} stops)`;
+      return isStopCount(params.stops)
+        ? `Within preferred stops (${params.stops} stops)`
+        : 'Within preferred stops';
     case 'match.stops.exceeds_preference':
-      return `Exceeds preferred stops (${explanation.params.stops} stops, max ${explanation.params.maxStops})`;
+      return isStopCount(params.stops) && isStopCount(params.maxStops)
+        ? `Exceeds preferred stops (${params.stops} stops, max ${params.maxStops})`
+        : 'Exceeds preferred stops';
     case 'match.stops.relative':
-      return explanation.params.stops === 0 ? 'Direct flight' : `${explanation.params.stops} stops`;
+      return isStopCount(params.stops)
+        ? params.stops === 0
+          ? 'Direct flight'
+          : `${params.stops} stops`
+        : 'Flight with stops';
     case 'match.departure.in_window':
-      return `Departs within preferred window (${explanation.params.windowStart}:00–${explanation.params.windowEnd}:00)`;
+      return isScheduleBound(params.windowStart) && isScheduleBound(params.windowEnd)
+        ? `Departs within preferred window (${escapeText(String(params.windowStart))}:00–${escapeText(String(params.windowEnd))}:00)`
+        : 'Departs within preferred window';
     case 'constraint.airline.blacklisted':
-      return `Blacklisted airline (${explanation.params.airline})`;
+      return isNonEmptyString(params.airline)
+        ? `Blacklisted airline (${escapeText(params.airline)})`
+        : 'Blacklisted airline';
     default:
       return CONSTANT_COPY[explanation.key] ?? 'Match criterion';
   }

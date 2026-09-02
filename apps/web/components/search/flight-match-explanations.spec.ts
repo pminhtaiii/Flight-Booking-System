@@ -6,6 +6,164 @@ import type { Explanation } from '@shared/types';
 import { formatExplanation } from './flight-match-explanations';
 
 describe('formatExplanation', () => {
+  it('falls back for an unknown runtime explanation key', () => {
+    const explanation = {
+      key: 'match.unknown.runtime_key',
+      params: {},
+    } as unknown as Explanation;
+
+    assert.equal(formatExplanation(explanation), 'Match criterion');
+  });
+
+  it('uses the price fallback for unusable runtime percentage parameters', () => {
+    const explanations = [
+      { key: 'match.price.below_median' },
+      { key: 'match.price.below_median', params: null },
+      { key: 'match.price.below_median', params: 'invalid' },
+      { key: 'match.price.below_median', params: { percentDiff: '12' } },
+      { key: 'match.price.below_median', params: { percentDiff: Number.NaN } },
+      { key: 'match.price.above_median', params: { percentDiff: Number.POSITIVE_INFINITY } },
+    ] as unknown as Explanation[];
+
+    const expected = [
+      'Below median price',
+      'Below median price',
+      'Below median price',
+      'Below median price',
+      'Below median price',
+      'Above median price',
+    ];
+
+    explanations.forEach((explanation, index) => {
+      const result = formatExplanation(explanation);
+      assert.equal(result, expected[index]);
+      assert.equal(result.includes('undefined'), false);
+      assert.equal(result.includes('NaN'), false);
+      assert.equal(result.includes('[object Object]'), false);
+    });
+  });
+
+  it('uses the airline fallback for unusable runtime airline parameters', () => {
+    const explanations = [
+      { key: 'match.airline.preferred', params: {} },
+      { key: 'match.airline.preferred', params: { airline: '' } },
+      { key: 'match.airline.preferred', params: { airline: 42 } },
+      { key: 'constraint.airline.blacklisted', params: { airline: {} } },
+    ] as unknown as Explanation[];
+
+    const expected = [
+      'Matches preferred airline',
+      'Matches preferred airline',
+      'Matches preferred airline',
+      'Blacklisted airline',
+    ];
+
+    explanations.forEach((explanation, index) => {
+      const result = formatExplanation(explanation);
+      assert.equal(result, expected[index]);
+      assert.equal(result.includes('undefined'), false);
+      assert.equal(result.includes('NaN'), false);
+      assert.equal(result.includes('[object Object]'), false);
+    });
+  });
+
+  it('escapes preferred airline text before interpolation', () => {
+    const explanation = {
+      key: 'match.airline.preferred',
+      params: { airline: '<img src=x onerror=alert(1)>' },
+    } as unknown as Explanation;
+
+    assert.equal(
+      formatExplanation(explanation),
+      'Matches preferred airline (&lt;img src=x onerror=alert(1)&gt;)',
+    );
+  });
+
+  it('uses the schedule fallback for unusable runtime window bounds', () => {
+    const explanations = [
+      { key: 'match.arrival.in_window' },
+      { key: 'match.arrival.in_window', params: null },
+      { key: 'match.arrival.in_window', params: 'invalid' },
+      { key: 'match.arrival.in_window', params: { windowStart: '', windowEnd: 10 } },
+      {
+        key: 'match.arrival.in_window',
+        params: { windowStart: Number.NaN, windowEnd: Number.POSITIVE_INFINITY },
+      },
+      { key: 'match.departure.in_window', params: { windowStart: {}, windowEnd: 10 } },
+      { key: 'match.departure.in_window', params: { windowStart: 8, windowEnd: false } },
+    ] as unknown as Explanation[];
+
+    const expected = [
+      'Arrives within preferred window',
+      'Arrives within preferred window',
+      'Arrives within preferred window',
+      'Arrives within preferred window',
+      'Arrives within preferred window',
+      'Departs within preferred window',
+      'Departs within preferred window',
+    ];
+
+    explanations.forEach((explanation, index) => {
+      const result = formatExplanation(explanation);
+      assert.equal(result, expected[index]);
+      assert.equal(result.includes('undefined'), false);
+      assert.equal(result.includes('NaN'), false);
+      assert.equal(result.includes('[object Object]'), false);
+    });
+  });
+
+  it('escapes every HTML-sensitive character in a schedule bound', () => {
+    const explanation = {
+      key: 'match.arrival.in_window',
+      params: { windowStart: '&<>"\'', windowEnd: 10 },
+    } as unknown as Explanation;
+
+    const result = formatExplanation(explanation);
+    assert.equal(result, 'Arrives within preferred window (&amp;&lt;&gt;&quot;&#39;:00–10:00)');
+    assert.equal(result.includes('<'), false);
+    assert.equal(result.includes('>'), false);
+    assert.equal(result.includes('"'), false);
+    assert.equal(result.includes("'"), false);
+  });
+
+  it('uses the stops fallback for unusable runtime stop parameters', () => {
+    const explanations = [
+      { key: 'match.stops.within_preference' },
+      { key: 'match.stops.within_preference', params: null },
+      { key: 'match.stops.within_preference', params: 'invalid' },
+      { key: 'match.stops.within_preference', params: { stops: -1 } },
+      { key: 'match.stops.within_preference', params: { stops: 1.5 } },
+      { key: 'match.stops.exceeds_preference', params: { stops: 2 } },
+      { key: 'match.stops.exceeds_preference', params: { stops: 2, maxStops: -1 } },
+      { key: 'match.stops.exceeds_preference', params: { stops: 2, maxStops: '1' } },
+      { key: 'match.stops.exceeds_preference', params: { stops: '2', maxStops: 1 } },
+      { key: 'match.stops.relative', params: { stops: Number.NaN } },
+      { key: 'match.stops.relative', params: { stops: {} } },
+    ] as unknown as Explanation[];
+
+    const expected = [
+      'Within preferred stops',
+      'Within preferred stops',
+      'Within preferred stops',
+      'Within preferred stops',
+      'Within preferred stops',
+      'Exceeds preferred stops',
+      'Exceeds preferred stops',
+      'Exceeds preferred stops',
+      'Exceeds preferred stops',
+      'Flight with stops',
+      'Flight with stops',
+    ];
+
+    explanations.forEach((explanation, index) => {
+      const result = formatExplanation(explanation);
+      assert.equal(result, expected[index]);
+      assert.equal(result.includes('undefined'), false);
+      assert.equal(result.includes('NaN'), false);
+      assert.equal(result.includes('[object Object]'), false);
+    });
+  });
+
   it('formats a price below-median explanation', () => {
     const explanation: Explanation = {
       key: 'match.price.below_median',
