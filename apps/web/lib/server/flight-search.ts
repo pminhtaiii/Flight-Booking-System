@@ -54,7 +54,7 @@ const CabinMismatchDetailSchema = z
   })
   .strict();
 
-const UpstreamOfferSchema = z
+const UpstreamOfferBaseSchema = z
   .object({
     id: LocalOfferIdSchema,
     duffelOfferId: z.string().min(1),
@@ -75,31 +75,55 @@ const UpstreamOfferSchema = z
     cabinMismatchDetails: z.array(CabinMismatchDetailSchema).nullable(),
     segments: z.array(UpstreamSegmentSchema).min(1),
     returnSegments: z.array(UpstreamSegmentSchema).min(1).nullable(),
-    matchResult: FlightMatchResultSchema.nullable().optional(),
   })
   .strict();
 
-const UpstreamSearchSchema = z
+const UpstreamMatchedOfferSchema = UpstreamOfferBaseSchema.extend({
+  matchResult: FlightMatchResultSchema,
+}).strict();
+
+const UpstreamRankedOfferSchema = UpstreamOfferBaseSchema.extend({
+  matchResult: z.null(),
+}).strict();
+
+const UpstreamSearchMetaBaseSchema = z
   .object({
-    mode: z.enum(['MATCHED', 'RANKED']).optional(),
-    results: z.array(UpstreamOfferSchema),
-    meta: z
-      .object({
-        totalResults: z.number().int().min(0).optional(),
-        searchHash: z.string().min(1).optional(),
-        cached: z.boolean().optional(),
-        requestedCabinClass: CabinClassSchema.optional(),
-        scoringVersion: z.string().min(1).nullable().optional(),
-        eligibleCount: z.number().int().min(0).optional(),
-        matchLevelCounts: FlightSearchMatchLevelCountsSchema.optional(),
-      })
-      .strict()
-      .optional(),
+    totalResults: z.number().int().min(0).optional(),
+    searchHash: z.string().min(1).optional(),
+    cached: z.boolean().optional(),
+    requestedCabinClass: CabinClassSchema.optional(),
   })
   .strict();
+
+const UpstreamMatchedSearchSchema = z
+  .object({
+    mode: z.literal('MATCHED'),
+    results: z.array(UpstreamMatchedOfferSchema),
+    meta: UpstreamSearchMetaBaseSchema.extend({
+      scoringVersion: z.literal('flight-match-v1'),
+      eligibleCount: z.number().int().min(0),
+      matchLevelCounts: FlightSearchMatchLevelCountsSchema,
+    }).strict(),
+  })
+  .strict();
+
+const UpstreamRankedSearchSchema = z
+  .object({
+    mode: z.literal('RANKED'),
+    results: z.array(UpstreamRankedOfferSchema),
+    meta: UpstreamSearchMetaBaseSchema.extend({ scoringVersion: z.null() }).strict(),
+  })
+  .strict();
+
+const UpstreamSearchSchema = z.discriminatedUnion('mode', [
+  UpstreamMatchedSearchSchema,
+  UpstreamRankedSearchSchema,
+]);
 const UpstreamSelectionSchema = z.object({ id: LocalOfferIdSchema }).passthrough();
 
-type UpstreamOffer = z.infer<typeof UpstreamOfferSchema>;
+type UpstreamOffer =
+  | z.infer<typeof UpstreamMatchedOfferSchema>
+  | z.infer<typeof UpstreamRankedOfferSchema>;
 type UpstreamSegment = z.infer<typeof UpstreamSegmentSchema>;
 
 type FetchResult = { ok: true; response: Response } | { ok: false };
@@ -167,7 +191,7 @@ export async function searchFlights(query: FlightSearchQuery): Promise<FlightSea
 
     return {
       ok: true,
-      mode: parsedPayload.data.mode ?? 'RANKED',
+      mode: parsedPayload.data.mode,
       offers: validatedOffers.data,
       meta: createSearchMeta(validatedOffers.data, parsedPayload.data.meta),
     };
@@ -356,10 +380,14 @@ function createSearchMeta(
     ...(upstreamMeta?.scoringVersion !== undefined
       ? { scoringVersion: upstreamMeta.scoringVersion }
       : {}),
-    ...(upstreamMeta?.eligibleCount !== undefined
+    ...(upstreamMeta &&
+    'eligibleCount' in upstreamMeta &&
+    upstreamMeta.eligibleCount !== undefined
       ? { eligibleCount: upstreamMeta.eligibleCount }
       : {}),
-    ...(upstreamMeta?.matchLevelCounts !== undefined
+    ...(upstreamMeta &&
+    'matchLevelCounts' in upstreamMeta &&
+    upstreamMeta.matchLevelCounts !== undefined
       ? { matchLevelCounts: upstreamMeta.matchLevelCounts }
       : {}),
   };
