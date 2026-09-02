@@ -1010,3 +1010,8 @@ Feature 019 restructures high-leverage boundaries without changing public produc
 4. **Search HTTP Boundary (`FlightsController`)**:
    - Both public search aliases return `FlightSearchResponseDto` through Nest's passthrough response path, preserving direct controller invocation and DTO serialization.
    - The controller sets `Cache-Control: private, no-store`, removes any existing `ETag`, and uses a response-local Express application view that omits only the `etag fn` setting during final JSON serialization. No global Express ETag setting is mutated, so unrelated concurrent responses retain their normal behavior.
+
+5. **Next.js Server Seam & Explanation Safety (`apps/web/lib/server/flight-search.ts`, `apps/web/components/search/flight-match-explanations.ts`)**:
+   - The trusted NestJS-to-Next.js search response is parsed as an exact Zod discriminated union. Untagged legacy responses are rejected; `MATCHED` requires valid non-null match results plus `flight-match-v1` aggregate metadata, while `RANKED` requires `matchResult: null` and `scoringVersion: null`.
+   - The seam rejects raw provider-prefixed public IDs case-insensitively, validates dimension values and six-decimal active-weight totals through the shared match schema, preserves local opaque IDs and upstream order, and uses an explicit browser-safe projection that strips `duffelOfferId`.
+   - `formatExplanation(explanation: Explanation): string` is a pure allowlisted formatter for all 24 explanation keys. It uses only approved primitive parameters, returns deterministic English copy, falls back safely for unknown or malformed runtime inputs, and HTML-escapes dynamic airline/window strings without React, DOM APIs, or `dangerouslySetInnerHTML`.

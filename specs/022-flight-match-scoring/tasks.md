@@ -117,10 +117,10 @@ description: "Dependency-ordered implementation tasks for deterministic flight m
 
 ### Server boundary and explanation safety
 
-- [ ] T046 [US3] Drive the post-producer required mode/match contract and removal of the temporary legacy fallback through RED → GREEN in `apps/web/lib/server/flight-search.spec.ts` and `apps/web/lib/server/flight-search.ts`
-- [ ] T047 [US3] Drive malformed breakdown/unknown-parameter/provider-ID rejection and local-ID preservation through RED → GREEN in `apps/web/lib/server/flight-search.spec.ts` and `apps/web/lib/server/flight-search.ts`
-- [ ] T048 [US3] Drive allowlisted airline/time/window/percentage/stop copy and primitive formatting through RED → GREEN in `apps/web/components/search/flight-match-explanations.spec.ts` and `apps/web/components/search/flight-match-explanations.ts`
-- [ ] T049 [US3] Drive unknown-key fallback, missing/wrong parameter handling, and HTML-injection safety through RED → GREEN in `apps/web/components/search/flight-match-explanations.spec.ts` and `apps/web/components/search/flight-match-explanations.ts`
+- [X] T046 [US3] Drive the post-producer required mode/match contract and removal of the temporary legacy fallback through RED → GREEN in `apps/web/lib/server/flight-search.spec.ts` and `apps/web/lib/server/flight-search.ts`
+- [X] T047 [US3] Drive malformed breakdown/unknown-parameter/provider-ID rejection and local-ID preservation through RED → GREEN in `apps/web/lib/server/flight-search.spec.ts` and `apps/web/lib/server/flight-search.ts`
+- [X] T048 [US3] Drive allowlisted airline/time/window/percentage/stop copy and primitive formatting through RED → GREEN in `apps/web/components/search/flight-match-explanations.spec.ts` and `apps/web/components/search/flight-match-explanations.ts`
+- [X] T049 [US3] Drive unknown-key fallback, missing/wrong parameter handling, and HTML-injection safety through RED → GREEN in `apps/web/components/search/flight-match-explanations.spec.ts` and `apps/web/components/search/flight-match-explanations.ts`
 
 ### Mode and profile vertical slices
 

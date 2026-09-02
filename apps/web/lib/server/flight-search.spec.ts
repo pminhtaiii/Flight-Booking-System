@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { after, afterEach, before, beforeEach, describe, it, mock } from 'node:test';
-import type { FlightSearchQuery } from '@shared/types';
+import type { FlightSearchOfferView, FlightSearchQuery } from '@shared/types/flight-search.types';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,7 +11,7 @@ const testRequire = createRequire(import.meta.url);
 type TestSession = { accessToken?: string } | null;
 
 let session: TestSession = null;
-const getServerSession = mock.fn(async () => session);
+const getServerSession = mock.fn(async (): Promise<TestSession> => session);
 const resolvePath = (specifier: string): string => {
   try {
     return testRequire.resolve(specifier);
@@ -35,7 +35,7 @@ const serverOnlyPath = resolvePath('server-only');
 const originalServerOnlyModule = testRequire.cache[serverOnlyPath];
 testRequire.cache[serverOnlyPath] = { exports: {} } as NodeModule;
 
-after(() => {
+after((): void => {
   if (originalNextAuthModule) {
     testRequire.cache[nextAuthPath] = originalNextAuthModule;
   } else {
@@ -53,7 +53,7 @@ after(() => {
 let searchFlights: typeof import('./flight-search').searchFlights;
 let selectFlightOffer: typeof import('./flight-search').selectFlightOffer;
 
-before(async () => {
+before(async (): Promise<void> => {
   ({ searchFlights, selectFlightOffer } = await import('./flight-search.ts'));
 });
 
@@ -105,32 +105,93 @@ const upstreamOffer = {
   returnSegments: null,
 };
 
+// On 2026-09-02 the user approved strict-contract fixture corrections so intended-valid payloads include required metadata and normalized eligible breakdowns.
+const validBreakdown = [
+  {
+    dimension: 'PRICE',
+    score: 0.88,
+    weight: 1,
+    contribution: 0.88,
+    signal: 'POSITIVE',
+    explanation: {
+      key: 'match.price.below_median',
+      params: { percentDiff: 12 },
+    },
+  },
+];
+
+const validMatchResult = {
+  eligibility: { eligible: true, violations: [] },
+  score: 88,
+  matchLevel: 'STRONG',
+  breakdown: validBreakdown,
+  metadata: {
+    scoringVersion: 'flight-match-v1',
+    activeWeights: {
+      PRICE: 0.35,
+      AIRLINE: 0.15,
+      ARRIVAL_SCHEDULE: 0.1,
+      STOPS: 0.1,
+      CABIN: 0.1,
+      DEPARTURE_SCHEDULE: 0.1,
+      BAGGAGE: 0.05,
+      DURATION: 0.05,
+    },
+  },
+};
+
+const validSearchMetaBase = {
+  totalResults: 1,
+  searchHash: 'search-hash-001',
+  cached: false,
+  requestedCabinClass: 'economy',
+};
+
+const validRankedMeta = {
+  ...validSearchMetaBase,
+  scoringVersion: null,
+};
+
+const validMatchedMeta = {
+  ...validSearchMetaBase,
+  scoringVersion: 'flight-match-v1',
+  eligibleCount: 1,
+  matchLevelCounts: { STRONG: 1, GOOD: 0, FAIR: 0, WEAK: 0 },
+};
+
 describe('flight-search server seam', () => {
   const originalEnvironment = process.env;
   const originalFetch = globalThis.fetch;
 
-  beforeEach(() => {
+  beforeEach((): void => {
     process.env = { ...originalEnvironment, API_URL: 'http://private-api.example/' };
     session = { accessToken: 'session-token' };
     getServerSession.mock.resetCalls();
   });
 
-  afterEach(() => {
+  afterEach((): void => {
     process.env = originalEnvironment;
     globalThis.fetch = originalFetch;
     session = null;
   });
 
-  it('maps an authenticated upstream response to an opaque shared view', async () => {
+  it('maps an authenticated upstream response to an opaque shared view', async (): Promise<void> => {
     let requestedUrl = '';
     let requestedInit: RequestInit | undefined;
     globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
       requestedUrl = String(input);
       requestedInit = init;
-      return new Response(JSON.stringify({ results: [upstreamOffer], meta: { totalResults: 1 } }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({
+          mode: 'RANKED',
+          results: [{ ...upstreamOffer, matchResult: null }],
+          meta: validRankedMeta,
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      );
     };
 
     const outcome = await searchFlights(validQuery);
@@ -182,6 +243,7 @@ describe('flight-search server seam', () => {
         minPrice: 285,
         maxPrice: 285,
         airlines: ['Mock Horizon Air'],
+        scoringVersion: null,
       },
     });
     assert.match(requestedUrl, /^http:\/\/private-api\.example\/api\/flights\/search$/);
@@ -193,7 +255,131 @@ describe('flight-search server seam', () => {
     assert.strictEqual(JSON.stringify(outcome).includes('duffelOfferId'), false);
   });
 
-  it('parses legacy untagged responses as mode RANKED with matchResult null', async () => {
+  it('rejects provider-prefixed public offer identifiers case-insensitively', async (): Promise<void> => {
+    globalThis.fetch = async (): Promise<Response> =>
+      new Response(
+        JSON.stringify({
+          mode: 'RANKED',
+          results: [{ ...upstreamOffer, id: 'OFF_provider-visible', matchResult: null }],
+          meta: validRankedMeta,
+        }),
+        { status: 200 },
+      );
+
+    const outcome = await searchFlights(validQuery);
+
+    assert.deepEqual(outcome, {
+      ok: false,
+      reason: 'UPSTREAM_UNAVAILABLE',
+      message: 'Flight search returned an invalid response. Please try again.',
+      retryable: true,
+    });
+  });
+
+  it('preserves ranked local IDs and upstream order while stripping provider IDs', async (): Promise<void> => {
+    const firstOffer = { ...upstreamOffer, id: 'local-id_001~opaque', price: 310, matchResult: null };
+    const secondOffer = { ...upstreamOffer, id: 'local-id_002~opaque', price: 285, matchResult: null };
+    globalThis.fetch = async (): Promise<Response> =>
+      new Response(
+        JSON.stringify({
+          mode: 'RANKED',
+          results: [firstOffer, secondOffer],
+          meta: { ...validRankedMeta, totalResults: 2 },
+        }),
+        { status: 200 },
+      );
+
+    const outcome = await searchFlights(validQuery);
+
+    assert.strictEqual(outcome.ok, true);
+    if (outcome.ok) {
+      assert.deepEqual(
+        outcome.offers.map((offer: FlightSearchOfferView): { id: string; price: number } => ({
+          id: offer.id,
+          price: offer.price,
+        })),
+        [
+          { id: 'local-id_001~opaque', price: 310 },
+          { id: 'local-id_002~opaque', price: 285 },
+        ],
+      );
+      assert.strictEqual(JSON.stringify(outcome).includes('duffelOfferId'), false);
+    }
+  });
+
+  it('rejects MATCHED and RANKED responses containing more than 20 offers', async (): Promise<void> => {
+    const modes: Array<'MATCHED' | 'RANKED'> = ['MATCHED', 'RANKED'];
+
+    for (const mode of modes) {
+      const results: Array<Record<string, unknown>> = Array.from(
+        { length: 21 },
+        (_value: undefined, index: number): Record<string, unknown> => ({
+          ...upstreamOffer,
+          id: `local-offer-${index}`,
+          matchResult: mode === 'MATCHED' ? validMatchResult : null,
+        }),
+      );
+      const meta =
+        mode === 'MATCHED'
+          ? {
+              ...validMatchedMeta,
+              totalResults: 21,
+              eligibleCount: 21,
+              matchLevelCounts: { STRONG: 21, GOOD: 0, FAIR: 0, WEAK: 0 },
+            }
+          : { ...validRankedMeta, totalResults: 21 };
+      globalThis.fetch = async (): Promise<Response> =>
+        new Response(JSON.stringify({ mode, results, meta }), { status: 200 });
+
+      const outcome = await searchFlights(validQuery);
+
+      assert.deepEqual(outcome, {
+        ok: false,
+        reason: 'UPSTREAM_UNAVAILABLE',
+        message: 'Flight search returned an invalid response. Please try again.',
+        retryable: true,
+      });
+    }
+  });
+
+  it('rejects MATCHED and RANKED responses missing required base metadata', async (): Promise<void> => {
+    const modes: Array<'MATCHED' | 'RANKED'> = ['MATCHED', 'RANKED'];
+    const requiredFields: string[] = [
+      'totalResults',
+      'searchHash',
+      'cached',
+      'requestedCabinClass',
+    ];
+
+    for (const mode of modes) {
+      for (const requiredField of requiredFields) {
+        const meta: Record<string, unknown> = {
+          ...(mode === 'MATCHED' ? validMatchedMeta : validRankedMeta),
+        };
+        delete meta[requiredField];
+        const results = [
+          {
+            ...upstreamOffer,
+            matchResult: mode === 'MATCHED' ? validMatchResult : null,
+          },
+        ];
+        globalThis.fetch = async (): Promise<Response> =>
+          new Response(JSON.stringify({ mode, results, meta }), { status: 200 });
+
+        const outcome = await searchFlights(validQuery);
+
+        assert.deepEqual(outcome, {
+          ok: false,
+          reason: 'UPSTREAM_UNAVAILABLE',
+          message: 'Flight search returned an invalid response. Please try again.',
+          retryable: true,
+        });
+      }
+    }
+  });
+
+  // On 2026-09-02 the user approved replacing the legacy-response fallback test because the post-producer strict contract supersedes the legacy fallback.
+  it('rejects legacy untagged responses as invalid upstream data', async (): Promise<void> => {
     globalThis.fetch = async (): Promise<Response> => {
       return new Response(JSON.stringify({ results: [upstreamOffer], meta: { totalResults: 1 } }), {
         status: 200,
@@ -203,19 +389,15 @@ describe('flight-search server seam', () => {
 
     const outcome = await searchFlights(validQuery);
 
-    assert.strictEqual(outcome.ok, true);
-    if (outcome.ok) {
-      assert.strictEqual(outcome.mode, 'RANKED');
-      assert.strictEqual(outcome.offers.length, 1);
-      assert.strictEqual(outcome.offers[0].matchResult, null);
-      assert.strictEqual(outcome.meta.scoringVersion, undefined);
-      assert.strictEqual(outcome.meta.eligibleCount, undefined);
-      assert.strictEqual(outcome.meta.matchLevelCounts, undefined);
-      assert.strictEqual(JSON.stringify(outcome).includes('duffelOfferId'), false);
-    }
+    assert.deepEqual(outcome, {
+      ok: false,
+      reason: 'UPSTREAM_UNAVAILABLE',
+      message: 'Flight search returned an invalid response. Please try again.',
+      retryable: true,
+    });
   });
 
-  it('parses MATCHED responses with eligible and ineligible offers and preserves scoring metadata', async () => {
+  it('parses MATCHED responses with eligible and ineligible offers and preserves scoring metadata', async (): Promise<void> => {
     const matchedOffer = {
       ...upstreamOffer,
       id: 'local-offer-matched-001',
@@ -230,8 +412,8 @@ describe('flight-search server seam', () => {
           {
             dimension: 'PRICE',
             score: 0.9,
-            weight: 0.35,
-            contribution: 0.315,
+            weight: 1,
+            contribution: 0.9,
             signal: 'POSITIVE',
             explanation: {
               key: 'match.price.below_median',
@@ -296,6 +478,7 @@ describe('flight-search server seam', () => {
           mode: 'MATCHED',
           results: [matchedOffer, ineligibleOffer],
           meta: {
+            ...validSearchMetaBase,
             totalResults: 2,
             scoringVersion: 'flight-match-v1',
             eligibleCount: 1,
@@ -334,7 +517,369 @@ describe('flight-search server seam', () => {
     }
   });
 
-  it('parses explicit RANKED responses with matchResult null', async () => {
+  it('projects a matched offer without provider IDs while retaining match data and local ID', async (): Promise<void> => {
+    const matchedOffer = {
+      ...upstreamOffer,
+      id: 'local-matched~opaque',
+      matchResult: validMatchResult,
+    };
+    globalThis.fetch = async (): Promise<Response> =>
+      new Response(
+        JSON.stringify({
+          mode: 'MATCHED',
+          results: [matchedOffer],
+          meta: { ...validMatchedMeta, totalResults: 1 },
+        }),
+        { status: 200 },
+      );
+
+    const outcome = await searchFlights(validQuery);
+
+    assert.strictEqual(outcome.ok, true);
+    if (outcome.ok) {
+      assert.strictEqual(outcome.offers[0].id, 'local-matched~opaque');
+      assert.deepEqual(outcome.offers[0].matchResult, validMatchResult);
+      assert.strictEqual(JSON.stringify(outcome).includes('duffelOfferId'), false);
+    }
+  });
+
+  it('rejects an eligible match result with an empty breakdown', async (): Promise<void> => {
+    const emptyBreakdownMatchResult = { ...validMatchResult, breakdown: [] };
+    globalThis.fetch = async (): Promise<Response> =>
+      new Response(
+        JSON.stringify({
+          mode: 'MATCHED',
+          results: [{ ...upstreamOffer, matchResult: emptyBreakdownMatchResult }],
+          meta: validMatchedMeta,
+        }),
+        { status: 200 },
+      );
+
+    const outcome = await searchFlights(validQuery);
+
+    assert.deepEqual(outcome, {
+      ok: false,
+      reason: 'UPSTREAM_UNAVAILABLE',
+      message: 'Flight search returned an invalid response. Please try again.',
+      retryable: true,
+    });
+  });
+
+  it('rejects an eligible match result when breakdown weights sum outside tolerance', async (): Promise<void> => {
+    const invalidWeightBreakdown = [
+      {
+        dimension: 'PRICE' as const,
+        score: 1,
+        weight: 0.95,
+        contribution: 0.95,
+        signal: 'POSITIVE' as const,
+        explanation: {
+          key: 'match.price.below_median',
+          params: { percentDiff: 12 },
+        },
+      },
+    ];
+    const invalidWeightMatchResult = {
+      ...validMatchResult,
+      breakdown: invalidWeightBreakdown,
+    };
+    globalThis.fetch = async (): Promise<Response> =>
+      new Response(
+        JSON.stringify({
+          mode: 'MATCHED',
+          results: [{ ...upstreamOffer, matchResult: invalidWeightMatchResult }],
+          meta: validMatchedMeta,
+        }),
+        { status: 200 },
+      );
+
+    const outcome = await searchFlights(validQuery);
+
+    assert.deepEqual(outcome, {
+      ok: false,
+      reason: 'UPSTREAM_UNAVAILABLE',
+      message: 'Flight search returned an invalid response. Please try again.',
+      retryable: true,
+    });
+  });
+
+  it('rejects a matched response with a score below zero', async (): Promise<void> => {
+    const malformedMatchResult = { ...validMatchResult, score: -0.01 };
+    globalThis.fetch = async (): Promise<Response> =>
+      new Response(
+        JSON.stringify({
+          mode: 'MATCHED',
+          results: [{ ...upstreamOffer, matchResult: malformedMatchResult }],
+          meta: validMatchedMeta,
+        }),
+        { status: 200 },
+      );
+
+    const outcome = await searchFlights(validQuery);
+
+    assert.deepEqual(outcome, {
+      ok: false,
+      reason: 'UPSTREAM_UNAVAILABLE',
+      message: 'Flight search returned an invalid response. Please try again.',
+      retryable: true,
+    });
+  });
+
+  it('rejects a matched response with a score above one', async (): Promise<void> => {
+    const malformedMatchResult = { ...validMatchResult, score: 1.01 };
+    globalThis.fetch = async (): Promise<Response> =>
+      new Response(
+        JSON.stringify({
+          mode: 'MATCHED',
+          results: [{ ...upstreamOffer, matchResult: malformedMatchResult }],
+          meta: validMatchedMeta,
+        }),
+        { status: 200 },
+      );
+
+    const outcome = await searchFlights(validQuery);
+
+    assert.deepEqual(outcome, {
+      ok: false,
+      reason: 'UPSTREAM_UNAVAILABLE',
+      message: 'Flight search returned an invalid response. Please try again.',
+      retryable: true,
+    });
+  });
+
+  it('rejects a matched response with a negative active dimension weight', async (): Promise<void> => {
+    const malformedMatchResult = {
+      ...validMatchResult,
+      metadata: {
+        ...validMatchResult.metadata,
+        activeWeights: { ...validMatchResult.metadata.activeWeights, PRICE: -0.01 },
+      },
+    };
+    globalThis.fetch = async (): Promise<Response> =>
+      new Response(
+        JSON.stringify({
+          mode: 'MATCHED',
+          results: [{ ...upstreamOffer, matchResult: malformedMatchResult }],
+          meta: validMatchedMeta,
+        }),
+        { status: 200 },
+      );
+
+    const outcome = await searchFlights(validQuery);
+
+    assert.deepEqual(outcome, {
+      ok: false,
+      reason: 'UPSTREAM_UNAVAILABLE',
+      message: 'Flight search returned an invalid response. Please try again.',
+      retryable: true,
+    });
+  });
+
+  it('rejects a matched response with an active dimension weight above one', async (): Promise<void> => {
+    const malformedMatchResult = {
+      ...validMatchResult,
+      metadata: {
+        ...validMatchResult.metadata,
+        activeWeights: { ...validMatchResult.metadata.activeWeights, PRICE: 1.01 },
+      },
+    };
+    globalThis.fetch = async (): Promise<Response> =>
+      new Response(
+        JSON.stringify({
+          mode: 'MATCHED',
+          results: [{ ...upstreamOffer, matchResult: malformedMatchResult }],
+          meta: validMatchedMeta,
+        }),
+        { status: 200 },
+      );
+
+    const outcome = await searchFlights(validQuery);
+
+    assert.deepEqual(outcome, {
+      ok: false,
+      reason: 'UPSTREAM_UNAVAILABLE',
+      message: 'Flight search returned an invalid response. Please try again.',
+      retryable: true,
+    });
+  });
+
+  it('rejects a matched response with a negative dimension contribution', async (): Promise<void> => {
+    const malformedMatchResult = {
+      ...validMatchResult,
+      breakdown: [
+        {
+          dimension: 'PRICE',
+          score: 0.9,
+          weight: 0.35,
+          contribution: -0.01,
+          signal: 'POSITIVE',
+          explanation: {
+            key: 'match.price.below_median',
+            params: { difference: '10%' },
+          },
+        },
+      ],
+    };
+    globalThis.fetch = async (): Promise<Response> =>
+      new Response(
+        JSON.stringify({
+          mode: 'MATCHED',
+          results: [{ ...upstreamOffer, matchResult: malformedMatchResult }],
+          meta: validMatchedMeta,
+        }),
+        { status: 200 },
+      );
+
+    const outcome = await searchFlights(validQuery);
+
+    assert.deepEqual(outcome, {
+      ok: false,
+      reason: 'UPSTREAM_UNAVAILABLE',
+      message: 'Flight search returned an invalid response. Please try again.',
+      retryable: true,
+    });
+  });
+
+  it('rejects a matched response with a dimension contribution above one', async (): Promise<void> => {
+    const malformedMatchResult = {
+      ...validMatchResult,
+      breakdown: [
+        {
+          dimension: 'PRICE',
+          score: 0.9,
+          weight: 0.35,
+          contribution: 1.01,
+          signal: 'POSITIVE',
+          explanation: {
+            key: 'match.price.below_median',
+            params: { difference: '10%' },
+          },
+        },
+      ],
+    };
+    globalThis.fetch = async (): Promise<Response> =>
+      new Response(
+        JSON.stringify({
+          mode: 'MATCHED',
+          results: [{ ...upstreamOffer, matchResult: malformedMatchResult }],
+          meta: validMatchedMeta,
+        }),
+        { status: 200 },
+      );
+
+    const outcome = await searchFlights(validQuery);
+
+    assert.deepEqual(outcome, {
+      ok: false,
+      reason: 'UPSTREAM_UNAVAILABLE',
+      message: 'Flight search returned an invalid response. Please try again.',
+      retryable: true,
+    });
+  });
+
+  it('rejects a matched response when active weights round to a sum below one', async (): Promise<void> => {
+    const malformedMatchResult = {
+      ...validMatchResult,
+      metadata: {
+        ...validMatchResult.metadata,
+        activeWeights: { ...validMatchResult.metadata.activeWeights, PRICE: 0.349998 },
+      },
+    };
+    globalThis.fetch = async (): Promise<Response> =>
+      new Response(
+        JSON.stringify({
+          mode: 'MATCHED',
+          results: [{ ...upstreamOffer, matchResult: malformedMatchResult }],
+          meta: validMatchedMeta,
+        }),
+        { status: 200 },
+      );
+
+    const outcome = await searchFlights(validQuery);
+
+    assert.deepEqual(outcome, {
+      ok: false,
+      reason: 'UPSTREAM_UNAVAILABLE',
+      message: 'Flight search returned an invalid response. Please try again.',
+      retryable: true,
+    });
+  });
+
+  it('rejects a matched response with a dimension score below zero', async (): Promise<void> => {
+    const malformedMatchResult = {
+      ...validMatchResult,
+      breakdown: [
+        {
+          dimension: 'PRICE',
+          score: -0.01,
+          weight: 0.35,
+          contribution: 0.315,
+          signal: 'POSITIVE',
+          explanation: {
+            key: 'match.price.below_median',
+            params: { difference: '10%' },
+          },
+        },
+      ],
+    };
+    globalThis.fetch = async (): Promise<Response> =>
+      new Response(
+        JSON.stringify({
+          mode: 'MATCHED',
+          results: [{ ...upstreamOffer, matchResult: malformedMatchResult }],
+          meta: validMatchedMeta,
+        }),
+        { status: 200 },
+      );
+
+    const outcome = await searchFlights(validQuery);
+
+    assert.deepEqual(outcome, {
+      ok: false,
+      reason: 'UPSTREAM_UNAVAILABLE',
+      message: 'Flight search returned an invalid response. Please try again.',
+      retryable: true,
+    });
+  });
+
+  it('rejects a matched response with a dimension score above one', async (): Promise<void> => {
+    const malformedMatchResult = {
+      ...validMatchResult,
+      breakdown: [
+        {
+          dimension: 'PRICE',
+          score: 1.01,
+          weight: 0.35,
+          contribution: 0.315,
+          signal: 'POSITIVE',
+          explanation: {
+            key: 'match.price.below_median',
+            params: { difference: '10%' },
+          },
+        },
+      ],
+    };
+    globalThis.fetch = async (): Promise<Response> =>
+      new Response(
+        JSON.stringify({
+          mode: 'MATCHED',
+          results: [{ ...upstreamOffer, matchResult: malformedMatchResult }],
+          meta: validMatchedMeta,
+        }),
+        { status: 200 },
+      );
+
+    const outcome = await searchFlights(validQuery);
+
+    assert.deepEqual(outcome, {
+      ok: false,
+      reason: 'UPSTREAM_UNAVAILABLE',
+      message: 'Flight search returned an invalid response. Please try again.',
+      retryable: true,
+    });
+  });
+
+  it('parses explicit RANKED responses with matchResult null', async (): Promise<void> => {
     const rankedOffer = {
       ...upstreamOffer,
       id: 'local-offer-ranked-001',
@@ -346,7 +891,7 @@ describe('flight-search server seam', () => {
         JSON.stringify({
           mode: 'RANKED',
           results: [rankedOffer],
-          meta: { totalResults: 1 },
+          meta: validRankedMeta,
         }),
         {
           status: 200,
@@ -366,7 +911,7 @@ describe('flight-search server seam', () => {
     }
   });
 
-  it('fails gracefully with UPSTREAM_UNAVAILABLE when matchResult is malformed', async () => {
+  it('fails gracefully with UPSTREAM_UNAVAILABLE when matchResult is malformed', async (): Promise<void> => {
     const malformedOffer = {
       ...upstreamOffer,
       id: 'local-offer-malformed-001',
@@ -382,7 +927,7 @@ describe('flight-search server seam', () => {
         JSON.stringify({
           mode: 'MATCHED',
           results: [malformedOffer],
-          meta: { totalResults: 1 },
+          meta: validMatchedMeta,
         }),
         {
           status: 200,
@@ -401,7 +946,227 @@ describe('flight-search server seam', () => {
     });
   });
 
-  it('maps upstream responses containing empty string or zero fallbacks', async () => {
+  it('rejects MATCHED responses when an offer omits matchResult', async (): Promise<void> => {
+    globalThis.fetch = async (): Promise<Response> =>
+      new Response(
+        JSON.stringify({ mode: 'MATCHED', results: [upstreamOffer], meta: validMatchedMeta }),
+        { status: 200 },
+      );
+
+    const outcome = await searchFlights(validQuery);
+
+    assert.deepEqual(outcome, {
+      ok: false,
+      reason: 'UPSTREAM_UNAVAILABLE',
+      message: 'Flight search returned an invalid response. Please try again.',
+      retryable: true,
+    });
+  });
+
+  it('rejects MATCHED responses when an offer has a null matchResult', async (): Promise<void> => {
+    globalThis.fetch = async (): Promise<Response> =>
+      new Response(
+        JSON.stringify({
+          mode: 'MATCHED',
+          results: [{ ...upstreamOffer, matchResult: null }],
+          meta: validMatchedMeta,
+        }),
+        { status: 200 },
+      );
+
+    const outcome = await searchFlights(validQuery);
+
+    assert.deepEqual(outcome, {
+      ok: false,
+      reason: 'UPSTREAM_UNAVAILABLE',
+      message: 'Flight search returned an invalid response. Please try again.',
+      retryable: true,
+    });
+  });
+
+  it('rejects MATCHED responses when scoringVersion is missing or wrong', async (): Promise<void> => {
+    for (const scoringVersion of [undefined, 'flight-match-v2']) {
+      const meta = { ...validMatchedMeta, scoringVersion };
+      globalThis.fetch = async (): Promise<Response> =>
+        new Response(
+          JSON.stringify({
+            mode: 'MATCHED',
+            results: [{ ...upstreamOffer, matchResult: validMatchResult }],
+            meta,
+          }),
+          { status: 200 },
+        );
+
+      const outcome = await searchFlights(validQuery);
+
+      assert.deepEqual(outcome, {
+        ok: false,
+        reason: 'UPSTREAM_UNAVAILABLE',
+        message: 'Flight search returned an invalid response. Please try again.',
+        retryable: true,
+      });
+    }
+  });
+
+  it('rejects MATCHED responses with an invalid eligibleCount', async (): Promise<void> => {
+    for (const eligibleCount of [-1, 1.5]) {
+      globalThis.fetch = async (): Promise<Response> =>
+        new Response(
+          JSON.stringify({
+            mode: 'MATCHED',
+            results: [{ ...upstreamOffer, matchResult: validMatchResult }],
+            meta: { ...validMatchedMeta, eligibleCount },
+          }),
+          { status: 200 },
+        );
+
+      const outcome = await searchFlights(validQuery);
+
+      assert.deepEqual(outcome, {
+        ok: false,
+        reason: 'UPSTREAM_UNAVAILABLE',
+        message: 'Flight search returned an invalid response. Please try again.',
+        retryable: true,
+      });
+    }
+  });
+
+  it('rejects MATCHED responses when eligibleCount does not equal eligible offers', async (): Promise<void> => {
+    globalThis.fetch = async (): Promise<Response> =>
+      new Response(
+        JSON.stringify({
+          mode: 'MATCHED',
+          results: [{ ...upstreamOffer, matchResult: validMatchResult }],
+          meta: { ...validMatchedMeta, eligibleCount: 0 },
+        }),
+        { status: 200 },
+      );
+
+    const outcome = await searchFlights(validQuery);
+
+    assert.deepEqual(outcome, {
+      ok: false,
+      reason: 'UPSTREAM_UNAVAILABLE',
+      message: 'Flight search returned an invalid response. Please try again.',
+      retryable: true,
+    });
+  });
+
+  it('rejects MATCHED responses with incomplete matchLevelCounts', async (): Promise<void> => {
+    globalThis.fetch = async (): Promise<Response> =>
+      new Response(
+        JSON.stringify({
+          mode: 'MATCHED',
+          results: [{ ...upstreamOffer, matchResult: validMatchResult }],
+          meta: {
+            ...validMatchedMeta,
+            matchLevelCounts: { STRONG: 1, GOOD: 0, FAIR: 0 },
+          },
+        }),
+        { status: 200 },
+      );
+
+    const outcome = await searchFlights(validQuery);
+
+    assert.deepEqual(outcome, {
+      ok: false,
+      reason: 'UPSTREAM_UNAVAILABLE',
+      message: 'Flight search returned an invalid response. Please try again.',
+      retryable: true,
+    });
+  });
+
+  it('rejects MATCHED responses with negative matchLevelCounts', async (): Promise<void> => {
+    globalThis.fetch = async (): Promise<Response> =>
+      new Response(
+        JSON.stringify({
+          mode: 'MATCHED',
+          results: [{ ...upstreamOffer, matchResult: validMatchResult }],
+          meta: {
+            ...validMatchedMeta,
+            matchLevelCounts: { STRONG: -1, GOOD: 0, FAIR: 0, WEAK: 0 },
+          },
+        }),
+        { status: 200 },
+      );
+
+    const outcome = await searchFlights(validQuery);
+
+    assert.deepEqual(outcome, {
+      ok: false,
+      reason: 'UPSTREAM_UNAVAILABLE',
+      message: 'Flight search returned an invalid response. Please try again.',
+      retryable: true,
+    });
+  });
+
+  it('rejects MATCHED responses when matchLevelCounts do not equal eligible offer levels', async (): Promise<void> => {
+    globalThis.fetch = async (): Promise<Response> =>
+      new Response(
+        JSON.stringify({
+          mode: 'MATCHED',
+          results: [{ ...upstreamOffer, matchResult: validMatchResult }],
+          meta: {
+            ...validMatchedMeta,
+            matchLevelCounts: { STRONG: 0, GOOD: 1, FAIR: 0, WEAK: 0 },
+          },
+        }),
+        { status: 200 },
+      );
+
+    const outcome = await searchFlights(validQuery);
+
+    assert.deepEqual(outcome, {
+      ok: false,
+      reason: 'UPSTREAM_UNAVAILABLE',
+      message: 'Flight search returned an invalid response. Please try again.',
+      retryable: true,
+    });
+  });
+
+  it('rejects RANKED responses when an offer has a non-null matchResult', async (): Promise<void> => {
+    globalThis.fetch = async (): Promise<Response> =>
+      new Response(
+        JSON.stringify({
+          mode: 'RANKED',
+          results: [{ ...upstreamOffer, matchResult: validMatchResult }],
+          meta: validRankedMeta,
+        }),
+        { status: 200 },
+      );
+
+    const outcome = await searchFlights(validQuery);
+
+    assert.deepEqual(outcome, {
+      ok: false,
+      reason: 'UPSTREAM_UNAVAILABLE',
+      message: 'Flight search returned an invalid response. Please try again.',
+      retryable: true,
+    });
+  });
+
+  it('rejects RANKED responses when scoringVersion is non-null', async (): Promise<void> => {
+    globalThis.fetch = async (): Promise<Response> =>
+      new Response(
+        JSON.stringify({
+          mode: 'RANKED',
+          results: [{ ...upstreamOffer, matchResult: null }],
+          meta: { ...validRankedMeta, scoringVersion: 'flight-match-v1' },
+        }),
+        { status: 200 },
+      );
+
+    const outcome = await searchFlights(validQuery);
+
+    assert.deepEqual(outcome, {
+      ok: false,
+      reason: 'UPSTREAM_UNAVAILABLE',
+      message: 'Flight search returned an invalid response. Please try again.',
+      retryable: true,
+    });
+  });
+
+  it('maps upstream responses containing empty string or zero fallbacks', async (): Promise<void> => {
     const fallbackOffer = {
       id: 'local-offer-fallback',
       duffelOfferId: 'off_fallback_123',
@@ -440,10 +1205,17 @@ describe('flight-search server seam', () => {
     };
 
     globalThis.fetch = async (): Promise<Response> => {
-      return new Response(JSON.stringify({ results: [fallbackOffer], meta: { totalResults: 1 } }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({
+          mode: 'RANKED',
+          results: [{ ...fallbackOffer, matchResult: null }],
+          meta: validRankedMeta,
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      );
     };
 
     const outcome = await searchFlights(validQuery);
@@ -458,7 +1230,7 @@ describe('flight-search server seam', () => {
     }
   });
 
-  it('returns an unauthenticated outcome before making an upstream call', async () => {
+  it('returns an unauthenticated outcome before making an upstream call', async (): Promise<void> => {
     session = null;
     let requested = false;
     globalThis.fetch = async (): Promise<Response> => {
@@ -477,7 +1249,7 @@ describe('flight-search server seam', () => {
     assert.strictEqual(requested, false);
   });
 
-  it('fails fast on 503 search response without repeating supplier-backed searches', async () => {
+  it('fails fast on 503 search response without repeating supplier-backed searches', async (): Promise<void> => {
     let attempts = 0;
     globalThis.fetch = async (): Promise<Response> => {
       attempts += 1;
@@ -495,7 +1267,7 @@ describe('flight-search server seam', () => {
     assert.strictEqual(attempts, 1);
   });
 
-  it('retries a 503 read failure on offer selection before returning the validated response', async () => {
+  it('retries a 503 read failure on offer selection before returning the validated response', async (): Promise<void> => {
     let attempts = 0;
     globalThis.fetch = async (): Promise<Response> => {
       attempts += 1;
@@ -509,7 +1281,7 @@ describe('flight-search server seam', () => {
     assert.strictEqual(attempts, 2);
   });
 
-  it('normalizes upstream validation responses without retrying them', async () => {
+  it('normalizes upstream validation responses without retrying them', async (): Promise<void> => {
     for (const status of [400, 422]) {
       let attempts = 0;
       globalThis.fetch = async (): Promise<Response> => {
@@ -531,7 +1303,7 @@ describe('flight-search server seam', () => {
     }
   });
 
-  it('normalizes a timed-out search request without repeating supplier-backed searches', async () => {
+  it('normalizes a timed-out search request without repeating supplier-backed searches', async (): Promise<void> => {
     let attempts = 0;
     globalThis.fetch = async (): Promise<Response> => {
       attempts += 1;
@@ -549,7 +1321,7 @@ describe('flight-search server seam', () => {
     assert.strictEqual(attempts, 1);
   });
 
-  it('normalizes a timed-out read request after the bounded retry budget', async () => {
+  it('normalizes a timed-out read request after the bounded retry budget', async (): Promise<void> => {
     let attempts = 0;
     globalThis.fetch = async (): Promise<Response> => {
       attempts += 1;
@@ -567,7 +1339,7 @@ describe('flight-search server seam', () => {
     assert.strictEqual(attempts, 3);
   });
 
-  it('rejects malformed upstream results instead of forwarding them', async () => {
+  it('rejects malformed upstream results instead of forwarding them', async (): Promise<void> => {
     globalThis.fetch = async (): Promise<Response> =>
       new Response(JSON.stringify({ results: [{ id: 'local-offer-001' }] }), { status: 200 });
 
@@ -581,7 +1353,7 @@ describe('flight-search server seam', () => {
     });
   });
 
-  it('verifies a selected offer and preserves the Slice 5B checkout path contract', async () => {
+  it('verifies a selected offer and preserves the Slice 5B checkout path contract', async (): Promise<void> => {
     let requestedUrl = '';
     globalThis.fetch = async (input: RequestInfo | URL): Promise<Response> => {
       requestedUrl = String(input);
