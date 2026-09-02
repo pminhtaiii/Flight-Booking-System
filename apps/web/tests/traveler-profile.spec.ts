@@ -163,6 +163,45 @@ test.describe('Secure traveler profile', () => {
     expect(browserStorageDump).not.toContain('901234567');
   });
 
+  test('saves canonical airline preferences', async ({ page, request, context }) => {
+    await registerAndOpenProfile(page, request, context);
+
+    await page.route('**/api/profile', async (route) => {
+      if (route.request().method() === 'PATCH') {
+        const requestBody = route.request().postDataJSON();
+        expect(requestBody.preferences).toMatchObject({
+          preferredAirlines: ['VN', 'SQ'],
+          blacklistedAirlines: ['AA', '9W'],
+        });
+
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ...savedDomesticProfile,
+            revision: 2,
+            preferences: {
+              ...savedDomesticProfile.preferences,
+              preferredAirlines: ['VN', 'SQ'],
+              blacklistedAirlines: ['AA', '9W'],
+            },
+          }),
+        });
+        return;
+      }
+      await route.continue();
+    });
+
+    await fillDomesticProfile(page);
+    await page.getByLabel('Preferred airlines').fill(' vn, SQ, vn ');
+    await page.getByLabel('Blacklisted airlines').fill('aa, 9w');
+    await page.getByRole('button', { name: 'Save profile' }).click();
+
+    await expect(page.getByRole('status')).toHaveText('Your traveler profile is saved securely.');
+    await expect(page.getByLabel('Preferred airlines')).toHaveValue('VN, SQ');
+    await expect(page.getByLabel('Blacklisted airlines')).toHaveValue('AA, 9W');
+  });
+
   test('returns to the server-validated handoff target after saving', async ({
     page,
     request,

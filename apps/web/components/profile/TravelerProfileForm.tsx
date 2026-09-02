@@ -37,6 +37,8 @@ type ProfileDraft = {
   preferences: {
     seatPreference: string;
     classPreference: string;
+    preferredAirlines: string;
+    blacklistedAirlines: string;
   };
 };
 
@@ -135,8 +137,21 @@ function profileToDraft(profile: TravelerProfileResponse): ProfileDraft {
     preferences: {
       seatPreference: valueOrEmpty(profile.preferences?.seatPreference),
       classPreference: valueOrEmpty(profile.preferences?.classPreference),
+      preferredAirlines: profile.preferences?.preferredAirlines?.join(', ') ?? '',
+      blacklistedAirlines: profile.preferences?.blacklistedAirlines?.join(', ') ?? '',
     },
   };
+}
+
+function parseAirlineCodes(value: string): string[] {
+  return Array.from(
+    new Set(
+      value
+        .split(',')
+        .map((code) => code.trim().toUpperCase())
+        .filter((code) => /^[A-Z0-9]{2,3}$/.test(code)),
+    ),
+  );
 }
 
 function draftToPayload(draft: ProfileDraft, revision: number): UpdateProfilePayload {
@@ -170,6 +185,8 @@ function draftToPayload(draft: ProfileDraft, revision: number): UpdateProfilePay
     preferences: {
       seatPreference: draft.preferences.seatPreference || null,
       classPreference: draft.preferences.classPreference || null,
+      preferredAirlines: parseAirlineCodes(draft.preferences.preferredAirlines),
+      blacklistedAirlines: parseAirlineCodes(draft.preferences.blacklistedAirlines),
     },
   };
 }
@@ -809,6 +826,22 @@ export function TravelerProfileForm({
                 'Cabin preference',
                 draft.preferences.classPreference,
                 classOptions,
+              )}
+              {renderTextField(
+                'preferences',
+                'preferredAirlines',
+                'Preferred airlines',
+                draft.preferences.preferredAirlines,
+                'text',
+                'Comma-delimited airline codes, such as VN, SQ',
+              )}
+              {renderTextField(
+                'preferences',
+                'blacklistedAirlines',
+                'Blacklisted airlines',
+                draft.preferences.blacklistedAirlines,
+                'text',
+                'Comma-delimited airline codes, such as AA, 9W',
               )}
             </div>
           </section>
