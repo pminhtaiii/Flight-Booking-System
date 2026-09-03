@@ -3,7 +3,7 @@ import { describe, it } from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-import type { DimensionScore, FlightMatchResult, FlightSearchMeta, FlightSearchOfferView, FlightSearchOutcome, FlightSelectionOutcome } from '@shared/types';
+import type { DimensionScore, FlightMatchResult, FlightSearchMeta, FlightSearchOfferView, FlightSearchOutcome, FlightSearchQuery, FlightSelectionOutcome } from '@shared/types';
 import { FlightMatchBadge } from '../components/search/FlightMatchBadge';
 import { FlightMatchBreakdown } from '../components/search/FlightMatchBreakdown';
 import { FlightRankingBanner } from '../components/search/FlightRankingBanner';
@@ -1800,6 +1800,173 @@ describe('SearchFormClient (T054)', (): void => {
         shouldSucceed = true;
         await (capturedOnSelectFlight as (offerId: string) => Promise<void>)('offer-m2');
         assert.strictEqual(actionCallCount, 2, 'Subsequent selection attempt proceeds after failure');
+      } finally {
+        (React as unknown as Record<string, unknown>).createElement = originalCreateElement;
+      }
+    });
+
+    it('verifies that submitting search form while booking is in progress is a no-op, does not trigger searchAction, does not clear navigation lock, and leaves search button/fieldset disabled', async (): Promise<void> => {
+      let capturedOnSelectFlight: ((offerId: string) => Promise<void>) | null = null;
+      let capturedOnSubmit: ((event: unknown) => Promise<void>) | null = null;
+      const originalCreateElement = React.createElement;
+
+      (React as unknown as Record<string, unknown>).createElement = function (
+        type: unknown,
+        ...rest: unknown[]
+      ) {
+        if (type === FlightResults) {
+          const props = rest[0] as { onSelectFlight?: (offerId: string) => Promise<void> };
+          capturedOnSelectFlight = props?.onSelectFlight ?? null;
+        } else if (type === 'form') {
+          const props = rest[0] as { onSubmit?: (event: unknown) => Promise<void> };
+          capturedOnSubmit = props?.onSubmit ?? null;
+        }
+        return originalCreateElement.apply(
+          this,
+          [type, ...rest] as Parameters<typeof React.createElement>,
+        );
+      };
+
+      let selectCallCount = 0;
+      let searchCallCount = 0;
+      let resolveSelect!: (value: FlightSelectionOutcome) => void;
+      const selectPromise = new Promise<FlightSelectionOutcome>((resolve) => {
+        resolveSelect = resolve;
+      });
+
+      const mockSelectAction = async (_offerId: string): Promise<FlightSelectionOutcome> => {
+        selectCallCount++;
+        return selectPromise;
+      };
+
+      const mockSearchAction = async (_query: FlightSearchQuery): Promise<FlightSearchOutcome> => {
+        searchCallCount++;
+        return {
+          ok: true,
+          mode: 'MATCHED',
+          offers: [],
+          meta: mockMeta,
+        };
+      };
+
+      const navigatedUrls: string[] = [];
+      const mockNavigate = (url: string): void => {
+        navigatedUrls.push(url);
+      };
+
+      try {
+        const html = renderToStaticMarkup(
+          React.createElement(SearchFormClient, {
+            initialOutcome: {
+              ok: true,
+              mode: 'MATCHED',
+              offers: [offerMatched1, offerMatched2],
+              meta: mockMeta,
+            },
+            initialBookingOfferId: 'offer-m1',
+            onSelectAction: mockSelectAction,
+            onSearchAction: mockSearchAction,
+            onNavigate: mockNavigate,
+          }),
+        );
+
+        // Verify search button and fieldset are disabled when booking is active
+        assert.match(html, /<fieldset[^>]*disabled/);
+        assert.match(html, /<button[^>]*disabled/);
+
+        assert.ok(capturedOnSubmit !== null, 'Form onSubmit must be captured');
+
+        // Attempt to submit search form while booking lock is held
+        let preventDefaultCalled = false;
+        await (capturedOnSubmit as (event: unknown) => Promise<void>)({
+          preventDefault: () => {
+            preventDefaultCalled = true;
+          },
+        });
+
+        assert.ok(preventDefaultCalled, 'preventDefault must be called');
+        assert.strictEqual(
+          searchCallCount,
+          0,
+          'searchAction must NOT be called when booking is in progress',
+        );
+
+        // Test dynamic flow: start selection in flight, submit search, ensure lock not cleared
+        let capturedDynamicOnSelect: ((offerId: string) => Promise<void>) | null = null;
+        let capturedDynamicOnSubmit: ((event: unknown) => Promise<void>) | null = null;
+
+        (React as unknown as Record<string, unknown>).createElement = function (
+          type: unknown,
+          ...rest: unknown[]
+        ) {
+          if (type === FlightResults) {
+            const props = rest[0] as { onSelectFlight?: (offerId: string) => Promise<void> };
+            capturedDynamicOnSelect = props?.onSelectFlight ?? null;
+          } else if (type === 'form') {
+            const props = rest[0] as { onSubmit?: (event: unknown) => Promise<void> };
+            capturedDynamicOnSubmit = props?.onSubmit ?? null;
+          }
+          return originalCreateElement.apply(
+            this,
+            [type, ...rest] as Parameters<typeof React.createElement>,
+          );
+        };
+
+        renderToStaticMarkup(
+          React.createElement(SearchFormClient, {
+            initialOutcome: {
+              ok: true,
+              mode: 'MATCHED',
+              offers: [offerMatched1, offerMatched2],
+              meta: mockMeta,
+            },
+            onSelectAction: mockSelectAction,
+            onSearchAction: mockSearchAction,
+            onNavigate: mockNavigate,
+          }),
+        );
+
+        assert.ok(capturedDynamicOnSelect !== null, 'capturedDynamicOnSelect must not be null');
+        assert.ok(capturedDynamicOnSubmit !== null, 'capturedDynamicOnSubmit must not be null');
+
+        // Initiate selection
+        const flightSelectPromise = (
+          capturedDynamicOnSelect as (offerId: string) => Promise<void>
+        )('offer-m1');
+        assert.strictEqual(selectCallCount, 1, 'Selection must be initiated');
+
+        // Attempt search submit while booking selection is in progress
+        await (capturedDynamicOnSubmit as (event: unknown) => Promise<void>)({
+          preventDefault: () => {},
+        });
+        assert.strictEqual(
+          searchCallCount,
+          0,
+          'searchAction must not be called during in-flight selection',
+        );
+
+        // Resolve first selection to complete navigation
+        resolveSelect({ ok: true, checkoutPath: '/checkout/step-1' });
+        await flightSelectPromise;
+        assert.deepStrictEqual(navigatedUrls, ['/checkout/step-1']);
+
+        // Attempt search submit again after navigation succeeded (lock still held)
+        await (capturedDynamicOnSubmit as (event: unknown) => Promise<void>)({
+          preventDefault: () => {},
+        });
+        assert.strictEqual(
+          searchCallCount,
+          0,
+          'searchAction must not be called after navigation lock is held',
+        );
+
+        // Verify navigation lock is retained: subsequent select attempt must still be ignored
+        await (capturedDynamicOnSelect as (offerId: string) => Promise<void>)('offer-m2');
+        assert.strictEqual(
+          selectCallCount,
+          1,
+          'Lock must be retained: competing selection ignored',
+        );
       } finally {
         (React as unknown as Record<string, unknown>).createElement = originalCreateElement;
       }

@@ -17,6 +17,7 @@ export type SearchFormClientProps = {
   initialValues?: Partial<FlightSearchQuery>;
   initialOutcome?: FlightSearchOutcome | null;
   initialSortBy?: FlightSortOption;
+  initialBookingOfferId?: string | null;
   onSearchAction?: (query: FlightSearchQuery) => Promise<FlightSearchOutcome>;
   onSelectAction?: (offerId: string) => Promise<FlightSelectionOutcome>;
   onNavigate?: (url: string) => void;
@@ -35,6 +36,7 @@ export function SearchFormClient({
   initialValues,
   initialOutcome,
   initialSortBy,
+  initialBookingOfferId,
   onSearchAction,
   onSelectAction,
   onNavigate,
@@ -62,20 +64,26 @@ export function SearchFormClient({
     initialOutcome && initialOutcome.ok ? initialOutcome.meta : null,
   );
   const [sortBy, setSortBy] = useState<FlightSortOption | undefined>(initialSortBy);
-  const [bookingOfferId, setBookingOfferId] = useState<string | null>(null);
-  const bookingOfferIdRef = useRef<string | null>(null);
+  const [bookingOfferId, setBookingOfferId] = useState<string | null>(
+    initialBookingOfferId ?? null,
+  );
+  const bookingOfferIdRef = useRef<string | null>(initialBookingOfferId ?? null);
   const router = useSafeRouter();
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
-    event.preventDefault();
+  const isBooking = bookingOfferId !== null;
+  const isFormDisabled = loading || isBooking;
+
+  const handleSubmit = async (event?: FormEvent<HTMLFormElement>): Promise<void> => {
+    event?.preventDefault();
+    if (loading || bookingOfferId !== null || bookingOfferIdRef.current !== null) {
+      return;
+    }
     setLoading(true);
     setError(null);
     setMode(null);
     setOffers([]);
     setMeta(null);
     setSortBy(undefined);
-    bookingOfferIdRef.current = null;
-    setBookingOfferId(null);
 
     try {
       const query: FlightSearchQuery = {
@@ -166,139 +174,141 @@ export function SearchFormClient({
   return (
     <div className="space-y-8">
       <form onSubmit={handleSubmit} className="card space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label htmlFor="origin" className="block text-sm font-medium text-text-secondary mb-1">
-              Origin (IATA)
-            </label>
-            <input
-              id="origin"
-              type="text"
-              required
-              maxLength={3}
-              pattern="[A-Za-z]{3}"
-              placeholder="e.g. JFK"
-              value={origin}
-              onChange={(e) => setOrigin(e.target.value)}
-              className="form-input w-full uppercase"
-            />
+        <fieldset disabled={isFormDisabled} className="space-y-6 border-0 p-0 m-0 min-w-0">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label htmlFor="origin" className="block text-sm font-medium text-text-secondary mb-1">
+                Origin (IATA)
+              </label>
+              <input
+                id="origin"
+                type="text"
+                required
+                maxLength={3}
+                pattern="[A-Za-z]{3}"
+                placeholder="e.g. JFK"
+                value={origin}
+                onChange={(e) => setOrigin(e.target.value)}
+                className="form-input w-full uppercase"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="destination"
+                className="block text-sm font-medium text-text-secondary mb-1"
+              >
+                Destination (IATA)
+              </label>
+              <input
+                id="destination"
+                type="text"
+                required
+                maxLength={3}
+                pattern="[A-Za-z]{3}"
+                placeholder="e.g. LHR"
+                value={destination}
+                onChange={(e) => setDestination(e.target.value)}
+                className="form-input w-full uppercase"
+              />
+            </div>
           </div>
 
-          <div>
-            <label
-              htmlFor="destination"
-              className="block text-sm font-medium text-text-secondary mb-1"
-            >
-              Destination (IATA)
-            </label>
-            <input
-              id="destination"
-              type="text"
-              required
-              maxLength={3}
-              pattern="[A-Za-z]{3}"
-              placeholder="e.g. LHR"
-              value={destination}
-              onChange={(e) => setDestination(e.target.value)}
-              className="form-input w-full uppercase"
-            />
-          </div>
-        </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label
+                htmlFor="departureDate"
+                className="block text-sm font-medium text-text-secondary mb-1"
+              >
+                Departure Date
+              </label>
+              <input
+                id="departureDate"
+                type="date"
+                required
+                value={departureDate}
+                onChange={(e) => setDepartureDate(e.target.value)}
+                className="form-input w-full"
+              />
+            </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label
-              htmlFor="departureDate"
-              className="block text-sm font-medium text-text-secondary mb-1"
-            >
-              Departure Date
-            </label>
-            <input
-              id="departureDate"
-              type="date"
-              required
-              value={departureDate}
-              onChange={(e) => setDepartureDate(e.target.value)}
-              className="form-input w-full"
-            />
+            <div>
+              <label
+                htmlFor="cabinClass"
+                className="block text-sm font-medium text-text-secondary mb-1"
+              >
+                Cabin Class
+              </label>
+              <select
+                id="cabinClass"
+                value={cabinClass}
+                onChange={(event) => {
+                  if (isCabinClass(event.target.value)) {
+                    setCabinClass(event.target.value);
+                  }
+                }}
+                className="form-input w-full animate-none"
+              >
+                <option value="economy">Economy</option>
+                <option value="premium_economy">Premium Economy</option>
+                <option value="business">Business</option>
+                <option value="first">First</option>
+              </select>
+            </div>
           </div>
 
-          <div>
-            <label
-              htmlFor="cabinClass"
-              className="block text-sm font-medium text-text-secondary mb-1"
-            >
-              Cabin Class
-            </label>
-            <select
-              id="cabinClass"
-              value={cabinClass}
-              onChange={(event) => {
-                if (isCabinClass(event.target.value)) {
-                  setCabinClass(event.target.value);
-                }
-              }}
-              className="form-input w-full animate-none"
-            >
-              <option value="economy">Economy</option>
-              <option value="premium_economy">Premium Economy</option>
-              <option value="business">Business</option>
-              <option value="first">First</option>
-            </select>
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label htmlFor="adults" className="block text-sm font-medium text-text-secondary mb-1">
+                Adults
+              </label>
+              <input
+                id="adults"
+                type="number"
+                min={1}
+                max={9}
+                required
+                value={adults}
+                onChange={(e) => setAdults(Number(e.target.value))}
+                className="form-input w-full"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="children"
+                className="block text-sm font-medium text-text-secondary mb-1"
+              >
+                Children
+              </label>
+              <input
+                id="children"
+                type="number"
+                min={0}
+                max={9}
+                value={children}
+                onChange={(e) => setChildren(Number(e.target.value))}
+                className="form-input w-full"
+              />
+            </div>
+            <div>
+              <label htmlFor="infants" className="block text-sm font-medium text-text-secondary mb-1">
+                Infants
+              </label>
+              <input
+                id="infants"
+                type="number"
+                min={0}
+                max={9}
+                value={infants}
+                onChange={(e) => setInfants(Number(e.target.value))}
+                className="form-input w-full"
+              />
+            </div>
           </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-4">
-          <div>
-            <label htmlFor="adults" className="block text-sm font-medium text-text-secondary mb-1">
-              Adults
-            </label>
-            <input
-              id="adults"
-              type="number"
-              min={1}
-              max={9}
-              required
-              value={adults}
-              onChange={(e) => setAdults(Number(e.target.value))}
-              className="form-input w-full"
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="children"
-              className="block text-sm font-medium text-text-secondary mb-1"
-            >
-              Children
-            </label>
-            <input
-              id="children"
-              type="number"
-              min={0}
-              max={9}
-              value={children}
-              onChange={(e) => setChildren(Number(e.target.value))}
-              className="form-input w-full"
-            />
-          </div>
-          <div>
-            <label htmlFor="infants" className="block text-sm font-medium text-text-secondary mb-1">
-              Infants
-            </label>
-            <input
-              id="infants"
-              type="number"
-              min={0}
-              max={9}
-              value={infants}
-              onChange={(e) => setInfants(Number(e.target.value))}
-              className="form-input w-full"
-            />
-          </div>
-        </div>
+        </fieldset>
 
         <div className="flex justify-end pt-4">
-          <button type="submit" disabled={loading} className="btn-primary w-full md:w-auto">
+          <button type="submit" disabled={isFormDisabled} className="btn-primary w-full md:w-auto">
             {loading ? 'Searching...' : 'Search Flights'}
           </button>
         </div>
