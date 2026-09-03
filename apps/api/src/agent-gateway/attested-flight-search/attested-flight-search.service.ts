@@ -221,6 +221,7 @@ export class AttestedFlightSearchService {
           mappedQuery,
           traceId || undefined,
           correlationId || undefined,
+          { caller: 'agent' },
         );
       } catch (err: unknown) {
         if (err instanceof HttpException) {
@@ -403,6 +404,7 @@ export class AttestedFlightSearchService {
           mappedQuery,
           traceId || undefined,
           correlationId || dto.chatSessionId,
+          { caller: 'agent', persistence: 'required' },
         );
       } catch (err: unknown) {
         if (err instanceof HttpException) {

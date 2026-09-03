@@ -63,6 +63,10 @@ describe('Agent Gateway Polish (E2E)', () => {
     await app.close();
   });
 
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   beforeEach(async () => {
     // Clear databases
     await prisma.chatHandoff.deleteMany({});
@@ -88,6 +92,30 @@ describe('Agent Gateway Polish (E2E)', () => {
     await prisma.airport.deleteMany({});
     await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
+
+    // User-requested CI repair: canonical search validates the airport reference table.
+    await prisma.airport.createMany({
+      data: [
+        {
+          iataCode: 'HAN',
+          name: 'Noi Bai',
+          city: 'Hanoi',
+          country: 'VN',
+          latitude: 21.2212,
+          longitude: 105.807,
+          type: 'LARGE_AIRPORT',
+        },
+        {
+          iataCode: 'NRT',
+          name: 'Narita',
+          city: 'Tokyo',
+          country: 'JP',
+          latitude: 35.7647,
+          longitude: 140.3864,
+          type: 'LARGE_AIRPORT',
+        },
+      ],
+    });
 
     // Reset Redis cache keys
     const keys = await cacheService.keys('*');
@@ -117,11 +145,13 @@ describe('Agent Gateway Polish (E2E)', () => {
       adults: '2',
     };
 
-    it('should retrieve search results from Cache directly on cache hit without calling Duffel service', async () => {
+    it('should reuse raw cached offers without supplier calls and score them for each user', async () => {
+      // User-requested CI repair: Phase 022 removed the mapped cache so user scores stay isolated.
       const normalizedQuery = {
         origin: 'HAN',
         destination: 'NRT',
-        date: '2026-12-20',
+        departureDate: '2026-12-20',
+        returnDate: null,
         adults: 2,
         children: 0,
         infants: 0,
@@ -129,32 +159,45 @@ describe('Agent Gateway Polish (E2E)', () => {
       };
       const queryStr = JSON.stringify(normalizedQuery);
       const sha256 = crypto.createHash('sha256').update(queryStr).digest('hex');
-      const cacheKey = `flights:search:${sha256}`;
+      const cacheKey = `flights:raw:${sha256}`;
 
-      // Mock cached results
+      // Cache supplier data only; equal objective inputs retain supplier order for cold start.
       const mockCachedResults = {
-        results: [
-          {
-            airline: 'Vietnam Airlines',
-            flightNumber: 'VN310',
-            departureAirport: 'HAN',
-            arrivalAirport: 'NRT',
-            departureTime: '2026-12-20T08:30:00',
-            arrivalTime: '2026-12-20T15:00:00',
-            duration: 330,
-            stops: 0,
-            price: 904.0,
-            currency: 'USD',
-            fareClass: 'Economy',
-            baggageAllowance: '23kg checked',
-          },
-        ],
+        offers: [
+          { code: 'VN', name: 'Vietnam Airlines', number: '310' },
+          { code: 'NH', name: 'ANA', number: '858' },
+        ].map((carrier) => ({
+          id: `off_cache_${carrier.code}`,
+          total_amount: '904.00',
+          total_currency: 'USD',
+          slices: [
+            {
+              duration: 'PT5H30M',
+              segments: [
+                {
+                  duration: 'PT5H30M',
+                  departing_at: '2026-12-20T08:30:00',
+                  arriving_at: '2026-12-20T15:00:00',
+                  origin: { iata_code: 'HAN' },
+                  destination: { iata_code: 'NRT' },
+                  operating_carrier: { iata_code: carrier.code, name: carrier.name },
+                  marketing_carrier: { iata_code: carrier.code, name: carrier.name },
+                  marketing_carrier_flight_number: carrier.number,
+                  passengers: [
+                    { cabin_class: 'economy', baggages: [{ type: 'checked', quantity: 1 }] },
+                  ],
+                },
+              ],
+            },
+          ],
+        })),
       };
 
       await cacheService.set(cacheKey, JSON.stringify(mockCachedResults), 900);
-
-      // Spy on DuffelService.searchFlights
-      const searchSpy = jest.spyOn(duffelService, 'searchFlights');
+      // An exhausted budget makes a cache miss fail before any supplier request.
+      const now = new Date();
+      const budgetKey = `budget:duffel:${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      await cacheService.set(budgetKey, '2000');
 
       // Make search request
       const res = await request(app.getHttpServer())
@@ -164,10 +207,52 @@ describe('Agent Gateway Polish (E2E)', () => {
         .set('X-User-Claim', token)
         .expect(200);
 
-      expect(res.body).toEqual(mockCachedResults);
-      expect(searchSpy).not.toHaveBeenCalled();
+      expect(res.body.mode).toBe('RANKED');
+      expect(res.body.meta.cached).toBe(true);
+      expect(
+        res.body.results.map((result: { flightNumber: string }) => result.flightNumber),
+      ).toEqual(['VN310', 'NH858']);
+      expect(res.body.results[0]).toMatchObject({
+        airline: 'Vietnam Airlines',
+        flightNumber: 'VN310',
+        departureAirport: 'HAN',
+        arrivalAirport: 'NRT',
+        departureTime: '2026-12-20T08:30:00',
+        arrivalTime: '2026-12-20T15:00:00',
+        duration: 330,
+        stops: 0,
+        price: 904,
+        currency: 'USD',
+        fareClass: 'Economy',
+        baggageAllowance: '1 checked bag(s)',
+        matchResult: null,
+      });
 
-      searchSpy.mockRestore();
+      const otherUser = await prisma.user.create({
+        data: {
+          email: 'agent-polish-other@example.com',
+          password: 'Password123!',
+          status: 'ACTIVE',
+        },
+      });
+      await prisma.travelerProfile.create({
+        data: { userId: otherUser.id, preferredAirlines: ['NH'], blacklistedAirlines: [] },
+      });
+      const personalized = await request(app.getHttpServer())
+        .get('/agent-gateway/flights/search')
+        .query(query)
+        .set('X-Agent-API-Key', apiKey)
+        .set('X-User-Claim', mintClaimToken(otherUser.id, Math.floor(Date.now() / 1000)))
+        .expect(200);
+
+      expect(personalized.body.mode).toBe('MATCHED');
+      expect(personalized.body.meta.cached).toBe(true);
+      expect(
+        personalized.body.results.map((result: { flightNumber: string }) => result.flightNumber),
+      ).toEqual(['NH858', 'VN310']);
+      expect(personalized.body.results[0].matchResult).not.toBeNull();
+      expect(await cacheService.get(budgetKey)).toBe('2000');
+      expect(JSON.parse((await cacheService.get(cacheKey))!)).toEqual(mockCachedResults);
     });
 
     it('should enforce budget limit and return 429 RATE_LIMIT_EXCEEDED if monthly budget is exceeded', async () => {

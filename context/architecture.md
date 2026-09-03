@@ -1007,6 +1007,8 @@ Feature 019 restructures high-leverage boundaries without changing public produc
    - `FlightsModule`: `imports: [..., FlightMatchModule, ProfileModule]` $\rightarrow$ `exports: [FlightsService, FlightSearchOrchestratorService]`.
    - Zero circular dependencies across `FlightsModule`, `FlightMatchModule`, and `ProfileModule`.
 
+   **Agent search persistence and budget boundary (Phase 6 follow-up):** Both gateway search versions delegate to `FlightsService.search()` with `caller: 'agent'`, preserving the agent supplier budget. V2 additionally requests `persistence: 'required'`: the search-history, flight-offer, and recovery transaction must commit before the gateway signs its ordered first five offers. A persistence failure rejects the search without issuing an attestation. Browser and legacy V1 searches retain deferred best-effort persistence. Only raw supplier offers are cached; each request applies its own profile and ranking. The canonical display mapper preserves weight-only baggage allowances as well as quantity-based baggage.
+
 4. **Search HTTP Boundary (`FlightsController`)**:
    - Both public search aliases return `FlightSearchResponseDto` through Nest's passthrough response path, preserving direct controller invocation and DTO serialization.
    - The controller sets `Cache-Control: private, no-store`, removes any existing `ETag`, and uses a response-local Express application view that omits only the `etag fn` setting during final JSON serialization. No global Express ETag setting is mutated, so unrelated concurrent responses retain their normal behavior.

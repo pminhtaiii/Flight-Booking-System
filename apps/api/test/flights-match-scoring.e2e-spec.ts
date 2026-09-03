@@ -628,6 +628,24 @@ describe('Flight match scoring (E2E)', (): void => {
 
   beforeEach(async (): Promise<void> => {
     searchesStarted = 0;
+    // User-requested CI repair: earlier suites leave handoffs that restrict offer deletion.
+    // Follow the gateway suite's dependency order, including payments that restrict user cleanup.
+    await prisma.chatHandoff.deleteMany({});
+    await prisma.chatSession.deleteMany({});
+    await prisma.paymentEvent.deleteMany({});
+    await prisma.ledgerEntry.deleteMany({});
+    await prisma.refund.deleteMany({});
+    await prisma.cancellationRefundObligation.deleteMany({});
+    await prisma.payment.deleteMany({});
+    await prisma.idempotencyKey.deleteMany({});
+    await prisma.paymentMethod.deleteMany({});
+    await prisma.bookingIntentPassenger.deleteMany({});
+    await prisma.bookingIntent.deleteMany({});
+    await prisma.itineraryRevisionSegment.deleteMany({});
+    await prisma.itineraryRevision.deleteMany({});
+    await prisma.disruptionAuditEvent.deleteMany({});
+    await prisma.notificationOutbox.deleteMany({});
+    await prisma.booking.deleteMany({});
     await prisma.offerRecovery.deleteMany({});
     await prisma.flightOffer.deleteMany({});
     await prisma.searchHistory.deleteMany({});

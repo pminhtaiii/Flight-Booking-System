@@ -119,6 +119,8 @@ describe('AttestedFlightSearchService', () => {
         },
         'trace-1',
         'corr-1',
+        // User-requested CI fix preserves the agent supplier budget through delegation.
+        { caller: 'agent' },
       );
       expect(cacheService.get).not.toHaveBeenCalled();
       expect(cacheService.set).not.toHaveBeenCalled();
@@ -251,6 +253,7 @@ describe('AttestedFlightSearchService', () => {
         },
         undefined,
         undefined,
+        { caller: 'agent' },
       );
     });
 
@@ -434,6 +437,8 @@ describe('AttestedFlightSearchService', () => {
         }),
         'trace-v2',
         'corr-v2',
+        // User-requested race fix requires committed offers before attestation.
+        { caller: 'agent', persistence: 'required' },
       );
 
       expect(result.selectionAttestation).toBe('sel_v1_mock_attestation.mock_signature');
@@ -512,6 +517,7 @@ describe('AttestedFlightSearchService', () => {
         expect.any(Object),
         'trace-v2',
         'sess_123',
+        { caller: 'agent', persistence: 'required' },
       );
 
       // Slices to exactly 5 preserving order
