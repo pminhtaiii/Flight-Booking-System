@@ -4,19 +4,19 @@ import { AttestedFlightSearchController } from './attested-flight-search.control
 import { SelectionAttestationService } from '../selection-attestation.service';
 import { PrismaModule } from '@/prisma/prisma.module';
 import { AuditModule } from '@/audit/audit.module';
-import { DuffelModule } from '@/duffel/duffel.module';
 import { ChatModule } from '@/chat/chat.module';
 import { AgentAuthModule } from '../auth/agent-auth.module';
 import { AgentToolAuditModule } from '../audit/agent-tool-audit.module';
+import { FlightsModule } from '@/flights/flights.module';
 
 @Module({
   imports: [
     PrismaModule,
     AuditModule,
-    DuffelModule,
     ChatModule,
     AgentAuthModule,
     AgentToolAuditModule,
+    FlightsModule,
   ],
   controllers: [AttestedFlightSearchController],
   providers: [AttestedFlightSearchService, SelectionAttestationService],

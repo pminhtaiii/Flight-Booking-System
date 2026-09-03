@@ -7,9 +7,6 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
-import { CacheService } from '@/cache/cache.service';
-import { DuffelService } from '@/duffel/duffel.service';
-import { DuffelBaggage } from '@/duffel/duffel.types';
 import { SelectionAttestationService } from '../selection-attestation.service';
 import { FlightSearchQueryDto } from '../dto/flight-search-query.dto';
 import {
@@ -18,8 +15,6 @@ import {
   AttestedFlightSearchResultDto,
 } from '../dto/attested-flight-search.dto';
 import { FlightSearchResponseDto, FlightResultDto } from '../dto/flight-result.dto';
-import { Prisma } from '@prisma/client';
-import * as crypto from 'crypto';
 import { CABIN_KEYWORDS, PASSENGER_KEYWORDS } from '../agent-gateway.constants';
 import {
   ChatMessageCryptoService,
@@ -27,52 +22,8 @@ import {
   UnsupportedKeyVersionError,
 } from '@/chat/chat-message-crypto.service';
 import { AgentToolAuditService } from '../audit/agent-tool-audit.service';
-
-function capitalizeCabinClass(cabinClass: string): string {
-  if (!cabinClass) return '';
-  return cabinClass
-    .trim()
-    .toLowerCase()
-    .split('_')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
-}
-
-function cleanIsoTime(t: string): string {
-  if (!t) return '';
-  const [datePart, timePartWithOffset] = t.split('T');
-  if (!timePartWithOffset) return t;
-  const timePart = timePartWithOffset.split('Z')[0].split('+')[0].split('-')[0];
-  return `${datePart}T${timePart}`;
-}
-
-function formatDuffelBaggageAllowance(baggages?: DuffelBaggage[]): string {
-  if (!baggages || baggages.length === 0) return 'No checked baggage';
-  const checked = baggages.find((b) => b.type === 'checked');
-  if (!checked) {
-    return 'No checked baggage';
-  }
-  if (checked.quantity === 0) {
-    return 'No checked baggage';
-  }
-  if (typeof checked.quantity === 'number') {
-    return `${checked.quantity} checked bag(s)`;
-  }
-  if (typeof checked.weight === 'number') {
-    return `${checked.weight}${checked.weight_unit?.toLowerCase() || 'kg'} checked`;
-  }
-  return 'No checked baggage';
-}
-
-function parseISODurationToMinutes(durationStr: string): number {
-  const regex = /P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?/;
-  const matches = durationStr.match(regex);
-  if (!matches) return 0;
-  const days = parseInt(matches[1] || '0', 10);
-  const hours = parseInt(matches[2] || '0', 10);
-  const minutes = parseInt(matches[3] || '0', 10);
-  return days * 1440 + hours * 60 + minutes;
-}
+import { FlightsService } from '@/flights/flights.service';
+import { FlightSearchRequestDto } from '@/flights/dto/search-flight.dto';
 
 @Injectable()
 export class AttestedFlightSearchService {
@@ -81,11 +32,10 @@ export class AttestedFlightSearchService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
-    private readonly cacheService: CacheService,
-    private readonly duffelService: DuffelService,
     private readonly selectionAttestationService: SelectionAttestationService,
     private readonly chatMessageCryptoService: ChatMessageCryptoService,
     private readonly agentToolAuditService: AgentToolAuditService,
+    private readonly flightsService: FlightsService,
   ) {}
 
   private async logToolCall(
@@ -134,6 +84,41 @@ export class AttestedFlightSearchService {
     });
   }
 
+  private buildFlightSearchRequest(query: FlightSearchQueryDto): FlightSearchRequestDto {
+    let adultsCount = query.adults;
+    if (adultsCount === undefined) {
+      adultsCount = query.passengers;
+    }
+    if (adultsCount === undefined || adultsCount === null || adultsCount <= 0) {
+      throw new HttpException(
+        'At least one of adults or passengers must be provided',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const searchDate = query.date || query.departureDate;
+    if (!searchDate) {
+      throw new HttpException(
+        'At least one of date or departureDate must be provided',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const origin = (query.origin || '').trim().toUpperCase();
+    const destination = (query.destination || '').trim().toUpperCase();
+    const cabinClass: FlightSearchRequestDto['cabinClass'] = query.cabinClass || 'economy';
+
+    return {
+      origin,
+      destination,
+      departureDate: searchDate,
+      adults: adultsCount,
+      children: 0,
+      infants: 0,
+      cabinClass,
+    };
+  }
+
   async searchFlights(
     userId: string,
     query: FlightSearchQueryDto,
@@ -142,19 +127,7 @@ export class AttestedFlightSearchService {
   ): Promise<FlightSearchResponseDto> {
     const startTime = Date.now();
     try {
-      const adultsCount = query.adults || query.passengers;
-      if (!adultsCount) {
-        throw new HttpException('Adults count is required', HttpStatus.BAD_REQUEST);
-      }
-
-      const searchDate = query.date || query.departureDate;
-      if (!searchDate) {
-        throw new HttpException('Date is required', HttpStatus.BAD_REQUEST);
-      }
-
-      const origin = query.origin.trim().toUpperCase();
-      const destination = query.destination.trim().toUpperCase();
-      const cabinClass = query.cabinClass || 'economy';
+      const mappedQuery = this.buildFlightSearchRequest(query);
 
       // Check for user's latest chat message and perform honest degradation keyword validation
       let lastMessage = null;
@@ -240,53 +213,16 @@ export class AttestedFlightSearchService {
         }
       }
 
-      // 1. Check Redis cache first for mapped results
-      const normalizedQuery = {
-        origin,
-        destination,
-        date: searchDate,
-        adults: adultsCount,
-        children: 0,
-        infants: 0,
-        cabinClass,
-      };
-      const queryStr = JSON.stringify(normalizedQuery);
-      const sha256 = crypto.createHash('sha256').update(queryStr).digest('hex');
-      const cacheKey = `flights:search:${sha256}`;
-
-      const cachedData = await this.cacheService.get(cacheKey);
-      if (cachedData) {
-        const parsed = JSON.parse(cachedData) as FlightSearchResponseDto;
-        await this.logToolCall(
-          userId,
-          'flights/search',
-          query,
-          startTime,
-          traceId,
-          correlationId,
-          true,
-          null,
-          parsed,
-        );
-        return parsed;
-      }
-
-      // 2. Call DuffelService
-      let rawResponse;
+      // Delegate to canonical FlightsService search
+      let searchResponse;
       try {
-        const searchResult = await this.duffelService.searchFlights(
-          {
-            origin,
-            destination,
-            departureDate: searchDate,
-            adults: adultsCount,
-            children: 0,
-            infants: 0,
-            cabinClass,
-          },
-          'agent',
+        searchResponse = await this.flightsService.search(
+          userId,
+          mappedQuery,
+          traceId || undefined,
+          correlationId || undefined,
+          { caller: 'agent' },
         );
-        rawResponse = searchResult.offerRequest;
       } catch (err: unknown) {
         if (err instanceof HttpException) {
           throw err;
@@ -303,74 +239,42 @@ export class AttestedFlightSearchService {
         );
       }
 
-      // 3. Parse/map raw response to FlightResultDto (limit to 5 results)
-      const offers = rawResponse.offers || [];
-      const limitedOffers = offers.slice(0, 5);
+      // Slice canonical results to top 5
+      const limitedOffers = (searchResponse.results || []).slice(0, 5);
 
       const results: FlightResultDto[] = [];
       for (const offer of limitedOffers) {
-        const slice = offer.slices?.[0];
-        if (!slice || !slice.segments || slice.segments.length === 0) {
-          continue;
-        }
-
-        const segments = slice.segments;
-        const firstSegment = segments[0];
-        const lastSegment = segments[segments.length - 1];
-
-        const airline = firstSegment.operating_carrier?.name || 'Unknown Airline';
-        const flightNumber = `${firstSegment.marketing_carrier?.iata_code || ''}${
-          firstSegment.marketing_carrier_flight_number || ''
-        }`;
-
-        const departureAirport = firstSegment.origin?.iata_code || '';
-        const arrivalAirport = lastSegment.destination?.iata_code || '';
-        const departureTime = cleanIsoTime(firstSegment.departing_at);
-        const arrivalTime = cleanIsoTime(lastSegment.arriving_at);
-
-        let duration = 0;
-        if (slice.duration) {
-          if (slice.duration.startsWith('P')) {
-            duration = parseISODurationToMinutes(slice.duration);
-          } else {
-            duration = parseInt(slice.duration, 10) || 0;
-          }
-        }
-        const stops = segments.length - 1;
-
-        const price = parseFloat(offer.total_amount);
-        const currency = offer.total_currency;
-
-        const segmentPassenger = firstSegment.passengers?.[0];
-        const offerPassenger = offer.passengers?.[0];
-        const passengerCabinClass = segmentPassenger?.cabin_class || cabinClass;
-        const fareClass = passengerCabinClass ? capitalizeCabinClass(passengerCabinClass) : null;
-
-        const baggages = segmentPassenger?.baggages || offerPassenger?.baggages;
-        const baggageAllowance = formatDuffelBaggageAllowance(baggages);
-
         results.push({
-          airline,
-          flightNumber,
-          departureAirport,
-          arrivalAirport,
-          departureTime,
-          arrivalTime,
-          duration,
-          stops,
-          price,
-          currency,
-          fareClass,
-          baggageAllowance,
+          airline: offer.airline,
+          flightNumber: offer.flightNumber,
+          departureAirport: offer.departureAirport,
+          arrivalAirport: offer.arrivalAirport,
+          departureTime: offer.departureTime,
+          arrivalTime: offer.arrivalTime,
+          duration: offer.duration,
+          stops: offer.stops,
+          price: offer.price,
+          currency: offer.currency,
+          fareClass: offer.fareClass,
+          baggageAllowance: offer.baggageAllowance,
+          matchResult: offer.matchResult ?? null,
         });
       }
 
-      const response: FlightSearchResponseDto = { results };
+      const response: FlightSearchResponseDto = {
+        mode: searchResponse.mode,
+        results,
+        meta: searchResponse.meta
+          ? {
+              scoringVersion: searchResponse.meta.scoringVersion ?? null,
+              totalResults: searchResponse.meta.totalResults,
+              cached: searchResponse.meta.cached,
+              searchHash: searchResponse.meta.searchHash,
+            }
+          : undefined,
+      };
 
-      // 4. Cache mapped results in Redis with TTL 900 seconds
-      await this.cacheService.set(cacheKey, JSON.stringify(response), 900);
-
-      // 5. Log TOOL_CALL audit log
+      // Log TOOL_CALL audit log
       await this.logToolCall(
         userId,
         'flights/search',
@@ -418,29 +322,8 @@ export class AttestedFlightSearchService {
 
       const proposedSnapshotVersion = dto.proposedSnapshotVersion ?? dto.proposedVersion ?? 1;
 
-      // Check degradation triggers
-      let adultsCount = dto.search.adults;
-      if (adultsCount === undefined) {
-        adultsCount = dto.search.passengers;
-      }
-      if (adultsCount === undefined) {
-        throw new HttpException(
-          'At least one of adults or passengers must be provided',
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-
-      const searchDate = dto.search.date || dto.search.departureDate;
-      if (!searchDate) {
-        throw new HttpException(
-          'At least one of date or departureDate must be provided',
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-
-      const origin = dto.search.origin.trim().toUpperCase();
-      const destination = dto.search.destination.trim().toUpperCase();
-      const cabinClass = dto.search.cabinClass || 'economy';
+      // Check degradation triggers and build mapped search query
+      const mappedQuery = this.buildFlightSearchRequest(dto.search);
 
       // Check for user's latest chat message and perform honest degradation keyword validation
       const lastMessage = await this.prisma.chatMessage.findFirst({
@@ -513,26 +396,20 @@ export class AttestedFlightSearchService {
         }
       }
 
-      // Call DuffelService
-      let rawResponse;
-      let searchHashValue = '';
+      // Delegate to canonical FlightsService search
+      let searchResponse;
       try {
-        const searchResult = await this.duffelService.searchFlights(
-          {
-            origin,
-            destination,
-            departureDate: searchDate,
-            adults: adultsCount,
-            children: 0,
-            infants: 0,
-            cabinClass,
-          },
-          'agent',
+        searchResponse = await this.flightsService.search(
+          userId,
+          mappedQuery,
+          traceId || undefined,
+          correlationId || dto.chatSessionId,
+          { caller: 'agent', persistence: 'required' },
         );
-        rawResponse = searchResult.offerRequest;
-        searchHashValue = searchResult.searchHash;
       } catch (err: unknown) {
-        if (err instanceof HttpException) throw err;
+        if (err instanceof HttpException) {
+          throw err;
+        }
         throw new HttpException(
           {
             message:
@@ -545,100 +422,30 @@ export class AttestedFlightSearchService {
         );
       }
 
-      const offers = rawResponse.offers || [];
-      const limitedOffers = offers.slice(0, 5);
-
-      const flightOffersData = limitedOffers.map((offer) => ({
-        searchHash: searchHashValue,
-        duffelOfferId: offer.id,
-        rawOffer: offer as unknown as Prisma.InputJsonValue,
-        origin,
-        destination,
-        departureDate: new Date(searchDate),
-        adults: adultsCount,
-        cabinClass,
-        price: offer.total_amount,
-        currency: offer.total_currency,
-      }));
-
-      if (flightOffersData.length > 0) {
-        await this.prisma.flightOffer.createMany({
-          data: flightOffersData,
-          skipDuplicates: true,
-        });
-      }
-
-      const createdOffers = await this.prisma.flightOffer.findMany({
-        where: {
-          searchHash: searchHashValue,
-          duffelOfferId: { in: limitedOffers.map((o) => o.id) },
-        },
-      });
-
+      const limitedOffers = (searchResponse.results || []).slice(0, 5);
       const results: AttestedFlightSearchResultDto[] = [];
       const attestationOffers: { flightOfferId: string; duffelOfferId: string }[] = [];
       const expiresAt = new Date(Date.now() + 15 * 60000); // 15 mins
 
-      for (let i = 0; i < limitedOffers.length; i++) {
-        const offer = limitedOffers[i];
-        const slice = offer.slices?.[0];
-        if (!slice || !slice.segments || slice.segments.length === 0) continue;
-
-        const createdOffer = createdOffers.find((co) => co.duffelOfferId === offer.id);
-        if (!createdOffer) continue;
-
-        const segments = slice.segments;
-        const firstSegment = segments[0];
-        const lastSegment = segments[segments.length - 1];
-
-        const airline = firstSegment.operating_carrier?.name || 'Unknown Airline';
-        const flightNumber = `${firstSegment.marketing_carrier?.iata_code || ''}${
-          firstSegment.marketing_carrier_flight_number || ''
-        }`;
-
-        const departureAirport = firstSegment.origin?.iata_code || '';
-        const arrivalAirport = lastSegment.destination?.iata_code || '';
-        const departureTime = cleanIsoTime(firstSegment.departing_at);
-        const arrivalTime = cleanIsoTime(lastSegment.arriving_at);
-
-        let duration = 0;
-        if (slice.duration) {
-          if (slice.duration.startsWith('P')) {
-            duration = parseISODurationToMinutes(slice.duration);
-          } else {
-            duration = parseInt(slice.duration, 10) || 0;
-          }
-        }
-        const stops = segments.length - 1;
-
-        const price = parseFloat(offer.total_amount);
-        const currency = offer.total_currency;
-
-        const segmentPassenger = firstSegment.passengers?.[0];
-        const offerPassenger = offer.passengers?.[0];
-        const passengerCabinClass = segmentPassenger?.cabin_class || cabinClass;
-        const fareClass = passengerCabinClass ? capitalizeCabinClass(passengerCabinClass) : null;
-
-        const baggages = segmentPassenger?.baggages || offerPassenger?.baggages;
-        const baggageAllowance = formatDuffelBaggageAllowance(baggages);
-
-        attestationOffers.push({ flightOfferId: createdOffer.id, duffelOfferId: offer.id });
+      for (const offer of limitedOffers) {
+        attestationOffers.push({ flightOfferId: offer.id, duffelOfferId: offer.duffelOfferId });
         results.push({
-          flightOfferId: createdOffer.id,
-          duffelOfferId: offer.id,
+          flightOfferId: offer.id,
+          duffelOfferId: offer.duffelOfferId,
           offerExpiresAt: expiresAt.toISOString(),
-          airline,
-          flightNumber,
-          departureAirport,
-          arrivalAirport,
-          departureTime,
-          arrivalTime,
-          duration,
-          stops,
-          price,
-          currency,
-          fareClass,
-          baggageAllowance,
+          airline: offer.airline,
+          flightNumber: offer.flightNumber,
+          departureAirport: offer.departureAirport,
+          arrivalAirport: offer.arrivalAirport,
+          departureTime: offer.departureTime,
+          arrivalTime: offer.arrivalTime,
+          duration: offer.duration,
+          stops: offer.stops,
+          price: offer.price,
+          currency: offer.currency,
+          fareClass: offer.fareClass,
+          baggageAllowance: offer.baggageAllowance,
+          matchResult: offer.matchResult ?? null,
         });
       }
 
@@ -650,10 +457,17 @@ export class AttestedFlightSearchService {
         attestationOffers,
       );
 
-      const response = {
+      const response: AttestedFlightSearchResponseDto = {
         selectionAttestation,
         snapshotVersion: proposedSnapshotVersion,
         snapshotExpiresAt: expiresAt.toISOString(),
+        mode: searchResponse.mode,
+        meta: {
+          scoringVersion: searchResponse.meta.scoringVersion ?? null,
+          totalResults: searchResponse.meta.totalResults,
+          cached: searchResponse.meta.cached,
+          searchHash: searchResponse.meta.searchHash,
+        },
         results,
       };
 

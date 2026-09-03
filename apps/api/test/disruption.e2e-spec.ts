@@ -14,6 +14,7 @@ import { DuffelEventProcessor } from '@/disruption/webhook/duffel-event.processo
 import { DisruptionStatus, Prisma } from '@prisma/client';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { JwtService } from '@nestjs/jwt';
+import { SchedulerRegistry } from '@nestjs/schedule';
 import request from 'supertest';
 import * as crypto from 'crypto';
 
@@ -51,6 +52,11 @@ describe('Disruption & Flight-Change Management (Webhook & Processor E2E)', () =
     app.useGlobalFilters(new HttpExceptionFilter());
     app.setGlobalPrefix('api', { exclude: ['health'] });
     await app.init();
+
+    // User-requested CI repair: this suite awaits explicit processor batches.
+    // A cron claim can return that batch early, leaving sync transactions racing assertions/cleanup.
+    const schedulerRegistry = moduleFixture.get<SchedulerRegistry>(SchedulerRegistry);
+    schedulerRegistry.getCronJobs().forEach((job) => job.stop());
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
     processor = moduleFixture.get<DuffelEventProcessor>(DuffelEventProcessor);
