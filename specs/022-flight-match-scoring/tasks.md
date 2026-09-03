@@ -130,8 +130,8 @@ description: "Dependency-ordered implementation tasks for deterministic flight m
 - [x] T053 [US3] Drive provider-blind ordered cards and default MATCHED order through RED → GREEN in `apps/web/tests/flight-match-scoring.spec.ts`, `apps/web/components/search/FlightResultCard.tsx`, and `apps/web/components/search/FlightResults.tsx`
 - [x] T054 [US3] Drive full outcome/mode retention and result composition through RED → GREEN in `apps/web/tests/flight-match-scoring.spec.ts` and `apps/web/components/search/SearchFormClient.tsx`
 - [x] T055 [US3] Drive class-profile prefill with submitted-query precedence through RED → GREEN in `apps/web/tests/flight-match-scoring.spec.ts`, `apps/web/app/search/page.tsx`, and `apps/web/components/search/SearchFormClient.tsx`
-- [ ] T056 [US3] Drive airline and overnight-window profile save/clear through RED → GREEN in `apps/web/tests/traveler-profile.spec.ts` and `apps/web/components/profile/TravelerProfileForm.tsx`
-- [ ] T057 [US3] Drive max-stops, sensitivity, tri-state baggage, atomic invalid rejection, and stale-revision recovery through RED → GREEN in `apps/web/tests/traveler-profile.spec.ts` and `apps/web/components/profile/TravelerProfileForm.tsx`
+- [x] T056 [US3] Drive airline and overnight-window profile save/clear through RED → GREEN in `apps/web/tests/traveler-profile.spec.ts` and `apps/web/components/profile/TravelerProfileForm.tsx`
+- [x] T057 [US3] Drive max-stops, sensitivity, tri-state baggage, atomic invalid rejection, and stale-revision recovery through RED → GREEN in `apps/web/tests/traveler-profile.spec.ts` and `apps/web/components/profile/TravelerProfileForm.tsx`
 - [ ] T058 [US3] Drive 360/768/desktop keyboard/accessibility behavior through RED → GREEN in `apps/web/tests/flight-match-scoring.spec.ts` and the components under `apps/web/components/search/`
 - [ ] T059 [US3] Drive zero-token/backend/provider/PII plus key-specific explanation allowlist assertions through RED → GREEN in `apps/web/tests/flight-match-scoring.spec.ts` and `apps/web/tests/characterization/search-seam.characterization.spec.ts`
 
