@@ -3,7 +3,7 @@ import { describe, it } from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-import type { DimensionScore, FlightMatchResult, FlightSearchMeta, FlightSearchOfferView, FlightSearchOutcome } from '@shared/types';
+import type { DimensionScore, FlightMatchResult, FlightSearchMeta, FlightSearchOfferView, FlightSearchOutcome, FlightSelectionOutcome } from '@shared/types';
 import { FlightMatchBadge } from '../components/search/FlightMatchBadge';
 import { FlightMatchBreakdown } from '../components/search/FlightMatchBreakdown';
 import { FlightRankingBanner } from '../components/search/FlightRankingBanner';
@@ -916,6 +916,55 @@ describe('FlightResultCard (T053)', (): void => {
       assert.match(html, /Business/i);
       assert.match(html, /Checked bag included/i);
     });
+
+    it('displays Business for mixed-cabin itinerary with shorter 1st segment in economy (PT1H) and longer 2nd segment in business (PT8H)', (): void => {
+      const mixedCabinOffer = createMockOffer({
+        stops: 1,
+        duration: 'PT9H',
+        slices: [
+          {
+            origin: 'JFK',
+            destination: 'CDG',
+            departureAt: '2026-10-01T08:00:00Z',
+            arrivalAt: '2026-10-01T22:00:00Z',
+            duration: 'PT9H',
+            stops: 1,
+            segments: [
+              {
+                airline: 'Delta Air Lines',
+                flightNumber: 'DL101',
+                origin: 'JFK',
+                destination: 'BOS',
+                departureAt: '2026-10-01T08:00:00Z',
+                arrivalAt: '2026-10-01T09:00:00Z',
+                duration: 'PT1H',
+                cabinClass: 'economy',
+              },
+              {
+                airline: 'Delta Air Lines',
+                flightNumber: 'DL102',
+                origin: 'BOS',
+                destination: 'CDG',
+                departureAt: '2026-10-01T11:00:00Z',
+                arrivalAt: '2026-10-01T22:00:00Z',
+                duration: 'PT8H',
+                cabinClass: 'business',
+              },
+            ],
+          },
+        ],
+      });
+
+      const html = renderToStaticMarkup(
+        React.createElement(FlightResultCard, {
+          offer: mixedCabinOffer,
+          onSelect: () => {},
+        }),
+      );
+
+      assert.match(html, />\s*Business\s*</);
+      assert.doesNotMatch(html, />\s*Economy\s*</);
+    });
   });
 
   describe('Embedded match transparency components', (): void => {
@@ -1269,6 +1318,32 @@ describe('FlightResults (T053)', (): void => {
       assert.match(html, /\sdisabled(?!=:)[=>\s]/);
     });
 
+    it('disables all select buttons in results container when bookingOfferId is passed', (): void => {
+      const html = renderToStaticMarkup(
+        React.createElement(FlightResults, {
+          offers: [offerA, offerB],
+          bookingOfferId: 'offer-B',
+          onSelectFlight: () => {},
+        }),
+      );
+
+      const buttonMatches = [...html.matchAll(/<button[^>]*>/g)];
+      assert.strictEqual(buttonMatches.length, 2, 'Must render select buttons for both offer cards');
+      for (const match of buttonMatches) {
+        assert.match(
+          match[0],
+          /\sdisabled(?!=:)[=>\s]/,
+          'Every select button must be disabled when booking is pending',
+        );
+      }
+      assert.match(html, /Loading\.\.\./, 'Selected card must display Loading...');
+      assert.match(
+        html,
+        /Select flight/,
+        'Non-selected card must retain Select flight text while disabled',
+      );
+    });
+
     it('uses semantic styling with zero hardcoded hex colors', (): void => {
       const html = renderToStaticMarkup(
         React.createElement(FlightResults, {
@@ -1583,6 +1658,76 @@ describe('SearchFormClient (T054)', (): void => {
       assert.match(html, /text-text-primary/);
       assert.match(html, /form-input/);
       assert.doesNotMatch(html, /#[0-9a-fA-F]{3,6}/);
+    });
+
+    it('verifies that handleBook ignores concurrent selection clicks while an offer selection is in flight', async (): Promise<void> => {
+      let capturedOnSelectFlight: ((offerId: string) => Promise<void>) | null = null;
+      const originalCreateElement = React.createElement;
+
+      // Intercept FlightResults creation to capture handleBook callback
+      (React as unknown as Record<string, unknown>).createElement = function (
+        type: unknown,
+        ...rest: unknown[]
+      ) {
+        if (type === FlightResults) {
+          const props = rest[0] as { onSelectFlight?: (offerId: string) => Promise<void> };
+          capturedOnSelectFlight = props?.onSelectFlight ?? null;
+        }
+        return originalCreateElement.apply(
+          this,
+          [type, ...rest] as Parameters<typeof React.createElement>,
+        );
+      };
+
+      let actionCallCount = 0;
+      let resolveFirstAction!: (value: FlightSelectionOutcome) => void;
+      const firstActionPromise = new Promise<FlightSelectionOutcome>((resolve) => {
+        resolveFirstAction = resolve;
+      });
+
+      const mockSelectAction = async (_offerId: string): Promise<FlightSelectionOutcome> => {
+        actionCallCount++;
+        return firstActionPromise;
+      };
+
+      try {
+        renderToStaticMarkup(
+          React.createElement(SearchFormClient, {
+            initialOutcome: {
+              ok: true,
+              mode: 'MATCHED',
+              offers: [offerMatched1, offerMatched2],
+              meta: mockMeta,
+            },
+            onSelectAction: mockSelectAction,
+          }),
+        );
+
+        assert.ok(
+          capturedOnSelectFlight !== null,
+          'FlightResults must receive handleBook onSelectFlight handler',
+        );
+
+        // First click begins selection and is in-flight
+        const firstClickPromise = (capturedOnSelectFlight as (offerId: string) => Promise<void>)(
+          'offer-m1',
+        );
+        assert.strictEqual(actionCallCount, 1, 'First click must initiate selection');
+
+        // Second click concurrently while first selection is in flight
+        const secondClickPromise = (capturedOnSelectFlight as (offerId: string) => Promise<void>)(
+          'offer-m2',
+        );
+        assert.strictEqual(actionCallCount, 1, 'Concurrent click while in-flight must be ignored');
+
+        // Complete the first selection
+        resolveFirstAction({ ok: true, checkoutPath: '/checkout/step-1' });
+        await Promise.all([firstClickPromise, secondClickPromise]);
+
+        assert.strictEqual(actionCallCount, 1, 'Selection action must be invoked exactly once');
+      } finally {
+        (React as unknown as Record<string, unknown>).createElement = originalCreateElement;
+      }
     });
   });
 });

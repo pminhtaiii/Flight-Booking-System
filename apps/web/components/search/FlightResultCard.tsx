@@ -4,7 +4,24 @@ import React from 'react';
 import type { FlightSearchOfferView } from '@shared/types';
 import { FlightMatchBadge } from './FlightMatchBadge';
 import { FlightMatchBreakdown } from './FlightMatchBreakdown';
-import { formatDuration } from '@/lib/search-prefill';
+import { formatDuration, parseDurationMinutes } from '@/lib/search-prefill';
+
+function getLongestSegmentCabin(offer: FlightSearchOfferView): string | undefined {
+  let longestDuration = -1;
+  let longestCabin: string | undefined = undefined;
+
+  for (const slice of offer.slices ?? []) {
+    for (const segment of slice.segments ?? []) {
+      const duration = parseDurationMinutes(segment.duration);
+      if (duration > longestDuration) {
+        longestDuration = duration;
+        longestCabin = segment.cabinClass;
+      }
+    }
+  }
+
+  return longestCabin;
+}
 
 function formatTime(isoString: string): string {
   try {
@@ -63,6 +80,7 @@ export type FlightResultCardProps = {
   offer: FlightSearchOfferView;
   onSelect: (offerId: string) => void;
   isSelecting?: boolean;
+  disabled?: boolean;
   className?: string;
 };
 
@@ -70,9 +88,10 @@ export function FlightResultCard({
   offer,
   onSelect,
   isSelecting = false,
+  disabled = false,
   className,
 }: FlightResultCardProps): React.JSX.Element {
-  const cabin = formatCabinClass(offer.slices?.[0]?.segments?.[0]?.cabinClass);
+  const cabin = formatCabinClass(getLongestSegmentCabin(offer));
   const baggage = getBaggageAllowance(offer);
   const durationText = formatDuration(offer.duration);
   const stopsText = formatStops(offer.stops);
@@ -143,7 +162,7 @@ export function FlightResultCard({
             data-offer-id={offer.id}
             aria-label={`Select flight ${offer.flightNumber}`}
             onClick={() => onSelect(offer.id)}
-            disabled={isSelecting}
+            disabled={disabled || isSelecting}
             className="btn-primary w-full md:w-auto text-sm px-5 py-2 font-semibold shadow-sm transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSelecting ? 'Loading...' : 'Select flight'}

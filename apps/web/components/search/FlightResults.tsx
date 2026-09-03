@@ -71,6 +71,7 @@ export function FlightResults({
             offer={offer}
             onSelect={onSelectFlight}
             isSelecting={bookingOfferId === offer.id}
+            disabled={Boolean(bookingOfferId)}
           />
         ))}
       </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { type FormEvent, useState } from 'react';
+import React, { type FormEvent, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type {
   FlightSearchMeta,
@@ -63,6 +63,7 @@ export function SearchFormClient({
   );
   const [sortBy, setSortBy] = useState<FlightSortOption | undefined>(initialSortBy);
   const [bookingOfferId, setBookingOfferId] = useState<string | null>(null);
+  const bookingOfferIdRef = useRef<string | null>(null);
   const router = useSafeRouter();
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
@@ -117,6 +118,10 @@ export function SearchFormClient({
   };
 
   const handleBook = async (offerId: string): Promise<void> => {
+    if (bookingOfferId !== null || bookingOfferIdRef.current !== null) {
+      return;
+    }
+    bookingOfferIdRef.current = offerId;
     setBookingOfferId(offerId);
     setError(null);
     try {
@@ -143,6 +148,7 @@ export function SearchFormClient({
     } catch {
       setError('Flight offer is temporarily unavailable. Please try again in a few moments.');
     } finally {
+      bookingOfferIdRef.current = null;
       setBookingOfferId(null);
     }
   };

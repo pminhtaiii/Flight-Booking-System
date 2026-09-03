@@ -12,7 +12,12 @@ export type {
 } from './profile-contract';
 
 function getApiUrl(): string {
-  const apiUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  const apiUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL;
+
+  if (!apiUrl || !apiUrl.trim()) {
+    throw new Error('NEXT_PUBLIC_API_URL is required but not configured.');
+  }
+
   return apiUrl.trim().replace(/\/+$/, '');
 }
 
