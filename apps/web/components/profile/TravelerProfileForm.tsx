@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useMemo, useState } from 'react';
+import type { HourWindow } from '@shared/types';
 import styles from '@/app/prototype/profile/profile-prototype.module.css';
 import {
   ProfileRequestError,
@@ -39,6 +40,10 @@ type ProfileDraft = {
     classPreference: string;
     preferredAirlines: string;
     blacklistedAirlines: string;
+    preferredDepartureStart: string;
+    preferredDepartureEnd: string;
+    preferredArrivalStart: string;
+    preferredArrivalEnd: string;
   };
 };
 
@@ -108,11 +113,43 @@ const classOptions: SelectOption[] = [
   { value: 'business', label: 'Business' },
 ];
 
+const hourOptions: SelectOption[] = [
+  { value: '', label: 'No time preference' },
+  ...Array.from({ length: 24 }, (_, i) => ({
+    value: String(i),
+    label: `${String(i).padStart(2, '0')}:00`,
+  })),
+];
+
 function valueOrEmpty(value: string | null | undefined): string {
   return value ?? '';
 }
 
+function parseWindowToDraft(
+  window?: HourWindow | null,
+): { start: string; end: string } {
+  if (!window || typeof window.start !== 'number' || typeof window.end !== 'number') {
+    return { start: '', end: '' };
+  }
+  return { start: String(window.start), end: String(window.end) };
+}
+
+function parseWindowDraft(startStr: string, endStr: string): HourWindow | null {
+  if (!startStr.trim() || !endStr.trim()) {
+    return null;
+  }
+  const start = Number(startStr);
+  const end = Number(endStr);
+  if (Number.isNaN(start) || Number.isNaN(end)) {
+    return null;
+  }
+  return { start, end };
+}
+
 function profileToDraft(profile: TravelerProfileResponse): ProfileDraft {
+  const departureWindow = parseWindowToDraft(profile.preferences?.preferredDepartureWindow);
+  const arrivalWindow = parseWindowToDraft(profile.preferences?.preferredArrivalWindow);
+
   return {
     identity: {
       givenName: valueOrEmpty(profile.identity?.givenName),
@@ -139,6 +176,10 @@ function profileToDraft(profile: TravelerProfileResponse): ProfileDraft {
       classPreference: valueOrEmpty(profile.preferences?.classPreference),
       preferredAirlines: profile.preferences?.preferredAirlines?.join(', ') ?? '',
       blacklistedAirlines: profile.preferences?.blacklistedAirlines?.join(', ') ?? '',
+      preferredDepartureStart: departureWindow.start,
+      preferredDepartureEnd: departureWindow.end,
+      preferredArrivalStart: arrivalWindow.start,
+      preferredArrivalEnd: arrivalWindow.end,
     },
   };
 }
@@ -187,6 +228,14 @@ function draftToPayload(draft: ProfileDraft, revision: number): UpdateProfilePay
       classPreference: draft.preferences.classPreference || null,
       preferredAirlines: parseAirlineCodes(draft.preferences.preferredAirlines),
       blacklistedAirlines: parseAirlineCodes(draft.preferences.blacklistedAirlines),
+      preferredDepartureWindow: parseWindowDraft(
+        draft.preferences.preferredDepartureStart,
+        draft.preferences.preferredDepartureEnd,
+      ),
+      preferredArrivalWindow: parseWindowDraft(
+        draft.preferences.preferredArrivalStart,
+        draft.preferences.preferredArrivalEnd,
+      ),
     },
   };
 }
@@ -842,6 +891,34 @@ export function TravelerProfileForm({
                 draft.preferences.blacklistedAirlines,
                 'text',
                 'Comma-delimited airline codes, such as AA, 9W',
+              )}
+              {renderSelectField(
+                'preferences',
+                'preferredDepartureStart',
+                'Preferred departure start',
+                draft.preferences.preferredDepartureStart,
+                hourOptions,
+              )}
+              {renderSelectField(
+                'preferences',
+                'preferredDepartureEnd',
+                'Preferred departure end',
+                draft.preferences.preferredDepartureEnd,
+                hourOptions,
+              )}
+              {renderSelectField(
+                'preferences',
+                'preferredArrivalStart',
+                'Preferred arrival start',
+                draft.preferences.preferredArrivalStart,
+                hourOptions,
+              )}
+              {renderSelectField(
+                'preferences',
+                'preferredArrivalEnd',
+                'Preferred arrival end',
+                draft.preferences.preferredArrivalEnd,
+                hourOptions,
               )}
             </div>
           </section>

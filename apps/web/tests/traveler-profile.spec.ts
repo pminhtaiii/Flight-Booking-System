@@ -365,4 +365,134 @@ test.describe('Secure traveler profile', () => {
       page.getByText('Complete the highlighted fields before saving.'),
     ).not.toBeVisible();
   });
+
+  test('clearing preferred and blacklisted airlines sends empty arrays and keeps inputs empty', async ({
+    page,
+    request,
+    context,
+  }) => {
+    await registerAndOpenProfile(page, request, context);
+
+    let patchPayload: any = null;
+    await page.route('**/api/profile', async (route) => {
+      if (route.request().method() === 'PATCH') {
+        patchPayload = route.request().postDataJSON();
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ...savedDomesticProfile,
+            revision: 2,
+            preferences: {
+              ...savedDomesticProfile.preferences,
+              preferredAirlines: [],
+              blacklistedAirlines: [],
+            },
+          }),
+        });
+        return;
+      }
+      await route.continue();
+    });
+
+    await fillDomesticProfile(page);
+    await page.getByLabel('Preferred airlines').fill('VN');
+    await page.getByLabel('Blacklisted airlines').fill('AA');
+    await page.getByLabel('Preferred airlines').fill('');
+    await page.getByLabel('Blacklisted airlines').fill('');
+    await page.getByRole('button', { name: 'Save profile' }).click();
+
+    await expect(page.getByRole('status')).toHaveText('Your traveler profile is saved securely.');
+    expect(patchPayload.preferences.preferredAirlines).toEqual([]);
+    expect(patchPayload.preferences.blacklistedAirlines).toEqual([]);
+    await expect(page.getByLabel('Preferred airlines')).toHaveValue('');
+    await expect(page.getByLabel('Blacklisted airlines')).toHaveValue('');
+  });
+
+  test('saves departure and arrival schedule windows including overnight and resets to no time preference', async ({
+    page,
+    request,
+    context,
+  }) => {
+    await registerAndOpenProfile(page, request, context);
+
+    let patchCount = 0;
+    let firstPatchPayload: any = null;
+    let secondPatchPayload: any = null;
+
+    await page.route('**/api/profile', async (route) => {
+      if (route.request().method() === 'PATCH') {
+        patchCount++;
+        if (patchCount === 1) {
+          firstPatchPayload = route.request().postDataJSON();
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              ...savedDomesticProfile,
+              revision: 2,
+              preferences: {
+                ...savedDomesticProfile.preferences,
+                preferredDepartureWindow: { start: 22, end: 6 },
+                preferredArrivalWindow: { start: 8, end: 12 },
+              },
+            }),
+          });
+          return;
+        }
+        if (patchCount === 2) {
+          secondPatchPayload = route.request().postDataJSON();
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              ...savedDomesticProfile,
+              revision: 3,
+              preferences: {
+                ...savedDomesticProfile.preferences,
+                preferredDepartureWindow: null,
+                preferredArrivalWindow: null,
+              },
+            }),
+          });
+          return;
+        }
+      }
+      await route.continue();
+    });
+
+    await fillDomesticProfile(page);
+
+    await page.getByLabel('Preferred departure start').selectOption({ label: '22:00' });
+    await page.getByLabel('Preferred departure end').selectOption({ label: '06:00' });
+    await page.getByLabel('Preferred arrival start').selectOption({ label: '08:00' });
+    await page.getByLabel('Preferred arrival end').selectOption({ label: '12:00' });
+
+    await page.getByRole('button', { name: 'Save profile' }).click();
+
+    await expect(page.getByRole('status')).toHaveText('Your traveler profile is saved securely.');
+    expect(firstPatchPayload.preferences.preferredDepartureWindow).toEqual({ start: 22, end: 6 });
+    expect(firstPatchPayload.preferences.preferredArrivalWindow).toEqual({ start: 8, end: 12 });
+
+    await expect(page.getByLabel('Preferred departure start')).toHaveValue('22');
+    await expect(page.getByLabel('Preferred departure end')).toHaveValue('6');
+    await expect(page.getByLabel('Preferred arrival start')).toHaveValue('8');
+    await expect(page.getByLabel('Preferred arrival end')).toHaveValue('12');
+
+    await page.getByLabel('Preferred departure start').selectOption({ label: 'No time preference' });
+    await page.getByLabel('Preferred departure end').selectOption({ label: 'No time preference' });
+    await page.getByLabel('Preferred arrival start').selectOption({ label: 'No time preference' });
+    await page.getByLabel('Preferred arrival end').selectOption({ label: 'No time preference' });
+
+    await page.getByRole('button', { name: 'Save profile' }).click();
+
+    await expect(page.getByRole('status')).toHaveText('Your traveler profile is saved securely.');
+    expect(secondPatchPayload.preferences.preferredDepartureWindow).toBeNull();
+    expect(secondPatchPayload.preferences.preferredArrivalWindow).toBeNull();
+
+    await expect(page.getByLabel('Preferred departure start')).toHaveValue('');
+    await expect(page.getByLabel('Preferred departure end')).toHaveValue('');
+    await expect(page.getByLabel('Preferred arrival start')).toHaveValue('');
+    await expect(page.getByLabel('Preferred arrival end')).toHaveValue('');
+  });
 });
