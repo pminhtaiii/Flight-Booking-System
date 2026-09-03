@@ -101,6 +101,8 @@ class TrustedSearchSnapshot(AttestedSearchEnvelope):
     sessionId: str = Field(min_length=1)
     createdAt: datetime
 
+    model_config = ConfigDict(extra="forbid")
+
     @field_validator("createdAt")
     @classmethod
     def validate_utc_created_at(cls, value: datetime) -> datetime:

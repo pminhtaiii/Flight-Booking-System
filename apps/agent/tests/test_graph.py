@@ -14,6 +14,7 @@ def mock_nestjs_client():
     client = MagicMock(spec=NestJSClient)
     client.check_user_access = AsyncMock(return_value={"allowed": True})
     client.get_gateway_flights_search = AsyncMock()
+    client.post_gateway_flights_search_v2 = AsyncMock()
     client.get_gateway_user_preferences = AsyncMock()
     client.get_gateway_user_booking_summaries = AsyncMock()
     client.get_gateway_booking_detail = AsyncMock()
@@ -36,8 +37,10 @@ def mock_llm():
 async def test_graph_search_flights_integration(mock_nestjs_client, mock_llm):
     mock_model, mock_model_with_tools = mock_llm
 
-    # Setup NestJS client mock response
+    # Setup NestJS client mock response in V2 MATCHED format
     mock_nestjs_client.post_gateway_flights_search_v2.return_value = {
+        "mode": "MATCHED",
+        "algorithmVersion": "v2",
         "snapshotVersion": 1,
         "snapshotExpiresAt": "2026-08-15T10:00:00Z",
         "selectionAttestation": "mock_attestation",
@@ -57,6 +60,20 @@ async def test_graph_search_flights_integration(mock_nestjs_client, mock_llm):
                 "currency": "USD",
                 "fareClass": "economy",
                 "baggageAllowance": "23kg checked",
+                "matchResult": {
+                    "score": 92.0,
+                    "matchLevel": "STRONG",
+                    "breakdown": [
+                        {
+                            "dimension": "AIRLINE",
+                            "score": 100,
+                            "explanation": {
+                                "key": "match.airline.preferred",
+                                "params": {"airline": "Vietnam Airlines"},
+                            },
+                        }
+                    ],
+                },
             }
         ],
     }
@@ -246,6 +263,7 @@ async def test_graph_out_of_bounds_query(mock_nestjs_client, mock_llm):
 
         # Ensure no gateway tools were invoked
         mock_nestjs_client.get_gateway_flights_search.assert_not_called()
+        mock_nestjs_client.post_gateway_flights_search_v2.assert_not_called()
         mock_nestjs_client.get_gateway_user_preferences.assert_not_called()
         mock_nestjs_client.get_gateway_user_booking_summaries.assert_not_called()
 

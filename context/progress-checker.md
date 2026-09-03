@@ -6,17 +6,26 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Flight Match Scoring (Feature 022) — Phase 6 / Slice 1 Completed (T060–T063)
-**Last completed:** T060–T063: Agent Gateway Delegation & Attestation (Phase 6 / Slice 1). Delegated V1 and V2 Agent Gateway search to canonical `FlightsService.search()`, eliminated direct Duffel calls, preserved exact canonical 20-to-5 server ranking, bound selection attestation to exact ordered top 5 offers, extended DTOs with `mode`, `matchResult`, and `meta`, removed legacy query-only Redis cache, and preserved chat ownership/degradation/audit logging.
-**Previous completed:** T058–T059: Multi-viewport responsiveness (360px mobile stacking, 768px tablet, 1280px desktop), >= 44px touch targets on interactive controls, keyboard navigation & focus rings, ARIA disclosure attributes, negative privacy scan, and search seam characterization.
-**In progress:** Phase 6 / Slice 1 complete. Ready for Slice 2 (Python Agent Narration & Invariants, T064–T067).
-**Next:** Phase 6 / Slice 2 (Tasks T064–T067): Strict score-free snapshot models in Python, transient immediate-response narration projection, V2 MATCHED parsing, and RANKED honesty.
+**Feature:** Flight Match Scoring (Feature 022) — Phase 6 Completed (Tasks T060–T069)
+**Last completed:** Tasks T064–T069: Python Agent Narration, Strict Score-Free Snapshot Models & E2E Parity Suite. Enforced `extra = "forbid"` on all trusted search snapshot Pydantic models; verified Redis snapshots remain 100% free of scores/breakdowns; created pure transient narration projection `flight_match_projection.py`; integrated gateway V2 with zero Python scoring and unknown-key fallback; created full E2E search-page/agent parity suite with 100% parity; updated graph, chat runner, and snapshot characterization regressions.
+**Previous completed:** T060–T063: Agent Gateway Delegation & Attestation (Phase 6 / Slice 1). Delegated V1 and V2 Agent Gateway search to canonical `FlightsService.search()`.
+**In progress:** Phase 6 complete. Ready for Phase 7 (Polish and Cross-Cutting Verification, Tasks T070–T077).
+**Next:** Phase 7 (Tasks T070–T077): Bounded metrics, telemetry cardinality, runbooks, documentation updates, and full cross-cutting regression gates.
 
 ---
 
 ## Progress by Feature
 
 ### [ ] Feature: Flight Match Scoring (Feature 022)
+
+- [x] Phase 6 / Slice 2: Python Agent Narration & E2E Parity Suite (T064–T069) (2026-09-03):
+  - T064: Enforced `extra = "forbid"` on `TrustedSearchResult`, `AttestedSearchEnvelope`, and `TrustedSearchSnapshot` in `apps/agent/src/agent/trusted_search_snapshot/models.py`. Verified `ValidationError` on `score`, `match_level`, `weights`, `breakdown`, `scoring_version`. Verified Redis payloads under `chat:snapshot:...` remain 100% free of score metadata in `test_search_snapshot.py` and `test_trusted_search_snapshot_lifecycle.py` (57 tests passing).
+  - T065: Created `apps/agent/src/agent/tools/flight_match_projection.py` with pure projection `project_flight_search_for_narration(data)`. Formats MATCHED mode (top 5, mapped airline, route, HH:MM times, price, duration, stops, baggage, overall score 0–100, level, allowlisted bullets) and RANKED mode (standard details + disclaimer + zero score claims). Negative privacy invariant strictly strips internal provider IDs (`duffelOfferId`), UUIDs, tokens, and PII.
+  - T066 & T067: Updated `search_flights.py` to call `POST /agent-gateway/v2/flights/search`, preserve exact server order, and delegate narration to `project_flight_search_for_narration`. Respected Zero Python Scoring invariant (no scoring or sorting in Python). Implemented unknown-key fallback formatting safely without crashing.
+  - T068: Created full E2E parity characterization suite in `apps/api/test/agent-flight-match-parity.e2e-spec.ts`. Proved 100% parity between public web search (`POST /api/flights/search`) and agent search (`POST /agent-gateway/v2/flights/search`) across MATCHED and RANKED modes for offers, scores, levels, active weights, explanation keys, and rank order. Verified zero customer PII and zero `duffelOfferId` in gateway responses.
+  - T069: Updated characterization fixtures and test assertions in `test_snapshot_characterization.py`, `test_graph.py`, and `test_chat_turn_runner.py` for V2 score-free snapshots. All regressions passing.
+  - Verification: E2E parity suite 5/5 PASS (`jest --config test/jest-e2e.json test/agent-flight-match-parity.e2e-spec.ts`); TypeScript typecheck 0 errors (`tsc --noEmit`); `ruff check` & `ruff format --check` 100% clean; 484/484 agent unit tests PASS.
+
 
 - Phase 6 / Slice 1 correctness and API E2E follow-up (2026-09-03): GitHub Actions run `33745578129`, API E2E job `100617447771`, failed 12 tests across the two gateway suites (509 passed). Their fixtures removed airport reference rows that canonical search now validates; cache/order assumptions also predated delegation. The suites now seed airports, exercise the real raw-cache path with distinct user profiles, assert canonical ordering, and check committed V2 offer IDs immediately. Existing mapping and audit behavior remains covered.
   - Fixed the valid attestation race: V2 requests required persistence from `FlightsService` and signs only after the transaction commits; persistence failure returns 503 without an attestation. Browser/V1 persistence remains deferred.

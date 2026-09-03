@@ -8,6 +8,7 @@ from langchain_core.tools import tool
 
 from agent.infrastructure.redis import get_redis_client
 from agent.tools.base import get_nestjs_client
+from agent.tools.flight_match_projection import project_flight_search_for_narration
 from agent.trusted_search_snapshot import (
     AttestedSearchEnvelope,
     SnapshotOwner,
@@ -17,13 +18,6 @@ from agent.trusted_search_snapshot import (
 )
 
 logger = logging.getLogger(__name__)
-
-AIRLINE_MAP = {
-    "VN": "Vietnam Airlines",
-    "NH": "ANA",
-    "JL": "Japan Airlines",
-    "SQ": "Singapore Airlines",
-}
 
 
 def _get_snapshot_lifecycle() -> TrustedSearchSnapshotLifecycle:
@@ -86,9 +80,6 @@ async def search_flights(
         search_call = getattr(client, "post_gateway_flights_search_v2", None) or getattr(
             client, "search_flights_v2", None
         )
-        if not search_call:
-            search_call = getattr(client, "get_gateway_flights_search", None)
-
         if not search_call:
             return "I couldn't search for flights right now. The flight search service is temporarily unavailable. Please try again in a moment."
 
@@ -194,31 +185,10 @@ async def search_flights(
         )
 
         create_res = lifecycle.create_or_replace(owner, envelope)
-        snapshot = await create_res if inspect.isawaitable(create_res) else create_res
+        if inspect.isawaitable(create_res):
+            await create_res
     except Exception as e:
         logger.error("Failed to save trusted snapshot: %s", str(e), exc_info=True)
         return "I encountered an error preparing your search results. Please try again."
 
-    safe_results = lifecycle.project_for_llm(snapshot)
-
-    flight_blocks = []
-    for flight in safe_results:
-        airline_name = AIRLINE_MAP.get(flight.airline, flight.airline)
-        dep_time_str = flight.departure_at.strftime("%H:%M")
-        arr_time_str = flight.arrival_at.strftime("%H:%M")
-
-        try:
-            price = float(flight.price)
-        except (ValueError, TypeError):
-            price = 0.0
-        price_formatted = f"${price:,.2f}"
-
-        block = (
-            f"{flight.index}. {airline_name}\n"
-            f"   Departs: {dep_time_str} {flight.origin} \u2192 Arrives: {arr_time_str} {flight.destination}\n"
-            f"   Price: {price_formatted} {flight.currency}"
-        )
-        flight_blocks.append(block)
-
-    header = f"Found {len(safe_results)} flights from {origin} to {destination} on {date}:"
-    return f"{header}\n\n" + "\n\n".join(flight_blocks)
+    return project_flight_search_for_narration(data)

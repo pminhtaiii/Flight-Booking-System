@@ -1,3 +1,4 @@
+import inspect
 import json
 import re
 import uuid
@@ -6,13 +7,17 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from langchain_core.runnables import RunnableConfig
+from pydantic import ValidationError
 
 from agent.tools.nestjs_client import NestJSClient
 from agent.tools.search_flights import search_flights
 from agent.trusted_search_snapshot import (
+    AttestedSearchEnvelope,
+    TrustedSearchResult,
     TrustedSearchSnapshot,
     TrustedSearchSnapshotLifecycle,
     TrustedSnapshotRepository,
+    models,
 )
 
 
@@ -687,7 +692,8 @@ async def test_strict_privacy_no_identifiers_in_tool_output():
         # 5. Positive assertions: Formatted human-readable output
         assert "1. Vietnam Airlines" in tool_output
         assert "2. ANA" in tool_output
-        assert "Departs: 02:00 SGN → Arrives: 08:30 NRT" in tool_output
+        assert "SGN → NRT" in tool_output
+        assert "Departs: 02:00 | Arrives: 08:30" in tool_output
         assert "Price: $420.00 USD" in tool_output
         assert "Price: $550.00 USD" in tool_output
 
@@ -748,3 +754,110 @@ def test_project_snapshot_results_is_identifier_free():
     assert "opaque-fingerprint" not in projected_str
     assert "flightOfferId" not in projected_str
     assert "duffelOfferId" not in projected_str
+
+
+FORBIDDEN_SCORING_FIELDS = [
+    "score",
+    "match_level",
+    "matchLevel",
+    "weights",
+    "breakdown",
+    "scoring_version",
+    "scoringVersion",
+]
+
+
+@pytest.mark.parametrize("field", FORBIDDEN_SCORING_FIELDS)
+def test_models_reject_scoring_fields_validation_error(field: str):
+    valid_result = {
+        "offerIndex": 1,
+        "flightOfferId": "uuid-1",
+        "duffelOfferId": "duff-1",
+        "airline": "VN",
+        "origin": "SGN",
+        "destination": "HAN",
+        "departureAt": "2026-09-20T02:00:00Z",
+        "arrivalAt": "2026-09-20T08:30:00Z",
+        "price": "420.00",
+        "currency": "USD",
+    }
+    with pytest.raises(ValidationError):
+        TrustedSearchResult.model_validate({**valid_result, field: 95})
+
+    valid_envelope = {
+        "schemaVersion": 1,
+        "snapshotVersion": 1,
+        "expiresAt": "2026-09-20T01:00:00Z",
+        "fingerprint": "mock_fp",
+        "selectionAttestation": "mock_att",
+        "results": [valid_result],
+    }
+    with pytest.raises(ValidationError):
+        AttestedSearchEnvelope.model_validate({**valid_envelope, field: 95})
+
+    valid_snapshot = {
+        **valid_envelope,
+        "userId": "usr-1",
+        "sessionId": "sess-1",
+        "createdAt": "2026-09-20T00:00:00Z",
+    }
+    with pytest.raises(ValidationError):
+        TrustedSearchSnapshot.model_validate({**valid_snapshot, field: 95})
+
+
+def test_trusted_search_snapshot_explicitly_enforces_extra_forbid():
+    for model_cls in (
+        models.TrustedSearchResult,
+        models.AttestedSearchEnvelope,
+        models.TrustedSearchSnapshot,
+    ):
+        src = inspect.getsource(model_cls)
+        assert 'extra="forbid"' in src or "extra='forbid'" in src
+
+
+@pytest.mark.asyncio
+async def test_serialized_redis_payload_under_snapshot_key_is_score_free():
+    fake_redis = FakeAsyncRedis()
+    repo = TrustedSnapshotRepository(fake_redis)
+
+    valid_snapshot = TrustedSearchSnapshot.model_validate(
+        {
+            "schemaVersion": 1,
+            "snapshotVersion": 1,
+            "userId": "user-score-free-1",
+            "sessionId": "session-score-free-1",
+            "createdAt": "2026-09-20T00:00:00Z",
+            "expiresAt": "2026-09-20T01:00:00Z",
+            "fingerprint": "fp-clean",
+            "selectionAttestation": "att-clean",
+            "results": [
+                {
+                    "offerIndex": 1,
+                    "flightOfferId": "flight-uuid-1",
+                    "duffelOfferId": "duffel-id-1",
+                    "airline": "VN",
+                    "origin": "SGN",
+                    "destination": "HAN",
+                    "departureAt": "2026-09-20T02:00:00Z",
+                    "arrivalAt": "2026-09-20T08:30:00Z",
+                    "price": "420.00",
+                    "currency": "USD",
+                }
+            ],
+        }
+    )
+
+    await repo.save_snapshot(valid_snapshot)
+    snapshot_key = repo._get_key("user-score-free-1", "session-score-free-1")
+    raw_payload = await fake_redis.get(snapshot_key)
+    assert raw_payload is not None
+
+    # Verify serialized JSON payload is 100% free of scoring fields
+    for field in FORBIDDEN_SCORING_FIELDS:
+        assert f'"{field}"' not in raw_payload
+
+    parsed = json.loads(raw_payload)
+    for field in FORBIDDEN_SCORING_FIELDS:
+        assert field not in parsed
+        for result in parsed.get("results", []):
+            assert field not in result

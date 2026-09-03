@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import json
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -10,9 +11,11 @@ from agent.trusted_search_snapshot import (
     AttestedSearchEnvelope,
     ResolvedOfferSelection,
     SnapshotOwner,
+    TrustedSearchResult,
     TrustedSearchSnapshot,
     TrustedSearchSnapshotLifecycle,
     TrustedSnapshotRepository,
+    models,
 )
 
 
@@ -920,3 +923,66 @@ async def test_legacy_session_direct_save_without_prior_next_version() -> None:
     stored = await repository.get_snapshot(owner.user_id, owner.chat_session_id)
     assert stored is not None
     assert stored.snapshotVersion == 2
+
+
+FORBIDDEN_SCORING_FIELDS = [
+    "score",
+    "match_level",
+    "matchLevel",
+    "weights",
+    "breakdown",
+    "scoring_version",
+    "scoringVersion",
+]
+
+
+@pytest.mark.parametrize("field", FORBIDDEN_SCORING_FIELDS)
+def test_models_reject_scoring_fields_validation_error(field: str) -> None:
+    owner = _owner()
+    raw_result = _results()[0]
+
+    with pytest.raises(ValidationError):
+        TrustedSearchResult.model_validate({**raw_result, field: 100})
+
+    envelope_data = _envelope_payload()
+    with pytest.raises(ValidationError):
+        AttestedSearchEnvelope.model_validate({**envelope_data, field: 100})
+
+    snapshot_data = _snapshot_payload(owner)
+    with pytest.raises(ValidationError):
+        TrustedSearchSnapshot.model_validate({**snapshot_data, field: 100})
+
+
+def test_trusted_search_snapshot_explicitly_enforces_extra_forbid() -> None:
+    for model_cls in (
+        models.TrustedSearchResult,
+        models.AttestedSearchEnvelope,
+        models.TrustedSearchSnapshot,
+    ):
+        src = inspect.getsource(model_cls)
+        assert 'extra="forbid"' in src or "extra='forbid'" in src
+
+
+@pytest.mark.asyncio
+async def test_lifecycle_persisted_redis_payload_is_strictly_score_free() -> None:
+    owner = _owner()
+    redis = FakeAsyncRedis()
+    lifecycle = _lifecycle(redis)
+
+    created = await lifecycle.create_or_replace(owner, _envelope(version=1))
+    assert created.snapshotVersion == 1
+
+    snapshot_key = f"chat:snapshot:{owner.user_id}:{owner.chat_session_id}"
+    raw_payload = await redis.get(snapshot_key)
+    assert raw_payload is not None
+
+    # Strict check: none of forbidden score keys/strings exist in raw json
+    for field in FORBIDDEN_SCORING_FIELDS:
+        assert f'"{field}"' not in raw_payload
+
+    # Strict check: parsed JSON contains zero scoring keys at top level or nested results
+    parsed = json.loads(raw_payload)
+    for field in FORBIDDEN_SCORING_FIELDS:
+        assert field not in parsed
+        for result in parsed.get("results", []):
+            assert field not in result
