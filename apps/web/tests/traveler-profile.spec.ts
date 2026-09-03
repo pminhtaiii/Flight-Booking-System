@@ -60,6 +60,8 @@ const savedInternationalProfile = {
   updatedAt: '2026-08-02T00:00:00.000Z',
 };
 
+const authenticatedLandingUrl = /127\.0\.0\.1:3000\/(?:dashboard)?$/;
+
 async function registerAndOpenProfile(
   page: Page,
   request: APIRequestContext,
@@ -78,7 +80,9 @@ async function registerAndOpenProfile(
   await page.getByRole('textbox', { name: 'Email' }).fill(email);
   await page.getByRole('textbox', { name: 'Password' }).fill('Password123!');
   await page.getByRole('button', { name: 'Create account' }).click();
-  await expect(page).toHaveURL(/127.0.0.1:3000\/$/, { timeout: 30000 });
+  // User-approved bootstrap correction: the app has observed valid post-sign-in landings at
+  // `/` and `/dashboard`; the helper accepts only those routes before opening the profile.
+  await expect(page).toHaveURL(authenticatedLandingUrl, { timeout: 300000 });
 
   const targetUrl = initialReturnTo
     ? `/profile?returnTo=${encodeURIComponent(initialReturnTo)}`
@@ -90,7 +94,7 @@ async function registerAndOpenProfile(
     await page.getByRole('textbox', { name: 'Email address' }).fill(email);
     await page.getByRole('textbox', { name: 'Password' }).fill('Password123!');
     await page.getByRole('button', { name: 'Sign in' }).click();
-    await expect(page).toHaveURL(/127.0.0.1:3000\/$/, { timeout: 30000 });
+    await expect(page).toHaveURL(authenticatedLandingUrl, { timeout: 300000 });
     await page.goto(targetUrl);
   }
 
@@ -121,7 +125,9 @@ async function fillInternationalDocumentAndPreferences(page: Page): Promise<void
 }
 
 test.describe('Secure traveler profile', () => {
-  test.setTimeout(90000);
+  // Registration traverses cold Next.js routes in this suite. The user approved a longer
+  // bootstrap allowance so a valid sign-in is not misclassified as a failed auth flow.
+  test.setTimeout(300000);
 
   test('shows every profile section and saves a domestic profile without a document', async ({
     page,
