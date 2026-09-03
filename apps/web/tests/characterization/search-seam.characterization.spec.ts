@@ -244,6 +244,34 @@ test.describe('Search Seam Characterization - User Flows', () => {
     await expect(page.getByText('Flight MP100')).toBeVisible();
     await expect(page.getByText('750 USD')).toBeVisible();
 
+    // Negative Privacy Boundary DOM Assertions (T059):
+    // Zero raw provider IDs (off_..., ord_..., duffel_...) in DOM attributes, text, or dataset
+    const domContent = await page.content();
+    expect(domContent).not.toMatch(/off_[a-zA-Z0-9_\-]+|ord_[a-zA-Z0-9_\-]+|duffel_[a-zA-Z0-9_\-]+/i);
+    // Zero customer PII or bearer auth tokens leaked in search results
+    expect(domContent).not.toContain('char-test-access-token');
+    expect(domContent).not.toMatch(/\b[A-Z]{1,2}\d{6,9}\b/);
+    expect(domContent).not.toMatch(/\b(?:19\d\d|20[0-2]\d)-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])\b/);
+    expect(domContent).not.toMatch(
+      /\b\d+\s+[A-Za-z0-9\s,.]+(?:Street|St|Avenue|Ave|Boulevard|Blvd|Road|Rd|Drive|Dr|Lane|Ln|Terrace|Way)\b/i,
+    );
+
+    const providerDatasetValues = await page.evaluate(() => {
+      const allElements = Array.from(document.querySelectorAll('*'));
+      const leakedValues: string[] = [];
+      for (const el of allElements) {
+        if (el instanceof HTMLElement) {
+          for (const [attr, val] of Object.entries(el.dataset)) {
+            if (val && /off_|ord_|duffel_/i.test(val)) {
+              leakedValues.push(`${attr}:${val}`);
+            }
+          }
+        }
+      }
+      return leakedValues;
+    });
+    expect(providerDatasetValues).toEqual([]);
+
     await page.getByRole('button', { name: 'Book' }).click();
     await expect(page).toHaveURL(/\/checkout\/passengers\?offerId=char-offer-book-123/);
     await expect(page.getByRole('heading', { name: 'Passenger Details' })).toBeVisible();
@@ -297,5 +325,32 @@ test.describe('Search Seam Characterization - Static Privacy Boundary', () => {
     expect(actions).toContain("'use server'");
     expect(actions).toContain('searchFlightsAction');
     expect(actions).toContain('selectFlightOfferAction');
+  });
+
+  test('enforces explanation allowlist and zero PII/provider identifiers across search components (T059)', () => {
+    const componentFiles = scanDirectory(path.resolve(__dirname, '../../components/search')).filter(
+      (file) => !file.filePath.endsWith('.spec.ts'),
+    );
+
+    const forbiddenPatterns = [
+      /\boff_[a-zA-Z0-9_\-]+/i,
+      /\bord_[a-zA-Z0-9_\-]+/i,
+      /\bduffel_[a-zA-Z0-9_\-]+/i,
+      /\bpassportNumber\b/,
+      /\bdateOfBirth\b/,
+      /\bstreetAddress\b/,
+    ];
+
+    for (const { filePath, content } of componentFiles) {
+      for (const pattern of forbiddenPatterns) {
+        expect(content).not.toMatch(pattern);
+      }
+
+      // If component renders match breakdown or badges, ensure it routes through formatExplanation
+      if (filePath.endsWith('FlightMatchBreakdown.tsx') || filePath.endsWith('FlightMatchBadge.tsx')) {
+        expect(content).toContain('formatExplanation');
+        expect(content).not.toMatch(/\{[^}]*\bexplanation\.key\b[^}]*\}/);
+      }
+    }
   });
 });

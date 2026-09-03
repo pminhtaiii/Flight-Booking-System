@@ -21,6 +21,8 @@ export type SearchFormClientProps = {
   onSearchAction?: (query: FlightSearchQuery) => Promise<FlightSearchOutcome>;
   onSelectAction?: (offerId: string) => Promise<FlightSelectionOutcome>;
   onNavigate?: (url: string) => void;
+  onBookFlightCapture?: (fn: (offerId: string) => Promise<void>) => void;
+  onSubmitCapture?: (fn: (event?: FormEvent<HTMLFormElement>) => Promise<void>) => void;
 };
 
 function useSafeRouter(): { push: (url: string) => void } | null {
@@ -40,6 +42,8 @@ export function SearchFormClient({
   onSearchAction,
   onSelectAction,
   onNavigate,
+  onBookFlightCapture,
+  onSubmitCapture,
 }: SearchFormClientProps): JSX.Element {
   const [origin, setOrigin] = useState(initialValues?.origin ?? '');
   const [destination, setDestination] = useState(initialValues?.destination ?? '');
@@ -170,6 +174,9 @@ export function SearchFormClient({
       }
     }
   };
+
+  onBookFlightCapture?.(handleBook);
+  onSubmitCapture?.(handleSubmit);
 
   return (
     <div className="space-y-8">
@@ -308,7 +315,11 @@ export function SearchFormClient({
         </fieldset>
 
         <div className="flex justify-end pt-4">
-          <button type="submit" disabled={isFormDisabled} className="btn-primary w-full md:w-auto">
+          <button
+            type="submit"
+            disabled={isFormDisabled}
+            className="btn-primary min-h-[44px] w-full md:w-auto"
+          >
             {loading ? 'Searching...' : 'Search Flights'}
           </button>
         </div>

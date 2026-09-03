@@ -6,17 +6,23 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Flight Match Scoring (Feature 022) — Phase 5 / Slice 4: Traveler Profile Preferences & Conflict Handling (T056–T057)
-**Last completed:** T056–T057: Implemented complete traveler profile preferences in `TravelerProfileForm.tsx`: preferred/blacklisted airline lists with IATA carrier code validation, upper-casing, deduplication, and `[]` serialization on clearing; departure & arrival schedule windows (`00:00`–`23:00`, ordinary and overnight ranges, `null` on clearing); max stops selector (`Any` / `Direct only` (0) / `Max 1 stop` (1) / `Max 2 stops` (2)); price sensitivity selector (`No preference` / `Budget-conscious` / `Moderate` / `Flexible`); tri-state baggage preference (`No preference` / `Checked bag required` / `Carry-on only`); atomic invalid carrier rejection before PATCH; safe 400 rejection draft preservation; and HTTP 409 stale revision recovery via "Refresh and reload latest" button.
-**Previous completed:** T053–T055: Implemented FlightResultCard (provider-blind details, embedded badge & breakdown), FlightResults (canonical order preservation, client-side sorting), SearchFormClient (mode retention, controls & banner composition), and SearchPage (profile cabin prefill with URL query precedence).
-**In progress:** Phase 5 / Slice 5 (T058–T059): Responsive layout & keyboard accessibility, privacy boundary & allowlist characterization.
-**Next:** Implement T058 (360/768/desktop responsive layout & keyboard accessibility in search components and `apps/web/tests/flight-match-scoring.spec.ts`) and T059 (zero-token/backend/provider/PII negative privacy assertions and explanation allowlist verification).
+**Feature:** Flight Match Scoring (Feature 022) — Phase 5 Completed (T050–T059)
+**Last completed:** T058–T059: Multi-viewport responsiveness (360px mobile stacking, 768px tablet, 1280px desktop), >= 44px touch targets on interactive controls (`FlightResultCard` select, `FlightMatchBreakdown` summary, `FlightResultsControls` select, `SearchFormClient` submit), keyboard navigation & focus rings (`focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2`), ARIA disclosure attributes (`aria-expanded`, `aria-controls`, `role="region"`), negative privacy scan in Playwright and unit tests (zero raw provider IDs, zero customer PII, zero auth tokens), safe explanation formatting without double escaping, and search seam characterization.
+**Previous completed:** T056–T057: Traveler profile preferences (airlines, schedule windows, max stops, price sensitivity, baggage) and conflict handling.
+**In progress:** Phase 5 complete. Ready for Phase 6.
+**Next:** Phase 6 (User Story 4 — Agent and Search-Page Parity, Tasks T060–T069): V2 delegation, canonical 20-before-5 order, score-free Python snapshot invariants, transient LLM narration projection.
 
 ---
 
 ## Progress by Feature
 
 ### [ ] Feature: Flight Match Scoring (Feature 022)
+
+- [x] Phase 5 / Slice 5: Responsive a11y & Privacy Characterization Gate (T058–T059) (2026-09-03):
+  - T058: Implemented multi-viewport responsiveness (mobile 360px vertical stack, tablet 768px layout transition, desktop alignment), >= 44x44px touch targets on all interactive controls (`min-h-[44px]` on select button, breakdown summary, sort dropdown, search submit), keyboard navigation focus indicators (`focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2`), and ARIA disclosure attributes (`aria-expanded`, `aria-controls`, `role="region"`).
+  - T059: Implemented negative privacy boundaries and explanation allowlist verification in `flight-match-scoring.spec.ts` and `search-seam.characterization.spec.ts`, asserting zero raw provider IDs (`off_...`, `ord_...`, `duffel_...`), zero customer PII (passports, dates of birth, street addresses), and zero auth tokens in client DOM or rendered markup; verified allowlist format and sanitized dynamic parameters without double-escaping.
+  - Dual-axis code review completed: resolved all hard/spec findings (added `aria-expanded`/`aria-controls`, added `min-h-[44px]` to search submit button, replaced HTML entity double-escaping with sanitization, removed `React.createElement` monkey patching).
+  - Verification: 116/116 tests PASS in `apps/web/tests/flight-match-scoring.spec.ts` via `tsx --test`; `pnpm --filter @web/frontend lint` (0 errors, 0 warnings); `pnpm --filter @web/frontend typecheck` (exit code 0).
 
 - [x] Phase 5 / Slice 4: Traveler Profile Preferences & Conflict Handling (T056–T057) (2026-09-03):
   - T056: Extended `TravelerProfileForm.tsx` with preferred/blacklisted airline inputs, carrier code canonicalization/clearing to `[]`, and departure/arrival schedule window selectors (hours `00:00`–`23:00`, overnight support where `start > end`, "No time preference" mapping to `null`).

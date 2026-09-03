@@ -1,4 +1,6 @@
-import React from 'react';
+'use client';
+
+import React, { useId, useState } from 'react';
 import type { FlightMatchDimension, FlightMatchResult } from '@shared/types';
 import { formatExplanation } from './flight-match-explanations';
 
@@ -53,6 +55,9 @@ export function FlightMatchBreakdown({
   className,
   summaryLabel,
 }: FlightMatchBreakdownProps): React.JSX.Element | null {
+  const [isOpen, setIsOpen] = useState(false);
+  const detailsId = useId();
+
   if (!matchResult) {
     return null;
   }
@@ -62,13 +67,28 @@ export function FlightMatchBreakdown({
 
   const combinedContainerClass = ['group text-xs', className].filter(Boolean).join(' ');
 
+  const handleSummaryKeyDown = (event: React.KeyboardEvent<HTMLElement>): void => {
+    if (event.key === ' ' || event.key === 'Enter') {
+      // Native summary handles toggle cleanly in browsers
+    }
+  };
+
   if (!matchResult.eligibility.eligible) {
     return (
-      <details className={combinedContainerClass}>
-        <summary className="cursor-pointer select-none font-medium text-text-cancelled hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 rounded">
+      <details
+        className={combinedContainerClass}
+        onToggle={(e) => setIsOpen(e.currentTarget.open)}
+      >
+        <summary
+          aria-expanded={isOpen}
+          aria-controls={detailsId}
+          onKeyDown={handleSummaryKeyDown}
+          className="cursor-pointer select-none font-medium text-text-cancelled hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 rounded min-h-[44px] inline-flex items-center"
+        >
           {label}
         </summary>
         <div
+          id={detailsId}
           role="region"
           aria-label="Constraint violations"
           className="mt-2 space-y-2 rounded-md border border-danger-border bg-bg-cancelled p-3 text-text-cancelled"
@@ -93,11 +113,20 @@ export function FlightMatchBreakdown({
   });
 
   return (
-    <details className={combinedContainerClass}>
-      <summary className="cursor-pointer select-none font-medium text-text-secondary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 rounded">
+    <details
+      className={combinedContainerClass}
+      onToggle={(e) => setIsOpen(e.currentTarget.open)}
+    >
+      <summary
+        aria-expanded={isOpen}
+        aria-controls={detailsId}
+        onKeyDown={handleSummaryKeyDown}
+        className="cursor-pointer select-none font-medium text-text-secondary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 rounded min-h-[44px] inline-flex items-center"
+      >
         {label}
       </summary>
       <div
+        id={detailsId}
         role="region"
         aria-label="Flight match breakdown"
         className="mt-2 space-y-2 rounded-md border border-card-border bg-card p-3"

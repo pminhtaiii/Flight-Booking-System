@@ -34,21 +34,53 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0;
 }
 
+const FORBIDDEN_PRIVACY_PATTERNS: readonly RegExp[] = Object.freeze([
+  /off_[a-zA-Z0-9_-]+|ord_[a-zA-Z0-9_-]+|duffel_[a-zA-Z0-9_-]+/i,
+  /bearer\s+[-a-zA-Z0-9._~+/]+=*|eyJ[a-zA-Z0-9_-]{10,}/i,
+  /\b[A-Z]{1,2}\d{6,9}\b/,
+  /\b(?:19\d\d|20[0-2]\d)-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])\b/,
+  /\b\d+\s+[A-Za-z0-9\s,.]+(?:Street|St|Avenue|Ave|Boulevard|Blvd|Road|Rd|Drive|Dr|Lane|Ln|Terrace|Way)\b/i,
+]);
+
+function containsForbiddenPrivacyPattern(value: string): boolean {
+  return FORBIDDEN_PRIVACY_PATTERNS.some((pattern) => pattern.test(value));
+}
+
+function isSafeAirlineName(value: unknown): value is string {
+  return isNonEmptyString(value) && !containsForbiddenPrivacyPattern(value);
+}
+
 function isScheduleBound(value: unknown): value is string | number {
-  return isNonEmptyString(value) || isFiniteNumber(value);
+  if (isFiniteNumber(value)) {
+    return value >= 0 && value <= 24;
+  }
+  if (isNonEmptyString(value)) {
+    return !containsForbiddenPrivacyPattern(value);
+  }
+  return false;
 }
 
 function isStopCount(value: unknown): value is number {
   return isFiniteNumber(value) && Number.isInteger(value) && value >= 0;
 }
 
-function escapeText(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
+function sanitizeText(value: string): string {
+  let cleaned = value;
+  let prev: string;
+  do {
+    prev = cleaned;
+    cleaned = cleaned.replace(/<[^>]*>/g, '');
+  } while (cleaned !== prev);
+
+  return cleaned
+    .replace(/[<>]/g, '')
+    .split('')
+    .filter((ch) => {
+      const code = ch.charCodeAt(0);
+      return code >= 32 && code !== 127 && (code < 128 || code > 159);
+    })
+    .join('')
+    .trim();
 }
 
 function formatScheduleWindow(
@@ -57,7 +89,11 @@ function formatScheduleWindow(
   windowEnd: unknown,
 ): string {
   if (isScheduleBound(windowStart) && isScheduleBound(windowEnd)) {
-    return `${actionPrefix} within preferred window (${escapeText(String(windowStart))}:00–${escapeText(String(windowEnd))}:00)`;
+    const start = sanitizeText(String(windowStart));
+    const end = sanitizeText(String(windowEnd));
+    if (start.length > 0 && end.length > 0) {
+      return `${actionPrefix} within preferred window (${start}:00–${end}:00)`;
+    }
   }
   return `${actionPrefix} within preferred window`;
 }
@@ -75,10 +111,15 @@ export function formatExplanation(explanation: Explanation): string {
       return isFiniteNumber(params.percentDiff)
         ? `${params.percentDiff}% above median price`
         : 'Above median price';
-    case 'match.airline.preferred':
-      return isNonEmptyString(params.airline)
-        ? `Matches preferred airline (${escapeText(params.airline)})`
-        : 'Matches preferred airline';
+    case 'match.airline.preferred': {
+      if (isSafeAirlineName(params.airline)) {
+        const airline = sanitizeText(params.airline);
+        return airline.length > 0
+          ? `Matches preferred airline (${airline})`
+          : 'Matches preferred airline';
+      }
+      return 'Matches preferred airline';
+    }
     case 'match.arrival.in_window':
       return formatScheduleWindow('Arrives', params.windowStart, params.windowEnd);
     case 'match.stops.within_preference':
@@ -97,10 +138,15 @@ export function formatExplanation(explanation: Explanation): string {
         : 'Flight with stops';
     case 'match.departure.in_window':
       return formatScheduleWindow('Departs', params.windowStart, params.windowEnd);
-    case 'constraint.airline.blacklisted':
-      return isNonEmptyString(params.airline)
-        ? `Blacklisted airline (${escapeText(params.airline)})`
-        : 'Blacklisted airline';
+    case 'constraint.airline.blacklisted': {
+      if (isSafeAirlineName(params.airline)) {
+        const airline = sanitizeText(params.airline);
+        return airline.length > 0
+          ? `Blacklisted airline (${airline})`
+          : 'Blacklisted airline';
+      }
+      return 'Blacklisted airline';
+    }
     default:
       return CONSTANT_COPY[explanation.key] ?? 'Match criterion';
   }
