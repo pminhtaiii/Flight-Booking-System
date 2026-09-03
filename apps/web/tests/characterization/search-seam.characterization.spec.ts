@@ -7,6 +7,8 @@ import { encode } from 'next-auth/jwt';
 const flightSearchFixtureUrl = process.env.FLIGHT_SEARCH_FIXTURE_API_URL || 'http://127.0.0.1:3101';
 const fixtureRequests: Array<{ method: string; pathname: string }> = [];
 let fixtureServer: Server | undefined;
+const ISO_DATE_PATTERN = /\b(?:19\d\d|20[0-2]\d)-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])\b/;
+const departureDateInputSelector = 'input#departureDate[type="date"]';
 
 const searchFixtureOffer = {
   id: 'char-offer-book-123',
@@ -145,6 +147,25 @@ async function hideAgentChat(page: Page): Promise<void> {
     .catch(() => {});
 }
 
+// User approved on 2026-09-03: exclude only the required departure-date control value.
+async function getIsoDatePrivacyScanDom(page: Page): Promise<string> {
+  return page.evaluate((selector: string) => {
+    const rootClone = document.documentElement.cloneNode(true);
+    if (!(rootClone instanceof HTMLElement)) {
+      throw new Error('Unable to clone the document for the ISO date privacy scan.');
+    }
+
+    const departureDateInput = rootClone.querySelector(selector);
+    if (!(departureDateInput instanceof HTMLInputElement)) {
+      throw new Error('The departure-date input is required for the ISO date privacy scan.');
+    }
+
+    departureDateInput.value = '';
+    departureDateInput.removeAttribute('value');
+    return rootClone.outerHTML;
+  }, departureDateInputSelector);
+}
+
 test.describe('Search Seam Characterization - User Flows', () => {
   test.slow();
 
@@ -253,7 +274,10 @@ test.describe('Search Seam Characterization - User Flows', () => {
     // Zero customer PII or bearer auth tokens leaked in search results
     expect(domContent).not.toContain('char-test-access-token');
     expect(domContent).not.toMatch(/\b[A-Z]{1,2}\d{6,9}\b/);
-    expect(domContent).not.toMatch(/\b(?:19\d\d|20[0-2]\d)-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])\b/);
+    expect(domContent).toMatch(ISO_DATE_PATTERN);
+    const isoDatePrivacyScanDom = await getIsoDatePrivacyScanDom(page);
+    expect(isoDatePrivacyScanDom).not.toMatch(ISO_DATE_PATTERN);
+    await expect(page.getByLabel('Departure Date')).toHaveValue('2026-12-01');
     expect(domContent).not.toMatch(
       /\b\d+\s+[A-Za-z0-9\s,.]+(?:Street|St|Avenue|Ave|Boulevard|Blvd|Road|Rd|Drive|Dr|Lane|Ln|Terrace|Way)\b/i,
     );
@@ -282,6 +306,43 @@ test.describe('Search Seam Characterization - User Flows', () => {
       { method: 'GET', pathname: '/api/flights/char-offer-book-123' },
       { method: 'GET', pathname: '/api/flights/char-offer-book-123' },
     ]);
+  });
+
+  test('keeps ISO date privacy scanning active outside the departure-date input', async ({
+    page,
+    context,
+  }) => {
+    const dateValue = '2026-12-01';
+    await authenticateSearchSession(context);
+    await page.goto('/search');
+    await hideAgentChat(page);
+    await page.getByLabel('Departure Date').fill(dateValue);
+    await page.evaluate((isoDate: string) => {
+      const textProbe = document.createElement('p');
+      textProbe.id = 'iso-date-text-probe';
+      textProbe.textContent = `Unexpected date text: ${isoDate}`;
+
+      const attributeProbe = document.createElement('div');
+      attributeProbe.id = 'iso-date-attribute-probe';
+      attributeProbe.setAttribute('data-unexpected-date', isoDate);
+
+      const scriptProbe = document.createElement('script');
+      scriptProbe.id = 'iso-date-script-probe';
+      scriptProbe.textContent = `window.__unexpectedIsoDate = \"${isoDate}\";`;
+
+      document.body.append(textProbe, attributeProbe, scriptProbe);
+    }, dateValue);
+
+    const isoDatePrivacyScanDom = await getIsoDatePrivacyScanDom(page);
+    const unapprovedDateSurfaces = [
+      `Unexpected date text: ${dateValue}`,
+      `data-unexpected-date=\"${dateValue}\"`,
+      `window.__unexpectedIsoDate = \"${dateValue}\";`,
+    ];
+    for (const surface of unapprovedDateSurfaces) {
+      expect(isoDatePrivacyScanDom).toContain(surface);
+      expect(surface).toMatch(ISO_DATE_PATTERN);
+    }
   });
 });
 
