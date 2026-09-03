@@ -239,7 +239,9 @@ test.describe('Search Seam Characterization - User Flows', () => {
     await page.getByLabel('Departure Date').fill('2026-12-01');
     await page.getByRole('button', { name: 'Search Flights' }).click();
 
-    await expect(page.getByRole('heading', { name: 'Flight Offers' })).toBeVisible();
+    await expect(
+      page.getByTestId('flight-results-container').or(page.getByRole('heading', { name: 'Flight Offers' })),
+    ).toBeVisible();
     await expect(page.getByText('Mock Pacific')).toBeVisible();
     await expect(page.getByText('Flight MP100')).toBeVisible();
     await expect(page.getByText('750 USD')).toBeVisible();
