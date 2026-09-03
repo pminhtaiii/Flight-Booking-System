@@ -6,17 +6,25 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Flight Match Scoring (Feature 022) — Phase 5 Completed (T050–T059)
-**Last completed:** T058–T059: Multi-viewport responsiveness (360px mobile stacking, 768px tablet, 1280px desktop), >= 44px touch targets on interactive controls (`FlightResultCard` select, `FlightMatchBreakdown` summary, `FlightResultsControls` select, `SearchFormClient` submit), keyboard navigation & focus rings (`focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2`), ARIA disclosure attributes (`aria-expanded`, `aria-controls`, `role="region"`), negative privacy scan in Playwright and unit tests (zero raw provider IDs, zero customer PII, zero auth tokens), safe explanation formatting without double escaping, and search seam characterization.
-**Previous completed:** T056–T057: Traveler profile preferences (airlines, schedule windows, max stops, price sensitivity, baggage) and conflict handling.
-**In progress:** Phase 5 complete. Ready for Phase 6.
-**Next:** Phase 6 (User Story 4 — Agent and Search-Page Parity, Tasks T060–T069): V2 delegation, canonical 20-before-5 order, score-free Python snapshot invariants, transient LLM narration projection.
+**Feature:** Flight Match Scoring (Feature 022) — Phase 6 / Slice 1 Completed (T060–T063)
+**Last completed:** T060–T063: Agent Gateway Delegation & Attestation (Phase 6 / Slice 1). Delegated V1 and V2 Agent Gateway search to canonical `FlightsService.search()`, eliminated direct Duffel calls, preserved exact canonical 20-to-5 server ranking, bound selection attestation to exact ordered top 5 offers, extended DTOs with `mode`, `matchResult`, and `meta`, removed legacy query-only Redis cache, and preserved chat ownership/degradation/audit logging.
+**Previous completed:** T058–T059: Multi-viewport responsiveness (360px mobile stacking, 768px tablet, 1280px desktop), >= 44px touch targets on interactive controls, keyboard navigation & focus rings, ARIA disclosure attributes, negative privacy scan, and search seam characterization.
+**In progress:** Phase 6 / Slice 1 complete. Ready for Slice 2 (Python Agent Narration & Invariants, T064–T067).
+**Next:** Phase 6 / Slice 2 (Tasks T064–T067): Strict score-free snapshot models in Python, transient immediate-response narration projection, V2 MATCHED parsing, and RANKED honesty.
 
 ---
 
 ## Progress by Feature
 
 ### [ ] Feature: Flight Match Scoring (Feature 022)
+
+- [x] Phase 6 / Slice 1: Agent Gateway Delegation & Attestation (T060–T063) (2026-09-03):
+  - T060: Imported `FlightsModule` into `AttestedFlightSearchModule`, injected `FlightsService` into `AttestedFlightSearchService`, delegated `searchFlightsV2` to `flightsService.search()`, eliminated direct Duffel search calls, and sliced canonical 20 offers to top 5 in exact server-ranked order.
+  - T061: Preserved exact ranked first 5 offers in selection attestation and snapshot results; bound selection attestation signatures to chat session with exact ordered deterministic UUIDs and Duffel IDs; eliminated redundant direct Prisma flightOffer writes in gateway.
+  - T062: Extended gateway response DTOs (`AttestedFlightSearchResponseDto`, `FlightSearchResponseDto`) with `mode: 'MATCHED' | 'RANKED'`, `meta` (`scoringVersion`, `totalResults`, `cached`, `searchHash`), and `matchResult: FlightMatchResult | null` per offer. Preserved trusted boundary with deterministic UUIDs.
+  - T063: Refactored legacy V1 `searchFlights()` to delegate to `flightsService.search()`, removed query-only scored Redis cache (`flights:search:*`), cleaned up unused `DuffelService`/`CacheService` dependencies, preserved chat ownership checks, tool degradation fallback handling (`CABIN_KEYWORDS`, `PASSENGER_KEYWORDS`), and `AgentToolAuditService` execution logs.
+  - Verified: Jest unit tests `attested-flight-search.service.spec.ts` (22/22 passed) and `flights.service.spec.ts` (11/11 passed); TypeScript typecheck `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` (0 errors).
+  - Parallel dual-axis code review completed: resolved all hard standards (`as any` removed) and spec findings (V2 upstream error normalization to 502 UPSTREAM_UNAVAILABLE, shared meta DTO extracted, query mapper deduplicated).
 
 - CI WebGate follow-up (2026-09-03, branch `022-flight-match-scoring`): GitHub Actions run `33722991620`, job `100545943799`, failed the search characterization ISO-date privacy assertion because it matched the legitimate departure-date input. With explicit user approval, the test now removes only `input#departureDate[type="date"]`'s value from a detached DOM clone for that scan. The original DOM remains the source for all other privacy checks. Regression coverage verifies dates in text, attributes, and scripts remain detectable, and the live input is unchanged. No production code or dependency versions changed.
   - Verified locally: full Playwright characterization **16/16 passed, exit 0** with `PLAYWRIGHT_FRONTEND_ONLY=true` and `--timeout=300000`; CI workflow contract **20/20 passed**; scoring/explanation Node tests **134/134 passed**; shared build, web lint (zero warnings/errors), route validation, web typecheck, and loopback-only production build passed (exit 0). Final standards and spec reviews found no actionable issues. No changes have been pushed; remote CI has not rerun for this correction.
