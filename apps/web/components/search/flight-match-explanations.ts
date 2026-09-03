@@ -64,13 +64,23 @@ function isStopCount(value: unknown): value is number {
   return isFiniteNumber(value) && Number.isInteger(value) && value >= 0;
 }
 
-function escapeText(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
+function sanitizeText(value: string): string {
+  let cleaned = value;
+  let prev: string;
+  do {
+    prev = cleaned;
+    cleaned = cleaned.replace(/<[^>]*>/g, '');
+  } while (cleaned !== prev);
+
+  return cleaned
+    .replace(/[<>]/g, '')
+    .split('')
+    .filter((ch) => {
+      const code = ch.charCodeAt(0);
+      return code >= 32 && code !== 127 && (code < 128 || code > 159);
+    })
+    .join('')
+    .trim();
 }
 
 function formatScheduleWindow(
@@ -79,8 +89,8 @@ function formatScheduleWindow(
   windowEnd: unknown,
 ): string {
   if (isScheduleBound(windowStart) && isScheduleBound(windowEnd)) {
-    const start = escapeText(String(windowStart));
-    const end = escapeText(String(windowEnd));
+    const start = sanitizeText(String(windowStart));
+    const end = sanitizeText(String(windowEnd));
     if (start.length > 0 && end.length > 0) {
       return `${actionPrefix} within preferred window (${start}:00–${end}:00)`;
     }
@@ -103,7 +113,7 @@ export function formatExplanation(explanation: Explanation): string {
         : 'Above median price';
     case 'match.airline.preferred': {
       if (isSafeAirlineName(params.airline)) {
-        const airline = escapeText(params.airline);
+        const airline = sanitizeText(params.airline);
         return airline.length > 0
           ? `Matches preferred airline (${airline})`
           : 'Matches preferred airline';
@@ -130,7 +140,7 @@ export function formatExplanation(explanation: Explanation): string {
       return formatScheduleWindow('Departs', params.windowStart, params.windowEnd);
     case 'constraint.airline.blacklisted': {
       if (isSafeAirlineName(params.airline)) {
-        const airline = escapeText(params.airline);
+        const airline = sanitizeText(params.airline);
         return airline.length > 0
           ? `Blacklisted airline (${airline})`
           : 'Blacklisted airline';

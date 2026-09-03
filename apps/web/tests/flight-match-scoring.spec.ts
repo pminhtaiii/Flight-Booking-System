@@ -2721,18 +2721,20 @@ describe('T059: Negative Privacy Scan & Explanation Allowlist Characterization',
         }
       });
 
-      it('formats plain text explanations cleanly with HTML entities escaped when needed', (): void => {
+      it('formats plain text explanations cleanly without literal HTML entities like &#39; or &amp;', (): void => {
         const formattedAirline = formatExplanation({
           key: 'match.airline.preferred',
           params: { airline: "Sky's Limit & Oceanic Air" },
         });
-        assert.equal(formattedAirline, "Matches preferred airline (Sky&#39;s Limit &amp; Oceanic Air)");
+        assert.equal(formattedAirline, "Matches preferred airline (Sky's Limit & Oceanic Air)");
+        assert.doesNotMatch(formattedAirline, /&#39;|&amp;|&quot;|&lt;|&gt;/);
 
         const formattedViolation = formatExplanation({
           key: 'constraint.airline.blacklisted',
           params: { airline: "Devil's Airline" },
         });
-        assert.equal(formattedViolation, "Blacklisted airline (Devil&#39;s Airline)");
+        assert.equal(formattedViolation, "Blacklisted airline (Devil's Airline)");
+        assert.doesNotMatch(formattedViolation, /&#39;|&amp;|&quot;|&lt;|&gt;/);
       });
 
       it('verifies XSS prevention: untrusted parameter values cannot inject HTML or script tags', (): void => {

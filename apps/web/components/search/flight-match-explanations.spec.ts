@@ -60,15 +60,25 @@ describe('formatExplanation', (): void => {
     });
   });
 
-  it('escapes preferred airline text before interpolation', (): void => {
-    const explanation: Explanation = {
+  it('sanitizes preferred airline text without entity encoding and strips HTML tags', (): void => {
+    const plainExplanation: Explanation = {
+      key: 'match.airline.preferred',
+      params: { airline: "Sky's Limit & Oceanic Air" },
+    };
+
+    assert.equal(
+      formatExplanation(plainExplanation),
+      "Matches preferred airline (Sky's Limit & Oceanic Air)",
+    );
+
+    const strippedExplanation: Explanation = {
       key: 'match.airline.preferred',
       params: { airline: '<img src=x onerror=alert(1)>' },
     };
 
     assert.equal(
-      formatExplanation(explanation),
-      'Matches preferred airline (&lt;img src=x onerror=alert(1)&gt;)',
+      formatExplanation(strippedExplanation),
+      'Matches preferred airline',
     );
   });
 
@@ -94,18 +104,15 @@ describe('formatExplanation', (): void => {
     });
   });
 
-  it('escapes every HTML-sensitive character in a schedule bound', (): void => {
+  it('formats schedule window as plain text without entity encoding', (): void => {
     const explanation: Explanation = {
       key: 'match.arrival.in_window',
-      params: { windowStart: '&<>"\'', windowEnd: 10 },
+      params: { windowStart: 8, windowEnd: 10 },
     };
 
     const result = formatExplanation(explanation);
-    assert.equal(result, 'Arrives within preferred window (&amp;&lt;&gt;&quot;&#39;:00–10:00)');
-    assert.equal(result.includes('<'), false);
-    assert.equal(result.includes('>'), false);
-    assert.equal(result.includes('"'), false);
-    assert.equal(result.includes("'"), false);
+    assert.equal(result, 'Arrives within preferred window (8:00–10:00)');
+    assert.doesNotMatch(result, /&#39;|&amp;|&quot;|&lt;|&gt;/);
   });
 
   it('uses the stops fallback for unusable runtime stop parameters', (): void => {
