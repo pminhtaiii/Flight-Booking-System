@@ -272,7 +272,7 @@ test.describe('Search Seam Characterization - User Flows', () => {
     });
     expect(providerDatasetValues).toEqual([]);
 
-    await page.getByRole('button', { name: 'Book' }).click();
+    await page.getByRole('button', { name: /Select flight|Book/i }).click();
     await expect(page).toHaveURL(/\/checkout\/passengers\?offerId=char-offer-book-123/);
     await expect(page.getByRole('heading', { name: 'Passenger Details' })).toBeVisible();
     expect(fixtureRequests).toEqual([

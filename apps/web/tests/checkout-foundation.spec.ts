@@ -214,7 +214,7 @@ test.describe('Checkout Foundation Flow', () => {
     await expect(page.getByText('150 USD')).toBeVisible();
 
     // Click Book
-    await page.getByRole('button', { name: 'Book' }).click();
+    await page.getByRole('button', { name: /Select flight|Book/i }).click();
     await expect(page).toHaveURL(/.*checkout\/passengers\?offerId=mock-dom-offer-id/);
 
     // Verify Dynamic passenger sections exist
