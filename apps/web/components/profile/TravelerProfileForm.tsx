@@ -216,13 +216,23 @@ function profileToDraft(profile: TravelerProfileResponse): ProfileDraft {
   };
 }
 
+const CARRIER_CODE_REGEX = /^[A-Z0-9]{2,3}$/;
+
+function isValidCarrierCode(code: string): boolean {
+  return CARRIER_CODE_REGEX.test(code);
+}
+
+function isPriceSensitivity(value: string): value is PriceSensitivity {
+  return value === 'BUDGET' || value === 'MODERATE' || value === 'FLEXIBLE';
+}
+
 function parseAirlineCodes(value: string): string[] {
   return Array.from(
     new Set(
       value
         .split(',')
         .map((code) => code.trim().toUpperCase())
-        .filter((code) => /^[A-Z0-9]{2,3}$/.test(code)),
+        .filter(isValidCarrierCode),
     ),
   );
 }
@@ -269,8 +279,8 @@ function draftToPayload(draft: ProfileDraft, revision: number): UpdateProfilePay
         draft.preferences.preferredArrivalEnd,
       ),
       maxStops: draft.preferences.maxStops !== '' ? Number(draft.preferences.maxStops) : null,
-      priceSensitivity: draft.preferences.priceSensitivity
-        ? (draft.preferences.priceSensitivity as PriceSensitivity)
+      priceSensitivity: isPriceSensitivity(draft.preferences.priceSensitivity)
+        ? draft.preferences.priceSensitivity
         : null,
       requiresCheckedBaggage:
         draft.preferences.requiresCheckedBaggage === 'true'
@@ -414,7 +424,7 @@ export function TravelerProfileForm({
         .split(',')
         .map((token) => token.trim())
         .filter((token) => token.length > 0);
-      return tokens.every((token) => /^[A-Z0-9]{2,3}$/.test(token.toUpperCase()));
+      return tokens.every((token) => isValidCarrierCode(token.toUpperCase()));
     };
 
     if (!validateAirlineTokens(draft.preferences.preferredAirlines)) {

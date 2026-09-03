@@ -5,6 +5,7 @@ import {
   type APIRequestContext,
   type BrowserContext,
 } from '@playwright/test';
+import type { UpdateProfilePayload } from '../lib/profile-contract';
 
 const savedDomesticProfile = {
   profileId: 'profile-test-1',
@@ -72,7 +73,10 @@ async function registerAndOpenProfile(
     .post('http://127.0.0.1:3001/api/auth/test/reset-lockout', {
       data: { clearAll: true },
     })
-    .catch(() => {});
+    .catch((error: unknown) => {
+      // Best-effort test lockout reset; server might not be test mode or already clear
+      console.warn('Notice: Test lockout reset returned an error:', error);
+    });
   await context.clearCookies();
 
   const email = `profile-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`;
@@ -373,10 +377,10 @@ test.describe('Secure traveler profile', () => {
   }) => {
     await registerAndOpenProfile(page, request, context);
 
-    let patchPayload: any = null;
+    let patchPayload: UpdateProfilePayload | null = null;
     await page.route('**/api/profile', async (route) => {
       if (route.request().method() === 'PATCH') {
-        patchPayload = route.request().postDataJSON();
+        patchPayload = route.request().postDataJSON() as UpdateProfilePayload;
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -403,8 +407,8 @@ test.describe('Secure traveler profile', () => {
     await page.getByRole('button', { name: 'Save profile' }).click();
 
     await expect(page.getByRole('status')).toHaveText('Your traveler profile is saved securely.');
-    expect(patchPayload.preferences.preferredAirlines).toEqual([]);
-    expect(patchPayload.preferences.blacklistedAirlines).toEqual([]);
+    expect(patchPayload?.preferences?.preferredAirlines).toEqual([]);
+    expect(patchPayload?.preferences?.blacklistedAirlines).toEqual([]);
     await expect(page.getByLabel('Preferred airlines')).toHaveValue('');
     await expect(page.getByLabel('Blacklisted airlines')).toHaveValue('');
   });
@@ -417,8 +421,8 @@ test.describe('Secure traveler profile', () => {
     await registerAndOpenProfile(page, request, context);
 
     let patchCount = 0;
-    let firstPatchPayload: any = null;
-    let secondPatchPayload: any = null;
+    let firstPatchPayload: UpdateProfilePayload | null = null;
+    let secondPatchPayload: UpdateProfilePayload | null = null;
 
     await page.route('**/api/profile', async (route) => {
       if (route.request().method() === 'PATCH') {
@@ -471,8 +475,8 @@ test.describe('Secure traveler profile', () => {
     await page.getByRole('button', { name: 'Save profile' }).click();
 
     await expect(page.getByRole('status')).toHaveText('Your traveler profile is saved securely.');
-    expect(firstPatchPayload.preferences.preferredDepartureWindow).toEqual({ start: 22, end: 6 });
-    expect(firstPatchPayload.preferences.preferredArrivalWindow).toEqual({ start: 8, end: 12 });
+    expect(firstPatchPayload?.preferences?.preferredDepartureWindow).toEqual({ start: 22, end: 6 });
+    expect(firstPatchPayload?.preferences?.preferredArrivalWindow).toEqual({ start: 8, end: 12 });
 
     await expect(page.getByLabel('Preferred departure start')).toHaveValue('22');
     await expect(page.getByLabel('Preferred departure end')).toHaveValue('6');
@@ -487,8 +491,8 @@ test.describe('Secure traveler profile', () => {
     await page.getByRole('button', { name: 'Save profile' }).click();
 
     await expect(page.getByRole('status')).toHaveText('Your traveler profile is saved securely.');
-    expect(secondPatchPayload.preferences.preferredDepartureWindow).toBeNull();
-    expect(secondPatchPayload.preferences.preferredArrivalWindow).toBeNull();
+    expect(secondPatchPayload?.preferences?.preferredDepartureWindow).toBeNull();
+    expect(secondPatchPayload?.preferences?.preferredArrivalWindow).toBeNull();
 
     await expect(page.getByLabel('Preferred departure start')).toHaveValue('');
     await expect(page.getByLabel('Preferred departure end')).toHaveValue('');
@@ -504,14 +508,14 @@ test.describe('Secure traveler profile', () => {
     await registerAndOpenProfile(page, request, context);
 
     let patchCount = 0;
-    let firstPatchPayload: any = null;
-    let secondPatchPayload: any = null;
+    let firstPatchPayload: UpdateProfilePayload | null = null;
+    let secondPatchPayload: UpdateProfilePayload | null = null;
 
     await page.route('**/api/profile', async (route) => {
       if (route.request().method() === 'PATCH') {
         patchCount++;
         if (patchCount === 1) {
-          firstPatchPayload = route.request().postDataJSON();
+          firstPatchPayload = route.request().postDataJSON() as UpdateProfilePayload;
           await route.fulfill({
             status: 200,
             contentType: 'application/json',
@@ -529,7 +533,7 @@ test.describe('Secure traveler profile', () => {
           return;
         }
         if (patchCount === 2) {
-          secondPatchPayload = route.request().postDataJSON();
+          secondPatchPayload = route.request().postDataJSON() as UpdateProfilePayload;
           await route.fulfill({
             status: 200,
             contentType: 'application/json',
@@ -559,9 +563,9 @@ test.describe('Secure traveler profile', () => {
     await page.getByRole('button', { name: 'Save profile' }).click();
 
     await expect(page.getByRole('status')).toHaveText('Your traveler profile is saved securely.');
-    expect(firstPatchPayload.preferences.maxStops).toBe(0);
-    expect(firstPatchPayload.preferences.priceSensitivity).toBe('BUDGET');
-    expect(firstPatchPayload.preferences.requiresCheckedBaggage).toBe(true);
+    expect(firstPatchPayload?.preferences?.maxStops).toBe(0);
+    expect(firstPatchPayload?.preferences?.priceSensitivity).toBe('BUDGET');
+    expect(firstPatchPayload?.preferences?.requiresCheckedBaggage).toBe(true);
 
     await expect(page.getByLabel('Max stops')).toHaveValue('0');
     await expect(page.getByLabel('Price sensitivity')).toHaveValue('BUDGET');
@@ -574,9 +578,9 @@ test.describe('Secure traveler profile', () => {
     await page.getByRole('button', { name: 'Save profile' }).click();
 
     await expect(page.getByRole('status')).toHaveText('Your traveler profile is saved securely.');
-    expect(secondPatchPayload.preferences.maxStops).toBeNull();
-    expect(secondPatchPayload.preferences.priceSensitivity).toBeNull();
-    expect(secondPatchPayload.preferences.requiresCheckedBaggage).toBeNull();
+    expect(secondPatchPayload?.preferences?.maxStops).toBeNull();
+    expect(secondPatchPayload?.preferences?.priceSensitivity).toBeNull();
+    expect(secondPatchPayload?.preferences?.requiresCheckedBaggage).toBeNull();
 
     await expect(page.getByLabel('Max stops')).toHaveValue('');
     await expect(page.getByLabel('Price sensitivity')).toHaveValue('');
