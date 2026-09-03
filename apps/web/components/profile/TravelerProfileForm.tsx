@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useMemo, useState } from 'react';
-import type { HourWindow } from '@shared/types';
+import type { HourWindow, PriceSensitivity } from '@shared/types';
 import styles from '@/app/prototype/profile/profile-prototype.module.css';
 import {
   ProfileRequestError,
@@ -44,6 +44,9 @@ type ProfileDraft = {
     preferredDepartureEnd: string;
     preferredArrivalStart: string;
     preferredArrivalEnd: string;
+    maxStops: string;
+    priceSensitivity: string;
+    requiresCheckedBaggage: string;
   };
 };
 
@@ -113,6 +116,26 @@ const classOptions: SelectOption[] = [
   { value: 'business', label: 'Business' },
 ];
 
+const maxStopsOptions: SelectOption[] = [
+  { value: '', label: 'Any' },
+  { value: '0', label: 'Direct only' },
+  { value: '1', label: 'Max 1 stop' },
+  { value: '2', label: 'Max 2 stops' },
+];
+
+const priceSensitivityOptions: SelectOption[] = [
+  { value: '', label: 'No preference' },
+  { value: 'BUDGET', label: 'Budget-conscious' },
+  { value: 'MODERATE', label: 'Moderate' },
+  { value: 'FLEXIBLE', label: 'Flexible' },
+];
+
+const baggageOptions: SelectOption[] = [
+  { value: '', label: 'No preference' },
+  { value: 'true', label: 'Checked bag required' },
+  { value: 'false', label: 'Carry-on only / Not required' },
+];
+
 const hourOptions: SelectOption[] = [
   { value: '', label: 'No time preference' },
   ...Array.from({ length: 24 }, (_, i) => ({
@@ -180,6 +203,15 @@ function profileToDraft(profile: TravelerProfileResponse): ProfileDraft {
       preferredDepartureEnd: departureWindow.end,
       preferredArrivalStart: arrivalWindow.start,
       preferredArrivalEnd: arrivalWindow.end,
+      maxStops:
+        profile.preferences?.maxStops != null ? String(profile.preferences.maxStops) : '',
+      priceSensitivity: profile.preferences?.priceSensitivity ?? '',
+      requiresCheckedBaggage:
+        profile.preferences?.requiresCheckedBaggage === true
+          ? 'true'
+          : profile.preferences?.requiresCheckedBaggage === false
+            ? 'false'
+            : '',
     },
   };
 }
@@ -236,6 +268,16 @@ function draftToPayload(draft: ProfileDraft, revision: number): UpdateProfilePay
         draft.preferences.preferredArrivalStart,
         draft.preferences.preferredArrivalEnd,
       ),
+      maxStops: draft.preferences.maxStops !== '' ? Number(draft.preferences.maxStops) : null,
+      priceSensitivity: draft.preferences.priceSensitivity
+        ? (draft.preferences.priceSensitivity as PriceSensitivity)
+        : null,
+      requiresCheckedBaggage:
+        draft.preferences.requiresCheckedBaggage === 'true'
+          ? true
+          : draft.preferences.requiresCheckedBaggage === 'false'
+            ? false
+            : null,
     },
   };
 }
@@ -365,6 +407,24 @@ export function TravelerProfileForm({
 
     if (draft.contact.email.trim() && !/^\S+@\S+\.\S+$/.test(draft.contact.email.trim())) {
       errors['contact.email'] = 'Enter a valid email address.';
+    }
+
+    const validateAirlineTokens = (value: string): boolean => {
+      const tokens = value
+        .split(',')
+        .map((token) => token.trim())
+        .filter((token) => token.length > 0);
+      return tokens.every((token) => /^[A-Z0-9]{2,3}$/.test(token.toUpperCase()));
+    };
+
+    if (!validateAirlineTokens(draft.preferences.preferredAirlines)) {
+      errors['preferences.preferredAirlines'] =
+        'Airline codes must be 2-3 alphanumeric characters (e.g. VN, SQ).';
+    }
+
+    if (!validateAirlineTokens(draft.preferences.blacklistedAirlines)) {
+      errors['preferences.blacklistedAirlines'] =
+        'Airline codes must be 2-3 alphanumeric characters (e.g. VN, SQ).';
     }
 
     return errors;
@@ -648,7 +708,7 @@ export function TravelerProfileForm({
             <span>{errorMessage}</span>
             {saveState === 'conflict' ? (
               <button className="btn-secondary" onClick={reloadProfile} type="button">
-                Reload latest profile
+                Refresh and reload latest
               </button>
             ) : null}
           </div>
@@ -875,6 +935,27 @@ export function TravelerProfileForm({
                 'Cabin preference',
                 draft.preferences.classPreference,
                 classOptions,
+              )}
+              {renderSelectField(
+                'preferences',
+                'maxStops',
+                'Max stops',
+                draft.preferences.maxStops,
+                maxStopsOptions,
+              )}
+              {renderSelectField(
+                'preferences',
+                'priceSensitivity',
+                'Price sensitivity',
+                draft.preferences.priceSensitivity,
+                priceSensitivityOptions,
+              )}
+              {renderSelectField(
+                'preferences',
+                'requiresCheckedBaggage',
+                'Baggage preference',
+                draft.preferences.requiresCheckedBaggage,
+                baggageOptions,
               )}
               {renderTextField(
                 'preferences',
