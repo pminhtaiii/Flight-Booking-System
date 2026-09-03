@@ -189,11 +189,23 @@ async def test_runner_tool_calls_and_flight_results():
 
     mock_graph.astream_events = mock_astream_events
 
+    mock_projected_item = MagicMock()
+    mock_projected_item.model_dump = MagicMock(
+        return_value={
+            "index": 1,
+            "airline": "United Airlines",
+            "origin": "SFO",
+            "destination": "JFK",
+            "departureAt": "2026-09-01T08:00:00Z",
+            "arrivalAt": "2026-09-01T16:00:00Z",
+            "price": "350.00",
+            "currency": "USD",
+        }
+    )
     mock_snapshot = MagicMock()
-    mock_snapshot.model_dump = MagicMock(return_value={"flightNumber": "AA100"})
     mock_lifecycle = MagicMock()
     mock_lifecycle.load_active = AsyncMock(return_value=mock_snapshot)
-    mock_lifecycle.project_for_browser = MagicMock(return_value=[mock_snapshot])
+    mock_lifecycle.project_for_browser = MagicMock(return_value=[mock_projected_item])
 
     with patch(
         "agent.chat_turn.runner.TrustedSearchSnapshotLifecycle",
@@ -226,6 +238,19 @@ async def test_runner_tool_calls_and_flight_results():
         flight_results = [e for e in events if isinstance(e, FlightResultsEvent)]
         assert len(flight_results) == 1
         assert len(flight_results[0].data.results) == 1
+        result_data = flight_results[0].data.results[0]
+        assert result_data["index"] == 1
+        assert result_data["airline"] == "United Airlines"
+        assert result_data["price"] == "350.00"
+        for forbidden in [
+            "score",
+            "matchScore",
+            "matchLevel",
+            "matchResult",
+            "flightOfferId",
+            "duffelOfferId",
+        ]:
+            assert forbidden not in result_data
 
 
 @pytest.mark.asyncio
