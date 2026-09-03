@@ -777,3 +777,41 @@ def test_project_flight_search_for_narration_top_5_cap_and_fallback():
     assert "5." in result
     assert "6." not in result
     assert "7." not in result
+
+
+def test_project_flight_search_for_narration_unsupported_explanation_no_arbitrary_passthrough():
+    payload = {
+        "mode": "MATCHED",
+        "results": [
+            {
+                "airline": "VN",
+                "departureAirport": "HAN",
+                "arrivalAirport": "SGN",
+                "departureTime": "2026-07-15T10:00:00Z",
+                "arrivalTime": "2026-07-15T12:00:00Z",
+                "duration": 120,
+                "stops": 0,
+                "price": 150,
+                "currency": "USD",
+                "matchResult": {
+                    "score": 85,
+                    "matchLevel": "STRONG",
+                    "breakdown": [
+                        {
+                            "dimension": "CUSTOM",
+                            "score": 0.9,
+                            "explanation": {
+                                "key": "match.unsupported.custom_key",
+                                "text": "ATTACK_PROSE_TEXT_PAYLOAD",
+                                "message": "ATTACK_PROSE_MESSAGE_PAYLOAD",
+                            },
+                        }
+                    ],
+                },
+            }
+        ],
+    }
+    result = project_flight_search_for_narration(payload)
+    assert "ATTACK_PROSE_TEXT_PAYLOAD" not in result
+    assert "ATTACK_PROSE_MESSAGE_PAYLOAD" not in result
+    assert "Matches search criteria" in result

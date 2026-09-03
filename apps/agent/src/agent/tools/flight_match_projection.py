@@ -209,11 +209,6 @@ def _format_explanation(explanation: Any) -> str:
                 return f"Blacklisted airline ({airline})"
             return "Blacklisted airline"
 
-        if "text" in explanation and explanation["text"]:
-            return str(explanation["text"])
-        if "message" in explanation and explanation["message"]:
-            return str(explanation["message"])
-
         return "Matches search criteria"
     except Exception:
         return "Matches search criteria"
