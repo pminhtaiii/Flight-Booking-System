@@ -7,6 +7,8 @@ import { encode } from 'next-auth/jwt';
 const flightSearchFixtureUrl = process.env.FLIGHT_SEARCH_FIXTURE_API_URL || 'http://127.0.0.1:3101';
 const fixtureRequests: Array<{ method: string; pathname: string }> = [];
 let fixtureServer: Server | undefined;
+const ISO_DATE_PATTERN = /\b(?:19\d\d|20[0-2]\d)-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])\b/;
+const departureDateInputSelector = 'input#departureDate[type="date"]';
 
 const searchFixtureOffer = {
   id: 'char-offer-book-123',
@@ -145,6 +147,25 @@ async function hideAgentChat(page: Page): Promise<void> {
     .catch(() => {});
 }
 
+// User approved on 2026-09-03: exclude only the required departure-date control value.
+async function getIsoDatePrivacyScanDom(page: Page): Promise<string> {
+  return page.evaluate((selector: string) => {
+    const rootClone = document.documentElement.cloneNode(true);
+    if (!(rootClone instanceof HTMLElement)) {
+      throw new Error('Unable to clone the document for the ISO date privacy scan.');
+    }
+
+    const departureDateInput = rootClone.querySelector(selector);
+    if (!(departureDateInput instanceof HTMLInputElement)) {
+      throw new Error('The departure-date input is required for the ISO date privacy scan.');
+    }
+
+    departureDateInput.value = '';
+    departureDateInput.removeAttribute('value');
+    return rootClone.outerHTML;
+  }, departureDateInputSelector);
+}
+
 test.describe('Search Seam Characterization - User Flows', () => {
   test.slow();
 
@@ -239,12 +260,45 @@ test.describe('Search Seam Characterization - User Flows', () => {
     await page.getByLabel('Departure Date').fill('2026-12-01');
     await page.getByRole('button', { name: 'Search Flights' }).click();
 
-    await expect(page.getByRole('heading', { name: 'Flight Offers' })).toBeVisible();
+    await expect(
+      page.getByTestId('flight-results-container').or(page.getByRole('heading', { name: 'Flight Offers' })),
+    ).toBeVisible();
     await expect(page.getByText('Mock Pacific')).toBeVisible();
     await expect(page.getByText('Flight MP100')).toBeVisible();
     await expect(page.getByText('750 USD')).toBeVisible();
 
-    await page.getByRole('button', { name: 'Book' }).click();
+    // Negative Privacy Boundary DOM Assertions (T059):
+    // Zero raw provider IDs (off_..., ord_..., duffel_...) in DOM attributes, text, or dataset
+    const domContent = await page.content();
+    expect(domContent).not.toMatch(/off_[a-zA-Z0-9_\-]+|ord_[a-zA-Z0-9_\-]+|duffel_[a-zA-Z0-9_\-]+/i);
+    // Zero customer PII or bearer auth tokens leaked in search results
+    expect(domContent).not.toContain('char-test-access-token');
+    expect(domContent).not.toMatch(/\b[A-Z]{1,2}\d{6,9}\b/);
+    expect(domContent).toMatch(ISO_DATE_PATTERN);
+    const isoDatePrivacyScanDom = await getIsoDatePrivacyScanDom(page);
+    expect(isoDatePrivacyScanDom).not.toMatch(ISO_DATE_PATTERN);
+    await expect(page.getByLabel('Departure Date')).toHaveValue('2026-12-01');
+    expect(domContent).not.toMatch(
+      /\b\d+\s+[A-Za-z0-9\s,.]+(?:Street|St|Avenue|Ave|Boulevard|Blvd|Road|Rd|Drive|Dr|Lane|Ln|Terrace|Way)\b/i,
+    );
+
+    const providerDatasetValues = await page.evaluate(() => {
+      const allElements = Array.from(document.querySelectorAll('*'));
+      const leakedValues: string[] = [];
+      for (const el of allElements) {
+        if (el instanceof HTMLElement) {
+          for (const [attr, val] of Object.entries(el.dataset)) {
+            if (val && /off_|ord_|duffel_/i.test(val)) {
+              leakedValues.push(`${attr}:${val}`);
+            }
+          }
+        }
+      }
+      return leakedValues;
+    });
+    expect(providerDatasetValues).toEqual([]);
+
+    await page.getByRole('button', { name: /Select flight|Book/i }).click();
     await expect(page).toHaveURL(/\/checkout\/passengers\?offerId=char-offer-book-123/);
     await expect(page.getByRole('heading', { name: 'Passenger Details' })).toBeVisible();
     expect(fixtureRequests).toEqual([
@@ -252,6 +306,43 @@ test.describe('Search Seam Characterization - User Flows', () => {
       { method: 'GET', pathname: '/api/flights/char-offer-book-123' },
       { method: 'GET', pathname: '/api/flights/char-offer-book-123' },
     ]);
+  });
+
+  test('keeps ISO date privacy scanning active outside the departure-date input', async ({
+    page,
+    context,
+  }) => {
+    const dateValue = '2026-12-01';
+    await authenticateSearchSession(context);
+    await page.goto('/search');
+    await hideAgentChat(page);
+    await page.getByLabel('Departure Date').fill(dateValue);
+    await page.evaluate((isoDate: string) => {
+      const textProbe = document.createElement('p');
+      textProbe.id = 'iso-date-text-probe';
+      textProbe.textContent = `Unexpected date text: ${isoDate}`;
+
+      const attributeProbe = document.createElement('div');
+      attributeProbe.id = 'iso-date-attribute-probe';
+      attributeProbe.setAttribute('data-unexpected-date', isoDate);
+
+      const scriptProbe = document.createElement('script');
+      scriptProbe.id = 'iso-date-script-probe';
+      scriptProbe.textContent = `window.__unexpectedIsoDate = \"${isoDate}\";`;
+
+      document.body.append(textProbe, attributeProbe, scriptProbe);
+    }, dateValue);
+
+    const isoDatePrivacyScanDom = await getIsoDatePrivacyScanDom(page);
+    const unapprovedDateSurfaces = [
+      `Unexpected date text: ${dateValue}`,
+      `data-unexpected-date=\"${dateValue}\"`,
+      `window.__unexpectedIsoDate = \"${dateValue}\";`,
+    ];
+    for (const surface of unapprovedDateSurfaces) {
+      expect(isoDatePrivacyScanDom).toContain(surface);
+      expect(surface).toMatch(ISO_DATE_PATTERN);
+    }
   });
 });
 
@@ -297,5 +388,32 @@ test.describe('Search Seam Characterization - Static Privacy Boundary', () => {
     expect(actions).toContain("'use server'");
     expect(actions).toContain('searchFlightsAction');
     expect(actions).toContain('selectFlightOfferAction');
+  });
+
+  test('enforces explanation allowlist and zero PII/provider identifiers across search components (T059)', () => {
+    const componentFiles = scanDirectory(path.resolve(__dirname, '../../components/search')).filter(
+      (file) => !file.filePath.endsWith('.spec.ts'),
+    );
+
+    const forbiddenPatterns = [
+      /\boff_[a-zA-Z0-9_\-]+/i,
+      /\bord_[a-zA-Z0-9_\-]+/i,
+      /\bduffel_[a-zA-Z0-9_\-]+/i,
+      /\bpassportNumber\b/,
+      /\bdateOfBirth\b/,
+      /\bstreetAddress\b/,
+    ];
+
+    for (const { filePath, content } of componentFiles) {
+      for (const pattern of forbiddenPatterns) {
+        expect(content).not.toMatch(pattern);
+      }
+
+      // If component renders match breakdown or badges, ensure it routes through formatExplanation
+      if (filePath.endsWith('FlightMatchBreakdown.tsx') || filePath.endsWith('FlightMatchBadge.tsx')) {
+        expect(content).toContain('formatExplanation');
+        expect(content).not.toMatch(/\{[^}]*\bexplanation\.key\b[^}]*\}/);
+      }
+    }
   });
 });

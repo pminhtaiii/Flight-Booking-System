@@ -163,7 +163,7 @@ export function FlightResultCard({
             aria-label={`Select flight ${offer.flightNumber}`}
             onClick={() => onSelect(offer.id)}
             disabled={disabled || isSelecting}
-            className="btn-primary w-full md:w-auto text-sm px-5 py-2 font-semibold shadow-sm transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-primary w-full md:w-auto min-h-[44px] text-sm px-5 py-2 font-semibold shadow-sm transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSelecting ? 'Loading...' : 'Select flight'}
           </button>
