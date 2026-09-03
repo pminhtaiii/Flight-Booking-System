@@ -74,6 +74,8 @@ export function SearchFormClient({
     setOffers([]);
     setMeta(null);
     setSortBy(undefined);
+    bookingOfferIdRef.current = null;
+    setBookingOfferId(null);
 
     try {
       const query: FlightSearchQuery = {
@@ -124,6 +126,7 @@ export function SearchFormClient({
     bookingOfferIdRef.current = offerId;
     setBookingOfferId(offerId);
     setError(null);
+    let navigating = false;
     try {
       const selectAction =
         onSelectAction ??
@@ -135,12 +138,17 @@ export function SearchFormClient({
       const outcome = await selectAction(offerId);
 
       if (outcome.ok) {
-        if (onNavigate) {
-          onNavigate(outcome.checkoutPath);
-        } else if (router) {
-          router.push(outcome.checkoutPath);
-        } else if (typeof window !== 'undefined') {
-          window.location.href = outcome.checkoutPath;
+        try {
+          if (onNavigate) {
+            onNavigate(outcome.checkoutPath);
+          } else if (router) {
+            router.push(outcome.checkoutPath);
+          } else if (typeof window !== 'undefined') {
+            window.location.href = outcome.checkoutPath;
+          }
+          navigating = true;
+        } catch {
+          setError('Failed to navigate to checkout. Please try again.');
         }
       } else {
         setError(outcome.message);
@@ -148,8 +156,10 @@ export function SearchFormClient({
     } catch {
       setError('Flight offer is temporarily unavailable. Please try again in a few moments.');
     } finally {
-      bookingOfferIdRef.current = null;
-      setBookingOfferId(null);
+      if (!navigating) {
+        bookingOfferIdRef.current = null;
+        setBookingOfferId(null);
+      }
     }
   };
 

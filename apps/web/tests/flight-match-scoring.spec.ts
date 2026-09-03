@@ -1660,7 +1660,7 @@ describe('SearchFormClient (T054)', (): void => {
       assert.doesNotMatch(html, /#[0-9a-fA-F]{3,6}/);
     });
 
-    it('verifies that handleBook ignores concurrent selection clicks while an offer selection is in flight', async (): Promise<void> => {
+    it('verifies that handleBook ignores concurrent selection clicks and retains lock after successful selection navigation', async (): Promise<void> => {
       let capturedOnSelectFlight: ((offerId: string) => Promise<void>) | null = null;
       const originalCreateElement = React.createElement;
 
@@ -1690,6 +1690,11 @@ describe('SearchFormClient (T054)', (): void => {
         return firstActionPromise;
       };
 
+      const navigatedUrls: string[] = [];
+      const mockNavigate = (url: string): void => {
+        navigatedUrls.push(url);
+      };
+
       try {
         renderToStaticMarkup(
           React.createElement(SearchFormClient, {
@@ -1700,6 +1705,7 @@ describe('SearchFormClient (T054)', (): void => {
               meta: mockMeta,
             },
             onSelectAction: mockSelectAction,
+            onNavigate: mockNavigate,
           }),
         );
 
@@ -1725,6 +1731,75 @@ describe('SearchFormClient (T054)', (): void => {
         await Promise.all([firstClickPromise, secondClickPromise]);
 
         assert.strictEqual(actionCallCount, 1, 'Selection action must be invoked exactly once');
+        assert.deepStrictEqual(navigatedUrls, ['/checkout/step-1']);
+
+        // Subsequent click during navigation transition must also be ignored because lock remains held
+        await (capturedOnSelectFlight as (offerId: string) => Promise<void>)('offer-m2');
+        assert.strictEqual(
+          actionCallCount,
+          1,
+          'Subsequent click during navigation transition must be ignored',
+        );
+      } finally {
+        (React as unknown as Record<string, unknown>).createElement = originalCreateElement;
+      }
+    });
+
+    it('verifies that handleBook releases lock when selection fails, allowing subsequent selection attempt', async (): Promise<void> => {
+      let capturedOnSelectFlight: ((offerId: string) => Promise<void>) | null = null;
+      const originalCreateElement = React.createElement;
+
+      (React as unknown as Record<string, unknown>).createElement = function (
+        type: unknown,
+        ...rest: unknown[]
+      ) {
+        if (type === FlightResults) {
+          const props = rest[0] as { onSelectFlight?: (offerId: string) => Promise<void> };
+          capturedOnSelectFlight = props?.onSelectFlight ?? null;
+        }
+        return originalCreateElement.apply(
+          this,
+          [type, ...rest] as Parameters<typeof React.createElement>,
+        );
+      };
+
+      let actionCallCount = 0;
+      let shouldSucceed = false;
+
+      const mockSelectAction = async (_offerId: string): Promise<FlightSelectionOutcome> => {
+        actionCallCount++;
+        if (!shouldSucceed) {
+          return { ok: false, message: 'Offer expired' };
+        }
+        return { ok: true, checkoutPath: '/checkout/step-1' };
+      };
+
+      try {
+        renderToStaticMarkup(
+          React.createElement(SearchFormClient, {
+            initialOutcome: {
+              ok: true,
+              mode: 'MATCHED',
+              offers: [offerMatched1, offerMatched2],
+              meta: mockMeta,
+            },
+            onSelectAction: mockSelectAction,
+          }),
+        );
+
+        assert.ok(
+          capturedOnSelectFlight !== null,
+          'FlightResults must receive handleBook onSelectFlight handler',
+        );
+
+        // First click fails
+        await (capturedOnSelectFlight as (offerId: string) => Promise<void>)('offer-m1');
+        assert.strictEqual(actionCallCount, 1, 'First attempt was invoked');
+
+        // Second click after failure should proceed because lock was released
+        shouldSucceed = true;
+        await (capturedOnSelectFlight as (offerId: string) => Promise<void>)('offer-m2');
+        assert.strictEqual(actionCallCount, 2, 'Subsequent selection attempt proceeds after failure');
       } finally {
         (React as unknown as Record<string, unknown>).createElement = originalCreateElement;
       }
