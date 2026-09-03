@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useMemo, useState } from 'react';
+import type { HourWindow, PriceSensitivity } from '@shared/types';
 import styles from '@/app/prototype/profile/profile-prototype.module.css';
 import {
   ProfileRequestError,
@@ -37,6 +38,15 @@ type ProfileDraft = {
   preferences: {
     seatPreference: string;
     classPreference: string;
+    preferredAirlines: string;
+    blacklistedAirlines: string;
+    preferredDepartureStart: string;
+    preferredDepartureEnd: string;
+    preferredArrivalStart: string;
+    preferredArrivalEnd: string;
+    maxStops: string;
+    priceSensitivity: string;
+    requiresCheckedBaggage: string;
   };
 };
 
@@ -106,11 +116,63 @@ const classOptions: SelectOption[] = [
   { value: 'business', label: 'Business' },
 ];
 
+const maxStopsOptions: SelectOption[] = [
+  { value: '', label: 'Any' },
+  { value: '0', label: 'Direct only' },
+  { value: '1', label: 'Max 1 stop' },
+  { value: '2', label: 'Max 2 stops' },
+];
+
+const priceSensitivityOptions: SelectOption[] = [
+  { value: '', label: 'No preference' },
+  { value: 'BUDGET', label: 'Budget-conscious' },
+  { value: 'MODERATE', label: 'Moderate' },
+  { value: 'FLEXIBLE', label: 'Flexible' },
+];
+
+const baggageOptions: SelectOption[] = [
+  { value: '', label: 'No preference' },
+  { value: 'true', label: 'Checked bag required' },
+  { value: 'false', label: 'Carry-on only / Not required' },
+];
+
+const hourOptions: SelectOption[] = [
+  { value: '', label: 'No time preference' },
+  ...Array.from({ length: 24 }, (_, i) => ({
+    value: String(i),
+    label: `${String(i).padStart(2, '0')}:00`,
+  })),
+];
+
 function valueOrEmpty(value: string | null | undefined): string {
   return value ?? '';
 }
 
+function parseWindowToDraft(
+  window?: HourWindow | null,
+): { start: string; end: string } {
+  if (!window || typeof window.start !== 'number' || typeof window.end !== 'number') {
+    return { start: '', end: '' };
+  }
+  return { start: String(window.start), end: String(window.end) };
+}
+
+function parseWindowDraft(startStr: string, endStr: string): HourWindow | null {
+  if (!startStr.trim() || !endStr.trim()) {
+    return null;
+  }
+  const start = Number(startStr);
+  const end = Number(endStr);
+  if (Number.isNaN(start) || Number.isNaN(end)) {
+    return null;
+  }
+  return { start, end };
+}
+
 function profileToDraft(profile: TravelerProfileResponse): ProfileDraft {
+  const departureWindow = parseWindowToDraft(profile.preferences?.preferredDepartureWindow);
+  const arrivalWindow = parseWindowToDraft(profile.preferences?.preferredArrivalWindow);
+
   return {
     identity: {
       givenName: valueOrEmpty(profile.identity?.givenName),
@@ -135,8 +197,44 @@ function profileToDraft(profile: TravelerProfileResponse): ProfileDraft {
     preferences: {
       seatPreference: valueOrEmpty(profile.preferences?.seatPreference),
       classPreference: valueOrEmpty(profile.preferences?.classPreference),
+      preferredAirlines: profile.preferences?.preferredAirlines?.join(', ') ?? '',
+      blacklistedAirlines: profile.preferences?.blacklistedAirlines?.join(', ') ?? '',
+      preferredDepartureStart: departureWindow.start,
+      preferredDepartureEnd: departureWindow.end,
+      preferredArrivalStart: arrivalWindow.start,
+      preferredArrivalEnd: arrivalWindow.end,
+      maxStops:
+        profile.preferences?.maxStops != null ? String(profile.preferences.maxStops) : '',
+      priceSensitivity: profile.preferences?.priceSensitivity ?? '',
+      requiresCheckedBaggage:
+        profile.preferences?.requiresCheckedBaggage === true
+          ? 'true'
+          : profile.preferences?.requiresCheckedBaggage === false
+            ? 'false'
+            : '',
     },
   };
+}
+
+const CARRIER_CODE_REGEX = /^[A-Z0-9]{2,3}$/;
+
+function isValidCarrierCode(code: string): boolean {
+  return CARRIER_CODE_REGEX.test(code);
+}
+
+function isPriceSensitivity(value: string): value is PriceSensitivity {
+  return value === 'BUDGET' || value === 'MODERATE' || value === 'FLEXIBLE';
+}
+
+function parseAirlineCodes(value: string): string[] {
+  return Array.from(
+    new Set(
+      value
+        .split(',')
+        .map((code) => code.trim().toUpperCase())
+        .filter(isValidCarrierCode),
+    ),
+  );
 }
 
 function draftToPayload(draft: ProfileDraft, revision: number): UpdateProfilePayload {
@@ -170,6 +268,26 @@ function draftToPayload(draft: ProfileDraft, revision: number): UpdateProfilePay
     preferences: {
       seatPreference: draft.preferences.seatPreference || null,
       classPreference: draft.preferences.classPreference || null,
+      preferredAirlines: parseAirlineCodes(draft.preferences.preferredAirlines),
+      blacklistedAirlines: parseAirlineCodes(draft.preferences.blacklistedAirlines),
+      preferredDepartureWindow: parseWindowDraft(
+        draft.preferences.preferredDepartureStart,
+        draft.preferences.preferredDepartureEnd,
+      ),
+      preferredArrivalWindow: parseWindowDraft(
+        draft.preferences.preferredArrivalStart,
+        draft.preferences.preferredArrivalEnd,
+      ),
+      maxStops: draft.preferences.maxStops !== '' ? Number(draft.preferences.maxStops) : null,
+      priceSensitivity: isPriceSensitivity(draft.preferences.priceSensitivity)
+        ? draft.preferences.priceSensitivity
+        : null,
+      requiresCheckedBaggage:
+        draft.preferences.requiresCheckedBaggage === 'true'
+          ? true
+          : draft.preferences.requiresCheckedBaggage === 'false'
+            ? false
+            : null,
     },
   };
 }
@@ -299,6 +417,24 @@ export function TravelerProfileForm({
 
     if (draft.contact.email.trim() && !/^\S+@\S+\.\S+$/.test(draft.contact.email.trim())) {
       errors['contact.email'] = 'Enter a valid email address.';
+    }
+
+    const validateAirlineTokens = (value: string): boolean => {
+      const tokens = value
+        .split(',')
+        .map((token) => token.trim())
+        .filter((token) => token.length > 0);
+      return tokens.every((token) => isValidCarrierCode(token.toUpperCase()));
+    };
+
+    if (!validateAirlineTokens(draft.preferences.preferredAirlines)) {
+      errors['preferences.preferredAirlines'] =
+        'Airline codes must be 2-3 alphanumeric characters (e.g. VN, SQ).';
+    }
+
+    if (!validateAirlineTokens(draft.preferences.blacklistedAirlines)) {
+      errors['preferences.blacklistedAirlines'] =
+        'Airline codes must be 2-3 alphanumeric characters (e.g. VN, SQ).';
     }
 
     return errors;
@@ -582,7 +718,7 @@ export function TravelerProfileForm({
             <span>{errorMessage}</span>
             {saveState === 'conflict' ? (
               <button className="btn-secondary" onClick={reloadProfile} type="button">
-                Reload latest profile
+                Refresh and reload latest
               </button>
             ) : null}
           </div>
@@ -809,6 +945,71 @@ export function TravelerProfileForm({
                 'Cabin preference',
                 draft.preferences.classPreference,
                 classOptions,
+              )}
+              {renderSelectField(
+                'preferences',
+                'maxStops',
+                'Max stops',
+                draft.preferences.maxStops,
+                maxStopsOptions,
+              )}
+              {renderSelectField(
+                'preferences',
+                'priceSensitivity',
+                'Price sensitivity',
+                draft.preferences.priceSensitivity,
+                priceSensitivityOptions,
+              )}
+              {renderSelectField(
+                'preferences',
+                'requiresCheckedBaggage',
+                'Baggage preference',
+                draft.preferences.requiresCheckedBaggage,
+                baggageOptions,
+              )}
+              {renderTextField(
+                'preferences',
+                'preferredAirlines',
+                'Preferred airlines',
+                draft.preferences.preferredAirlines,
+                'text',
+                'Comma-delimited airline codes, such as VN, SQ',
+              )}
+              {renderTextField(
+                'preferences',
+                'blacklistedAirlines',
+                'Blacklisted airlines',
+                draft.preferences.blacklistedAirlines,
+                'text',
+                'Comma-delimited airline codes, such as AA, 9W',
+              )}
+              {renderSelectField(
+                'preferences',
+                'preferredDepartureStart',
+                'Preferred departure start',
+                draft.preferences.preferredDepartureStart,
+                hourOptions,
+              )}
+              {renderSelectField(
+                'preferences',
+                'preferredDepartureEnd',
+                'Preferred departure end',
+                draft.preferences.preferredDepartureEnd,
+                hourOptions,
+              )}
+              {renderSelectField(
+                'preferences',
+                'preferredArrivalStart',
+                'Preferred arrival start',
+                draft.preferences.preferredArrivalStart,
+                hourOptions,
+              )}
+              {renderSelectField(
+                'preferences',
+                'preferredArrivalEnd',
+                'Preferred arrival end',
+                draft.preferences.preferredArrivalEnd,
+                hourOptions,
               )}
             </div>
           </section>
