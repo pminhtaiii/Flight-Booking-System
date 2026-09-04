@@ -1023,3 +1023,13 @@ Feature 019 restructures high-leverage boundaries without changing public produc
    - `FlightResults.tsx`: List container component preserving canonical server order by default in both `MATCHED` (`BEST_MATCH`) and `RANKED` (`RECOMMENDED`) modes, and performing client-side re-sorting for objective sort options (`PRICE`, `DURATION`, `STOPS`, `DEPARTURE_TIME`).
    - `SearchFormClient.tsx`: Stateful client component retaining search outcome state (`mode`, `offers`, `meta`, `sortBy`), rendering `FlightRankingBanner` when `mode === 'RANKED'`, rendering `FlightResultsControls` with mode-aware defaults, and cleanly composing `<FlightResults>`.
    - Cabin Preference Prefill & Precedence (`apps/web/app/search/page.tsx`, `apps/web/lib/search-prefill.ts`): Server component inspects authenticated session, fetches profile preferences server-side via `fetchProfile()`, and prefills `initialValues.cabinClass` with saved `classPreference` when no URL query param exists. Explicit URL `?cabinClass=` query parameters strictly override profile preferences. Zero-Client-Credential invariant is strictly maintained.
+
+## Planned Feature 023: Deterministic Guardrails and Security Verification
+
+Design only (2026-09-04); current implementation descriptions above remain unchanged. See `specs/023-security-systems/plan.md` and `tasks.md` for the pending 52-task delivery.
+
+Proposed flow: authenticated SSE -> thin ChatController -> ChatTurnRunner -> mandatory GuardrailGateway. Runner owns input, guarded tool execution and output streaming enforcement. Tool authorization/result validation must complete before ToolMessages, signal parsing, graph state/checkpoints, model continuation or public events; observing runner tool-end events is insufficient. Preserve existing auth, quotas, encrypted persistence, fencing, snapshots and dedicated handoff channels.
+
+Verification plan adds per-layer/boundary tests, static source analysis, separate dependency/secret scans, authenticated HTTP DAST and custom SSE/tool adversarial coverage. Production release requires complete evidence through existing `ci-status`. No runtime/scanner code has been implemented by the planning task.
+
+Feature 023 plan convergence (2026-09-04): admission context is separate from post-router/gate sealed tool authority. The design now specifies bounded PII spans, stage-local DAST oracles and quota profiles, validated generated summaries and payload-free model callbacks. Two independent review cycles closed six planning findings; see `specs/023-security-systems/review-convergence.md`. Runtime implementation remains pending.
