@@ -1,7 +1,7 @@
 # Deterministic LLM Guardrail Architecture Decisions
 
 > **Date**: 2026-09-04
-> **Status**: Accepted
+> **Status**: Accepted (resource and telemetry contracts amended 2026-09-04)
 > **Scope**: Deterministic LLM Guardrail System — Unified gateway, layer composition, enforcement points, and threat mitigation.
 > **Builds on**: [research-output-guardrails-architecture.md](./research-output-guardrails-architecture.md), [research-agent-tool-calling-architecture.md](./research-agent-tool-calling-architecture.md), [research-chatbot-backend-architecture.md](./research-chatbot-backend-architecture.md)
 
@@ -27,7 +27,7 @@ To secure the flight booking conversational agent against prompt injections, PII
 
 ## Decision 2: ChatController Layer & Decoupled Transports
 
-**Decision**: Introduce a thin `ChatController` layer positioned between transport adapters (SSE, WebSocket, Batch) and the `ChatTurnRunner`. The controller operates as a dumb delegator following the Ports & Adapters (Hexagonal) pattern. Transport adapters own zero security logic. Redundant modules such as `SessionManager` or `HistoryLogger` are explicitly omitted.
+**Decision**: Introduce a thin `ChatController` layer positioned between transport adapters (SSE, WebSocket, Batch) and the `ChatTurnRunner`. The controller operates as a dumb delegator following the Ports & Adapters (Hexagonal) pattern. Transport adapters own no guardrail content policy; authentication/admission and bounded raw-body framing remain transport responsibilities before JSON parsing. Redundant modules such as `SessionManager` or `HistoryLogger` are explicitly omitted.
 
 **Considered Options**:
 - *Transport adapters directly instantiating `ChatTurnRunner`*: Rejected. Direct coupling leaks orchestration internals into transport handlers and duplicates session wiring across transports.
@@ -110,7 +110,8 @@ The runner decides **WHEN** to invoke guardrails; the `GuardrailGateway` decides
 **Decision**: Enforce two structural least-privilege mechanisms:
 1. **Per-turn tool allowlisting**: The intent router categorizes queries (`travel`, `checkout`, `general`). Each intent maps to an explicit tool whitelist. A general conversation turn is assigned zero tools, mitigating blast radius if an injection manages to bypass input filters.
 2. **Tool payload data minimization**: Raw tool responses are filtered and stripped of extraneous metadata before ingestion into LLM context, exposing only the exact schema fields needed.
-3. **Deferred for Phase 1**: Per-session tool invocation budgets and rigid payload byte caps.
+3. **Required resource-safety bounds in the initial delivery**: Enforce bounded raw request reads before JSON decoding and bounded upstream tool-response reads before JSON parsing, including decompressed bytes. Missing, incorrect, or chunked `Content-Length` must not bypass the limits. Bound JSON depth/node count, decoding rounds/expansion, and pending output buffers; fail closed on overflow. These parser and transport safety limits are distinct from business quotas and are not deferred.
+4. **Deferred beyond the initial delivery**: New per-session tool invocation budgets. Existing admission and API quotas remain enforced. The initial numeric limits and compatibility checks are defined in [Feature 023 research](../../specs/023-security-systems/research.md); enforcement and overflow behavior follow the [boundary contracts](../../specs/023-security-systems/contracts/guardrail-boundaries.md).
 
 **Considered Options**:
 - *Global tool availability for every turn*: Rejected. Giving every turn full access to all tools maximizes the blast radius of any prompt extraction or tool hijack attempt.
@@ -152,9 +153,13 @@ The runner decides **WHEN** to invoke guardrails; the `GuardrailGateway` decides
 
 ## Decision 10: Unified Observability & Security Metrics
 
-**Decision**: Implement a centralized `SecurityEventEmitter` that publishes structured audit events on every guardrail decision. Log records include `layerName`, `decision` (`PASS` / `BLOCK`), `durationMs`, and `userId`. Metrics aggregate into a dedicated security dashboard tracking block rates per layer per hour, user-level block anomalies, and false positive trends.
+**Decision**: Implement a centralized `SecurityEventEmitter` that publishes structured audit events on every guardrail decision. Log records include `layerName`, `decision` (`PASS` / `BLOCK`), `durationMs`, and the established structured trace fields. Restricted security audit records may also include `subjectRef` (a keyed HMAC of the authenticated user identity) and `keyId` for controlled anomaly correlation. Raw `userId`, prompts, tool/model payloads, credentials, and PII must not be emitted. Pseudonyms remain access-controlled data with documented key rotation and retention; neither raw identifiers nor `subjectRef` may be metric labels. Metrics use bounded labels for per-layer block rates and latency; false-positive trends come from labeled evaluation or triage, not block counts alone. See the [SecurityEvent model](../../specs/023-security-systems/data-model.md) and tasks T042–T045 in the [canonical checklist](../../specs/023-security-systems/tasks.md).
 
 **Considered Options**:
 - *Unstructured stderr/stdout application logging*: Rejected. Prevents real-time alerting, trend analysis, and immediate anomaly detection.
 
 **Rationale**: Structured telemetry allows operators to identify attack campaigns, monitor latency overhead per layer, and detect regression anomalies promptly without persisting sensitive payload data.
+
+## Amendment: Resource and Telemetry Contract Alignment (2026-09-04)
+
+PR review identified conflicts between Decisions 7/10 and the refined Feature 023 acceptance contracts. This amendment supersedes the original deferral of rigid payload byte caps and raw `userId` audit field: bounded pre-parse resource controls are required, while new per-session tool budgets remain deferred; audit correlation uses restricted pseudonymous `subjectRef`/`keyId` with no identifier metric labels. Decision 2 now distinguishes content guardrails from required transport authentication and framing. These are accepted design requirements, not a claim that runtime enforcement is already implemented.
