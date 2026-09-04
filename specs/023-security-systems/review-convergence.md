@@ -23,9 +23,9 @@ Primary agent revised all eight artifacts and requested cycle 2. Task count rema
 
 Verdict: **converged**. Independent reviewer confirmed R1–R6 closed at planning level across all eight artifacts. No remaining actionable HIGH, MEDIUM or LOW findings; cycle 3 not needed. This confirms plan consistency, not implemented security or passing scans.
 
-## Final Artifact Snapshot
+## Cycle-2 Artifact Snapshot (Historical)
 
-SHA-256 hashes of the eight reviewed design files (review log excluded):
+SHA-256 hashes captured at the end of cycle 2 (review log excluded). These preserve the historical review snapshot; subsequent implementation status and PR-review amendments may change the current files.
 
 | Artifact | SHA-256 |
 |---|---|
@@ -37,3 +37,7 @@ SHA-256 hashes of the eight reviewed design files (review log excluded):
 | tasks.md | 1ba29d032b780749e8350042ed4b1d500f424386a3a051ae4d9e83742a323ea7 |
 | security-test-matrix.md | 16459d5563b23bafe1f8d0be3d87ef69995a54bdf4a008db7f6335cd59a7b61e |
 | contracts/guardrail-boundaries.md | 55056391bb778382d4394eec61a1702612efd73245c56ec25dc856a9ebed5fb4 |
+
+## PR Review Follow-up: Resource/Telemetry Alignment and ZAP Ownership
+
+Both findings were verified against the ADR and canonical tasks. Decisions 2/7/10 now require pre-parse safety limits and restricted `subjectRef`/`keyId` audit correlation, prohibit raw user IDs in emitted telemetry, and retain only new session tool budgets as deferred. T037 now explicitly creates/tests `scripts/security/run-zap.mjs`; T040 consumes the verified executable after T037. Task IDs/counts and existing completion markers are preserved. These documentation corrections do not execute the planned security tooling.

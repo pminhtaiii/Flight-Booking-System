@@ -1,6 +1,6 @@
 # Research and Planning Decisions
 
-**Date**: 2026-09-04. Primary input: `docs/adr/research-llm-guardrail-architecture-decisions.md`. Supporting ADRs: `research-output-guardrails-architecture.md`, `research-agent-tool-calling-architecture.md`, `research-chatbot-backend-architecture.md`, all under `docs/adr/`. Source documents remain unchanged.
+**Date**: 2026-09-04. Primary input: `docs/adr/research-llm-guardrail-architecture-decisions.md`. Supporting ADRs: `research-output-guardrails-architecture.md`, `research-agent-tool-calling-architecture.md`, `research-chatbot-backend-architecture.md`, all under `docs/adr/`. The primary guardrail ADR was amended after PR review on 2026-09-04 to align Decisions 2/7/10 with the refined resource and privacy contracts; supporting ADRs remain unchanged.
 
 ## Code Evidence
 
@@ -20,7 +20,7 @@
 | Preserve intent enums; retain valid low-confidence fallback, deny malformed/unknown authority | Seal authority after router/gate with provenance; use explicit downgrade/single-agent policy; see boundary contract | Renaming to ADR shorthand breaks contracts |
 | Remove security classifier calls/probes only | Primary/router inference remains; shared Mimo settings may still be needed | Blind deletion of all model configuration |
 | Mandatory production registry layers, validated prerequisites | Input size precedes decode; tool size precedes schema/scans; buffer precedes output scan | Unrestricted toggles permit bypass |
-| Resource bounds now; business quotas deferred | Resolves ADR Decision 6 size checks versus Decision 7 cap deferral | Unbounded parser/decode pipeline |
+| Resource bounds now; new session tool budgets deferred | Amended ADR Decision 7 requires parser/transport safety bounds and defers only new session tool budgets | Unbounded parser/decode pipeline |
 | Output hard-stop with withheld suffix | Preserve earlier hard-stop semantics; no already-emitted PII can be recalled | Redact-and-continue or late look-back only |
 | Restricted audit subjectRef, not raw userId | Keyed HMAC with keyId permits anomaly correlation while preserving existing telemetry policy | Raw identifiers in general logs/metric labels |
 | Per-tool typed models and private control fields | Tool results mix text/JSON; generic JSON shape cannot enforce meaning | Passing raw minimized-looking dicts |
@@ -44,6 +44,6 @@ Tool installation and version pinning belong to implementation. No scanner ran d
 
 Production canaries, live-model campaigns, neural judges, general toxicity filtering, new transport endpoints and new per-session tool quotas. None exempts structural authorization/privacy gates.
 
-Review refinement: raw byte ceilings apply before JSON parsing, not only inside post-parse pipelines; bound chunked and decompressed reads. Treat persisted history/summaries as untrusted model input. Include all changed boundary modules in measured coverage, including transport, tools and memory. These resolve implementation gaps without changing the source ADR.
+Review refinement: raw byte ceilings apply before JSON parsing, not only inside post-parse pipelines; bound chunked and decompressed reads. Treat persisted history/summaries as untrusted model input. Include all changed boundary modules in measured coverage, including transport, tools and memory. These resolve implementation gaps; the subsequent PR-review amendment aligns the source ADR resource and telemetry requirements with these contracts.
 
 Cycle-1 convergence decisions are specified in `contracts/guardrail-boundaries.md`: revised invalid-router fallback authority, stage-local detector denominators, test-profile quotas/reset/sharding, bounded output format inventory, lower-trust memory framing, generated-summary validation and model callback isolation. These are explicit changes to old behavior, not claims that current code implements them.

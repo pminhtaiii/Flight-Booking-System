@@ -8,10 +8,10 @@
 
 Goal: reproducible inventory and baseline. Exit: every entry point, tool, schema, sensitive sink and runtime prerequisite is identified.
 
-- [ ] T001 Inventory actual routes, six tool contracts, state/event/log sinks, auth/quotas and resource limits in `docs/security/guardrail-inventory.md`; map existing test names and validate proposed caps against legitimate payloads before coding.
-- [ ] T002 [P] Capture existing SSE, runner cleanup, handoff and output behavior in `apps/agent/tests/security/test_characterization.py`; distinguish intended security corrections from compatibility guarantees.
-- [ ] T003 [P] Pin Semgrep/rules, ZAP image digest, Gitleaks, pip-audit, pnpm audit runtime and pytest-cov in `tests/security/toolchain.json` and `apps/agent/pyproject.toml`; document verified commands/output schemas, licenses and advisory freshness in `docs/security/toolchain.md` and refresh `uv.lock` only as needed.
-- [ ] T004 [P] Define reviewed corpus provenance, label rules, split/dedup procedure and pinned taxonomy edition in `tests/security/corpus/README.md`; set at least 200 attack and 500 benign holdout cases separate from development data.
+- [x] T001 Inventory actual routes, six tool contracts, state/event/log sinks, auth/quotas and resource limits in `docs/security/guardrail-inventory.md`; map existing test names and validate proposed caps against legitimate payloads before coding.
+- [x] T002 [P] Capture existing SSE, runner cleanup, handoff and output behavior in `apps/agent/tests/security/test_characterization.py`; distinguish intended security corrections from compatibility guarantees.
+- [x] T003 [P] Pin Semgrep/rules, ZAP image digest, Gitleaks, pip-audit, pnpm audit runtime and pytest-cov in `tests/security/toolchain.json` and `apps/agent/pyproject.toml`; document verified commands/output schemas, licenses and advisory freshness in `docs/security/toolchain.md` and refresh `uv.lock` only as needed.
+- [x] T004 [P] Define reviewed corpus provenance, label rules, split/dedup procedure and pinned taxonomy edition in `tests/security/corpus/README.md`; set at least 200 attack and 500 benign holdout cases separate from development data.
 
 ## Phase 2: Foundation
 
@@ -71,10 +71,10 @@ Goal: reproducible static gates. Independent test: injected vulnerable fixture f
 Goal: measured attack resistance against real local boundaries. Independent test: locked corpus, authenticated route census and canary/side-effect evidence pass; scanner failure or all-401 run fails. Depends on US1/US2 and report/CI interfaces.
 
 - [ ] T036 [US4] Curate and freeze holdout/development JSONL plus license/source/hash manifest in `tests/security/corpus/`; include >=200 unique malicious and >=500 benign holdout cases, nonzero per-stage denominators and family-separated splits; never tune against holdout. Allocate detector cases input 100/250, tool 50/125 and output 50/125; keep authorization/quota/resource/side-effect cases in a separate required invariant manifest.
-- [ ] T037 [P] [US4] Generate route/method/auth inventory and scoped ZAP configuration in `tests/security/zap/automation.yaml` and `tests/security/zap/routes.json`; test auth verification, exclusions and target/redirect bounds with T007 harness.
+- [ ] T037 [P] [US4] Create `scripts/security/run-zap.mjs` and its runner contract tests in `tests/security/zap-runner.test.mjs`, alongside route/method/auth inventory and scoped ZAP configuration in `tests/security/zap/automation.yaml` and `tests/security/zap/routes.json`. Write runner tests before implementation: pinned toolchain invocation, authenticated target/redirect scope, bounded execution and cleanup, exit-code/finding policy, missing/invalid report failure, and sanitized evidence via T010. Verify the executable interface consumed by the T007 local harness without modifying that harness concurrently; finish runner/config validation before T040 invokes ZAP.
 - [ ] T038 [P] [US4] Build two-user JWT/claim/ownership/replay/fencing tests in `tests/security/dast/test_ownership.py`; cover expired/revoked/forged claims, missing service key, wrong-owner session/booking, stale snapshots and handoff replay with no unauthorized side effects.
 - [ ] T039 [P] [US4] Build adversarial HTTP/SSE replay in `tests/security/dast/test_adversarial.py`: direct/multi-turn/encoded prompts, malicious upstream tool stubs and output partitions; capture model/tool invocations and all forbidden-value sinks with deterministic local model stubs. Use benign carrier turns for tool/output candidates and require payload-free expected-stage reachability markers; upstream block invalidates the run rather than counting as TP.
-- [ ] T040 [US4] Add conventional HTTP/browser security checks in `tests/security/dast/test_http_security.py` and `apps/web/tests/security-boundaries.spec.ts` for XSS/injection, CORS, CSRF, redirects, traversal and authenticated access; run scoped active/passive ZAP via `scripts/security/run-zap.mjs` with explicit exit-code/finding policy.
+- [ ] T040 [US4] Add conventional HTTP/browser security checks in `tests/security/dast/test_http_security.py` and `apps/web/tests/security-boundaries.spec.ts` for XSS/injection, CORS, CSRF, redirects, traversal and authenticated access; after T037 creates and verifies the runner, run scoped active/passive ZAP via `scripts/security/run-zap.mjs` with explicit exit-code/finding policy.
 - [ ] T041 [US4] Run complete DAST twice on the same commit/corpus; publish sanitized aggregate/per-stage TPR/FPR, family outcomes, confusion counts, confidence intervals, authenticated route coverage and invariants in `docs/security/dast-validation.md`; infrastructure errors/timeouts/skips invalidate runs, and any authorization/privacy breach fails regardless of aggregate score. Verify shard union completeness and profile/reset manifests; compare semantic corpus results, excluding nondeterministic metadata. Run real-quota exhaustion and Redis outage assertions separately from corpus scores.
 
 ## Phase 7: US5 — Observe, Measure and Release (P2)
@@ -106,7 +106,7 @@ Goal: reviewable release evidence. Depends on all stories.
 - US1: after T013, T014 input tests can pair with T015 gateway work; T019 output tests can pair with T016/T017 input implementation. T018 and T020 serialize shared runner/startup changes. T019 policy/tests must finish before T020; T012/T018 memory tests and T020 model-output tests precede their respective wiring.
 - US2: T021/T022/T023 are independent test files. T024/T025/T026 serialize schema, pipeline and executor integration.
 - US3: T029 fixtures and T031 census can run together after foundation; T033 supply-chain work is independent. T034 precedes T035 CI mutations.
-- US4: after T036, T037 inventory, T038 ownership and T039 replay can run in parallel on separate files; all join at T040/T041.
+- US4: after T036, T037 ZAP runner/configuration, T038 ownership and T039 replay can run in parallel on separate files; all join at T040/T041.
 - US5: T042 events and T043 benchmarks can run in parallel; T044–T047 integrate sequentially.
 - Closure: T051 documentation may run alongside finding retests, but T052 requires final evidence.
 
