@@ -40,7 +40,7 @@ All corpus cases must declare verified provenance and reviewable licensing:
    - `source`: Dataset or author origin (e.g. `synthetic-internal`, `garak-prompt-inject-subset`).
    - `license`: SPDX identifier (e.g. `Apache-2.0`, `MIT`).
    - `revision`: Git commit hash or dataset release version.
-   - `hash`: SHA-256 digest of the canonical payload.
+   - `canonicalHash`: SHA-256 digest of the canonical payload.
 
 ---
 
@@ -95,7 +95,7 @@ Before hashing or deduplication, payloads undergo deterministic normalization:
 3. **Casing**: Lowercase conversion (`lower()`).
 
 ### Hashing & Variant Grouping
-1. **Payload Hash**: Each normalized payload is hashed using SHA-256 (`payloadHash`).
+1. **Payload Hash**: Each normalized payload is hashed using SHA-256 (`canonicalHash`).
 2. **Variant Groups**: Semantic variations, paraphrases, or encoding mutations of an attack concept share a single `variantGroup` identifier (e.g. `vg-jailbreak-dan-001`).
 3. **Strict Partitioning**: Every record sharing a `variantGroup` MUST reside in the same split (`holdout` OR `development`). Cross-split contamination of variant families causes corpus validation (`validate-corpus.mjs`) to fail with a non-zero exit code.
 

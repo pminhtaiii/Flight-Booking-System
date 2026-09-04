@@ -125,6 +125,7 @@ This document defines the verified security scanner toolchain for the Flight Boo
     --cov=agent.streaming \
     --cov=agent.tools \
     --cov=agent.sanitization \
+    --cov-branch \
     --cov-report=term-missing \
     --cov-report=xml:tests/security/coverage.xml \
     --cov-fail-under=95

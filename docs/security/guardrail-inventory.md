@@ -215,7 +215,7 @@ All outbound events streamed via `POST /chat/stream` use rigid Pydantic models w
 - **Storage**: Redis-backed atomic evaluation via Lua script (`LUA_SCRIPT`).
 - **Default Parameters**:
   - Daily limit: `CHAT_QUOTA_DAILY=50` (or `CHAT_DAILY_MESSAGE_LIMIT=50`) per user per UTC day.
-  - Burst limit: `CHAT_QUOTA_BURST=10` (or 60) per user in a 60-second sliding window (`CHAT_BURST_WINDOW_SECONDS=60`).
+  - Burst limit: `CHAT_QUOTA_BURST=60` per user in a 60-second sliding window (`CHAT_BURST_WINDOW_SECONDS=60`).
 - **Admission Timing**: Checked BEFORE session lock acquisition and BEFORE any LLM or model execution.
 - **Fail-Closed Behavior**: If Redis is unreachable, raises `RedisUnavailableException` which immediately aborts with HTTP 503 (`CHAT_CONTROL_PLANE_UNAVAILABLE`).
 - **Exceeded Responses**: Raises `BudgetExceededException` mapping to HTTP 429 (`CHAT_DAILY_QUOTA_EXCEEDED` or `CHAT_BURST_LIMIT_EXCEEDED`).
