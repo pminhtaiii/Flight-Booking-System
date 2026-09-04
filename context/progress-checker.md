@@ -4,21 +4,22 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ---
 
-### Feature 023 — Security Systems Planning (2026-09-04)
+### Feature 023 — Security Systems: Phase 1 Setup (T001–T004 Completed) (2026-09-04)
 
-- Plan review converged in two independent review cycles: four HIGH and two MEDIUM findings resolved; no remaining actionable planning findings. Still 52 pending tasks; security matrix now 30 rows. Evidence: `specs/023-security-systems/review-convergence.md`. No implementation or security scans executed.
+- T001: Created `docs/security/guardrail-inventory.md` mapping all actual agent and NestJS API routes, all 6 active agent tool contracts (`search_flights`, `get_user_preferences`, `list_user_booking_summaries`, `get_booking_detail`, `check_booking_readiness`, `signal_checkout_intent`), sensitive state/event/logging sinks (Redis checkpoints/locks/fences/budgets/snapshots, encrypted Postgres message persistence, SSE event schemas, opaque telemetry IDs), existing auth/quota mechanisms, unit/E2E test suite mapping, and payload size validation against legitimate travel queries (>2.7x safety headroom, zero false blocks).
+- T002: Created baseline characterization suite in `apps/agent/tests/security/test_characterization.py` (14/14 tests passing). Captured existing SSE stream lifecycle, runner lease cleanup on exit/exception/cancellation, Redis fencing before message persistence, handoff signal dispatch, and raw unredacted output when guardrails are disabled (documenting the baseline security gap for Phase 3). Explicitly segregated inviolable compatibility invariants from future security corrections.
+- T003: Created `tests/security/toolchain.json` pinning exact scanner versions (Semgrep CLI 1.88.0, ZAP container digest `zaproxy/zap-stable:2.15.0@sha256:2d184081c7ff8be2ad7500599a0d4c82c3cfa5d95b542013fbe40d346ffc0303`, Gitleaks v8.18.4, pip-audit 2.7.3 with 24h freshness, pnpm audit 9.0.0+, pytest-cov >=5.0.0 targeting >=95% statement and >=90% branch coverage). Added `pytest-cov>=5.0.0` to `apps/agent/pyproject.toml` dev dependency group and refreshed `uv.lock`. Created `docs/security/toolchain.md` documenting verified invocation commands, SARIF/JSON schemas, licensing constraints, freshness rules, and update procedures.
+- T004: Created `tests/security/corpus/README.md` defining reviewed corpus provenance, annotation taxonomy pinned to OWASP Top 10 for LLM Applications 2025 (`LLM01`, `LLM02`, `LLM06`, `LLM07`), holdout set allocation rules (>=200 malicious, >=500 benign, strictly isolated from dev data; input 100/250, tool 50/125, output 50/125), separate invariant suite (100% required pass rate, excluded from confusion matrices), NFKC+whitespace deduplication, and deterministic stage-local oracles.
+- Verified: `uv run --package agent pytest apps/agent/tests/security/test_characterization.py` (14/14 passed in 14.66s) and `uv run --package agent ruff check apps/agent` (clean, exit 0).
 
-- Planning artifacts created in `specs/023-security-systems/`: specification, implementation/penetration plan, research decisions, data model, boundary contracts, security coverage matrix, quickstart and phased `tasks.md`.
-- 52 tasks across eight implementation phases; includes deterministic guardrails, dispatch enforcement, SAST/SCA/secrets, authenticated HTTP/SSE DAST, telemetry and release verification.
-- Planned acceptance: 200+ attack/500+ benign holdout cases, TPR >=95%/FPR <=2%, zero privacy/authorization invariant failures, >=95% statement/>=90% branch coverage for changed security modules.
-- **Implementation not started; no security scan/test results claimed.** Feature 022 status below is preserved. Next: Feature 023 setup tasks T001–T004 when implementation begins.
+- PR planning-review follow-up: amended the guardrail ADR resource/telemetry contracts and assigned ZAP runner implementation/tests to T037 before T040 execution. Existing Phase 1 completion state is preserved; no scanner or runtime changes made by this follow-up.
+
 ### Current Status
 
-**Feature:** Flight Match Scoring (Feature 022) — Phase 6 Completed (Tasks T060–T069)
-**Last completed:** Tasks T064–T069: Python Agent Narration, Strict Score-Free Snapshot Models & E2E Parity Suite. Enforced `extra = "forbid"` on all trusted search snapshot Pydantic models; verified Redis snapshots remain 100% free of scores/breakdowns; created pure transient narration projection `flight_match_projection.py`; integrated gateway V2 with zero Python scoring and unknown-key fallback; created full E2E search-page/agent parity suite with 100% parity; updated graph, chat runner, and snapshot characterization regressions.
-**Previous completed:** T060–T063: Agent Gateway Delegation & Attestation (Phase 6 / Slice 1). Delegated V1 and V2 Agent Gateway search to canonical `FlightsService.search()`.
-**In progress:** Phase 6 complete. Ready for Phase 7 (Polish and Cross-Cutting Verification, Tasks T070–T077).
-**Next:** Phase 7 (Tasks T070–T077): Bounded metrics, telemetry cardinality, runbooks, documentation updates, and full cross-cutting regression gates.
+**Feature:** Security Systems (Feature 023) — Phase 1 Completed (Tasks T001–T004)
+**Last completed:** Phase 1 Setup (Tasks T001–T004): Comprehensive Inventory, Baseline Characterization Suite, Pinned Security Toolchain, and Evaluation Corpus Specification.
+**In progress:** Phase 1 complete. Ready for Phase 2 (Foundation, Tasks T005–T011).
+**Next:** Phase 2 Foundation (Tasks T005–T011): Shared contracts, evaluation runner, corpus validator, local DAST orchestration harness, gate contracts, sanitized evidence reporter, and coverage policy.
 
 ---
 

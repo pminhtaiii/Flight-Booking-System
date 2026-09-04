@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "flight-booking-system-security-toolchain",
+  "version": "1.0.0",
+  "updatedAt": "2026-09-04",
+  "scanners": {
+    "semgrep": {
+      "name": "Semgrep",
+      "cliVersion": "1.88.0",
+      "license": "LGPL-2.1",
+      "outputFormat": "sarif",
+      "rulesets": [
+        "p/default@v1.88.0",
+        "p/owasp-top-ten@v1.88.0",
+        "p/security-audit@v1.88.0",
+        "p/secrets@v1.88.0"
+      ],
+      "failSeverity": "ERROR",
+      "includePaths": [
+        "apps/agent",
+        "apps/api",
+        "apps/web",
+        "packages/shared"
+      ]
+    },
+    "zap": {
+      "name": "OWASP ZAP",
+      "containerImage": "zaproxy/zap-stable:2.15.0",
+      "containerDigest": "sha256:2d184081c7ff8be2ad7500599a0d4c82c3cfa5d95b542013fbe40d346ffc0303",
+      "pinnedImage": "zaproxy/zap-stable:2.15.0@sha256:2d184081c7ff8be2ad7500599a0d4c82c3cfa5d95b542013fbe40d346ffc0303",
+      "license": "Apache-2.0",
+      "outputFormat": "sarif",
+      "alertThreshold": "LOW",
+      "failSeverity": "HIGH"
+    },
+    "gitleaks": {
+      "name": "Gitleaks",
+      "version": "v8.18.4",
+      "license": "MIT",
+      "outputFormat": "json",
+      "action": "gitleaks/gitleaks-action@v2",
+      "configFile": ".gitleaks.toml"
+    },
+    "pipAudit": {
+      "name": "pip-audit",
+      "cliVersion": "2.7.3",
+      "license": "Apache-2.0",
+      "outputFormat": "json",
+      "vulnerabilityService": "pypi",
+      "maxAdvisoryAgeHours": 24,
+      "freshness": {
+        "cacheTtlSeconds": 86400,
+        "maxAdvisoryAgeHours": 24
+      }
+    },
+    "pnpmAudit": {
+      "name": "pnpm audit",
+      "cliVersion": "9.15.4",
+      "license": "MIT",
+      "outputFormat": "json",
+      "auditLevel": "moderate",
+      "freshness": {
+        "networkOnline": true,
+        "liveRegistryQuery": true
+      }
+    },
+    "pytestCov": {
+      "name": "pytest-cov",
+      "version": "7.1.0",
+      "license": "MIT",
+      "outputFormat": "term-missing,xml",
+      "thresholds": {
+        "statementCoverageMin": 95.0,
+        "branchCoverageMin": 90.0
+      },
+      "targetModules": [
+        "agent.guardrails",
+        "agent.chat_turn",
+        "agent.streaming",
+        "agent.tools",
+        "agent.sanitization"
+      ]
+    }
+  }
+}
