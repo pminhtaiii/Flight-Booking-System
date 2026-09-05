@@ -25,10 +25,77 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Security Systems (Feature 023) — Phase 2 Foundation complete
-**Last completed:** Task T007: Phase 2 Final Slice (Local Stack Orchestration and DAST Harness).
-**In progress:** None in Phase 2.
-**Next:** Phase 3 US1, beginning with T012 enforcement characterization and T013 closed registry implementation.
+**Feature:** Security Systems (Feature 023) — Phase 3 US1 in progress
+**Last completed:** Task T014: Input Layers & Normalization Contract Tests (`apps/agent/src/agent/guardrails/normalization.py`, `apps/agent/tests/security/test_input_layers.py`, `apps/agent/tests/security/test_normalization.py`).
+**In progress:** Phase 3 US1.
+**Next:** T016 input pipeline validators (`LengthValidator`, `PIIDetector`, `InjectionDetector`, `TopicBoundary`).
+
+### Feature 023 — Security Systems: Phase 3 US1 (Task T014 Completed) (2026-09-05)
+
+- T014: Implemented input layers & normalization contract tests in `apps/agent/tests/security/test_input_layers.py` and `apps/agent/tests/security/test_normalization.py`, along with utility module `apps/agent/src/agent/guardrails/normalization.py` following TDD (RED -> GREEN -> REFACTOR):
+  - Normalization Utilities (`apps/agent/src/agent/guardrails/normalization.py`):
+    - `normalize_unicode`: canonical (NFC, NFD) and compatibility (NFKC, NFKD) normalization with strict validation.
+    - `strip_zero_width`: safely strips zero-width, invisible format, and directional control characters (`\u200B`, `\u200C`, `\u200D`, `\uFEFF`, `\u200E`, `\u200F`, `\u00AD`, `\u2060`, etc.).
+    - `normalize_homoglyphs`: translates Cyrillic, Greek, and IPA/phonetic lookalike characters to Latin equivalents.
+    - `decode_nested_url`: recursively decodes percent-encodings up to `max_rounds` with length boundary and early stop.
+    - `detect_base64_payloads`: identifies base64-encoded strings, verifies canonical re-encoding, and returns decoded UTF-8 candidates.
+    - `bounded_normalize`: composite security normalization pipeline combining zero-width stripping, Unicode NFKC, recursive URL decode, and homoglyph mapping.
+    - `is_catastrophic_regex` & `safe_regex_match`: AST-based ReDoS detection identifying nested quantifiers and alternations within repetitions; bounds input evaluation to sub-millisecond execution (< 5ms) on pathological inputs (`"a" * 1000 + "!"`) without hanging.
+  - Normalization Tests (`apps/agent/tests/security/test_normalization.py`):
+    - 35/35 assertions covering Unicode forms, homoglyphs, zero-width stripping, nested URLs, base64 detection, and catastrophic regex termination.
+  - Input Layer Contract Tests (`apps/agent/tests/security/test_input_layers.py`):
+    - Exact Length Boundaries: verifies codepoints (`max-1`, `max`, `max+1`) and UTF-8 bytes (`max-1`, `max`, `max+1`) on `InputLengthLayer` (4096 chars / 16384 bytes).
+    - Multibyte Characters: Vietnamese diacritics, Japanese Kanji/Kana, and emojis asserting proper handling when codepoint length != byte length.
+    - Multilingual Benign Travel: legitimate flight inquiries in English, Spanish, French, Vietnamese, Japanese, German, and Chinese evaluate to `PASS`.
+    - Malformed Encodings: detects homoglyphic prompt injections ("Iɡnore..."), zero-width obfuscation ("d\u200br\u200bo..."), and base64-encoded injection payloads.
+    - Protocol & Contracts: verifies `GuardrailLayer` protocol conformance (`@runtime_checkable`), `AdmissionContext` immutability, `validated_data` stripping on `BLOCK`, and static response key mapping.
+  - Verification: 52/52 tests in T014 passing; 109/109 tests passing across full security suite; `ruff check` and `ruff format --check` clean.
+
+### Feature 023 — Security Systems: Phase 3 US1 (Task T012 Completed) (2026-09-05)
+
+- T012: Implemented comprehensive Adapter & Direct-Runner Enforcement Tests in `apps/agent/tests/security/test_enforcement.py` and minimal support code in `apps/agent/src/agent/memory/manager.py` and `apps/agent/src/agent/chat_turn/runner.py` following TDD (RED -> GREEN -> REFACTOR).
+  - Enforced Absent Gateway Fails Closed:
+    - `ChatController.stream(command)` yields `ErrorEvent(code="GUARDRAIL_CONFIGURATION_ERROR")` with 0 model/runner calls when `gateway is None`.
+    - Direct `ChatTurnRunner` configured with `require_gateway=True` (or via setting) yields `GUARDRAIL_CONFIGURATION_ERROR` and halts before session creation or LLM calls.
+  - Enforced Classifier Exceptions Fail Closed:
+    - Custom guardrail layers throwing unhandled exceptions fail closed in `GuardrailGateway` (`status="BLOCK"`, generic response key) and `ChatController` (`GUARDRAIL_INPUT_INJECTION`), preventing runner and model execution.
+    - Direct runner fails closed on classifier exceptions without invoking the model or backend.
+  - Enforced Zero Model Calls on Input/History Block:
+    - Guaranteed strictly 0 model or runner invocations when input is blocked by any guardrail layer.
+  - Enforced Lower-Trust History Framing:
+    - Tested `format_messages`: `messages[0]` is strictly trusted `SystemMessage(content=SYSTEM_PROMPT)`; history messages are never `SystemMessage` (even if adversarial sender='SYSTEM' provided); conversation summary is strictly enclosed in `HumanMessage` with untrusted context indicator.
+  - Enforced Summary Validation Before Persistence:
+    - Updated `MemoryManager` to accept optional `gateway: Optional[GuardrailGateway] = None`.
+    - Validates generated summary text against `gateway.validate_input` before calling `client.create_message`.
+    - Discards summary on `BLOCK` or validator exception, preventing persistence of malicious or PII-violating summaries.
+  - Enforced Summary Error Canaries & Model Callback Restrictions:
+    - Injected canary strings (`CANARY_SECRET_TOKEN_...`) are proven not to leak into ErrorPayloads, event messages, or log records.
+    - Verified model callbacks are never triggered when input is blocked.
+  - Verification: 17/17 tests in `test_enforcement.py` pass; 57/57 security tests pass; `ruff check` and `ruff format --check` pass clean.
+
+### Feature 023 — Security Systems: Phase 3 US1 (Task T015 Completed) (2026-09-05)
+
+- T015: Implemented mandatory `GuardrailGateway` in `apps/agent/src/agent/guardrails/gateway.py` and thin `ChatController` in `apps/agent/src/agent/chat_turn/controller.py` following TDD (RED -> GREEN -> REFACTOR).
+  - Implemented `GuardrailGateway`:
+    - `validate_input(context, message)`: verifies `AdmissionContext`, executes input layers in topological prerequisite order, short-circuits on first `BLOCK` decision stripping data, and fails closed (`GUARDRAIL_INPUT_INJECTION`) without leaking unhandled exceptions or stack traces.
+    - `execute_tool(context, call, invoke)`: checks calls against sealed capabilities in `TurnCapabilities`, executes sync/async invoke on authorized tools, and fails closed with `GUARDRAIL_TOOL_SCHEMA` on unauthorized tools or execution errors.
+    - `stream_output(context, tokens)`: streams approved chunks for safe tokens, stopping on any invalid state or exception.
+  - Implemented `ChatController`:
+    - Validates mandatory gateway configuration, immediately yielding `ErrorEvent(code="GUARDRAIL_CONFIGURATION_ERROR")` if gateway is absent.
+    - Validates input message before execution using `AdmissionContext`, immediately terminating with `ErrorEvent(code=decision.response_key)` without invoking execution runner or model if blocked.
+    - Delegates to `runner.run(command)` only when gateway and input checks pass.
+  - Unit tests in `apps/agent/tests/security/test_gateway.py` (9/9 passed).
+  - Verified clean `ruff check` and `ruff format --check` (exit 0).
+
+### Feature 023 — Security Systems: Phase 3 US1 (Task T013 Completed) (2026-09-05)
+
+- T013: Implemented closed registry and dependency-ordered compulsory production composition in `apps/agent/src/agent/guardrails/registry.py`.
+  - Defined `RegistryContractError` custom exception for all registry contract violations.
+  - Implemented `GuardrailRegistry` with closed `allowed_keys` enforcement, duplicate rejection, stage-filtering, deterministic topological sort by prerequisites with cycle detection, and instance-local `inject_for_test` strictly forbidden in production.
+  - Implemented `create_production_registry` with immutable compulsory production layers (`input.length`, `input.pii`, `input.injection`, `input.topic`, `output.pii`), fail-closed validation against disabling compulsory layers, and standard base layer implementations conforming to the `GuardrailLayer` protocol.
+  - Enforced strict anti-patterns: zero dynamic imports (no `__import__(`, `importlib.import_module`, `eval(`, or `exec(`).
+  - Verified: `apps/agent/tests/security/test_registry.py` (8/8 passed), `apps/agent/tests/security/test_contracts.py` (9/9 passed), and clean `ruff check` + `ruff format --check` (exit code 0).
+
 
 ### Feature 023 — Security Systems: Phase 2 Final Slice (T007 Completed) (2026-09-05)
 

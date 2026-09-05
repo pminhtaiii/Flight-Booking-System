@@ -51,6 +51,14 @@ class GuardrailGateway:
                 validated_data=None,
             )
 
+        if not layers:
+            return PipelineDecision(
+                status="BLOCK",
+                response_key=GUARDRAIL_INPUT_INJECTION,
+                reason="Guardrail classifier failed closed: no input layers configured",
+                validated_data=None,
+            )
+
         for layer in layers:
             try:
                 decision = await layer.check(context, message)

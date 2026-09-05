@@ -89,6 +89,20 @@ async def test_validate_input_with_passing_layers_returns_pass(
 
 
 @pytest.mark.asyncio
+async def test_validate_input_with_empty_registry_fails_closed(
+    admission_context: AdmissionContext,
+) -> None:
+    registry = GuardrailRegistry()
+    gateway = GuardrailGateway(registry)
+    decision = await gateway.validate_input(admission_context, "Find flights to Tokyo")
+
+    assert decision.status == "BLOCK"
+    assert decision.response_key == GUARDRAIL_INPUT_INJECTION
+    assert "no input layers configured" in (decision.reason or "")
+    assert decision.validated_data is None
+
+
+@pytest.mark.asyncio
 async def test_validate_input_short_circuits_on_first_block_layer(
     admission_context: AdmissionContext,
 ) -> None:
