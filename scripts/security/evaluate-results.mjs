@@ -80,6 +80,76 @@ export function evaluateCoverage(coverageData) {
   };
 }
 
+export const RECOGNIZED_SEVERITY_KEYS = new Set([
+  'Critical',
+  'High',
+  'Medium',
+  'Low',
+  'Informational',
+  'Info',
+]);
+
+/**
+ * Validates whether counts object contains valid severity counts.
+ *
+ * @param {any} counts
+ * @returns {boolean}
+ */
+export function hasValidSeverityCounts(counts) {
+  if (!counts || typeof counts !== 'object' || Array.isArray(counts)) {
+    return false;
+  }
+  if (!Number.isInteger(counts.Critical) || counts.Critical < 0) {
+    return false;
+  }
+  if (!Number.isInteger(counts.High) || counts.High < 0) {
+    return false;
+  }
+  for (const [key, val] of Object.entries(counts)) {
+    if (!RECOGNIZED_SEVERITY_KEYS.has(key) || !Number.isInteger(val) || val < 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Validates explicit counts object and returns list of error messages.
+ *
+ * @param {any} counts
+ * @param {string} prefix
+ * @returns {string[]}
+ */
+export function validateExplicitCounts(counts, prefix) {
+  if (counts === undefined) {
+    return [];
+  }
+  if (!counts || typeof counts !== 'object' || Array.isArray(counts)) {
+    return [`[${prefix} Error] Explicit counts must be an object`];
+  }
+
+  const errors = [];
+  for (const [key, val] of Object.entries(counts)) {
+    if (!RECOGNIZED_SEVERITY_KEYS.has(key)) {
+      errors.push(
+        `[${prefix} Error] Unrecognized count key "${key}" in counts. Expected severity keys: Critical, High, Medium, Low, Informational`,
+      );
+    }
+    if (!Number.isInteger(val) || val < 0) {
+      errors.push(`[${prefix} Error] Explicit count for "${key}" must be a non-negative integer`);
+    }
+  }
+
+  if (!('Critical' in counts)) {
+    errors.push(`[${prefix} Error] Explicit counts must specify non-negative integer for "Critical"`);
+  }
+  if (!('High' in counts)) {
+    errors.push(`[${prefix} Error] Explicit counts must specify non-negative integer for "High"`);
+  }
+
+  return errors;
+}
+
 /**
  * Evaluates SAST results (Semgrep SARIF or JSON):
  * 0 Critical, 0 High findings. No scanner crashes or errors.
@@ -103,7 +173,7 @@ export function evaluateSast(sastData) {
     Array.isArray(sastData.runs) ||
     Array.isArray(sastData.findings) ||
     Array.isArray(sastData.results) ||
-    Boolean(sastData.counts && typeof sastData.counts === 'object');
+    hasValidSeverityCounts(sastData.counts);
   if (!hasEvidence) {
     errors.push('[SAST Error] Missing scanner execution evidence (runs, findings, results, or counts required)');
   }
@@ -167,18 +237,16 @@ export function evaluateSast(sastData) {
   }
 
   // Explicit counts validation
-  if (sastData.counts && typeof sastData.counts === 'object') {
-    for (const [key, val] of Object.entries(sastData.counts)) {
-      if (!Number.isInteger(val) || val < 0) {
-        errors.push(`[SAST Error] Explicit count for "${key}" must be a non-negative integer`);
-      }
-    }
+  if (sastData.counts !== undefined) {
+    errors.push(...validateExplicitCounts(sastData.counts, 'SAST'));
   }
 
   // If finding objects are present, they are the source of truth for severity counts.
   if (findings.length === 0 && sastData.counts && typeof sastData.counts === 'object') {
     if (typeof sastData.counts.Critical === 'number') criticalCount = sastData.counts.Critical;
     if (typeof sastData.counts.High === 'number') highCount = sastData.counts.High;
+    if (typeof sastData.counts.Medium === 'number') mediumCount = sastData.counts.Medium;
+    if (typeof sastData.counts.Low === 'number') lowCount = sastData.counts.Low;
   }
 
   if (criticalCount > 0) {
@@ -227,7 +295,7 @@ export function evaluateSupplyChain(supplyChainData, options = {}) {
     Boolean(supplyChainData.pipAudit) ||
     Boolean(supplyChainData.pnpmAudit) ||
     Boolean(supplyChainData.gitleaks) ||
-    Boolean(supplyChainData.counts && typeof supplyChainData.counts === 'object');
+    hasValidSeverityCounts(supplyChainData.counts);
   if (!hasEvidence) {
     errors.push('[Supply Chain Error] Missing scanner execution evidence (findings, sub-scanner reports, or counts required)');
   }
@@ -283,12 +351,8 @@ export function evaluateSupplyChain(supplyChainData, options = {}) {
   }
 
   // Explicit counts validation
-  if (supplyChainData.counts && typeof supplyChainData.counts === 'object') {
-    for (const [key, val] of Object.entries(supplyChainData.counts)) {
-      if (!Number.isInteger(val) || val < 0) {
-        errors.push(`[Supply Chain Error] Explicit count for "${key}" must be a non-negative integer`);
-      }
-    }
+  if (supplyChainData.counts !== undefined) {
+    errors.push(...validateExplicitCounts(supplyChainData.counts, 'Supply Chain'));
   }
 
   // If finding objects are present, they are the source of truth for severity counts and suppression.
@@ -362,7 +426,7 @@ export function evaluateDast(dastData) {
   const hasExecutionEvidence =
     dastData.exitCode !== undefined &&
     dastData.exitCode !== null &&
-    (Array.isArray(dastData.findings) || Boolean(dastData.counts && typeof dastData.counts === 'object'));
+    (Array.isArray(dastData.findings) || hasValidSeverityCounts(dastData.counts));
   if (!hasExecutionEvidence) {
     errors.push('[DAST Error] Missing scanner execution evidence (findings or counts required)');
   }
@@ -404,12 +468,8 @@ export function evaluateDast(dastData) {
   }
 
   // Explicit counts validation
-  if (dastData.counts && typeof dastData.counts === 'object') {
-    for (const [key, val] of Object.entries(dastData.counts)) {
-      if (!Number.isInteger(val) || val < 0) {
-        errors.push(`[DAST Error] Explicit count for "${key}" must be a non-negative integer`);
-      }
-    }
+  if (dastData.counts !== undefined) {
+    errors.push(...validateExplicitCounts(dastData.counts, 'DAST'));
   }
 
   // If finding objects are present, they are the source of truth for severity counts.

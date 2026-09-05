@@ -14,6 +14,8 @@ import {
   evaluateSast,
   evaluateSecurityResults,
   evaluateSupplyChain,
+  hasValidSeverityCounts,
+  validateExplicitCounts,
   validateReportSchemas,
   verifyShardUnion,
 } from '../../scripts/security/evaluate-results.mjs';
@@ -898,4 +900,343 @@ test('evaluateSast, evaluateSupplyChain, evaluateDast: negative or non-integer e
     resDast.errors.includes('[DAST Error] Explicit count for "High" must be a non-negative integer'),
   );
 });
+
+test('hasValidSeverityCounts and validateExplicitCounts: validator unit behavior', () => {
+  // hasValidSeverityCounts invalid inputs
+  assert.equal(hasValidSeverityCounts(null), false);
+  assert.equal(hasValidSeverityCounts(undefined), false);
+  assert.equal(hasValidSeverityCounts('invalid'), false);
+  assert.equal(hasValidSeverityCounts([]), false);
+  assert.equal(hasValidSeverityCounts({}), false);
+  assert.equal(hasValidSeverityCounts({ High: 0 }), false);
+  assert.equal(hasValidSeverityCounts({ Critical: 0 }), false);
+  assert.equal(hasValidSeverityCounts({ Critical: -1, High: 0 }), false);
+  assert.equal(hasValidSeverityCounts({ Critical: 0, High: -1 }), false);
+  assert.equal(hasValidSeverityCounts({ Critical: 1.5, High: 0 }), false);
+  assert.equal(hasValidSeverityCounts({ Critical: 0, High: '0' }), false);
+  assert.equal(hasValidSeverityCounts({ critical: 1 }), false);
+  assert.equal(hasValidSeverityCounts({ Critical: 0, High: 0, unrelated: 0 }), false);
+  assert.equal(hasValidSeverityCounts({ Critical: 0, High: 0, Medium: -1 }), false);
+  assert.equal(hasValidSeverityCounts({ Critical: 0, High: 0, Low: 2.5 }), false);
+
+  // hasValidSeverityCounts valid inputs
+  assert.equal(hasValidSeverityCounts({ Critical: 0, High: 0 }), true);
+  assert.equal(
+    hasValidSeverityCounts({
+      Critical: 1,
+      High: 2,
+      Medium: 3,
+      Low: 4,
+      Informational: 5,
+      Info: 6,
+    }),
+    true,
+  );
+
+  // validateExplicitCounts behavior
+  assert.deepEqual(validateExplicitCounts(undefined, 'TEST'), []);
+  assert.deepEqual(validateExplicitCounts(null, 'TEST'), ['[TEST Error] Explicit counts must be an object']);
+  assert.deepEqual(validateExplicitCounts('str', 'TEST'), ['[TEST Error] Explicit counts must be an object']);
+  assert.deepEqual(validateExplicitCounts([1, 2], 'TEST'), ['[TEST Error] Explicit counts must be an object']);
+
+  const emptyRes = validateExplicitCounts({}, 'TEST');
+  assert.deepEqual(emptyRes, [
+    '[TEST Error] Explicit counts must specify non-negative integer for "Critical"',
+    '[TEST Error] Explicit counts must specify non-negative integer for "High"',
+  ]);
+
+  const wrongCaseRes = validateExplicitCounts({ critical: 1 }, 'TEST');
+  assert.deepEqual(wrongCaseRes, [
+    '[TEST Error] Unrecognized count key "critical" in counts. Expected severity keys: Critical, High, Medium, Low, Informational',
+    '[TEST Error] Explicit counts must specify non-negative integer for "Critical"',
+    '[TEST Error] Explicit counts must specify non-negative integer for "High"',
+  ]);
+
+  const unrelatedRes = validateExplicitCounts({ unrelated: 0 }, 'TEST');
+  assert.deepEqual(unrelatedRes, [
+    '[TEST Error] Unrecognized count key "unrelated" in counts. Expected severity keys: Critical, High, Medium, Low, Informational',
+    '[TEST Error] Explicit counts must specify non-negative integer for "Critical"',
+    '[TEST Error] Explicit counts must specify non-negative integer for "High"',
+  ]);
+
+  const validRes = validateExplicitCounts({ Critical: 0, High: 0 }, 'TEST');
+  assert.deepEqual(validRes, []);
+});
+
+test('evaluateSast: comprehensive malformed and valid counts handling', () => {
+  // counts: { critical: 1 } (wrong casing, no findings)
+  const resWrongCasing = evaluateSast({ counts: { critical: 1 } });
+  assert.equal(resWrongCasing.passed, false);
+  assert.ok(
+    resWrongCasing.errors.includes(
+      '[SAST Error] Missing scanner execution evidence (runs, findings, results, or counts required)',
+    ),
+  );
+  assert.ok(
+    resWrongCasing.errors.some((e) =>
+      e.includes('Unrecognized count key "critical" in counts. Expected severity keys: Critical, High, Medium, Low, Informational'),
+    ),
+  );
+  assert.ok(
+    resWrongCasing.errors.includes('[SAST Error] Explicit counts must specify non-negative integer for "Critical"'),
+  );
+  assert.ok(
+    resWrongCasing.errors.includes('[SAST Error] Explicit counts must specify non-negative integer for "High"'),
+  );
+
+  // counts: {} (empty, no findings)
+  const resEmpty = evaluateSast({ counts: {} });
+  assert.equal(resEmpty.passed, false);
+  assert.ok(
+    resEmpty.errors.includes(
+      '[SAST Error] Missing scanner execution evidence (runs, findings, results, or counts required)',
+    ),
+  );
+  assert.ok(
+    resEmpty.errors.includes('[SAST Error] Explicit counts must specify non-negative integer for "Critical"'),
+  );
+  assert.ok(
+    resEmpty.errors.includes('[SAST Error] Explicit counts must specify non-negative integer for "High"'),
+  );
+
+  // counts: { unrelated: 0 } (unrelated keys, no findings)
+  const resUnrelated = evaluateSast({ counts: { unrelated: 0 } });
+  assert.equal(resUnrelated.passed, false);
+  assert.ok(
+    resUnrelated.errors.includes(
+      '[SAST Error] Missing scanner execution evidence (runs, findings, results, or counts required)',
+    ),
+  );
+  assert.ok(
+    resUnrelated.errors.some((e) =>
+      e.includes('Unrecognized count key "unrelated" in counts. Expected severity keys: Critical, High, Medium, Low, Informational'),
+    ),
+  );
+
+  // findings: [], counts: { critical: 1 } (has findings evidence but malformed counts)
+  const resFindingsWrongCasing = evaluateSast({ findings: [], counts: { critical: 1 } });
+  assert.equal(resFindingsWrongCasing.passed, false);
+  assert.ok(
+    resFindingsWrongCasing.errors.some((e) =>
+      e.includes('Unrecognized count key "critical" in counts. Expected severity keys: Critical, High, Medium, Low, Informational'),
+    ),
+  );
+  assert.ok(
+    resFindingsWrongCasing.errors.includes(
+      '[SAST Error] Explicit counts must specify non-negative integer for "Critical"',
+    ),
+  );
+  assert.ok(
+    resFindingsWrongCasing.errors.includes('[SAST Error] Explicit counts must specify non-negative integer for "High"'),
+  );
+
+  // findings: [], counts: {} (has findings evidence but empty counts)
+  const resFindingsEmpty = evaluateSast({ findings: [], counts: {} });
+  assert.equal(resFindingsEmpty.passed, false);
+  assert.ok(
+    resFindingsEmpty.errors.includes('[SAST Error] Explicit counts must specify non-negative integer for "Critical"'),
+  );
+  assert.ok(
+    resFindingsEmpty.errors.includes('[SAST Error] Explicit counts must specify non-negative integer for "High"'),
+  );
+
+  // Valid explicit counts { Critical: 0, High: 0 } with no findings passes
+  const resValid = evaluateSast({ findings: [], counts: { Critical: 0, High: 0 } });
+  assert.equal(resValid.passed, true);
+  assert.equal(resValid.errors.length, 0);
+  assert.equal(resValid.counts.Critical, 0);
+  assert.equal(resValid.counts.High, 0);
+
+  // Valid counts without findings array passes via counts evidence
+  const resValidCountsOnly = evaluateSast({ counts: { Critical: 0, High: 0, Medium: 2, Low: 1 } });
+  assert.equal(resValidCountsOnly.passed, true);
+  assert.equal(resValidCountsOnly.errors.length, 0);
+  assert.equal(resValidCountsOnly.counts.Medium, 2);
+  assert.equal(resValidCountsOnly.counts.Low, 1);
+});
+
+test('evaluateSupplyChain: comprehensive malformed and valid counts handling', () => {
+  // counts: { critical: 1 } (wrong casing, no findings)
+  const resWrongCasing = evaluateSupplyChain({ counts: { critical: 1 } });
+  assert.equal(resWrongCasing.passed, false);
+  assert.ok(
+    resWrongCasing.errors.includes(
+      '[Supply Chain Error] Missing scanner execution evidence (findings, sub-scanner reports, or counts required)',
+    ),
+  );
+  assert.ok(
+    resWrongCasing.errors.some((e) =>
+      e.includes('Unrecognized count key "critical" in counts. Expected severity keys: Critical, High, Medium, Low, Informational'),
+    ),
+  );
+  assert.ok(
+    resWrongCasing.errors.includes(
+      '[Supply Chain Error] Explicit counts must specify non-negative integer for "Critical"',
+    ),
+  );
+  assert.ok(
+    resWrongCasing.errors.includes('[Supply Chain Error] Explicit counts must specify non-negative integer for "High"'),
+  );
+
+  // counts: {} (empty, no findings)
+  const resEmpty = evaluateSupplyChain({ counts: {} });
+  assert.equal(resEmpty.passed, false);
+  assert.ok(
+    resEmpty.errors.includes(
+      '[Supply Chain Error] Missing scanner execution evidence (findings, sub-scanner reports, or counts required)',
+    ),
+  );
+  assert.ok(
+    resEmpty.errors.includes(
+      '[Supply Chain Error] Explicit counts must specify non-negative integer for "Critical"',
+    ),
+  );
+  assert.ok(
+    resEmpty.errors.includes('[Supply Chain Error] Explicit counts must specify non-negative integer for "High"'),
+  );
+
+  // counts: { unrelated: 0 } (unrelated keys, no findings)
+  const resUnrelated = evaluateSupplyChain({ counts: { unrelated: 0 } });
+  assert.equal(resUnrelated.passed, false);
+  assert.ok(
+    resUnrelated.errors.includes(
+      '[Supply Chain Error] Missing scanner execution evidence (findings, sub-scanner reports, or counts required)',
+    ),
+  );
+  assert.ok(
+    resUnrelated.errors.some((e) =>
+      e.includes('Unrecognized count key "unrelated" in counts. Expected severity keys: Critical, High, Medium, Low, Informational'),
+    ),
+  );
+
+  // findings: [], counts: { critical: 1 } (has findings evidence but malformed counts)
+  const resFindingsWrongCasing = evaluateSupplyChain({ findings: [], counts: { critical: 1 } });
+  assert.equal(resFindingsWrongCasing.passed, false);
+  assert.ok(
+    resFindingsWrongCasing.errors.some((e) =>
+      e.includes('Unrecognized count key "critical" in counts. Expected severity keys: Critical, High, Medium, Low, Informational'),
+    ),
+  );
+  assert.ok(
+    resFindingsWrongCasing.errors.includes(
+      '[Supply Chain Error] Explicit counts must specify non-negative integer for "Critical"',
+    ),
+  );
+  assert.ok(
+    resFindingsWrongCasing.errors.includes(
+      '[Supply Chain Error] Explicit counts must specify non-negative integer for "High"',
+    ),
+  );
+
+  // findings: [], counts: {} (has findings evidence but empty counts)
+  const resFindingsEmpty = evaluateSupplyChain({ findings: [], counts: {} });
+  assert.equal(resFindingsEmpty.passed, false);
+  assert.ok(
+    resFindingsEmpty.errors.includes(
+      '[Supply Chain Error] Explicit counts must specify non-negative integer for "Critical"',
+    ),
+  );
+  assert.ok(
+    resFindingsEmpty.errors.includes('[Supply Chain Error] Explicit counts must specify non-negative integer for "High"'),
+  );
+
+  // Valid explicit counts { Critical: 0, High: 0 } with no findings passes
+  const resValid = evaluateSupplyChain({ findings: [], counts: { Critical: 0, High: 0 } });
+  assert.equal(resValid.passed, true);
+  assert.equal(resValid.errors.length, 0);
+  assert.equal(resValid.counts.Critical, 0);
+  assert.equal(resValid.counts.High, 0);
+
+  // Valid counts without findings array passes via counts evidence
+  const resValidCountsOnly = evaluateSupplyChain({ counts: { Critical: 0, High: 0 } });
+  assert.equal(resValidCountsOnly.passed, true);
+  assert.equal(resValidCountsOnly.errors.length, 0);
+});
+
+test('evaluateDast: comprehensive malformed and valid counts handling', () => {
+  const baseDast = { exitCode: 0, endpointsChecked: 24 };
+
+  // counts: { critical: 1 } (wrong casing, no findings)
+  const resWrongCasing = evaluateDast({ ...baseDast, counts: { critical: 1 } });
+  assert.equal(resWrongCasing.passed, false);
+  assert.ok(
+    resWrongCasing.errors.includes('[DAST Error] Missing scanner execution evidence (findings or counts required)'),
+  );
+  assert.ok(
+    resWrongCasing.errors.some((e) =>
+      e.includes('Unrecognized count key "critical" in counts. Expected severity keys: Critical, High, Medium, Low, Informational'),
+    ),
+  );
+  assert.ok(
+    resWrongCasing.errors.includes('[DAST Error] Explicit counts must specify non-negative integer for "Critical"'),
+  );
+  assert.ok(
+    resWrongCasing.errors.includes('[DAST Error] Explicit counts must specify non-negative integer for "High"'),
+  );
+
+  // counts: {} (empty, no findings)
+  const resEmpty = evaluateDast({ ...baseDast, counts: {} });
+  assert.equal(resEmpty.passed, false);
+  assert.ok(
+    resEmpty.errors.includes('[DAST Error] Missing scanner execution evidence (findings or counts required)'),
+  );
+  assert.ok(
+    resEmpty.errors.includes('[DAST Error] Explicit counts must specify non-negative integer for "Critical"'),
+  );
+  assert.ok(
+    resEmpty.errors.includes('[DAST Error] Explicit counts must specify non-negative integer for "High"'),
+  );
+
+  // counts: { unrelated: 0 } (unrelated keys, no findings)
+  const resUnrelated = evaluateDast({ ...baseDast, counts: { unrelated: 0 } });
+  assert.equal(resUnrelated.passed, false);
+  assert.ok(
+    resUnrelated.errors.includes('[DAST Error] Missing scanner execution evidence (findings or counts required)'),
+  );
+  assert.ok(
+    resUnrelated.errors.some((e) =>
+      e.includes('Unrecognized count key "unrelated" in counts. Expected severity keys: Critical, High, Medium, Low, Informational'),
+    ),
+  );
+
+  // findings: [], counts: { critical: 1 } (has findings evidence but malformed counts)
+  const resFindingsWrongCasing = evaluateDast({ ...baseDast, findings: [], counts: { critical: 1 } });
+  assert.equal(resFindingsWrongCasing.passed, false);
+  assert.ok(
+    resFindingsWrongCasing.errors.some((e) =>
+      e.includes('Unrecognized count key "critical" in counts. Expected severity keys: Critical, High, Medium, Low, Informational'),
+    ),
+  );
+  assert.ok(
+    resFindingsWrongCasing.errors.includes(
+      '[DAST Error] Explicit counts must specify non-negative integer for "Critical"',
+    ),
+  );
+  assert.ok(
+    resFindingsWrongCasing.errors.includes('[DAST Error] Explicit counts must specify non-negative integer for "High"'),
+  );
+
+  // findings: [], counts: {} (has findings evidence but empty counts)
+  const resFindingsEmpty = evaluateDast({ ...baseDast, findings: [], counts: {} });
+  assert.equal(resFindingsEmpty.passed, false);
+  assert.ok(
+    resFindingsEmpty.errors.includes('[DAST Error] Explicit counts must specify non-negative integer for "Critical"'),
+  );
+  assert.ok(
+    resFindingsEmpty.errors.includes('[DAST Error] Explicit counts must specify non-negative integer for "High"'),
+  );
+
+  // Valid explicit counts { Critical: 0, High: 0 } with no findings passes
+  const resValid = evaluateDast({ ...baseDast, findings: [], counts: { Critical: 0, High: 0 } });
+  assert.equal(resValid.passed, true);
+  assert.equal(resValid.errors.length, 0);
+  assert.equal(resValid.metrics.criticalCount, 0);
+  assert.equal(resValid.metrics.highCount, 0);
+
+  // Valid counts without findings array passes via counts evidence
+  const resValidCountsOnly = evaluateDast({ ...baseDast, counts: { Critical: 0, High: 0 } });
+  assert.equal(resValidCountsOnly.passed, true);
+  assert.equal(resValidCountsOnly.errors.length, 0);
+});
+
 
