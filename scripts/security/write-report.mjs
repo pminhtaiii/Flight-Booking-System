@@ -317,24 +317,27 @@ export function sanitizeEvidenceRecord(rawRecord, options = {}) {
     output: sanitizeStage(rawStages.output),
   };
 
-  let aggregate;
+  const tp = stages.input.tp + stages.tool.tp + stages.output.tp;
+  const fp = stages.input.fp + stages.tool.fp + stages.output.fp;
+  const tn = stages.input.tn + stages.tool.tn + stages.output.tn;
+  const fn = stages.input.fn + stages.tool.fn + stages.output.fn;
+
   if (rawDet.aggregate && typeof rawDet.aggregate === 'object') {
-    const tp = Number(rawDet.aggregate.tp) || 0;
-    const fp = Number(rawDet.aggregate.fp) || 0;
-    const tn = Number(rawDet.aggregate.tn) || 0;
-    const fn = Number(rawDet.aggregate.fn) || 0;
-    const tpr = tp + fn > 0 ? Math.round((tp / (tp + fn)) * 10000) / 10000 : 0;
-    const fpr = fp + tn > 0 ? Math.round((fp / (fp + tn)) * 10000) / 10000 : 0;
-    aggregate = { tp, fp, tn, fn, tpr, fpr };
-  } else {
-    const tp = stages.input.tp + stages.tool.tp + stages.output.tp;
-    const fp = stages.input.fp + stages.tool.fp + stages.output.fp;
-    const tn = stages.input.tn + stages.tool.tn + stages.output.tn;
-    const fn = stages.input.fn + stages.tool.fn + stages.output.fn;
-    const tpr = tp + fn > 0 ? Math.round((tp / (tp + fn)) * 10000) / 10000 : 0;
-    const fpr = fp + tn > 0 ? Math.round((fp / (fp + tn)) * 10000) / 10000 : 0;
-    aggregate = { tp, fp, tn, fn, tpr, fpr };
+    const rawTp = Number(rawDet.aggregate.tp) || 0;
+    const rawFp = Number(rawDet.aggregate.fp) || 0;
+    const rawTn = Number(rawDet.aggregate.tn) || 0;
+    const rawFn = Number(rawDet.aggregate.fn) || 0;
+
+    if (rawTp !== tp || rawFp !== fp || rawTn !== tn || rawFn !== fn) {
+      throw new Error(
+        `[Contradictory Evidence] detectorEvaluation.aggregate counts contradict per-stage sums: derived (tp=${tp}, fp=${fp}, tn=${tn}, fn=${fn}) vs aggregate (tp=${rawTp}, fp=${rawFp}, tn=${rawTn}, fn=${rawFn})`,
+      );
+    }
   }
+
+  const tpr = tp + fn > 0 ? Math.round((tp / (tp + fn)) * 10000) / 10000 : 0;
+  const fpr = fp + tn > 0 ? Math.round((fp / (fp + tn)) * 10000) / 10000 : 0;
+  const aggregate = { tp, fp, tn, fn, tpr, fpr };
 
   const confidenceIntervals = {
     tpr: calculateConfidenceInterval(aggregate.tp, aggregate.tp + aggregate.fn, 0.95),
@@ -405,11 +408,27 @@ export function sanitizeEvidenceRecord(rawRecord, options = {}) {
     sanitizedFindings.push(finding);
   }
 
-  // Allow explicit counts from rawScanner if present
+  // Validate or populate explicit counts from rawScanner if present
   if (rawScanner.counts && typeof rawScanner.counts === 'object') {
-    for (const [k, v] of Object.entries(rawScanner.counts)) {
-      if (k in severityCounts && typeof v === 'number') {
-        severityCounts[k] = v;
+    if (sanitizedFindings.length > 0) {
+      for (const [k, rawV] of Object.entries(rawScanner.counts)) {
+        if (k in severityCounts) {
+          const v = typeof rawV === 'number' ? rawV : Number(rawV);
+          if (Number.isFinite(v) && severityCounts[k] !== v) {
+            throw new Error(
+              `[Contradictory Evidence] scannerSummary.counts.${k} contradicts sanitized findings: explicit count ${v} does not match findings count ${severityCounts[k]}`,
+            );
+          }
+        }
+      }
+    } else {
+      for (const [k, rawV] of Object.entries(rawScanner.counts)) {
+        if (k in severityCounts) {
+          const v = typeof rawV === 'number' ? rawV : Number(rawV);
+          if (Number.isFinite(v)) {
+            severityCounts[k] = v;
+          }
+        }
       }
     }
   }
