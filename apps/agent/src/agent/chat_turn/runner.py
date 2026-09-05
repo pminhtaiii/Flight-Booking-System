@@ -26,6 +26,7 @@ from agent.chat_turn.events import (
     ToolResultPayload,
 )
 from agent.config import get_settings
+from agent.guardrails.base import AdmissionContext
 from agent.guardrails.output_pipeline import OutputGuardrailBlockedError, OutputGuardrailPipeline
 from agent.infrastructure.redis import get_redis_client
 from agent.memory.manager import MemoryManager
@@ -91,6 +92,8 @@ class ChatTurnRunner:
         redis_client: Any = None,
         client_factory: Optional[Callable[..., Any]] = None,
         telemetry: Any = None,
+        gateway: Optional[Any] = None,
+        require_gateway: bool = False,
     ):
         self._settings = settings
         self._graph = graph
@@ -99,6 +102,8 @@ class ChatTurnRunner:
         self._redis_client = redis_client
         self._client_factory = client_factory
         self._telemetry = telemetry
+        self.gateway = gateway
+        self.require_gateway = require_gateway
 
     @property
     def settings(self) -> Any:
@@ -262,6 +267,55 @@ class ChatTurnRunner:
 
         trace_id = safe_opaque_id(command.trace_id)
         correlation_id = safe_opaque_id(command.correlation_id)
+
+        require_gw = bool(self.require_gateway)
+        if not require_gw:
+            setting_val = getattr(settings, "REQUIRE_GUARDRAIL_GATEWAY", None)
+            if isinstance(setting_val, bool):
+                require_gw = setting_val
+            elif isinstance(setting_val, str):
+                require_gw = setting_val.lower() in ("true", "1", "yes")
+
+        if require_gw and self.gateway is None:
+            yield ErrorEvent(
+                data=ErrorPayload(
+                    code="GUARDRAIL_CONFIGURATION_ERROR",
+                    message=(
+                        "Chat execution rejected: mandatory guardrail gateway is absent "
+                        "or unconfigured."
+                    ),
+                )
+            )
+            return
+
+        if self.gateway is not None and command.message:
+            context = AdmissionContext(
+                user_id=command.user_id,
+                chat_session_id=command.session_id or "unassigned",
+                trace_id=command.trace_id or "trace-default",
+                correlation_id=command.correlation_id,
+                policy_version="2026-09-05",
+            )
+            try:
+                decision = await self.gateway.validate_input(context, command.message)
+            except Exception:
+                yield ErrorEvent(
+                    data=ErrorPayload(
+                        code="GUARDRAIL_INPUT_INJECTION",
+                        message="Input rejected by security guardrail: GUARDRAIL_INPUT_INJECTION",
+                    )
+                )
+                return
+
+            if decision.status == "BLOCK":
+                code = decision.response_key or "GUARDRAIL_INPUT_BLOCKED"
+                yield ErrorEvent(
+                    data=ErrorPayload(
+                        code=code,
+                        message=f"Input rejected by security guardrail: {code}",
+                    )
+                )
+                return
 
         client = self._create_client(
             token=command.token,
@@ -882,6 +936,7 @@ class ChatTurnRunner:
                 memory_mgr = MemoryManager(
                     window_size=getattr(settings, "MEMORY_WINDOW_SIZE", 20),
                     token_budget=getattr(settings, "MEMORY_TOKEN_BUDGET", 4000),
+                    gateway=self.gateway,
                 )
                 original_total = (
                     memory_data.get("totalMessageCount", 0) if isinstance(memory_data, dict) else 0
