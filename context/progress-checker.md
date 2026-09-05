@@ -25,10 +25,26 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Security Systems (Feature 023) — Phase 2 Foundation in progress
-**Last completed:** Tasks T008, T009, T011: Phase 2 Slice 2 (Guardrail Core Contracts, Registry RED Contracts, Security Coverage Policy).
-**In progress:** Phase 2 Foundation (Task T007 remains).
-**Next:** Task T007 (Local DAST Orchestration), then T013 (Closed Registry implementation) after Phase 2 exits.
+**Feature:** Security Systems (Feature 023) — Phase 2 Foundation complete
+**Last completed:** Task T007: Phase 2 Final Slice (Local Stack Orchestration and DAST Harness).
+**In progress:** None in Phase 2.
+**Next:** Phase 3 US1, beginning with T012 enforcement characterization and T013 closed registry implementation.
+
+### Feature 023 — Security Systems: Phase 2 Final Slice (T007 Completed) (2026-09-05)
+
+- T007: Added `tests/security/compose.security.yml` with loopback-only PostgreSQL (`5433`), Redis (`6380`), API (`3301`), agent (`3302`) and local model/provider stub (`3400`) services. The Compose network is internal, runtime credentials are synthetic, and API/provider/model destinations resolve only to local services. Added narrowly scoped API/agent Dockerfiles and Docker ignore files so build contexts exclude environment files and unrelated workspace data.
+- T007: Added deterministic `tests/security/mock-server.mjs` and tests. The model stub returns fixed local responses, provider search is empty, and unsupported payment/provider routes fail closed.
+- T007: Added `scripts/security/dast-transport.mjs` with fixed loopback destination allowlist, IPv4 pinning, redirect refusal, request/response bounds, 5 requests/second ceiling, cancellation and deadline handling, and sanitized static errors.
+- T007: Added `scripts/security/run-local-dast.mjs` and lifecycle tests. Each run creates a fresh project name, starts infrastructure, runs Prisma migrations before application services, waits on health endpoints, registers and authenticates distinct synthetic users, supports detector (`10000` daily / `600` burst) and quota-invariant (default quota) profiles, and removes only its own containers/volumes on success, failure, cancellation or interruption. `--smoke` is the implemented lifecycle gate; full detector/DAST drivers remain T037–T041.
+- T007 follow-up corrections: Docker subprocesses now preserve configured context/host/TLS discovery instead of forcing a platform socket; the loopback transport enforces a 1 MiB request-body cap before dispatch; and API/agent images run under dedicated unprivileged users. Focused transport, lifecycle and stack tests pass 20/20.
+- Verification: `node --test tests/security/dast-transport.test.mjs tests/security/mock-server.test.mjs tests/security/stack.test.mjs tests/security/run-local-dast.test.mjs` — 18/18 passed; `node scripts/security/run-local-dast.mjs --help` — exit 0; Compose policy parse and `git diff --check` — passed. Live Docker smoke was not run because automatic Docker approval was unavailable after the usage-limit rejection; no runtime result is claimed.
+
+### Feature 023 — Security Systems: Review Corrections (Issues 1–4) (2026-09-05)
+
+- Issue 1 fixed: `test_registry.py` now uses an explicit module-level `importorskip` until T013 provides `agent.guardrails.registry`, so the normal agent test collection no longer fails while the future contract suite remains ready to activate.
+- Issue 2 fixed: `PipelineDecision` now requires non-null validated data for PASS, requires a static response key for BLOCK, and rejects arbitrary response keys. Added regression coverage for each invalid combination.
+- Issues 3–4 fixed: `evaluate-results.mjs` loads `tests/security/coverage-policy.json` and enforces every exact and wildcard module scope with fail-closed missing-file and missing-metric errors. Added weighted per-scope statement/branch metrics to the summary and expanded policy coverage to `agent.main`, `agent.config`, `agent.streaming.sse`, and `agent.tools.*`.
+- Verification: 34/34 evaluator tests, 9 passed + 1 expected registry skip in the Python contract collection, and full agent Ruff checks passed.
 
 ---
 

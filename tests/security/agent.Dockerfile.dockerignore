@@ -1,0 +1,9 @@
+**
+!pyproject.toml
+!uv.lock
+!apps/
+!apps/agent/
+!apps/agent/pyproject.toml
+!apps/agent/src/**
+**/__pycache__
+**/.env*
