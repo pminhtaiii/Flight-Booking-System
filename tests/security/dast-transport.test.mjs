@@ -73,6 +73,19 @@ test('bounds response bytes and never exposes response secrets in errors', async
   await assert.rejects(transport.request(origin), { message: 'DAST response too large' });
 });
 
+test('rejects oversized request bodies before dispatch', async (t) => {
+  let calls = 0;
+  const origin = await server(t, (_request, response) => { calls += 1; response.end('ok'); });
+  const transport = createTransport({ origins: [origin], maxRequestBytes: 32 });
+  t.after(() => transport.close());
+  await assert.rejects(
+    transport.request(origin, { method: 'POST', body: 'x'.repeat(33) }),
+    { message: 'DAST request body too large' },
+  );
+  assert.equal(calls, 0);
+  assert.equal(transport.requests, 0);
+});
+
 test('external cancellation stops pending and queued requests', async (t) => {
   let received;
   const started = new Promise((resolve) => { received = resolve; });

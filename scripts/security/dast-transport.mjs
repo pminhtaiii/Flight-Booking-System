@@ -13,11 +13,12 @@ function scopedUrl(value) {
   }
 }
 
-export function createTransport({ origins, maxRequests = 5000, minimumIntervalMs = 210, maxDurationMs = 1800000, signal, maxResponseBytes = 1048576 }) {
+export function createTransport({ origins, maxRequests = 5000, minimumIntervalMs = 210, maxDurationMs = 1800000, signal, maxResponseBytes = 1048576, maxRequestBytes = 1048576 }) {
   const allowed = new Set(origins.map((origin) => scopedUrl(origin).origin));
   if (!Number.isInteger(maxRequests) || maxRequests < 1 || maxRequests > 5000 || !Number.isFinite(minimumIntervalMs) || minimumIntervalMs < 200) throw new Error('Invalid DAST budget');
   if (!Number.isFinite(maxDurationMs) || maxDurationMs <= 0 || maxDurationMs > 1800000) throw new Error('Invalid DAST budget');
   if (!Number.isInteger(maxResponseBytes) || maxResponseBytes < 1 || maxResponseBytes > 1048576) throw new Error('Invalid DAST budget');
+  if (!Number.isInteger(maxRequestBytes) || maxRequestBytes < 1 || maxRequestBytes > 1048576) throw new Error('Invalid DAST budget');
   const deadline = performance.now() + maxDurationMs;
   const controller = new AbortController();
   const expire = () => controller.abort(new Error('DAST time budget exhausted'));
@@ -43,6 +44,13 @@ export function createTransport({ origins, maxRequests = 5000, minimumIntervalMs
       if (Object.keys(options).some((key) => !['method', 'headers', 'body'].includes(key))) throw new Error('DAST request options refused');
       const { method = 'GET', headers = {}, body: requestBody } = options;
       if (Object.keys(headers).some((key) => ['host', 'proxy-authorization', 'proxy-connection'].includes(key.toLowerCase()))) throw new Error('DAST request options refused');
+      let requestBodyBytes = 0;
+      if (requestBody !== undefined && requestBody !== null) {
+        if (typeof requestBody === 'string') requestBodyBytes = Buffer.byteLength(requestBody);
+        else if (Buffer.isBuffer(requestBody) || requestBody instanceof Uint8Array) requestBodyBytes = requestBody.byteLength;
+        else throw new Error('DAST request body refused');
+        if (requestBodyBytes > maxRequestBytes) throw new Error('DAST request body too large');
+      }
       const slot = queue.then(async () => {
         check();
         if (requests >= maxRequests) throw new Error('DAST request budget exhausted');

@@ -22,3 +22,13 @@ test('security stack isolates every runtime service and binds only loopback port
   assert.equal(stack.services.agent_security.environment.CHAT_QUOTA_DAILY, '${DAST_QUOTA_DAILY:-50}');
   assert.equal(stack.services.agent_security.environment.CHAT_QUOTA_BURST, '${DAST_QUOTA_BURST:-60}');
 });
+
+test('network-facing application images declare dedicated unprivileged users', async () => {
+  const dockerfiles = await Promise.all([
+    readFile(new URL('./api.Dockerfile', import.meta.url), 'utf8'),
+    readFile(new URL('./agent.Dockerfile', import.meta.url), 'utf8'),
+  ]);
+  assert.match(dockerfiles[0], /^USER\s+security-api\s*$/m);
+  assert.match(dockerfiles[1], /^USER\s+security-agent\s*$/m);
+  for (const dockerfile of dockerfiles) assert.doesNotMatch(dockerfile, /^USER\s+root\s*$/m);
+});

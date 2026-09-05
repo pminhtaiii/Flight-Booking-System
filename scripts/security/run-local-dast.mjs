@@ -22,12 +22,16 @@ export function createRunPlan({ profile = 'detector', maxRequests = 5000, maxDur
 
 // Only OS/Docker discovery variables cross this boundary. Never inherit .env,
 // provider keys, proxy settings, NODE_OPTIONS or unit-test network guards.
-function dockerEnvironment(overrides) {
+export function dockerEnvironment(overrides = {}, source = process.env) {
   const env = {};
-  for (const key of ['PATH', 'Path', 'SystemRoot', 'SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP', 'HOME', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'DOCKER_CONFIG']) {
-    if (process.env[key] !== undefined) env[key] = process.env[key];
+  for (const key of [
+    'PATH', 'Path', 'SystemRoot', 'SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP',
+    'HOME', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'DOCKER_CONFIG',
+    'DOCKER_CONTEXT', 'DOCKER_HOST', 'DOCKER_TLS_VERIFY', 'DOCKER_CERT_PATH',
+  ]) {
+    if (source[key] !== undefined) env[key] = source[key];
   }
-  return { ...env, DOCKER_HOST: process.platform === 'win32' ? 'npipe:////./pipe/docker_engine' : 'unix:///var/run/docker.sock', ...overrides };
+  return { ...env, ...overrides };
 }
 
 export function runDocker(args, { environment, signal, timeoutMs }) {

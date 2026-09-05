@@ -1,7 +1,25 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createRunPlan, runLocalDast } from '../../scripts/security/run-local-dast.mjs';
+import { createRunPlan, dockerEnvironment, runLocalDast } from '../../scripts/security/run-local-dast.mjs';
+
+test('Docker command environment preserves configured daemon discovery', () => {
+  const configured = dockerEnvironment({}, {
+    DOCKER_CONFIG: '/home/test/.docker',
+    DOCKER_CONTEXT: 'rootless',
+    DOCKER_HOST: 'unix:///run/user/1000/docker.sock',
+    DOCKER_TLS_VERIFY: '1',
+    DOCKER_CERT_PATH: '/home/test/.docker/certs',
+  });
+  assert.equal(configured.DOCKER_CONFIG, '/home/test/.docker');
+  assert.equal(configured.DOCKER_CONTEXT, 'rootless');
+  assert.equal(configured.DOCKER_HOST, 'unix:///run/user/1000/docker.sock');
+  assert.equal(configured.DOCKER_TLS_VERIFY, '1');
+  assert.equal(configured.DOCKER_CERT_PATH, '/home/test/.docker/certs');
+
+  const discovered = dockerEnvironment({}, {});
+  assert.equal(discovered.DOCKER_HOST, undefined);
+});
 
 test('run plan owns fresh disposable state and fixed loopback destinations', () => {
   const a = createRunPlan({ profile: 'detector' });
