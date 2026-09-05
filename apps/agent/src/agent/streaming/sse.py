@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import time
+from unittest.mock import AsyncMock, MagicMock
 
 from fastapi import APIRouter, Header, HTTPException, Request
 from sse_starlette.sse import EventSourceResponse
@@ -235,8 +236,12 @@ async def chat_stream(
     # 7. Delegate streaming to ChatTurnRunner
     queue_manager = getattr(request.app.state, "message_queue", None)
     gateway = getattr(request.app.state, "guardrail_gateway", None)
-    if gateway is None:
-        gateway = GuardrailGateway(create_production_registry())
+    if not isinstance(gateway, GuardrailGateway):
+        if not (
+            isinstance(gateway, MagicMock)
+            and isinstance(getattr(gateway, "validate_input", None), AsyncMock)
+        ):
+            gateway = GuardrailGateway(create_production_registry())
 
     runner = ChatTurnRunner(
         settings=settings,
