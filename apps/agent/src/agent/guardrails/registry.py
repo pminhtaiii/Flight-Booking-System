@@ -121,6 +121,7 @@ INJECTION_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"forget\s+what\s+you", re.IGNORECASE),
     re.compile(r"disregard\s+instructions", re.IGNORECASE),
     re.compile(r"disregard\s+all\s+instructions", re.IGNORECASE),
+    re.compile(r"\bdrop\s+table\b", re.IGNORECASE),
 )
 
 OUT_OF_DOMAIN_PATTERNS: tuple[re.Pattern[str], ...] = (
