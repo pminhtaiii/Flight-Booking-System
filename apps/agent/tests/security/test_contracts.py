@@ -95,6 +95,17 @@ def test_pass_decision_preserves_only_validated_payload() -> None:
     assert decision.validated_data == validated
 
 
+def test_pass_decision_requires_validated_payload() -> None:
+    with pytest.raises(ValidationError):
+        PipelineDecision[ValidatedInput](status="PASS")
+
+
+@pytest.mark.parametrize("response_key", [None, "arbitrary-user-content"])
+def test_block_decision_requires_a_static_response_key(response_key: str | None) -> None:
+    with pytest.raises(ValidationError):
+        PipelineDecision[ValidatedInput](status="BLOCK", response_key=response_key)
+
+
 def test_payload_types_are_immutable_and_strict() -> None:
     payloads = (
         ValidatedInput(content="find flights"),

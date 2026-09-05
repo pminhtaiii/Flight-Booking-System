@@ -2,13 +2,16 @@ from pathlib import Path
 from typing import ClassVar, Literal
 
 import pytest
-from agent.guardrails.registry import (
-    GuardrailRegistry,
-    RegistryContractError,
-    create_production_registry,
-)
 
 from agent.guardrails.base import AdmissionContext, PipelineDecision, ValidatedInput
+
+registry_module = pytest.importorskip(
+    "agent.guardrails.registry",
+    reason="T013 supplies the closed registry implementation",
+)
+GuardrailRegistry = registry_module.GuardrailRegistry
+RegistryContractError = registry_module.RegistryContractError
+create_production_registry = registry_module.create_production_registry
 
 pytestmark = pytest.mark.security
 

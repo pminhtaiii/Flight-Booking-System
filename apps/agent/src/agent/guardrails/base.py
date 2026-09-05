@@ -77,6 +77,18 @@ class PipelineDecision(_ImmutableContract, Generic[T]):
             return {**data, "validated_data": None}
         return data
 
+    @model_validator(mode="after")
+    def validate_transition(self) -> "PipelineDecision[T]":
+        """Require a complete, static decision at the gateway seam."""
+        if self.status == "PASS" and self.validated_data is None:
+            raise ValueError("PASS decisions require validated_data")
+        static_keys = set(GUARDRAIL_RESPONSE_KEYS.values())
+        if self.response_key is not None and self.response_key not in static_keys:
+            raise ValueError("response_key must be a static guardrail key")
+        if self.status == "BLOCK" and self.response_key is None:
+            raise ValueError("BLOCK decisions require response_key")
+        return self
+
 
 TIn = TypeVar("TIn", contravariant=True)
 TOut = TypeVar("TOut", covariant=True)
