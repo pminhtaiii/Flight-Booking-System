@@ -1,5 +1,4 @@
 import inspect
-from typing import Any
 
 import pytest
 from pydantic import ValidationError
@@ -19,10 +18,8 @@ from agent.guardrails.gateway import GuardrailGateway
 from agent.guardrails.normalization import (
     bounded_normalize,
     detect_base64_payloads,
-    safe_regex_match,
 )
 from agent.guardrails.registry import (
-    BaseGuardrailLayer,
     GuardrailRegistry,
     InputInjectionLayer,
     InputLengthLayer,
@@ -203,31 +200,9 @@ async def test_malformed_homoglyphic_prompt_injection(
     normalized = bounded_normalize(raw_payload)
     assert "Ignore previous instructions" in normalized
 
-    # Mock injection detector layer using normalization
-    class NormalizingInjectionLayer(BaseGuardrailLayer):
-        key = "input.injection"
-        stage = "input"
-        prerequisites = ("input.length",)
-
-        async def check(
-            self,
-            context: AdmissionContext | Any,
-            data: Any,
-        ) -> PipelineDecision[Any]:
-            text = data if isinstance(data, str) else getattr(data, "content", str(data))
-            norm_text = bounded_normalize(text)
-            if safe_regex_match(r"ignore\s+previous\s+instructions", norm_text.lower()):
-                return PipelineDecision(
-                    status="BLOCK",
-                    response_key=GUARDRAIL_INPUT_INJECTION,
-                    reason="Prompt injection detected",
-                    validated_data=None,
-                )
-            return PipelineDecision(status="PASS", validated_data=ValidatedInput(content=text))
-
     registry = GuardrailRegistry()
     registry.register(InputLengthLayer())
-    registry.register(NormalizingInjectionLayer())
+    registry.register(InputInjectionLayer())
 
     gateway = GuardrailGateway(registry)
     decision = await gateway.validate_input(admission_context, raw_payload)
@@ -248,30 +223,9 @@ async def test_malformed_zero_width_obfuscation(
     normalized = bounded_normalize(raw_payload)
     assert normalized == "drop table"
 
-    class NormalizingSQLInjectionLayer(BaseGuardrailLayer):
-        key = "input.injection"
-        stage = "input"
-        prerequisites = ("input.length",)
-
-        async def check(
-            self,
-            context: AdmissionContext | Any,
-            data: Any,
-        ) -> PipelineDecision[Any]:
-            text = data if isinstance(data, str) else getattr(data, "content", str(data))
-            norm_text = bounded_normalize(text)
-            if safe_regex_match(r"drop\s+table", norm_text.lower()):
-                return PipelineDecision(
-                    status="BLOCK",
-                    response_key=GUARDRAIL_INPUT_INJECTION,
-                    reason="SQL injection attempt detected",
-                    validated_data=None,
-                )
-            return PipelineDecision(status="PASS", validated_data=ValidatedInput(content=text))
-
     registry = GuardrailRegistry()
     registry.register(InputLengthLayer())
-    registry.register(NormalizingSQLInjectionLayer())
+    registry.register(InputInjectionLayer())
 
     gateway = GuardrailGateway(registry)
     decision = await gateway.validate_input(admission_context, raw_payload)
@@ -293,32 +247,9 @@ async def test_base64_encoded_injection_payload(
     extracted = detect_base64_payloads(raw_input)
     assert "Ignore previous instructions" in extracted
 
-    class Base64InjectionDetectorLayer(BaseGuardrailLayer):
-        key = "input.injection"
-        stage = "input"
-        prerequisites = ("input.length",)
-
-        async def check(
-            self,
-            context: AdmissionContext | Any,
-            data: Any,
-        ) -> PipelineDecision[Any]:
-            text = data if isinstance(data, str) else getattr(data, "content", str(data))
-            candidates = [text] + detect_base64_payloads(text)
-            for c in candidates:
-                norm = bounded_normalize(c)
-                if safe_regex_match(r"ignore\s+previous\s+instructions", norm.lower()):
-                    return PipelineDecision(
-                        status="BLOCK",
-                        response_key=GUARDRAIL_INPUT_INJECTION,
-                        reason="Base64 encoded injection detected",
-                        validated_data=None,
-                    )
-            return PipelineDecision(status="PASS", validated_data=ValidatedInput(content=text))
-
     registry = GuardrailRegistry()
     registry.register(InputLengthLayer())
-    registry.register(Base64InjectionDetectorLayer())
+    registry.register(InputInjectionLayer())
 
     gateway = GuardrailGateway(registry)
     decision = await gateway.validate_input(admission_context, raw_input)

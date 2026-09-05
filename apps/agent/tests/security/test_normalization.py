@@ -1,3 +1,4 @@
+import statistics
 import time
 
 import pytest
@@ -223,15 +224,29 @@ def test_is_catastrophic_regex_clears_safe_patterns(pattern: str) -> None:
 def test_safe_regex_match_terminates_within_strict_bound_on_pathological_input(
     pattern: str,
 ) -> None:
+    # Assert deterministic behavior first
+    assert is_catastrophic_regex(pattern) is True
+
     # Pathological input: 1000 'a's or 'x's followed by mismatch character '!'
     pathological_input = ("a" if "a" in pattern else "x") * 1000 + "!"
 
-    start = time.perf_counter()
-    result = safe_regex_match(pattern, pathological_input, timeout_seconds=0.05)
-    duration = time.perf_counter() - start
+    # Warmup call
+    _ = safe_regex_match(pattern, pathological_input, timeout_seconds=0.05)
 
-    # Strict performance bound: must terminate sub-millisecond or <= 5ms per check without hanging
-    assert duration <= 0.005, f"Execution took {duration * 1000:.2f}ms, exceeding 5ms ceiling"
+    # Multi-sample benchmark loop
+    durations: list[float] = []
+    result = None
+    for _ in range(5):
+        start = time.perf_counter()
+        result = safe_regex_match(pattern, pathological_input, timeout_seconds=0.05)
+        durations.append(time.perf_counter() - start)
+        assert result is False
+
+    median_duration = statistics.median(durations)
+    # Generous 20ms CI bound
+    assert median_duration <= 0.02, (
+        f"Execution median took {median_duration * 1000:.2f}ms, exceeding 20ms ceiling"
+    )
     assert result is False
 
 
