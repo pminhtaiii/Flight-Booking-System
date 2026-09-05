@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flight-booking-system.internal/schemas/security/corpus-record.json",
+  "title": "SecurityCorpusRecord",
+  "description": "Canonical schema for security evaluation corpus test cases across detector and invariant suites.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "suiteKind",
+    "expectedStage",
+    "expectedLayerFamily",
+    "taxonomyCode",
+    "label",
+    "payload",
+    "canonicalHash",
+    "variantGroup",
+    "split",
+    "fixture",
+    "oracle",
+    "provenance"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_-]+$",
+      "description": "Unique identifier for the corpus case."
+    },
+    "suiteKind": {
+      "type": "string",
+      "enum": ["detector", "invariant"],
+      "description": "Suite categorization: detector for confusion matrix evaluation, invariant for 100% pass verification."
+    },
+    "expectedStage": {
+      "type": "string",
+      "enum": ["input", "tool", "output"],
+      "description": "Target pipeline stage where evaluation oracle applies."
+    },
+    "expectedLayerFamily": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Guardrail layer family targeted by the case (e.g. injection, pii, topic, schema, authorization, rate_limit)."
+    },
+    "taxonomyCode": {
+      "type": "string",
+      "minLength": 1,
+      "description": "OWASP LLM 2025 taxonomy code (e.g. LLM01, LLM02, LLM06, LLM07) or system invariant category."
+    },
+    "label": {
+      "type": "string",
+      "enum": ["malicious", "benign"],
+      "description": "Ground-truth classification of payload."
+    },
+    "payload": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Raw test payload to be delivered through the stage fixture carrier."
+    },
+    "canonicalHash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA-256 hex digest of NFKC-normalized, whitespace-collapsed, lowercased payload."
+    },
+    "variantGroup": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Family identifier for semantic variants of the same attack/probe concept; must never cross splits."
+    },
+    "split": {
+      "type": "string",
+      "enum": ["holdout", "development", "invariant"],
+      "description": "Corpus partition split."
+    },
+    "fixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["carrier", "authProfile", "mockToolResponse"],
+      "properties": {
+        "carrier": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Harness delivery mechanism (e.g. direct_input, tool_result_wrapper, model_chunk_stream)."
+        },
+        "authProfile": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Authentication context profile for the request."
+        },
+        "mockToolResponse": {
+          "type": ["object", "string", "null"],
+          "description": "Candidate upstream tool response payload if delivery carrier is tool execution."
+        }
+      }
+    },
+    "oracle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["expectedDecision", "expectedErrorCode", "reachedStageMarker"],
+      "properties": {
+        "expectedDecision": {
+          "type": "string",
+          "enum": ["PASS", "BLOCK"],
+          "description": "Expected deterministic guardrail decision."
+        },
+        "expectedErrorCode": {
+          "type": ["string", "null"],
+          "description": "Expected error code on BLOCK, or null on PASS."
+        },
+        "reachedStageMarker": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Payload-free reachability marker identifying successful delivery to the expected stage."
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "license", "revision", "curatedBy", "curatedAt"],
+      "properties": {
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Dataset or synthetic generator origin."
+        },
+        "license": {
+          "type": "string",
+          "minLength": 1,
+          "description": "SPDX license identifier (e.g. MIT, Apache-2.0)."
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Git commit or dataset release version."
+        },
+        "curatedBy": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Entity or team responsible for reviewing the case."
+        },
+        "curatedAt": {
+          "type": "string",
+          "minLength": 1,
+          "description": "ISO 8601 timestamp of case curation."
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "suiteKind": { "const": "invariant" } }
+      },
+      "then": {
+        "properties": { "split": { "const": "invariant" } }
+      }
+    },
+    {
+      "if": {
+        "properties": { "suiteKind": { "const": "detector" } }
+      },
+      "then": {
+        "properties": { "split": { "enum": ["holdout", "development"] } }
+      }
+    },
+    {
+      "if": {
+        "properties": { "label": { "const": "benign" } }
+      },
+      "then": {
+        "properties": {
+          "oracle": {
+            "properties": {
+              "expectedDecision": { "const": "PASS" },
+              "expectedErrorCode": { "type": "null" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "label": { "const": "malicious" } }
+      },
+      "then": {
+        "properties": {
+          "oracle": {
+            "properties": {
+              "expectedDecision": { "const": "BLOCK" },
+              "expectedErrorCode": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
