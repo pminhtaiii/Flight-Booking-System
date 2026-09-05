@@ -57,7 +57,8 @@
 │   │   └── test/                      → API E2E & characterization spec tests
 │   ├── agent/                         → Python/FastAPI agent service
 │   │   ├── src/agent/                 → FastAPI source code
-│   │   │   ├── chat_turn/             → ChatTurnRunner (causal cleanup) & event models
+│   │   │   ├── chat_turn/             → ChatController (thin delegator), ChatTurnRunner (causal cleanup) & event models
+│   │   │   ├── guardrails/            → GuardrailGateway, closed registry, pipeline decisions, layer protocols & boundaries
 │   │   │   ├── trusted_search_snapshot/ → 3-key Redis protocol & safe projections
 │   │   │   ├── graph/                 → LangGraph state machine & deterministic nodes
 │   │   │   └── streaming/             → Thin SSE transport adapter & pre-stream admission
@@ -114,6 +115,51 @@
 ## Build and Runtime Output
 
 The root TypeScript configuration is type-check-only and sets `noEmit: true`. Package build configurations override that setting where runtime JavaScript is required: the API emits `apps/api/dist/main.js` for NestJS startup, and the shared package emits `packages/shared/dist` for the API's workspace imports. The API development command builds shared types first and then runs `nest start --watch`; inheriting the root `noEmit` setting prevents the API entrypoint from being created and causes a `dist/main` module-resolution failure.
+
+## Deterministic Security Guardrails & Chat Protection (Feature 023, Phase 3 US1)
+
+Feature 023 establishes a deterministic, multi-layered security architecture that replaces monolithic LLM-judge guardrails with bounded regex, AST analysis, normalization, and strict capability boundaries, guaranteeing zero secondary model latency and reliable fail-closed behavior across every chat turn.
+
+1. **Thin Controller Delegation (`apps/agent/src/agent/chat_turn/controller.py`)**:
+   - `ChatController` serves as the single entry orchestrator between transport adapters (SSE) and execution engines (`ChatTurnRunner`).
+   - Validates mandatory `GuardrailGateway` presence immediately. If the gateway is unconfigured or absent, it yields `ErrorEvent(code="GUARDRAIL_CONFIGURATION_ERROR")` with 0 downstream runner or model invocations.
+   - Enforces pre-execution input admission validation via `gateway.validate_input(context, message)` using an immutable `AdmissionContext`. If rejected, it immediately yields `ErrorEvent(code=decision.response_key)` without touching session state or LLMs.
+
+2. **Mandatory Security Gateway (`apps/agent/src/agent/guardrails/gateway.py`)**:
+   - `validate_input(context, message)`:
+     - Strict type checking: enforces `AdmissionContext` (zero tool authority).
+     - Layer ordering: queries `registry.ordered_layers("input")` and fails closed (`GUARDRAIL_INPUT_INJECTION`) if the registry contains no input layers or throws an exception.
+     - Short-circuits on the first `BLOCK` decision, completely discarding unvalidated payload data.
+     - Catches unhandled classifier exceptions and fails closed with generic response keys, preventing exception leaks or canary disclosure.
+   - `execute_tool(context, call, invoke)`:
+     - Enforces `TurnCapabilities` validation; verifies the requested tool call is present in `context.sealed_tools`.
+     - Denies unauthorized tools with `GUARDRAIL_TOOL_SCHEMA` before invocation.
+     - Fails closed on execution crashes without leaking internal traceback details.
+   - `stream_output(context, tokens)`:
+     - Yields `ApprovedChunk` instances for safe emitted tokens and terminates safely upon boundary violations.
+
+3. **Closed Registry with Topological Dependency Sorting (`apps/agent/src/agent/guardrails/registry.py`)**:
+   - Closed keyset enforcement: strictly forbids unverified or arbitrary layer registration.
+   - DAG ordering: implements Kahn's in-degree reduction topological sort with cycle detection, ensuring prerequisites (e.g. `input.length`) execute before dependent layers (e.g. `input.pii`, `input.injection`, `input.topic`).
+   - Anti-patterns prohibited: zero dynamic imports (`__import__`, `importlib.import_module`, `eval`, `exec`).
+   - Compulsory production registry (`create_production_registry`):
+     - `COMPULSORY_PRODUCTION_LAYERS`: immutable set containing `input.length`, `input.pii`, `input.injection`, `input.topic`, and `output.pii`.
+     - Disallowing or disabling any compulsory layer raises `RegistryContractError`.
+     - Production layers execute deterministic checks:
+       - `InputLengthLayer`: validates max characters (4096) and max UTF-8 bytes (16384) with static `GUARDRAIL_INPUT_LENGTH`.
+       - `InputPIILayer`: evaluates passport numbers, credit card numbers (Luhn checked), emails, and phone numbers via `detect_pii` with `GUARDRAIL_INPUT_PII`.
+       - `InputInjectionLayer`: evaluates raw text and multi-step normalized variants (`bounded_normalize`, `detect_base64_payloads`) against compiled injection signatures with `GUARDRAIL_INPUT_INJECTION`.
+       - `InputTopicLayer`: filters out-of-domain requests (code generation, creative writing, medical/legal advice) while permitting greetings and travel inquiries with `GUARDRAIL_INPUT_TOPIC`.
+       - `OutputPIILayer`: checks emitted chunk text for confidential PII via `detect_pii` with `GUARDRAIL_OUTPUT_PII`.
+
+4. **Normalization & ReDoS Safe Execution (`apps/agent/src/agent/guardrails/normalization.py`)**:
+   - `bounded_normalize`: composites Unicode NFKC normalization, zero-width character stripping, recursive nested URL decoding (bounded rounds), and homoglyph translation.
+   - `safe_regex_match` & `is_catastrophic_regex`: inspects regex AST for nested quantifiers and repetition alternations, restricting input scanning to sub-millisecond execution (< 5ms) on adversarial inputs.
+
+5. **Immutable Security Contracts (`apps/agent/src/agent/guardrails/base.py`)**:
+   - `AdmissionContext`: immutable turn context before routing with zero tool authority.
+   - `TurnCapabilities`: post-routing sealed capability bound to effective route intent and sealed tool list.
+   - `PipelineDecision[T]`: frozen decision container automatically stripping payload data when `status == "BLOCK"`.
 
 ---
 

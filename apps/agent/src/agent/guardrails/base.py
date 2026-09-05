@@ -1,5 +1,5 @@
 from types import MappingProxyType
-from typing import Any, Generic, Literal, Mapping, Protocol, Tuple, TypeVar
+from typing import Any, Generic, Literal, Mapping, Protocol, Tuple, TypeVar, runtime_checkable
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
@@ -94,6 +94,7 @@ TIn = TypeVar("TIn", contravariant=True)
 TOut = TypeVar("TOut", covariant=True)
 
 
+@runtime_checkable
 class GuardrailLayer(Protocol[TIn, TOut]):
     key: str
     stage: Literal["input", "tool", "output"]
