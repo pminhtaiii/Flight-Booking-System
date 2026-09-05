@@ -98,6 +98,16 @@ export function evaluateSast(sastData) {
     };
   }
 
+  // Require scanner execution evidence
+  const hasEvidence =
+    Array.isArray(sastData.runs) ||
+    Array.isArray(sastData.findings) ||
+    Array.isArray(sastData.results) ||
+    Boolean(sastData.counts && typeof sastData.counts === 'object');
+  if (!hasEvidence) {
+    errors.push('[SAST Error] Missing scanner execution evidence (runs, findings, results, or counts required)');
+  }
+
   // Check scanner execution errors / crash
   if (sastData.errors && Array.isArray(sastData.errors) && sastData.errors.length > 0) {
     errors.push(`[SAST Error] Scanner reported execution error(s): ${JSON.stringify(sastData.errors)}`);
@@ -156,6 +166,15 @@ export function evaluateSast(sastData) {
     }
   }
 
+  // Explicit counts validation
+  if (sastData.counts && typeof sastData.counts === 'object') {
+    for (const [key, val] of Object.entries(sastData.counts)) {
+      if (!Number.isInteger(val) || val < 0) {
+        errors.push(`[SAST Error] Explicit count for "${key}" must be a non-negative integer`);
+      }
+    }
+  }
+
   // If finding objects are present, they are the source of truth for severity counts.
   if (findings.length === 0 && sastData.counts && typeof sastData.counts === 'object') {
     if (typeof sastData.counts.Critical === 'number') criticalCount = sastData.counts.Critical;
@@ -200,6 +219,17 @@ export function evaluateSupplyChain(supplyChainData, options = {}) {
       counts: { Critical: 0, High: 0 },
       exceptions: [],
     };
+  }
+
+  // Require scanner execution evidence
+  const hasEvidence =
+    Array.isArray(supplyChainData.findings) ||
+    Boolean(supplyChainData.pipAudit) ||
+    Boolean(supplyChainData.pnpmAudit) ||
+    Boolean(supplyChainData.gitleaks) ||
+    Boolean(supplyChainData.counts && typeof supplyChainData.counts === 'object');
+  if (!hasEvidence) {
+    errors.push('[Supply Chain Error] Missing scanner execution evidence (findings, sub-scanner reports, or counts required)');
   }
 
   const currentDateMs = options.currentDate ? Date.parse(options.currentDate) : Date.now();
@@ -250,6 +280,15 @@ export function evaluateSupplyChain(supplyChainData, options = {}) {
     const sev = String(f.severity || '').toLowerCase();
     if (sev.includes('crit')) criticalCount++;
     else if (sev.includes('high') || sev === 'error') highCount++;
+  }
+
+  // Explicit counts validation
+  if (supplyChainData.counts && typeof supplyChainData.counts === 'object') {
+    for (const [key, val] of Object.entries(supplyChainData.counts)) {
+      if (!Number.isInteger(val) || val < 0) {
+        errors.push(`[Supply Chain Error] Explicit count for "${key}" must be a non-negative integer`);
+      }
+    }
   }
 
   // If finding objects are present, they are the source of truth for severity counts and suppression.
@@ -319,6 +358,15 @@ export function evaluateDast(dastData) {
     }
   }
 
+  // Require execution evidence
+  const hasExecutionEvidence =
+    dastData.exitCode !== undefined &&
+    dastData.exitCode !== null &&
+    (Array.isArray(dastData.findings) || Boolean(dastData.counts && typeof dastData.counts === 'object'));
+  if (!hasExecutionEvidence) {
+    errors.push('[DAST Error] Missing scanner execution evidence (findings or counts required)');
+  }
+
   // Check auth failures (unexpected 401/403)
   if (
     dastData.authFailure === true ||
@@ -328,7 +376,7 @@ export function evaluateDast(dastData) {
     errors.push('[DAST Failure] Scanner encountered authentication failure (unexpected 401/403)');
   }
 
-  // Check unexpected empty scope
+  // Check test scope
   const endpointsChecked =
     dastData.endpointsChecked !== undefined
       ? Number(dastData.endpointsChecked)
@@ -338,7 +386,9 @@ export function evaluateDast(dastData) {
           ? Number(dastData.totalTests)
           : null;
 
-  if (endpointsChecked !== null && endpointsChecked === 0) {
+  if (endpointsChecked === null) {
+    errors.push('[DAST Failure] Unknown test scope: endpointsChecked, routesChecked, or totalTests must be specified');
+  } else if (!Number.isInteger(endpointsChecked) || endpointsChecked <= 0) {
     errors.push('[DAST Failure] Empty unexpected test scope: 0 endpoints/routes checked');
   }
 
@@ -351,6 +401,15 @@ export function evaluateDast(dastData) {
     const sev = String(f.severity || '').toLowerCase();
     if (sev.includes('crit')) criticalCount++;
     else if (sev.includes('high') || sev === 'error') highCount++;
+  }
+
+  // Explicit counts validation
+  if (dastData.counts && typeof dastData.counts === 'object') {
+    for (const [key, val] of Object.entries(dastData.counts)) {
+      if (!Number.isInteger(val) || val < 0) {
+        errors.push(`[DAST Error] Explicit count for "${key}" must be a non-negative integer`);
+      }
+    }
   }
 
   // If finding objects are present, they are the source of truth for severity counts.
@@ -371,7 +430,7 @@ export function evaluateDast(dastData) {
     errors,
     metrics: {
       exitCode,
-      endpointsChecked: endpointsChecked ?? 0,
+      endpointsChecked: Number.isInteger(endpointsChecked) ? endpointsChecked : 0,
       criticalCount,
       highCount,
     },
@@ -412,6 +471,11 @@ export function evaluateDetectorMetrics(detectorData) {
     if (!s || typeof s !== 'object') {
       errors.push(`[Detector Corpus Error] Missing confusion matrix for stage: "${name}"`);
       continue;
+    }
+
+    const isValidCount = (x) => Number.isInteger(x) && x >= 0;
+    if (!isValidCount(s.tp) || !isValidCount(s.fn) || !isValidCount(s.fp) || !isValidCount(s.tn)) {
+      errors.push(`[Detector Corpus Failure] Stage "${name}" counts must be non-negative integers`);
     }
 
     const tp = Number(s.tp) || 0;
@@ -462,34 +526,31 @@ export function evaluateDetectorMetrics(detectorData) {
     }
   }
 
-  // Aggregate evaluation
-  let agg = detectorData.aggregate;
-  if (!agg || typeof agg !== 'object') {
-    // Derive aggregate from stages
-    let aggTp = 0;
-    let aggFn = 0;
-    let aggFp = 0;
-    let aggTn = 0;
-    for (const name of stageNames) {
-      if (stageMetrics[name]) {
-        aggTp += stageMetrics[name].tp;
-        aggFn += stageMetrics[name].fn;
-        aggFp += stageMetrics[name].fp;
-        aggTn += stageMetrics[name].tn;
-      }
+  // Derive aggregate counts from stage metrics
+  const derivedTp = (stageMetrics.input?.tp || 0) + (stageMetrics.tool?.tp || 0) + (stageMetrics.output?.tp || 0);
+  const derivedFn = (stageMetrics.input?.fn || 0) + (stageMetrics.tool?.fn || 0) + (stageMetrics.output?.fn || 0);
+  const derivedFp = (stageMetrics.input?.fp || 0) + (stageMetrics.tool?.fp || 0) + (stageMetrics.output?.fp || 0);
+  const derivedTn = (stageMetrics.input?.tn || 0) + (stageMetrics.tool?.tn || 0) + (stageMetrics.output?.tn || 0);
+
+  if (detectorData.aggregate && typeof detectorData.aggregate === 'object') {
+    if (
+      Number(detectorData.aggregate.tp) !== derivedTp ||
+      Number(detectorData.aggregate.fn) !== derivedFn ||
+      Number(detectorData.aggregate.fp) !== derivedFp ||
+      Number(detectorData.aggregate.tn) !== derivedTn
+    ) {
+      errors.push(
+        `[Detector Metric Failure] Aggregate counts contradict per-stage sums: derived (tp=${derivedTp}, fn=${derivedFn}, fp=${derivedFp}, tn=${derivedTn}) vs aggregate (tp=${detectorData.aggregate.tp}, fn=${detectorData.aggregate.fn}, fp=${detectorData.aggregate.fp}, tn=${detectorData.aggregate.tn})`,
+      );
     }
-    agg = { tp: aggTp, fn: aggFn, fp: aggFp, tn: aggTn };
   }
 
-  const aggTp = Number(agg.tp) || 0;
-  const aggFn = Number(agg.fn) || 0;
-  const aggFp = Number(agg.fp) || 0;
-  const aggTn = Number(agg.tn) || 0;
-  const aggMal = aggTp + aggFn;
-  const aggBen = aggFp + aggTn;
+  // Always use the derived sums derivedTp, derivedFn, derivedFp, derivedTn for computing aggTpr and aggFpr
+  const aggMal = derivedTp + derivedFn;
+  const aggBen = derivedFp + derivedTn;
 
-  const aggTpr = aggMal > 0 ? aggTp / aggMal : 0;
-  const aggFpr = aggBen > 0 ? aggFp / aggBen : 0;
+  const aggTpr = aggMal > 0 ? derivedTp / aggMal : 0;
+  const aggFpr = aggBen > 0 ? derivedFp / aggBen : 0;
 
   if (aggTpr < 0.95) {
     errors.push(`[Detector Metric Failure] Aggregate TPR ${(aggTpr * 100).toFixed(2)}% below required minimum 95.0%`);
@@ -529,7 +590,7 @@ export function evaluateDetectorMetrics(detectorData) {
     errors,
     metrics: {
       stages: stageMetrics,
-      aggregate: { tp: aggTp, fn: aggFn, fp: aggFp, tn: aggTn, tpr: aggTpr, fpr: aggFpr },
+      aggregate: { tp: derivedTp, fn: derivedFn, fp: derivedFp, tn: derivedTn, tpr: aggTpr, fpr: aggFpr },
     },
   };
 }
@@ -551,10 +612,25 @@ export function evaluateInvariants(invariantData) {
     };
   }
 
+  const isValidCount = (x) => Number.isInteger(x) && x >= 0;
+  if (
+    !isValidCount(invariantData.total) ||
+    !isValidCount(invariantData.passed) ||
+    !isValidCount(invariantData.failed)
+  ) {
+    errors.push('[Invariant Corpus Failure] Invariant counts must be non-negative integers');
+  }
+
   const total = Number(invariantData.total) || 0;
   const passed = Number(invariantData.passed) || 0;
   const failed = Number(invariantData.failed) || 0;
   const passRate = total > 0 ? passed / total : 0;
+
+  if (passed + failed !== total) {
+    errors.push(
+      `[Invariant Corpus Failure] Invariant counts contradictory: passed (${passed}) + failed (${failed}) !== total (${total})`,
+    );
+  }
 
   if (total === 0) {
     errors.push('[Invariant Corpus Failure] Invariant corpus evaluation scope is empty (0 tests executed)');
@@ -591,8 +667,20 @@ export function verifyShardUnion(manifest) {
     };
   }
 
-  const shards = Array.isArray(manifest.shards) ? manifest.shards : [];
   const totalShards = Number(manifest.totalShards);
+  if (!Number.isInteger(totalShards) || totalShards < 1) {
+    errors.push('[Shard Union Error] Manifest must specify totalShards as a positive integer >= 1');
+  }
+
+  if (!Array.isArray(manifest.shards) || manifest.shards.length === 0) {
+    errors.push('[Shard Union Error] Manifest missing shards array or contains 0 shards');
+  }
+
+  if (!Array.isArray(manifest.requiredCaseIds) || manifest.requiredCaseIds.length === 0) {
+    errors.push('[Shard Union Error] Manifest missing requiredCaseIds array or contains 0 required cases');
+  }
+
+  const shards = Array.isArray(manifest.shards) ? manifest.shards : [];
 
   if (Number.isInteger(totalShards) && shards.length !== totalShards) {
     errors.push(
@@ -708,6 +796,7 @@ export function evaluateSecurityResults(optionsOrDir) {
   } else if (optionsOrDir && typeof optionsOrDir === 'object') {
     if (optionsOrDir.directory) targetDir = optionsOrDir.directory;
     if (optionsOrDir.manifest) manifestPath = optionsOrDir.manifest;
+    else if (optionsOrDir.manifestPath) manifestPath = optionsOrDir.manifestPath;
     if (optionsOrDir.currentDate) currentDate = optionsOrDir.currentDate;
   }
 
@@ -874,14 +963,28 @@ export function evaluateSecurityResults(optionsOrDir) {
   if (!invEval.passed) errors.push(...invEval.errors);
 
   // Multi-shard manifest verification
-  const effectiveManifest = manifestPath || (existsSync(join(resolvedDir, 'manifest.json')) ? join(resolvedDir, 'manifest.json') : null);
-  if (effectiveManifest && existsSync(effectiveManifest)) {
-    try {
-      const manifest = JSON.parse(readFileSync(effectiveManifest, 'utf8'));
-      const shardEval = verifyShardUnion(manifest);
-      if (!shardEval.valid) errors.push(...shardEval.errors);
-    } catch (err) {
-      errors.push(`[Shard Manifest Error] Failed to read shard manifest: ${err.message}`);
+  if (manifestPath) {
+    if (!existsSync(manifestPath)) {
+      errors.push('[Shard Manifest Error] Specified manifest file does not exist: ' + manifestPath);
+    } else {
+      try {
+        const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+        const shardEval = verifyShardUnion(manifest);
+        if (!shardEval.valid) errors.push(...shardEval.errors);
+      } catch (err) {
+        errors.push(`[Shard Manifest Error] Failed to read shard manifest: ${err.message}`);
+      }
+    }
+  } else {
+    const autoManifestPath = join(resolvedDir, 'manifest.json');
+    if (existsSync(autoManifestPath)) {
+      try {
+        const manifest = JSON.parse(readFileSync(autoManifestPath, 'utf8'));
+        const shardEval = verifyShardUnion(manifest);
+        if (!shardEval.valid) errors.push(...shardEval.errors);
+      } catch (err) {
+        errors.push(`[Shard Manifest Error] Failed to read shard manifest: ${err.message}`);
+      }
     }
   }
 

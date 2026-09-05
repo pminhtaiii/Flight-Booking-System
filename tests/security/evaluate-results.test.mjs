@@ -642,3 +642,260 @@ test('validateReportSchemas and evaluateSecurityResults: missing report version 
   }
 });
 
+test('evaluateSast, evaluateSupplyChain, evaluateDast: empty or version-only reports fail closed', () => {
+  // SAST empty/version-only
+  const sastEmpty = { version: '1.88.0' };
+  const sastRes = evaluateSast(sastEmpty);
+  assert.equal(sastRes.passed, false);
+  assert.ok(
+    sastRes.errors.includes('[SAST Error] Missing scanner execution evidence (runs, findings, results, or counts required)'),
+  );
+
+  // Supply Chain empty/version-only
+  const scEmpty = { version: '1.0.0' };
+  const scRes = evaluateSupplyChain(scEmpty);
+  assert.equal(scRes.passed, false);
+  assert.ok(
+    scRes.errors.includes('[Supply Chain Error] Missing scanner execution evidence (findings, sub-scanner reports, or counts required)'),
+  );
+
+  // DAST empty/version-only
+  const dastEmpty = { version: '1.0.0' };
+  const dastRes = evaluateDast(dastEmpty);
+  assert.equal(dastRes.passed, false);
+  assert.ok(
+    dastRes.errors.includes('[DAST Error] Missing scanner execution evidence (findings or counts required)'),
+  );
+  assert.ok(
+    dastRes.errors.includes('[DAST Failure] Unknown test scope: endpointsChecked, routesChecked, or totalTests must be specified'),
+  );
+});
+
+test('evaluateDast: missing scope fails closed', () => {
+  // Missing scope entirely
+  const dastMissingScope = {
+    exitCode: 0,
+    findings: [],
+  };
+  const resMissing = evaluateDast(dastMissingScope);
+  assert.equal(resMissing.passed, false);
+  assert.ok(
+    resMissing.errors.includes('[DAST Failure] Unknown test scope: endpointsChecked, routesChecked, or totalTests must be specified'),
+  );
+
+  // Empty scope (0)
+  const dastZeroScope = {
+    exitCode: 0,
+    endpointsChecked: 0,
+    findings: [],
+  };
+  const resZero = evaluateDast(dastZeroScope);
+  assert.equal(resZero.passed, false);
+  assert.ok(
+    resZero.errors.includes('[DAST Failure] Empty unexpected test scope: 0 endpoints/routes checked'),
+  );
+
+  // Negative scope (-5)
+  const dastNegScope = {
+    exitCode: 0,
+    endpointsChecked: -5,
+    findings: [],
+  };
+  const resNeg = evaluateDast(dastNegScope);
+  assert.equal(resNeg.passed, false);
+  assert.ok(
+    resNeg.errors.includes('[DAST Failure] Empty unexpected test scope: 0 endpoints/routes checked'),
+  );
+
+  // Non-integer scope (2.5)
+  const dastFloatScope = {
+    exitCode: 0,
+    endpointsChecked: 2.5,
+    findings: [],
+  };
+  const resFloat = evaluateDast(dastFloatScope);
+  assert.equal(resFloat.passed, false);
+  assert.ok(
+    resFloat.errors.includes('[DAST Failure] Empty unexpected test scope: 0 endpoints/routes checked'),
+  );
+});
+
+test('evaluateDetectorMetrics: contradictory aggregate counts fail closed', () => {
+  const detectorContradictory = {
+    stages: {
+      input: { tp: 100, fn: 0, fp: 2, tn: 248 },
+      tool: { tp: 50, fn: 0, fp: 1, tn: 124 },
+      output: { tp: 50, fn: 0, fp: 1, tn: 124 },
+    },
+    // Derived sums are: tp: 200, fn: 0, fp: 4, tn: 496. Aggregate provides contradictory tp: 250
+    aggregate: { tp: 250, fn: 0, fp: 4, tn: 496 },
+    stageReachability: {
+      upstreamBlocksAsDownstreamTp: 0,
+      missingStageMarkers: 0,
+      incompleteRuns: 0,
+    },
+  };
+
+  const res = evaluateDetectorMetrics(detectorContradictory);
+  assert.equal(res.passed, false);
+  assert.ok(
+    res.errors.includes(
+      '[Detector Metric Failure] Aggregate counts contradict per-stage sums: derived (tp=200, fn=0, fp=4, tn=496) vs aggregate (tp=250, fn=0, fp=4, tn=496)',
+    ),
+  );
+  // Derived counts should still be used for aggregate metrics
+  assert.equal(res.metrics.aggregate.tp, 200);
+});
+
+test('evaluateSecurityResults: missing explicitly provided manifest path fails closed', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'sec-eval-manifest-missing-'));
+  try {
+    writeFixtureDirectory(tempDir);
+    const nonExistentManifest = join(tempDir, 'does-not-exist-manifest.json');
+
+    const res = evaluateSecurityResults({
+      directory: tempDir,
+      manifest: nonExistentManifest,
+      currentDate: EVAL_DATE,
+    });
+    assert.equal(res.passed, false);
+    assert.equal(res.exitCode, 1);
+    assert.ok(
+      res.errors.includes(`[Shard Manifest Error] Specified manifest file does not exist: ${nonExistentManifest}`),
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('verifyShardUnion: empty manifest {} fails closed', () => {
+  const res = verifyShardUnion({});
+  assert.equal(res.valid, false);
+  assert.ok(
+    res.errors.includes('[Shard Union Error] Manifest must specify totalShards as a positive integer >= 1'),
+  );
+  assert.ok(
+    res.errors.includes('[Shard Union Error] Manifest missing shards array or contains 0 shards'),
+  );
+  assert.ok(
+    res.errors.includes('[Shard Union Error] Manifest missing requiredCaseIds array or contains 0 required cases'),
+  );
+});
+
+test('evaluateDetectorMetrics: negative or non-integer stage counts fail closed', () => {
+  // Negative stage count
+  const negCounts = {
+    stages: {
+      input: { tp: -10, fn: 0, fp: 2, tn: 248 },
+      tool: { tp: 50, fn: 0, fp: 1, tn: 124 },
+      output: { tp: 50, fn: 0, fp: 1, tn: 124 },
+    },
+    stageReachability: {
+      upstreamBlocksAsDownstreamTp: 0,
+      missingStageMarkers: 0,
+      incompleteRuns: 0,
+    },
+  };
+  const resNeg = evaluateDetectorMetrics(negCounts);
+  assert.equal(resNeg.passed, false);
+  assert.ok(
+    resNeg.errors.includes('[Detector Corpus Failure] Stage "input" counts must be non-negative integers'),
+  );
+
+  // Non-integer stage count
+  const floatCounts = {
+    stages: {
+      input: { tp: 100, fn: 0, fp: 2, tn: 248 },
+      tool: { tp: 50.5, fn: 0, fp: 1, tn: 124 },
+      output: { tp: 50, fn: 0, fp: 1, tn: 124 },
+    },
+    stageReachability: {
+      upstreamBlocksAsDownstreamTp: 0,
+      missingStageMarkers: 0,
+      incompleteRuns: 0,
+    },
+  };
+  const resFloat = evaluateDetectorMetrics(floatCounts);
+  assert.equal(resFloat.passed, false);
+  assert.ok(
+    resFloat.errors.includes('[Detector Corpus Failure] Stage "tool" counts must be non-negative integers'),
+  );
+});
+
+test('evaluateInvariants: negative or contradictory counts fail closed', () => {
+  // Negative count
+  const negInv = {
+    total: 35,
+    passed: -1,
+    failed: 36,
+  };
+  const resNeg = evaluateInvariants(negInv);
+  assert.equal(resNeg.passed, false);
+  assert.ok(
+    resNeg.errors.includes('[Invariant Corpus Failure] Invariant counts must be non-negative integers'),
+  );
+
+  // Non-integer count
+  const floatInv = {
+    total: 35.5,
+    passed: 35.5,
+    failed: 0,
+  };
+  const resFloat = evaluateInvariants(floatInv);
+  assert.equal(resFloat.passed, false);
+  assert.ok(
+    resFloat.errors.includes('[Invariant Corpus Failure] Invariant counts must be non-negative integers'),
+  );
+
+  // Contradictory counts (passed + failed !== total)
+  const contradictoryInv = {
+    total: 35,
+    passed: 34,
+    failed: 0,
+  };
+  const resContradictory = evaluateInvariants(contradictoryInv);
+  assert.equal(resContradictory.passed, false);
+  assert.ok(
+    resContradictory.errors.includes(
+      '[Invariant Corpus Failure] Invariant counts contradictory: passed (34) + failed (0) !== total (35)',
+    ),
+  );
+});
+
+test('evaluateSast, evaluateSupplyChain, evaluateDast: negative or non-integer explicit counts fail closed', () => {
+  // SAST negative explicit count
+  const sastBad = {
+    findings: [],
+    counts: { Critical: -1, High: 0 },
+  };
+  const resSast = evaluateSast(sastBad);
+  assert.equal(resSast.passed, false);
+  assert.ok(
+    resSast.errors.includes('[SAST Error] Explicit count for "Critical" must be a non-negative integer'),
+  );
+
+  // Supply Chain non-integer explicit count
+  const scBad = {
+    findings: [],
+    counts: { Critical: 1.5, High: 0 },
+  };
+  const resSc = evaluateSupplyChain(scBad);
+  assert.equal(resSc.passed, false);
+  assert.ok(
+    resSc.errors.includes('[Supply Chain Error] Explicit count for "Critical" must be a non-negative integer'),
+  );
+
+  // DAST negative explicit count
+  const dastBad = {
+    exitCode: 0,
+    endpointsChecked: 20,
+    findings: [],
+    counts: { High: -2 },
+  };
+  const resDast = evaluateDast(dastBad);
+  assert.equal(resDast.passed, false);
+  assert.ok(
+    resDast.errors.includes('[DAST Error] Explicit count for "High" must be a non-negative integer'),
+  );
+});
+
