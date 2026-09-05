@@ -4,6 +4,145 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 
+function coverageModuleName(filePath) {
+  let normalized = String(filePath).replaceAll('\\', '/');
+  const sourceMarker = normalized.lastIndexOf('/src/');
+  if (sourceMarker >= 0) normalized = normalized.slice(sourceMarker + 5);
+  else {
+    const agentMarker = normalized.indexOf('agent/');
+    if (agentMarker >= 0) normalized = normalized.slice(agentMarker);
+  }
+  normalized = normalized.replace(/\.[^.\/]+$/, '').replace(/\/__init__$/, '');
+  return normalized.replaceAll('/', '.');
+}
+
+function coverageScopeMatches(scope, moduleName) {
+  if (scope.endsWith('.*')) return moduleName.startsWith(`${scope.slice(0, -1)}`);
+  return moduleName === scope;
+}
+
+function coverageFileRecords(coverageData) {
+  if (coverageData && typeof coverageData === 'object' && coverageData.files && typeof coverageData.files === 'object') {
+    return Object.entries(coverageData.files).map(([filePath, file]) => ({
+      moduleName: coverageModuleName(filePath),
+      summary: file?.summary && typeof file.summary === 'object' ? file.summary : file,
+    }));
+  }
+  if (typeof coverageData === 'string') {
+    return [...coverageData.matchAll(/<class\b([^>]*?)>/g)].map((match) => {
+      const attrs = match[1];
+      const read = (name) => attrs.match(new RegExp(`${name}="([0-9.]+|[^\"]*)"`))?.[1];
+      const lineRate = Number(read('line-rate'));
+      const branchRate = Number(read('branch-rate'));
+      return {
+        moduleName: coverageModuleName(read('filename') || read('name') || ''),
+        summary: {
+          percent_covered: Number.isFinite(lineRate) ? lineRate * 100 : undefined,
+          branch_percent_covered: Number.isFinite(branchRate) ? branchRate * 100 : undefined,
+        },
+      };
+    });
+  }
+  return [];
+}
+
+function ratioOrPercent(summary, coveredNames, totalNames, percentNames, zeroTotalPercent = null) {
+  const covered = coveredNames.map((name) => summary?.[name]).find((value) => Number.isFinite(value));
+  const total = totalNames.map((name) => summary?.[name]).find((value) => Number.isFinite(value));
+  if (Number.isFinite(covered) && Number.isFinite(total) && total >= 0) {
+    if (total === 0 && zeroTotalPercent === null) return null;
+    if (total === 0) return { covered: 0, total: 1, percent: zeroTotalPercent };
+    return { covered, total, percent: (covered / total) * 100 };
+  }
+  const percent = percentNames.map((name) => summary?.[name]).find((value) => Number.isFinite(value));
+  if (Number.isFinite(percent)) return { covered: percent, total: 1, percent };
+  return null;
+}
+
+function evaluateCoverageScopes(coverageData, policy) {
+  const errors = [];
+  const scopes = {};
+  const records = coverageFileRecords(coverageData);
+  for (const scope of policy.modules) {
+    const matching = records.filter(({ moduleName }) => coverageScopeMatches(scope, moduleName));
+    if (matching.length === 0) {
+      errors.push(`[Coverage Failure] Scope ${scope} has no covered files`);
+      continue;
+    }
+    const statement = matching.map(({ summary }) => ratioOrPercent(summary, ['covered_lines', 'covered_statements'], ['num_statements', 'num_lines'], ['percent_covered'], 100));
+    const branch = matching.map(({ summary }) => ratioOrPercent(summary, ['covered_branches'], ['num_branches'], ['branch_percent_covered', 'percent_covered_branches'], 100));
+    if (statement.some((value) => value === null) || branch.some((value) => value === null)) {
+      errors.push(`[Coverage Failure] Scope ${scope} is missing measurable statement or branch coverage`);
+      continue;
+    }
+    const statementTotal = statement.reduce((sum, value) => sum + value.total, 0);
+    const statementCovered = statement.reduce((sum, value) => sum + value.covered, 0);
+    const branchTotal = branch.reduce((sum, value) => sum + value.total, 0);
+    const branchCovered = branch.reduce((sum, value) => sum + value.covered, 0);
+    for (let index = 0; index < matching.length; index += 1) {
+      const moduleName = matching[index].moduleName;
+      if (statement[index].percent < policy.thresholds.statements) {
+        errors.push(`[Coverage Failure] Scope ${scope} module ${moduleName} statement coverage ${statement[index].percent.toFixed(1)}% is below required minimum ${policy.thresholds.statements.toFixed(1)}%`);
+      }
+      if (branch[index].percent < policy.thresholds.branches) {
+        errors.push(`[Coverage Failure] Scope ${scope} module ${moduleName} branch coverage ${branch[index].percent.toFixed(1)}% is below required minimum ${policy.thresholds.branches.toFixed(1)}%`);
+      }
+    }
+    const metrics = {
+      statementCoverage: (statementCovered / statementTotal) * 100,
+      branchCoverage: (branchCovered / branchTotal) * 100,
+      files: matching.length,
+    };
+    scopes[scope] = metrics;
+    if (metrics.statementCoverage < policy.thresholds.statements) errors.push(`[Coverage Failure] Scope ${scope} statement coverage ${metrics.statementCoverage.toFixed(1)}% is below required minimum ${policy.thresholds.statements.toFixed(1)}%`);
+    if (metrics.branchCoverage < policy.thresholds.branches) errors.push(`[Coverage Failure] Scope ${scope} branch coverage ${metrics.branchCoverage.toFixed(1)}% is below required minimum ${policy.thresholds.branches.toFixed(1)}%`);
+  }
+  return { passed: errors.length === 0, errors, metrics: scopes };
+}
+
+function aggregateCoverageFromFiles(coverageData) {
+  const records = coverageFileRecords(coverageData);
+  if (records.length === 0) return null;
+  const statements = records.map(({ summary }) => ratioOrPercent(summary, ['covered_lines', 'covered_statements'], ['num_statements', 'num_lines'], ['percent_covered'], 100));
+  const branches = records.map(({ summary }) => ratioOrPercent(summary, ['covered_branches'], ['num_branches'], ['branch_percent_covered', 'percent_covered_branches'], 100));
+  if (statements.some((value) => value === null) || branches.some((value) => value === null)) return null;
+  const statementTotal = statements.reduce((sum, value) => sum + value.total, 0);
+  const branchTotal = branches.reduce((sum, value) => sum + value.total, 0);
+  return {
+    statementCoverage: statements.reduce((sum, value) => sum + value.covered, 0) / statementTotal * 100,
+    branchCoverage: branches.reduce((sum, value) => sum + value.covered, 0) / branchTotal * 100,
+  };
+}
+
+export function normalizeCoveragePolicy(policy) {
+  if (!policy || typeof policy !== 'object' || Array.isArray(policy) || !policy.thresholds || !Array.isArray(policy.modules) || policy.modules.length === 0) {
+    return { policy: null, errors: ['[Fail-Closed] Invalid coverage policy shape'] };
+  }
+  const { statements, branches } = policy.thresholds;
+  if (!Number.isFinite(statements) || !Number.isFinite(branches) || statements < 0 || statements > 100 || branches < 0 || branches > 100) {
+    return { policy: null, errors: ['[Fail-Closed] Invalid coverage policy thresholds'] };
+  }
+  if (policy.modules.some((scope) => typeof scope !== 'string' || !scope.trim())) {
+    return { policy: null, errors: ['[Fail-Closed] Invalid coverage policy scope'] };
+  }
+  return {
+    policy: {
+      ...policy,
+      thresholds: { statements, branches },
+      modules: [...policy.modules],
+    },
+    errors: [],
+  };
+}
+
+export function loadCoveragePolicy(policyPath = resolve(fileURLToPath(new URL('../../tests/security/coverage-policy.json', import.meta.url)))) {
+  try {
+    return normalizeCoveragePolicy(JSON.parse(readFileSync(policyPath, 'utf8')));
+  } catch (error) {
+    return { policy: null, errors: [`[Fail-Closed] Failed to load coverage policy: ${error.message}`] };
+  }
+}
+
 /**
  * Evaluates test coverage metrics against thresholds:
  * statement coverage >= 95.0%, branch coverage >= 90.0%.
@@ -11,7 +150,7 @@ const __filename = fileURLToPath(import.meta.url);
  * @param {object|string} coverageData JSON object or Cobertura XML string
  * @returns {{ passed: boolean, errors: string[], metrics: { statementCoverage: number, branchCoverage: number } }}
  */
-export function evaluateCoverage(coverageData) {
+export function evaluateCoverage(coverageData, options = {}) {
   const errors = [];
   let stmt = 0;
   let branch = 0;
@@ -63,11 +202,28 @@ export function evaluateCoverage(coverageData) {
     };
   }
 
+  // coverage.py JSON reports expose the authoritative per-file counts under
+  // `files`; derive aggregate rates when the report has no top-level totals.
+  if (coverageData && typeof coverageData === 'object' && coverageData.files && typeof coverageData.files === 'object') {
+    const aggregate = aggregateCoverageFromFiles(coverageData);
+    const hasStatementTotal = coverageData.statementCoverage !== undefined || coverageData.statements || coverageData.totals?.percent_covered !== undefined || coverageData.total?.statements || coverageData.total?.lines;
+    const hasBranchTotal = coverageData.branchCoverage !== undefined || coverageData.branches || coverageData.totals?.branch_percent_covered !== undefined || coverageData.total?.branches;
+    if (aggregate && !hasStatementTotal) stmt = aggregate.statementCoverage;
+    if (aggregate && !hasBranchTotal) branch = aggregate.branchCoverage;
+  }
+
   if (stmt < 95.0) {
     errors.push(`[Coverage Failure] Statement (statement) coverage ${stmt.toFixed(1)}% is below required minimum 95.0%`);
   }
   if (branch < 90.0) {
     errors.push(`[Coverage Failure] Branch (branch) coverage ${branch.toFixed(1)}% is below required minimum 90.0%`);
+  }
+
+  let scopes = {};
+  if (options.policy) {
+    const scoped = evaluateCoverageScopes(coverageData, options.policy);
+    errors.push(...scoped.errors);
+    scopes = scoped.metrics;
   }
 
   return {
@@ -76,6 +232,7 @@ export function evaluateCoverage(coverageData) {
     metrics: {
       statementCoverage: stmt,
       branchCoverage: branch,
+      ...(options.policy ? { scopes } : {}),
     },
   };
 }
@@ -796,7 +953,7 @@ function hasValidReportVersion(report) {
     return Boolean(vMatch && vMatch[1] && vMatch[1].trim() !== '');
   }
   if (report && typeof report === 'object') {
-    const v = report.version;
+    const v = report.version ?? report.meta?.version;
     if (typeof v === 'string') return v.trim() !== '';
     if (typeof v === 'number') return !isNaN(v);
   }
@@ -850,6 +1007,9 @@ export function evaluateSecurityResults(optionsOrDir) {
   let targetDir = 'artifacts/security';
   let manifestPath = null;
   let currentDate = new Date().toISOString();
+  let coveragePolicyPath;
+  let coveragePolicyOverride;
+  let hasCoveragePolicyOverride = false;
 
   if (typeof optionsOrDir === 'string') {
     targetDir = optionsOrDir;
@@ -858,11 +1018,24 @@ export function evaluateSecurityResults(optionsOrDir) {
     if (optionsOrDir.manifest) manifestPath = optionsOrDir.manifest;
     else if (optionsOrDir.manifestPath) manifestPath = optionsOrDir.manifestPath;
     if (optionsOrDir.currentDate) currentDate = optionsOrDir.currentDate;
+    if (Object.prototype.hasOwnProperty.call(optionsOrDir, 'coveragePolicy')) {
+      coveragePolicyOverride = optionsOrDir.coveragePolicy;
+      hasCoveragePolicyOverride = true;
+    } else if (optionsOrDir.coveragePolicyPath) {
+      coveragePolicyPath = optionsOrDir.coveragePolicyPath;
+    }
   }
 
   const resolvedDir = resolve(targetDir);
   const errors = [];
   const reports = {};
+  const policyResult = hasCoveragePolicyOverride
+    ? (() => {
+        const normalized = normalizeCoveragePolicy(coveragePolicyOverride);
+        return { policy: normalized.policy, errors: normalized.errors };
+      })()
+    : loadCoveragePolicy(coveragePolicyPath);
+  if (policyResult.errors.length > 0) errors.push(...policyResult.errors);
 
   if (!existsSync(resolvedDir)) {
     return {
@@ -999,7 +1172,7 @@ export function evaluateSecurityResults(optionsOrDir) {
   }
 
   // Evaluate Coverage
-  const covEval = evaluateCoverage(reports.coverage);
+  const covEval = evaluateCoverage(reports.coverage, { policy: policyResult.policy });
   if (!covEval.passed) errors.push(...covEval.errors);
 
   // Evaluate SAST

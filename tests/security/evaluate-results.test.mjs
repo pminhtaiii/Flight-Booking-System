@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
@@ -27,6 +27,62 @@ const evaluatorCliPath = resolve(repoRoot, 'scripts/security/evaluate-results.mj
 
 const EVAL_DATE = '2026-09-05T00:00:00Z';
 
+const cleanCoverageFiles = Object.fromEntries(
+  [
+    'agent/chat_turn/controller.py',
+    'agent/chat_turn/runner.py',
+    'agent/main.py',
+    'agent/config.py',
+    'agent/guardrails/base.py',
+    'agent/middleware/body_limit.py',
+    'agent/streaming/chunk_buffer.py',
+    'agent/streaming/sse.py',
+    'agent/memory/manager.py',
+    'agent/sanitization/pii.py',
+    'agent/tools/search.py',
+  ].map((file) => [
+    file,
+    {
+      summary: {
+        covered_lines: 100,
+        num_statements: 100,
+        covered_branches: 100,
+        num_branches: 100,
+      },
+    },
+  ]),
+);
+
+test('coverage policy scopes are enforced per module and missing scopes fail closed', () => {
+  const policy = {
+    thresholds: { statements: 95, branches: 90 },
+    modules: ['agent.main', 'agent.tools.*'],
+  };
+  const complete = {
+    meta: { version: '7.0.0' },
+    statementCoverage: 95,
+    branchCoverage: 90,
+    files: {
+      'apps/agent/src/agent/main.py': {
+        summary: { covered_lines: 19, num_statements: 20, covered_branches: 9, num_branches: 10 },
+      },
+      'apps/agent/src/agent/tools/search.py': {
+        summary: { covered_lines: 19, num_statements: 20, covered_branches: 9, num_branches: 10 },
+      },
+    },
+  };
+  const pass = evaluateCoverage(complete, { policy });
+  assert.equal(pass.passed, true);
+  assert.deepEqual(pass.metrics.scopes, {
+    'agent.main': { statementCoverage: 95, branchCoverage: 90, files: 1 },
+    'agent.tools.*': { statementCoverage: 95, branchCoverage: 90, files: 1 },
+  });
+
+  const missing = evaluateCoverage({ ...complete, files: { 'apps/agent/src/agent/main.py': complete.files['apps/agent/src/agent/main.py'] } }, { policy });
+  assert.equal(missing.passed, false);
+  assert.match(missing.errors.join('\n'), /agent\.tools\.\*.*no covered files/);
+});
+
 function createCleanFixtureReports() {
   return {
     coverage: {
@@ -35,6 +91,7 @@ function createCleanFixtureReports() {
       branchCoverage: 91.5,
       statements: { covered: 962, total: 1000, pct: 96.2 },
       branches: { covered: 183, total: 200, pct: 91.5 },
+      files: cleanCoverageFiles,
     },
     sast: {
       scanner: 'semgrep',
@@ -105,6 +162,22 @@ test('evaluateSecurityResults: clean synthetic reports fixture passes with exit 
     assert.equal(result.passed, true);
     assert.equal(result.exitCode, 0);
     assert.equal(result.errors.length, 0);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('evaluateSecurityResults: missing required module coverage fails closed', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'sec-eval-scope-'));
+  try {
+    writeFixtureDirectory(tempDir);
+    const coveragePath = join(tempDir, 'coverage.json');
+    const coverage = JSON.parse(readFileSync(coveragePath, 'utf8'));
+    delete coverage.files['agent/main.py'];
+    writeFileSync(coveragePath, JSON.stringify(coverage, null, 2), 'utf8');
+    const result = evaluateSecurityResults({ directory: tempDir, currentDate: EVAL_DATE });
+    assert.equal(result.passed, false);
+    assert.match(result.errors.join('\n'), /Scope agent\.main has no covered files/);
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
@@ -1238,5 +1311,3 @@ test('evaluateDast: comprehensive malformed and valid counts handling', () => {
   assert.equal(resValidCountsOnly.passed, true);
   assert.equal(resValidCountsOnly.errors.length, 0);
 });
-
-

@@ -44,4 +44,5 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 markers = [
     "redis_integration: requires a reachable Redis server",
+    "security: security regression and guardrail verification tests",
 ]
