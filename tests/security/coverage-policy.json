@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "1.0.0",
+  "thresholds": {
+    "statements": 95,
+    "branches": 90
+  },
+  "modules": [
+    "agent.chat_turn.controller",
+    "agent.chat_turn.runner",
+    "agent.guardrails.*",
+    "agent.middleware.body_limit",
+    "agent.streaming.chunk_buffer",
+    "agent.memory.manager",
+    "agent.sanitization.*"
+  ]
+}
