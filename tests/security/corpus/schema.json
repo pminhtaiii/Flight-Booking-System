@@ -53,6 +53,7 @@
     },
     "payload": {
       "type": "string",
+      "minLength": 1,
       "description": "Raw test payload to be delivered through the stage fixture carrier."
     },
     "canonicalHash": {
@@ -144,5 +145,53 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "suiteKind": { "const": "invariant" } }
+      },
+      "then": {
+        "properties": { "split": { "const": "invariant" } }
+      }
+    },
+    {
+      "if": {
+        "properties": { "suiteKind": { "const": "detector" } }
+      },
+      "then": {
+        "properties": { "split": { "enum": ["holdout", "development"] } }
+      }
+    },
+    {
+      "if": {
+        "properties": { "label": { "const": "benign" } }
+      },
+      "then": {
+        "properties": {
+          "oracle": {
+            "properties": {
+              "expectedDecision": { "const": "PASS" },
+              "expectedErrorCode": { "type": "null" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "label": { "const": "malicious" } }
+      },
+      "then": {
+        "properties": {
+          "oracle": {
+            "properties": {
+              "expectedDecision": { "const": "BLOCK" },
+              "expectedErrorCode": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

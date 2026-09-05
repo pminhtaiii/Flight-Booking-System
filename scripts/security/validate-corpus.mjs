@@ -71,6 +71,87 @@ export function loadCorpusJsonl(filePath) {
  * @param {any} schema
  * @returns {string[]} List of validation error messages, or empty if valid.
  */
+function validatePropertyBySchema(propName, val, propDef, prefix = '') {
+  const errs = [];
+  const fullName = prefix ? `${prefix}.${propName}` : propName;
+
+  if (Array.isArray(propDef.type)) {
+    const matched = propDef.type.some((t) => {
+      if (t === 'null') return val === null;
+      if (t === 'string') return typeof val === 'string';
+      if (t === 'object') return typeof val === 'object' && val !== null && !Array.isArray(val);
+      return false;
+    });
+    if (!matched) {
+      errs.push(`${fullName} must be one of types: [${propDef.type.join(', ')}]`);
+      return errs;
+    }
+  } else if (propDef.type === 'string') {
+    if (typeof val !== 'string') {
+      errs.push(`${fullName} must be a string`);
+      return errs;
+    }
+  } else if (propDef.type === 'object') {
+    if (typeof val !== 'object' || val === null || Array.isArray(val)) {
+      errs.push(`${fullName} must be an object`);
+      return errs;
+    }
+  }
+
+  if (typeof val === 'string') {
+    if (propDef.minLength !== undefined && val.trim().length < propDef.minLength) {
+      errs.push(`${fullName} must be a non-empty string`);
+    }
+    if (propDef.pattern !== undefined && !new RegExp(propDef.pattern).test(val)) {
+      errs.push(`Invalid ${fullName}: "${val}". Must match pattern ${propDef.pattern}`);
+    }
+    if (propDef.enum !== undefined && !propDef.enum.includes(val)) {
+      errs.push(`Invalid ${fullName}: "${val}". Must be one of: ${propDef.enum.join(', ')}`);
+    }
+  }
+
+  return errs;
+}
+
+function validateObjectBySchema(objName, obj, objSchema) {
+  const errs = [];
+  if (typeof obj !== 'object' || obj === null || Array.isArray(obj)) {
+    return [`${objName} must be an object`];
+  }
+
+  if (objSchema.additionalProperties === false && objSchema.properties) {
+    const allowed = new Set(Object.keys(objSchema.properties));
+    for (const k of Object.keys(obj)) {
+      if (!allowed.has(k)) {
+        errs.push(`Disallowed ${objName} property "${k}"`);
+      }
+    }
+  }
+
+  const required = objSchema.required || [];
+  for (const req of required) {
+    if (!(req in obj) || obj[req] === undefined) {
+      errs.push(`Missing required ${objName} property "${req}"`);
+    }
+  }
+
+  if (objSchema.properties) {
+    for (const [key, propDef] of Object.entries(objSchema.properties)) {
+      if (key in obj && obj[key] !== undefined) {
+        errs.push(...validatePropertyBySchema(key, obj[key], propDef, objName));
+      }
+    }
+  }
+
+  return errs;
+}
+
+/**
+ * Dynamic JSON schema validation matching tests/security/corpus/schema.json.
+ * @param {any} record
+ * @param {any} schema
+ * @returns {string[]} List of validation error messages, or empty if valid.
+ */
 export function validateRecordSchema(record, schema) {
   const errors = [];
   if (typeof record !== 'object' || record === null || Array.isArray(record)) {
@@ -93,123 +174,65 @@ export function validateRecordSchema(record, schema) {
 
   if (errors.length > 0) return errors;
 
-  // id
-  if (typeof record.id !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(record.id)) {
-    errors.push(`Invalid id: "${record.id}". Must match pattern ^[a-zA-Z0-9_-]+$`);
+  // Validate top-level primitive/string fields dynamically from schema
+  const props = schema.properties || {};
+  for (const [propName, propDef] of Object.entries(props)) {
+    if (propDef.type === 'object') continue;
+    if (propName in record && record[propName] !== undefined) {
+      errors.push(...validatePropertyBySchema(propName, record[propName], propDef));
+    }
   }
 
-  // suiteKind
-  if (!['detector', 'invariant'].includes(record.suiteKind)) {
-    errors.push(`Invalid suiteKind: "${record.suiteKind}". Must be "detector" or "invariant"`);
+  // Validate nested objects dynamically from schema
+  if ('fixture' in props) {
+    errors.push(...validateObjectBySchema('fixture', record.fixture, props.fixture));
+  }
+  if ('oracle' in props) {
+    errors.push(...validateObjectBySchema('oracle', record.oracle, props.oracle));
+  }
+  if ('provenance' in props) {
+    errors.push(...validateObjectBySchema('provenance', record.provenance, props.provenance));
   }
 
-  // expectedStage
-  if (!['input', 'tool', 'output'].includes(record.expectedStage)) {
-    errors.push(`Invalid expectedStage: "${record.expectedStage}". Must be "input", "tool", or "output"`);
+  // Semantic checks & relational invariants:
+  // Issue 4: Payload must not be empty or whitespace-only after normalization
+  if (typeof record.payload === 'string') {
+    if (record.payload.trim().length === 0 || normalizePayload(record.payload).length === 0) {
+      errors.push('payload must be a non-empty string');
+    }
   }
 
-  // expectedLayerFamily
-  if (typeof record.expectedLayerFamily !== 'string' || record.expectedLayerFamily.trim().length === 0) {
-    errors.push('expectedLayerFamily must be a non-empty string');
+  // Issue 2: Suite kind and split alignment (invariants must not mix with detector splits)
+  if (record.suiteKind === 'invariant' && record.split !== 'invariant') {
+    errors.push(`Invariant suiteKind records must use split "invariant", got "${record.split}"`);
+  }
+  if (record.suiteKind === 'detector' && record.split === 'invariant') {
+    errors.push(`Detector suiteKind records cannot use split "invariant", must be "holdout" or "development"`);
   }
 
-  // taxonomyCode
-  if (typeof record.taxonomyCode !== 'string' || record.taxonomyCode.trim().length === 0) {
-    errors.push('taxonomyCode must be a non-empty string');
-  }
-
-  // label
-  if (!['malicious', 'benign'].includes(record.label)) {
-    errors.push(`Invalid label: "${record.label}". Must be "malicious" or "benign"`);
-  }
-
-  // payload
-  if (typeof record.payload !== 'string') {
-    errors.push('payload must be a string');
-  }
-
-  // canonicalHash
-  if (typeof record.canonicalHash !== 'string' || !/^[a-f0-9]{64}$/.test(record.canonicalHash)) {
-    errors.push(`canonicalHash must be a 64-character lowercase hex SHA-256 digest`);
-  }
-
-  // variantGroup
-  if (typeof record.variantGroup !== 'string' || record.variantGroup.trim().length === 0) {
-    errors.push('variantGroup must be a non-empty string');
-  }
-
-  // split
-  if (!['holdout', 'development', 'invariant'].includes(record.split)) {
-    errors.push(`Invalid split: "${record.split}". Must be "holdout", "development", or "invariant"`);
-  }
-
-  // fixture
-  if (typeof record.fixture !== 'object' || record.fixture === null || Array.isArray(record.fixture)) {
-    errors.push('fixture must be an object');
-  } else {
-    const fixtureAllowed = new Set(['carrier', 'authProfile', 'mockToolResponse']);
-    for (const k of Object.keys(record.fixture)) {
-      if (!fixtureAllowed.has(k)) {
-        errors.push(`Disallowed fixture property "${k}"`);
+  // Issue 3: Oracle and label consistency (no contradictory ground truth)
+  if (record.oracle && typeof record.oracle === 'object' && !Array.isArray(record.oracle)) {
+    if (record.label === 'benign') {
+      if (record.oracle.expectedDecision !== 'PASS') {
+        errors.push(`Contradictory oracle: benign records must have expectedDecision "PASS", got "${record.oracle.expectedDecision}"`);
+      }
+      if (record.oracle.expectedErrorCode !== null) {
+        errors.push(`Contradictory oracle: records with expectedDecision "PASS" must have expectedErrorCode null, got "${record.oracle.expectedErrorCode}"`);
+      }
+    } else if (record.label === 'malicious') {
+      if (record.oracle.expectedDecision !== 'BLOCK') {
+        errors.push(`Contradictory oracle: malicious records must have expectedDecision "BLOCK", got "${record.oracle.expectedDecision}"`);
+      }
+      if (typeof record.oracle.expectedErrorCode !== 'string' || record.oracle.expectedErrorCode.trim().length === 0) {
+        errors.push(`Contradictory oracle: malicious records with expectedDecision "BLOCK" must have non-empty string expectedErrorCode`);
       }
     }
-    if (typeof record.fixture.carrier !== 'string' || record.fixture.carrier.trim().length === 0) {
-      errors.push('fixture.carrier must be a non-empty string');
-    }
-    if (typeof record.fixture.authProfile !== 'string' || record.fixture.authProfile.trim().length === 0) {
-      errors.push('fixture.authProfile must be a non-empty string');
-    }
-    const mockTool = record.fixture.mockToolResponse;
-    if (mockTool !== null && typeof mockTool !== 'string' && (typeof mockTool !== 'object' || Array.isArray(mockTool))) {
-      errors.push('fixture.mockToolResponse must be an object, string, or null');
-    }
-  }
 
-  // oracle
-  if (typeof record.oracle !== 'object' || record.oracle === null || Array.isArray(record.oracle)) {
-    errors.push('oracle must be an object');
-  } else {
-    const oracleAllowed = new Set(['expectedDecision', 'expectedErrorCode', 'reachedStageMarker']);
-    for (const k of Object.keys(record.oracle)) {
-      if (!oracleAllowed.has(k)) {
-        errors.push(`Disallowed oracle property "${k}"`);
-      }
+    if (record.oracle.expectedDecision === 'PASS' && record.oracle.expectedErrorCode !== null) {
+      errors.push(`oracle.expectedErrorCode must be null when expectedDecision is "PASS"`);
     }
-    if (!['PASS', 'BLOCK'].includes(record.oracle.expectedDecision)) {
-      errors.push(`oracle.expectedDecision must be "PASS" or "BLOCK"`);
-    }
-    if (record.oracle.expectedErrorCode !== null && typeof record.oracle.expectedErrorCode !== 'string') {
-      errors.push('oracle.expectedErrorCode must be string or null');
-    }
-    if (typeof record.oracle.reachedStageMarker !== 'string' || record.oracle.reachedStageMarker.trim().length === 0) {
-      errors.push('oracle.reachedStageMarker must be a non-empty string');
-    }
-  }
-
-  // provenance
-  if (typeof record.provenance !== 'object' || record.provenance === null || Array.isArray(record.provenance)) {
-    errors.push('provenance must be an object');
-  } else {
-    const provAllowed = new Set(['source', 'license', 'revision', 'curatedBy', 'curatedAt']);
-    for (const k of Object.keys(record.provenance)) {
-      if (!provAllowed.has(k)) {
-        errors.push(`Disallowed provenance property "${k}"`);
-      }
-    }
-    if (typeof record.provenance.source !== 'string' || record.provenance.source.trim().length === 0) {
-      errors.push('provenance.source must be a non-empty string');
-    }
-    if (typeof record.provenance.license !== 'string' || record.provenance.license.trim().length === 0) {
-      errors.push('provenance.license must be a non-empty string');
-    }
-    if (typeof record.provenance.revision !== 'string' || record.provenance.revision.trim().length === 0) {
-      errors.push('provenance.revision must be a non-empty string');
-    }
-    if (typeof record.provenance.curatedBy !== 'string' || record.provenance.curatedBy.trim().length === 0) {
-      errors.push('provenance.curatedBy must be a non-empty string');
-    }
-    if (typeof record.provenance.curatedAt !== 'string' || record.provenance.curatedAt.trim().length === 0) {
-      errors.push('provenance.curatedAt must be a non-empty string');
+    if (record.oracle.expectedDecision === 'BLOCK' && (typeof record.oracle.expectedErrorCode !== 'string' || record.oracle.expectedErrorCode.trim().length === 0)) {
+      errors.push(`oracle.expectedErrorCode must be a non-empty string when expectedDecision is "BLOCK"`);
     }
   }
 
@@ -495,10 +518,14 @@ const isMain =
     resolve(process.argv[1]) === resolve(__filename));
 
 if (isMain) {
-  const targetDir = resolve(process.argv[2] || join(repoRoot, 'tests/security/corpus'));
+  const args = process.argv.slice(2);
+  const flags = new Set(args.filter((a) => a.startsWith('--')));
+  const nonFlags = args.filter((a) => !a.startsWith('--'));
+  const requireHoldoutQuotas = !flags.has('--no-quotas') && !flags.has('--skip-quotas');
+  const targetDir = resolve(nonFlags[0] || join(repoRoot, 'tests/security/corpus'));
   console.log(`[Corpus Validator] Validating corpus directory: ${targetDir}`);
 
-  const result = validateCorpus(targetDir, { requireHoldoutQuotas: true });
+  const result = validateCorpus(targetDir, { requireHoldoutQuotas });
 
   if (!result.valid) {
     console.error(`\n[Corpus Validation Failed] Found ${result.errors.length} error(s):`);

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
@@ -171,6 +171,94 @@ test('schema validation and record constraints', async (t) => {
     assert.equal(result.valid, false);
     assert.ok(result.errors.some((e) => e.includes('Disallowed property')));
   });
+
+  await t.test('suiteKind invariant with holdout split fails validation', () => {
+    const record = createSampleRecord({ suiteKind: 'invariant', split: 'holdout' });
+    const result = validateCorpus([record], { requireHoldoutQuotas: false });
+    assert.equal(result.valid, false);
+    assert.ok(result.errors.some((e) => e.includes('Invariant suiteKind records must use split "invariant"')));
+  });
+
+  await t.test('suiteKind detector with invariant split fails validation', () => {
+    const record = createSampleRecord({ suiteKind: 'detector', split: 'invariant' });
+    const result = validateCorpus([record], { requireHoldoutQuotas: false });
+    assert.equal(result.valid, false);
+    assert.ok(result.errors.some((e) => e.includes('Detector suiteKind records cannot use split "invariant"')));
+  });
+
+  await t.test('contradictory oracle benign with BLOCK fails validation', () => {
+    const record = createSampleRecord({
+      label: 'benign',
+      oracle: { expectedDecision: 'BLOCK', expectedErrorCode: 'SOME_CODE' },
+    });
+    const result = validateCorpus([record], { requireHoldoutQuotas: false });
+    assert.equal(result.valid, false);
+    assert.ok(result.errors.some((e) => e.includes('Contradictory oracle')));
+  });
+
+  await t.test('contradictory oracle malicious with PASS fails validation', () => {
+    const record = createSampleRecord({
+      label: 'malicious',
+      oracle: { expectedDecision: 'PASS', expectedErrorCode: null },
+    });
+    const result = validateCorpus([record], { requireHoldoutQuotas: false });
+    assert.equal(result.valid, false);
+    assert.ok(result.errors.some((e) => e.includes('Contradictory oracle')));
+  });
+
+  await t.test('expectedDecision PASS with non-null expectedErrorCode fails validation', () => {
+    const record = createSampleRecord({
+      label: 'benign',
+      oracle: { expectedDecision: 'PASS', expectedErrorCode: 'UNEXPECTED_ERROR' },
+    });
+    const result = validateCorpus([record], { requireHoldoutQuotas: false });
+    assert.equal(result.valid, false);
+    assert.ok(result.errors.some((e) => e.includes('expectedErrorCode')));
+  });
+
+  await t.test('expectedDecision BLOCK with null expectedErrorCode fails validation', () => {
+    const record = createSampleRecord({
+      label: 'malicious',
+      oracle: { expectedDecision: 'BLOCK', expectedErrorCode: null },
+    });
+    const result = validateCorpus([record], { requireHoldoutQuotas: false });
+    assert.equal(result.valid, false);
+    assert.ok(result.errors.some((e) => e.includes('expectedErrorCode')));
+  });
+
+  await t.test('empty string payload fails validation', () => {
+    const record = createSampleRecord({ payload: '' });
+    const result = validateCorpus([record], { requireHoldoutQuotas: false });
+    assert.equal(result.valid, false);
+    assert.ok(result.errors.some((e) => e.includes('payload must be a non-empty string')));
+  });
+
+  await t.test('whitespace-only payload fails validation', () => {
+    const record = createSampleRecord({ payload: '   \n\t  ' });
+    const result = validateCorpus([record], { requireHoldoutQuotas: false });
+    assert.equal(result.valid, false);
+    assert.ok(result.errors.some((e) => e.includes('payload must be a non-empty string')));
+  });
+
+  await t.test('canonical schema enums and properties dynamically match validator constraints', () => {
+    const schemaRaw = readFileSync(schemaPath, 'utf8');
+    const schema = JSON.parse(schemaRaw);
+
+    const stages = schema.properties.expectedStage.enum;
+    assert.ok(Array.isArray(stages) && stages.length > 0);
+    for (const stg of stages) {
+      const rec = createSampleRecord({ expectedStage: stg });
+      const res = validateCorpus([rec], { requireHoldoutQuotas: false });
+      assert.equal(res.valid, true, `Stage ${stg} should be accepted`);
+    }
+
+    for (const req of schema.required) {
+      const rec = createSampleRecord();
+      delete rec[req];
+      const res = validateCorpus([rec], { requireHoldoutQuotas: false });
+      assert.equal(res.valid, false, `Missing required ${req} should fail`);
+    }
+  });
 });
 
 test('loadCorpusJsonl file loader', async (t) => {
@@ -199,7 +287,7 @@ test('loadCorpusJsonl file loader', async (t) => {
 test('hash and deduplication validation', async (t) => {
   await t.test('hash mismatch fails validation', () => {
     const record = createSampleRecord({
-      canonicalHash: '0000000000000000000000000000000000000000000000000000000000000000',
+      canonicalHash: '0'.repeat(64),
     });
     const result = validateCorpus([record], { requireHoldoutQuotas: false });
     assert.equal(result.valid, false);
@@ -327,6 +415,7 @@ test('invariant suite segregation', () => {
     id: 'inv-auth-001',
     suiteKind: 'invariant',
     split: 'invariant',
+    label: 'malicious',
     expectedStage: 'input',
     expectedLayerFamily: 'authorization',
     payload: 'Attempt access without AGENT_SERVICE_API_KEY',
@@ -344,7 +433,36 @@ test('invariant suite segregation', () => {
 });
 
 test('CLI validation execution via spawnSync', async (t) => {
-  await t.test('CLI succeeds with exit code 0 against repo corpus directory', () => {
+  await t.test('CLI succeeds with exit code 0 against valid corpus directory', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'corpus-test-cli-valid-'));
+    try {
+      const validRecord = createSampleRecord({ split: 'development' });
+      writeFileSync(join(tempDir, 'development.jsonl'), JSON.stringify(validRecord) + '\n');
+
+      const proc = spawnSync('node', [validatorCliPath, tempDir, '--no-quotas'], {
+        cwd: repoRoot,
+        encoding: 'utf8',
+      });
+      assert.equal(
+        proc.status,
+        0,
+        `CLI failed with status ${proc.status}:\nSTDOUT: ${proc.stdout}\nSTDERR: ${proc.stderr}`,
+      );
+      assert.match(proc.stdout, /corpus validation passed/i);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  await t.test('CLI succeeds against repo corpus directory if dataset exists', (tSub) => {
+    const defaultCorpusDir = resolve(repoRoot, 'tests/security/corpus');
+    const hasJsonl =
+      existsSync(defaultCorpusDir) &&
+      readdirSync(defaultCorpusDir).some((f) => f.endsWith('.jsonl'));
+    if (!hasJsonl) {
+      tSub.skip('Skipping repo corpus check because no .jsonl files exist in tests/security/corpus yet');
+      return;
+    }
     const proc = spawnSync('node', [validatorCliPath], {
       cwd: repoRoot,
       encoding: 'utf8',
