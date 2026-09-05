@@ -21,9 +21,7 @@ class StubLayer:
     stage: ClassVar[Literal["input"]] = "input"
     prerequisites: ClassVar[tuple[str, ...]] = ()
 
-    async def check(
-        self, context: AdmissionContext, data: str
-    ) -> PipelineDecision[ValidatedInput]:
+    async def check(self, context: AdmissionContext, data: str) -> PipelineDecision[ValidatedInput]:
         return PipelineDecision(status="PASS", validated_data=ValidatedInput(content=data))
 
 
@@ -100,9 +98,7 @@ def test_missing_prerequisite_fails_closed() -> None:
 
 
 def test_cyclic_prerequisites_fail_closed() -> None:
-    registry = GuardrailRegistry(
-        allowed_keys={CycleA.key, CycleB.key}, production=False
-    )
+    registry = GuardrailRegistry(allowed_keys={CycleA.key, CycleB.key}, production=False)
     registry.register(CycleA())
     registry.register(CycleB())
 
