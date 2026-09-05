@@ -43,6 +43,11 @@ async def lifespan(app: FastAPI):
         lock_ttl_ms=settings.SESSION_LOCK_TTL_MS,
         refresh_interval=settings.SESSION_LOCK_REFRESH_INTERVAL_SECONDS,
     )
+
+    from agent.guardrails.gateway import GuardrailGateway
+    from agent.guardrails.registry import create_production_registry
+
+    app.state.guardrail_gateway = GuardrailGateway(create_production_registry())
     yield
     # Graceful shutdown: cancel and await all active runner tasks
     if active_runners:
