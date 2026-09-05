@@ -77,7 +77,13 @@
 │
 ├── tests/
 │   ├── ci/                            → CI workflow contract & network guard tests
+│   ├── security/                      → Security test harnesses, toolchain pins, and corpus manifests
+│   │   └── corpus/                    → schema.json, holdout.jsonl, invariants.jsonl
 │   └── smoke/                         → Authoritative whole-stack smoke & sanity test harness
+│
+├── scripts/
+│   ├── ci/                            → CI status and gate evaluation scripts
+│   └── security/                      → evaluate-results.mjs, validate-corpus.mjs, write-report.mjs, and security harness tooling
 │
 ├── docs/
 │   ├── adr/                           → Architectural Decision Records
@@ -1026,10 +1032,13 @@ Feature 019 restructures high-leverage boundaries without changing public produc
 
 ## Planned Feature 023: Deterministic Guardrails and Security Verification
 
-Design only (2026-09-04); current implementation descriptions above remain unchanged. See `specs/023-security-systems/plan.md` and `tasks.md` for the pending 52-task delivery.
+Design baseline established (2026-09-04); current implementation descriptions above remain unchanged. See `specs/023-security-systems/plan.md` and `tasks.md` for the 52-task delivery plan.
 
 Proposed flow: authenticated SSE -> thin ChatController -> ChatTurnRunner -> mandatory GuardrailGateway. Runner owns input, guarded tool execution and output streaming enforcement. Tool authorization/result validation must complete before ToolMessages, signal parsing, graph state/checkpoints, model continuation or public events; observing runner tool-end events is insufficient. Preserve existing auth, quotas, encrypted persistence, fencing, snapshots and dedicated handoff channels.
 
-Verification plan adds per-layer/boundary tests, static source analysis, separate dependency/secret scans, authenticated HTTP DAST and custom SSE/tool adversarial coverage. Production release requires complete evidence through existing `ci-status`. No runtime/scanner code has been implemented by the planning task.
+
+Verification plan adds per-layer/boundary tests, static source analysis, separate dependency/secret scans, authenticated HTTP DAST and custom SSE/tool adversarial coverage. Production release requires complete evidence through existing `ci-status`.
+
+Phase 2 Foundation status (2026-09-05): Tasks T005, T006, and T010 implemented. `scripts/security/evaluate-results.mjs` provides the fail-closed results evaluation engine and boundary enforcer (coverage >=95/90%, 0 Critical/High SAST/supply-chain/DAST, stage-local and aggregate TPR >=95%/FPR <=2%, SEC28 stage-reachability, 100% invariants, complete shard union); `scripts/security/validate-corpus.mjs` validates the canonical JSONL corpus against `tests/security/corpus/schema.json` and holdout quotas (100/250, 50/125, 50/125); `scripts/security/write-report.mjs` generates sanitized evidence records with allowlisted fields and privacy redaction. Runtime guardrail implementation remains pending.
 
 Feature 023 plan convergence (2026-09-04): admission context is separate from post-router/gate sealed tool authority. The design now specifies bounded PII spans, stage-local DAST oracles and quota profiles, validated generated summaries and payload-free model callbacks. Two independent review cycles closed six planning findings; see `specs/023-security-systems/review-convergence.md`. Runtime implementation remains pending.
