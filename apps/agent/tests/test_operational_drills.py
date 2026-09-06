@@ -128,7 +128,7 @@ def test_health_reports_degraded_when_redis_down(monkeypatch):
         assert data["status"] == "degraded"
         assert data["dependencies"]["redis"]["status"] == "down"
         assert data["dependencies"]["nestjsApi"]["status"] == "ok"
-        assert data["dependencies"]["guardrails"]["status"] == "ok"
+        assert data["dependencies"]["guardrails"]["status"] == "deterministic"
 
 
 def test_health_reports_degraded_when_redis_client_none(monkeypatch):

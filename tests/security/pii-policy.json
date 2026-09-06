@@ -1,0 +1,50 @@
+{
+  "version": "2026-09-06",
+  "normalization": "NFKC",
+  "units": "unicode_scalars",
+  "maximumInspectionScalars": 512,
+  "minimumUndecidedSuffixScalars": 512,
+  "maximumPendingRawUtf8Bytes": 8192,
+  "candidateTerminators": {
+    "version": 1,
+    "asciiWhitespace": true,
+    "asciiPunctuation": true,
+    "endOfStream": true,
+    "adjacentIdentifierContinuesCandidate": true
+  },
+  "detectors": {
+    "passport": {
+      "maximumMatchScalars": 11,
+      "leftLookaroundScalars": 1,
+      "rightLookaroundScalars": 1,
+      "asciiOnly": true
+    },
+    "paymentCard": {
+      "maximumMatchScalars": 37,
+      "leftLookaroundScalars": 1,
+      "rightLookaroundScalars": 1,
+      "luhnRequired": true,
+      "allowedSeparators": [" ", "-"]
+    },
+    "phone": {
+      "maximumMatchScalars": 40,
+      "leftLookaroundScalars": 2,
+      "rightLookaroundScalars": 2
+    },
+    "email": {
+      "maximumMatchScalars": 254,
+      "maximumLocalPartScalars": 64,
+      "leftLookaroundScalars": 1,
+      "rightLookaroundScalars": 1,
+      "asciiOnly": true,
+      "unsupportedNonAsciiCandidates": "fail_closed"
+    },
+    "credential": {
+      "maximumMatchScalars": 512,
+      "leftLookaroundScalars": 0,
+      "rightLookaroundScalars": 0,
+      "prefixes": ["api_key=", "access_token=", "secret=", "bearer "],
+      "overlongCandidate": "fail_closed"
+    }
+  }
+}

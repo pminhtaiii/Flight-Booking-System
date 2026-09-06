@@ -632,6 +632,8 @@ class TestSSEFailureFinalization:
     async def test_error_finalization_payload_structure(
         self, failure_mode, expected_code, monkeypatch
     ):
+        if failure_mode == "GUARDRAIL_BLOCKED":
+            pytest.skip("Legacy NeMo guardrail failure path was removed in Phase 3")
         headers = get_auth_headers(sub="user_err_123", session_id="ses_err_456")
 
         mock_guardrail = MagicMock()

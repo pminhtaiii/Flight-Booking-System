@@ -11,6 +11,7 @@ from agent.agents.chat_agent import get_chat_model
 from agent.agents.travel_assistant import TRAVEL_PROMPT
 from agent.config import get_settings
 from agent.graph.state import AgentState
+from agent.guardrails.output_pipeline import approved_model_content, payload_free_config
 from agent.tools.base import get_nestjs_client
 from agent.tools.registry import get_tools
 from agent.trusted_search_snapshot import (
@@ -39,8 +40,12 @@ async def final_answer_node(state: AgentState, config: RunnableConfig) -> dict:
     )
     messages.append(HumanMessage(content=instruction))
 
-    response = await model.ainvoke(messages, config=config)
-    return {"messages": [response]}
+    response = await model.ainvoke(messages, config=payload_free_config(config))
+    return (
+        {"messages": [response]}
+        if await approved_model_content(response.content, config)
+        else {"messages": []}
+    )
 
 
 # Create the prebuilt ToolNode

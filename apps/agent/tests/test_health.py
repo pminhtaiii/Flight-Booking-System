@@ -21,10 +21,7 @@ def test_health_live_zero_inference_guarantee(monkeypatch):
         patch("agent.main.settings") as mock_settings,
         patch("agent.infrastructure.redis.get_redis_client", return_value=None),
     ):
-        mock_settings.MIMO_API_KEY = None
-        mock_settings.MIMO_API_URL = "http://unreachable-mimo:9999"
         mock_settings.NESTJS_API_URL = "http://unreachable-nestjs:9999"
-        monkeypatch.setattr(app.state, "guardrails", None, raising=False)
 
         response = client.get("/health/live")
         assert response.status_code == 200
@@ -41,8 +38,6 @@ def test_health_success(monkeypatch):
         patch("agent.main.settings") as mock_settings,
         patch("agent.infrastructure.redis.get_redis_client", return_value=mock_redis),
     ):
-        mock_settings.MIMO_API_URL = "http://mockmimo"
-        mock_settings.MIMO_API_KEY = "mockkey"
         mock_settings.NESTJS_API_URL = "http://localhost:3001"
 
         # Mocking NestJS API health check to be ok
@@ -53,18 +48,12 @@ def test_health_success(monkeypatch):
         )
         mock_get.return_value = mock_response
 
-        # Mock healthy guardrail service in app state
-        mock_guardrail = MagicMock()
-        mock_guardrail.is_healthy.return_value = True
-        monkeypatch.setattr(app.state, "guardrails", mock_guardrail, raising=False)
-
         response = client.get("/health")
         assert response.status_code == 200
 
         data = response.json()
         assert data["status"] == "ok"
         assert "dependencies" in data
-        assert "llm" in data["dependencies"]
         assert "nestjsApi" in data["dependencies"]
         assert "guardrails" in data["dependencies"]
         assert data["dependencies"]["nestjsApi"]["status"] == "ok"
@@ -76,17 +65,10 @@ def test_health_nestjs_down(monkeypatch):
         patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get,
         patch("agent.main.settings") as mock_settings,
     ):
-        mock_settings.MIMO_API_URL = "http://mockmimo"
-        mock_settings.MIMO_API_KEY = "mockkey"
         mock_settings.NESTJS_API_URL = "http://localhost:3001"
 
         # Simulate NestJS API connection error
         mock_get.side_effect = httpx.RequestError("Connection failed")
-
-        # Mock healthy guardrail service in app state
-        mock_guardrail = MagicMock()
-        mock_guardrail.is_healthy.return_value = True
-        monkeypatch.setattr(app.state, "guardrails", mock_guardrail, raising=False)
 
         response = client.get("/health")
         assert response.status_code == 200
@@ -121,7 +103,6 @@ async def test_lifespan_shutdown_cancels_active_runners(monkeypatch):
 
     monkeypatch.setattr("agent.infrastructure.redis.init_redis", AsyncMock())
     monkeypatch.setattr("agent.infrastructure.redis.close_redis", AsyncMock())
-    monkeypatch.setattr("agent.guardrails.nemo.NemoGuardrailService.probe", AsyncMock())
 
     cancelled = False
 

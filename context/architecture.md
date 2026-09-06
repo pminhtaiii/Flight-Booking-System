@@ -58,7 +58,7 @@
 │   ├── agent/                         → Python/FastAPI agent service
 │   │   ├── src/agent/                 → FastAPI source code
 │   │   │   ├── chat_turn/             → ChatController (thin delegator), ChatTurnRunner (causal cleanup) & event models
-│   │   │   ├── guardrails/            → GuardrailGateway, InputGuardrailPipeline, closed registry, layers (LengthValidator, PIIDetector, InjectionDetector, TopicBoundary, InjectionSignatureEngine), pipeline decisions
+│   │   │   ├── guardrails/            → GuardrailGateway, deterministic input/output pipelines, closed registry, bounded PII scanning, pipeline decisions
 │   │   │   ├── middleware/            → BodyLimitMiddleware (raw ASGI 64 KiB ceiling), auth & rate limit middlewares
 │   │   │   ├── memory/                → MemoryManager (sliding window, lower-trust envelope, summary gateway validation)
 │   │   │   ├── trusted_search_snapshot/ → 3-key Redis protocol & safe projections
@@ -822,17 +822,17 @@ Next.js UI → POST apps/agent:3002/chat/stream (Direct SSE streaming with corre
         ↓
 FastAPI JWTAuthMiddleware validates JWT token (shared JWT_SECRET)
         ↓
-FastAPI NemoGuardrailService runs safety checks (length, regex heuristics, Mimo safety classification)
-        ├── Safety check FAILS/BLOCKED → Log security event, return error event and close stream
-        └── Safety check PASSES ↓
+FastAPI ChatController requires the deterministic GuardrailGateway and validates input before runner/model execution
+        ├── Gateway FAILS/BLOCKS → Emit a static guardrail event and close without model/tool execution
+        └── Gateway PASSES ↓
             Agent checks conversation memory (loads history/summary from NestJS Chat API using X-Service-Auth)
                 ↓
             Orchestrates LangGraph StateGraph agent (Router → Travel Assistant or Checkout Orchestrator)
                 ↓
-            Tokens fed into OutputGuardrailPipeline (accumulates tokens to sentences → concurrent lookahead regex scan & NeMo safety check)
-                ├── Safety check FAILS/BLOCKED → Log security event, emit OUTPUT_GUARDRAIL_BLOCKED error, persist partial response, and close stream
-                └── Safety check PASSES ↓
-                    Safe chunks streamed back to frontend via SSE in real time (structured JSON latency & verdict logged per check)
+            Raw model tokens remain private inside OutputGuardrailPipeline until deterministic bounded PII inspection approves a raw prefix
+                ├── PII/credential/overflow detected → discard undecided text, close upstream, emit OUTPUT_GUARDRAIL_BLOCKED, persist only approved prefix
+                └── Prefix approved ↓
+                    Approved raw chunks stream through SSE; payload-free callbacks expose no prompts, tokens, messages, or raw exceptions
                 ↓
             If Checkout Intent:
                 Checkout Orchestrator validates Trusted Search Snapshot, calls deterministic NestJS handoff service.
@@ -851,6 +851,8 @@ FastAPI NemoGuardrailService runs safety checks (length, regex heuristics, Mimo 
     3. `InjectionDetector` (`input.injection`): Employs `InjectionSignatureEngine` with 60+ compiled regexes spanning direct overrides, roleplay/delimiter hijacking, jailbreaks, and obfuscation. Operates with bounded multi-round normalization, 16 KiB scanning ceiling, and AST inspection ensuring ReDoS-safe linear matching.
     4. `TopicBoundary` (`input.topic`): Restricts agent interactions strictly to travel, flight bookings, baggage, and airline operations, blocking off-topic requests (code generation, medical, financial, legal advice).
   - **Memory Security Boundary**: Conversation history loaded from persistence is kept strictly isolated from the trusted `SystemMessage(content=SYSTEM_PROMPT)`. Prior turns and summaries are framed within a lower-trust `HumanMessage` data envelope. Loaded history is validated against guardrails (rejecting turns containing historical injection or PII), and newly generated conversation summaries are validated via `GuardrailGateway` prior to database persistence and discarded if blocked.
+  - **Deterministic Output Boundary**: `OutputGuardrailPipeline` and `ChunkBuffer` keep detector-relevant normalized suffixes and their raw-source mapping private until a finite policy decision is possible. The versioned policy limits passport matches to 11 ASCII scalars, Luhn-validated cards to 37 scalars, phones to 40, ASCII emails to 254 with a 64-scalar local part, and credentials to 512; pending raw UTF-8 text is capped at 8 KiB. Unsupported/overlong candidates fail closed. Output blocking closes the upstream iterator, discards undecided text, emits the static `OUTPUT_GUARDRAIL_BLOCKED` event, and persists only the already-approved prefix.
+  - **Payload-Free Model Dispatch**: Main, travel, checkout, router, final-answer, graph-stream and summarizer invocations replace caller callbacks with a payload-free configuration while retaining trusted turn-local dependencies. Non-streamed `AIMessage` and generated summary content is deterministically validated before graph export, reuse, or persistence. Runtime startup and SSE no longer initialize or call the legacy NeMo/MiMo security classifier; primary advisory models remain unchanged.
 - **Browser Transport & Correlation (Direct-Only Lockdown)**: Chat clients stream directly to the public FastAPI agent endpoint (`apps/agent:3002/chat/stream`) via permanent direct-only SSE transport (`POST ${NEXT_PUBLIC_AGENT_URL}/chat/stream`). The legacy Next.js proxy route has been permanently decommissioned and removed (Phase 8D / T101). Both the Python Agent configuration and Next.js web client enforce fail-closed runtime validation against any decommissioned proxy flag (e.g. `FEATURE_FLAG_CHAT_DIRECT_STREAM='false'` or `NEXT_PUBLIC_FEATURE_FLAG_CHAT_DIRECT_STREAM='false'`), throwing a startup/request initialization error. Independently sanitized opaque trace and correlation IDs propagate across browser, agent, and backend; the Python sanitizer is shared by SSE and the NestJS client, and a real loopback integration test verifies identical IDs in NestJS telemetry and audit persistence. Agent and API telemetry enforce per-field closed type/value schemas, fail open on emission failure, and use fixed event names; audit metadata never stores request/session/user/offer/message/token/passenger/payment/passport values.
 - **Independent Handoff Gates**: The LLM remains read-only and never creates bookings. When users commit to a flight, the Checkout Orchestrator signals a deterministic NestJS handoff service to issue a token.
 - **Secure Handoff Lifecycle**: The `ACTION_HANDOFF` SSE event delivers a hash-only token without URL or offer identifier. A native same-origin form adds the in-memory credential only while constructing the POST body; the bootstrap route validates a renderable safe checkout context, sets a short-lived root-scoped `HttpOnly; Secure; SameSite=Strict` cookie, and redirects to `/checkout/passengers`. The passenger page resolves server-side, and same-origin readiness/intent routes accept only allowlisted passenger inputs, inject the credential from the HttpOnly cookie, use bounded upstream calls, and clear the cookie at the same root scope only after successful intent creation. Tokens are strictly absent from URLs, DOM fields, readable storage, and telemetry.

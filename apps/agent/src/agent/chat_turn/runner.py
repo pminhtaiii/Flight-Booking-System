@@ -27,7 +27,11 @@ from agent.chat_turn.events import (
 )
 from agent.config import get_settings
 from agent.guardrails.base import AdmissionContext, ValidatedInput
-from agent.guardrails.output_pipeline import OutputGuardrailBlockedError, OutputGuardrailPipeline
+from agent.guardrails.output_pipeline import (
+    OutputGuardrailBlockedError,
+    OutputGuardrailPipeline,
+    payload_free_config,
+)
 from agent.infrastructure.redis import get_redis_client
 from agent.memory.manager import MemoryManager
 from agent.observability.chat_observability import ChatTelemetry, safe_opaque_id, safe_tool_name
@@ -71,8 +75,6 @@ async def _persist_response(
             {"sender": "USER", "type": "STANDARD", "content": user_msg},
             {"sender": "AGENT", "type": "STANDARD", "content": response_text},
         ]
-    if use_shield:
-        return await asyncio.shield(client.create_message_batch(session_id, payload))
     return await client.create_message_batch(session_id, payload)
 
 
@@ -522,7 +524,6 @@ class ChatTurnRunner:
             output_config = getattr(settings, "output_guardrail", None)
             pipeline = OutputGuardrailPipeline(
                 config=output_config,
-                nemo_service=guardrails,
                 session_id=session_id,
             )
 
@@ -606,6 +607,7 @@ class ChatTurnRunner:
             if command.action_payload:
                 initial_state["action_payload"] = command.action_payload
 
+            config = payload_free_config(config)
             event_stream = graph.astream_events(
                 initial_state,
                 config=config,
@@ -613,15 +615,35 @@ class ChatTurnRunner:
             )
 
             tool_started_at: Dict[str, float] = {}
+            saw_model_stream = False
 
             async for event in event_stream:
                 kind = event.get("event")
 
                 if kind == "on_chat_model_stream":
+                    saw_model_stream = True
                     chunk = event.get("data", {}).get("chunk")
                     if chunk and hasattr(chunk, "content") and chunk.content:
                         token_content = str(chunk.content)
                         async for safe_chunk in pipeline.process_token(token_content):
+                            partial_response += safe_chunk
+                            yield TokenEvent(data=TokenPayload(content=safe_chunk))
+
+                elif kind == "on_chat_model_end" and not saw_model_stream:
+                    # Some chat-model adapters implement ``ainvoke`` without
+                    # emitting token events. Preserve the streaming contract
+                    # by adapting the completed AI message through the same
+                    # deterministic pipeline, while avoiding duplication for
+                    # adapters that did emit stream chunks.
+                    output = event.get("data", {}).get("output")
+                    message = output
+                    if isinstance(output, dict):
+                        message = output.get("generations") or output.get("message") or output
+                        if isinstance(message, list) and message:
+                            message = message[0]
+                    content = getattr(message, "content", None)
+                    if isinstance(content, str) and content:
+                        async for safe_chunk in pipeline.process_token(content):
                             partial_response += safe_chunk
                             yield TokenEvent(data=TokenPayload(content=safe_chunk))
 
@@ -644,6 +666,22 @@ class ChatTurnRunner:
 
                 elif kind == "on_chain_end":
                     node_name = event.get("name")
+                    if not saw_model_stream and node_name in {
+                        "general",
+                        "travel",
+                        "checkout",
+                        "final_answer",
+                    }:
+                        output = event.get("data", {}).get("output")
+                        messages_out = (
+                            output.get("messages", []) if isinstance(output, dict) else []
+                        )
+                        if messages_out:
+                            content = getattr(messages_out[-1], "content", None)
+                            if isinstance(content, str) and content:
+                                async for safe_chunk in pipeline.process_token(content):
+                                    partial_response += safe_chunk
+                                    yield TokenEvent(data=TokenPayload(content=safe_chunk))
                     if node_name in (
                         "create_handoff_token",
                         "create_handoff_token_node",
@@ -1053,6 +1091,8 @@ class ChatTurnRunner:
                     req_id = None
 
         except OutputGuardrailBlockedError as e:
+            if "event_stream" in locals() and hasattr(event_stream, "aclose"):
+                await event_stream.aclose()
             guardrails_logger.warning(
                 json.dumps(
                     {
