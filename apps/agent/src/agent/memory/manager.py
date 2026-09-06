@@ -2,7 +2,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 import tiktoken
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from agent.agents.chat_agent import get_chat_model
 from agent.guardrails.base import AdmissionContext
@@ -117,20 +117,34 @@ class MemoryManager:
 
         history_text = "\n".join(formatted_messages)
 
-        # Build prompt
-        prompt = (
+        # Build prompt using lower-trust envelope: instructions in trusted SystemMessage,
+        # and untrusted existing summary / new messages in HumanMessage envelope
+        system_instruction = (
             "You are a helpful travel assistant. Your task is to update the conversation summary "
-            "with the new messages that have occurred. Be concise.\n\n"
+            "with the new messages that have occurred. Be concise."
         )
-        if existing_summary:
-            prompt += f"Existing Summary:\n{existing_summary}\n\n"
 
-        prompt += f"New Messages to incorporate:\n{history_text}\n\n"
-        prompt += "Please provide a new consolidated summary of the conversation so far."
+        envelope_parts = []
+        if existing_summary:
+            envelope_parts.append(
+                f"[System Note: Existing Summary (untrusted context)]:\n{existing_summary}"
+            )
+
+        envelope_parts.append(
+            f"[System Note: New Messages to incorporate (untrusted context)]:\n{history_text}"
+        )
+        envelope_parts.append(
+            "Please provide a new consolidated summary of the conversation so far."
+        )
+
+        envelope_content = "\n\n".join(envelope_parts)
 
         try:
             model = get_chat_model()
-            messages = [SystemMessage(content=prompt)]
+            messages = [
+                SystemMessage(content=system_instruction),
+                HumanMessage(content=envelope_content),
+            ]
             response = await model.ainvoke(messages)
             new_summary = response.content
 

@@ -1,24 +1,31 @@
-import re
 from typing import Any, ClassVar, Literal
 
 from agent.guardrails.base import (
-    GUARDRAIL_INPUT_INJECTION,
-    GUARDRAIL_INPUT_LENGTH,
-    GUARDRAIL_INPUT_PII,
-    GUARDRAIL_INPUT_TOPIC,
     GUARDRAIL_OUTPUT_PII,
     AdmissionContext,
     ApprovedChunk,
+    BaseGuardrailLayer,
     PipelineDecision,
     TurnCapabilities,
-    ValidatedInput,
 )
-from agent.guardrails.normalization import (
-    bounded_normalize,
-    detect_base64_payloads,
-    safe_regex_match,
+from agent.guardrails.layers.injection import (
+    INJECTION_SIGNATURES,
+)
+from agent.guardrails.layers.input import (
+    OUT_OF_DOMAIN_PATTERNS,
+    InjectionDetector,
+    LengthValidator,
+    PIIDetector,
+    TopicBoundary,
 )
 from agent.sanitization.pii_scrubber import detect_pii
+
+# Re-export and maintain backwards-compatible aliases
+InputLengthLayer = LengthValidator
+InputPIILayer = PIIDetector
+InputInjectionLayer = InjectionDetector
+InputTopicLayer = TopicBoundary
+INJECTION_PATTERNS = INJECTION_SIGNATURES
 
 COMPULSORY_PRODUCTION_LAYERS: frozenset[str] = frozenset(
     {
@@ -33,208 +40,6 @@ COMPULSORY_PRODUCTION_LAYERS: frozenset[str] = frozenset(
 
 class RegistryContractError(Exception):
     """Raised when a guardrail registry contract rule is violated."""
-
-
-class BaseGuardrailLayer:
-    """Standard base implementation satisfying the GuardrailLayer protocol."""
-
-    key: ClassVar[str] = ""
-    stage: ClassVar[Literal["input", "tool", "output"]] = "input"
-    prerequisites: ClassVar[tuple[str, ...]] = ()
-
-    def __init__(
-        self,
-        key: str | None = None,
-        stage: Literal["input", "tool", "output"] | None = None,
-        prerequisites: tuple[str, ...] | None = None,
-    ) -> None:
-        if key is not None:
-            self.key = key
-        if stage is not None:
-            self.stage = stage
-        if prerequisites is not None:
-            self.prerequisites = prerequisites
-
-    async def check(
-        self,
-        context: AdmissionContext | TurnCapabilities,
-        data: Any,
-    ) -> PipelineDecision[Any]:
-        if self.stage == "input":
-            content = data if isinstance(data, str) else getattr(data, "content", str(data))
-            return PipelineDecision(status="PASS", validated_data=ValidatedInput(content=content))
-        if self.stage == "output":
-            content = data if isinstance(data, str) else getattr(data, "content", str(data))
-            return PipelineDecision(status="PASS", validated_data=ApprovedChunk(content=content))
-        return PipelineDecision(status="PASS", validated_data=data)
-
-
-class InputLengthLayer(BaseGuardrailLayer):
-    key: ClassVar[str] = "input.length"
-    stage: ClassVar[Literal["input"]] = "input"
-    prerequisites: ClassVar[tuple[str, ...]] = ()
-
-    def __init__(
-        self,
-        max_characters: int = 4096,
-        max_bytes: int = 16384,
-        key: str | None = None,
-        stage: Literal["input", "tool", "output"] | None = None,
-        prerequisites: tuple[str, ...] | None = None,
-    ) -> None:
-        super().__init__(key=key, stage=stage, prerequisites=prerequisites)
-        self.max_characters = max_characters
-        self.max_bytes = max_bytes
-
-    async def check(
-        self,
-        context: AdmissionContext | TurnCapabilities,
-        data: Any,
-    ) -> PipelineDecision[Any]:
-        content = data if isinstance(data, str) else getattr(data, "content", str(data))
-        if len(content) > self.max_characters:
-            return PipelineDecision(
-                status="BLOCK",
-                response_key=GUARDRAIL_INPUT_LENGTH,
-                reason=f"Input exceeds maximum character length {self.max_characters}",
-                validated_data=None,
-            )
-        if len(content.encode("utf-8")) > self.max_bytes:
-            return PipelineDecision(
-                status="BLOCK",
-                response_key=GUARDRAIL_INPUT_LENGTH,
-                reason=f"Input exceeds maximum byte length {self.max_bytes}",
-                validated_data=None,
-            )
-        return PipelineDecision(
-            status="PASS",
-            validated_data=ValidatedInput(content=content),
-        )
-
-
-INJECTION_PATTERNS: tuple[re.Pattern[str], ...] = (
-    re.compile(r"ignore\s+previous\s+instructions", re.IGNORECASE),
-    re.compile(r"ignore\s+all\s+previous\s+instructions", re.IGNORECASE),
-    re.compile(r"system\s+prompt", re.IGNORECASE),
-    re.compile(r"reveal\s+prompt", re.IGNORECASE),
-    re.compile(r"reveal\s+the\s+prompt", re.IGNORECASE),
-    re.compile(r"forget\s+what\s+you", re.IGNORECASE),
-    re.compile(r"disregard\s+instructions", re.IGNORECASE),
-    re.compile(r"disregard\s+all\s+instructions", re.IGNORECASE),
-    re.compile(r"\bdrop\s+table\b", re.IGNORECASE),
-)
-
-OUT_OF_DOMAIN_PATTERNS: tuple[re.Pattern[str], ...] = (
-    # Code generation and programming requests
-    re.compile(r"\bpython\s+script\b", re.IGNORECASE),
-    re.compile(r"\bwrite\s+code\b", re.IGNORECASE),
-    re.compile(r"\bwrite\s+some\s+code\b", re.IGNORECASE),
-    re.compile(r"\bwrite\s+a\s+script\b", re.IGNORECASE),
-    re.compile(r"\bhow\s+to\s+code\b", re.IGNORECASE),
-    re.compile(r"\bcode\s+in\s+typescript\b", re.IGNORECASE),
-    re.compile(r"\bcode\s+in\s+python\b", re.IGNORECASE),
-    re.compile(r"\bwrite\s+a\s+program\b", re.IGNORECASE),
-    re.compile(r"\bwrite\s+an\s+algorithm\b", re.IGNORECASE),
-    # Creative writing (essays, stories, poems)
-    re.compile(r"\bwrite\s+an\s+essay\b", re.IGNORECASE),
-    re.compile(r"\bwrite\s+essay\b", re.IGNORECASE),
-    re.compile(r"\btell\s+me\s+a\s+story\b", re.IGNORECASE),
-    re.compile(r"\bwrite\s+a\s+story\b", re.IGNORECASE),
-    re.compile(r"\bwrite\s+a\s+poem\b", re.IGNORECASE),
-    re.compile(r"\bcompose\s+a\s+poem\b", re.IGNORECASE),
-    # Medical advice
-    re.compile(r"\bmedical\s+advice\b", re.IGNORECASE),
-    re.compile(r"\bwhat\s+medicine\s+should\s+i\s+take\b", re.IGNORECASE),
-    re.compile(r"\bdiagnose\s+my\b", re.IGNORECASE),
-    re.compile(r"\bprescribe\s+me\b", re.IGNORECASE),
-    # Legal advice
-    re.compile(r"\blegal\s+advice\b", re.IGNORECASE),
-    re.compile(r"\blegal\s+counsel\b", re.IGNORECASE),
-    re.compile(r"\bhow\s+to\s+sue\b", re.IGNORECASE),
-    re.compile(r"\bfile\s+a\s+lawsuit\b", re.IGNORECASE),
-)
-
-
-class InputPIILayer(BaseGuardrailLayer):
-    key: ClassVar[str] = "input.pii"
-    stage: ClassVar[Literal["input"]] = "input"
-    prerequisites: ClassVar[tuple[str, ...]] = ("input.length",)
-
-    async def check(
-        self,
-        context: AdmissionContext | TurnCapabilities,
-        data: Any,
-    ) -> PipelineDecision[Any]:
-        content = data if isinstance(data, str) else getattr(data, "content", str(data))
-        if detect_pii(content):
-            return PipelineDecision(
-                status="BLOCK",
-                response_key=GUARDRAIL_INPUT_PII,
-                reason="Input contains personally identifiable information (PII)",
-                validated_data=None,
-            )
-        return PipelineDecision(
-            status="PASS",
-            validated_data=ValidatedInput(content=content),
-        )
-
-
-class InputInjectionLayer(BaseGuardrailLayer):
-    key: ClassVar[str] = "input.injection"
-    stage: ClassVar[Literal["input"]] = "input"
-    prerequisites: ClassVar[tuple[str, ...]] = ("input.length",)
-
-    async def check(
-        self,
-        context: AdmissionContext | TurnCapabilities,
-        data: Any,
-    ) -> PipelineDecision[Any]:
-        content = data if isinstance(data, str) else getattr(data, "content", str(data))
-        candidates = [content, bounded_normalize(content)]
-        for payload in detect_base64_payloads(content):
-            candidates.append(payload)
-            candidates.append(bounded_normalize(payload))
-
-        for candidate in candidates:
-            for pattern in INJECTION_PATTERNS:
-                if safe_regex_match(pattern, candidate):
-                    return PipelineDecision(
-                        status="BLOCK",
-                        response_key=GUARDRAIL_INPUT_INJECTION,
-                        reason="Prompt injection detected",
-                        validated_data=None,
-                    )
-
-        return PipelineDecision(
-            status="PASS",
-            validated_data=ValidatedInput(content=content),
-        )
-
-
-class InputTopicLayer(BaseGuardrailLayer):
-    key: ClassVar[str] = "input.topic"
-    stage: ClassVar[Literal["input"]] = "input"
-    prerequisites: ClassVar[tuple[str, ...]] = ("input.length",)
-
-    async def check(
-        self,
-        context: AdmissionContext | TurnCapabilities,
-        data: Any,
-    ) -> PipelineDecision[Any]:
-        content = data if isinstance(data, str) else getattr(data, "content", str(data))
-        for pattern in OUT_OF_DOMAIN_PATTERNS:
-            if safe_regex_match(pattern, content):
-                return PipelineDecision(
-                    status="BLOCK",
-                    response_key=GUARDRAIL_INPUT_TOPIC,
-                    reason="Input contains out-of-domain request",
-                    validated_data=None,
-                )
-
-        return PipelineDecision(
-            status="PASS",
-            validated_data=ValidatedInput(content=content),
-        )
 
 
 class OutputPIILayer(BaseGuardrailLayer):
@@ -398,10 +203,10 @@ def create_production_registry(
     )
 
     default_layers = (
-        InputLengthLayer(),
-        InputPIILayer(),
-        InputInjectionLayer(),
-        InputTopicLayer(),
+        LengthValidator(),
+        PIIDetector(),
+        InjectionDetector(),
+        TopicBoundary(),
         OutputPIILayer(),
     )
     for layer in default_layers:
@@ -409,3 +214,23 @@ def create_production_registry(
             registry.register(layer)
 
     return registry
+
+
+__all__ = [
+    "COMPULSORY_PRODUCTION_LAYERS",
+    "RegistryContractError",
+    "BaseGuardrailLayer",
+    "OutputPIILayer",
+    "GuardrailRegistry",
+    "create_production_registry",
+    "LengthValidator",
+    "PIIDetector",
+    "InjectionDetector",
+    "TopicBoundary",
+    "InputLengthLayer",
+    "InputPIILayer",
+    "InputInjectionLayer",
+    "InputTopicLayer",
+    "INJECTION_PATTERNS",
+    "OUT_OF_DOMAIN_PATTERNS",
+]
