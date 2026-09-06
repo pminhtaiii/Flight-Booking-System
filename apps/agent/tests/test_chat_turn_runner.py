@@ -745,3 +745,61 @@ async def test_runner_cancellation_bounded_timeout_on_stuck_dependency():
     with pytest.raises(asyncio.CancelledError):
         async for _ in runner.run(command):
             pass
+
+
+@pytest.mark.asyncio
+async def test_on_chat_model_end_prevents_duplicate_on_chain_end():
+    mock_client = MagicMock()
+    mock_client.create_session = AsyncMock(return_value={"id": "session-123"})
+    mock_client.get_memory = AsyncMock(
+        return_value={"recentMessages": [], "summary": None, "totalMessageCount": 0}
+    )
+    mock_client.create_message_batch = AsyncMock(
+        return_value={"messages": [{"id": "msg_usr_1"}, {"id": "msg_agent_1"}]}
+    )
+    mock_client.set_fencing_token = MagicMock()
+
+    mock_queue = MagicMock()
+    mock_queue.acquire = AsyncMock(return_value="req-123")
+    mock_queue.get_fence = MagicMock(return_value=42)
+    mock_queue.validate_active_fence = AsyncMock(return_value=True)
+    mock_queue.release = AsyncMock()
+
+    msg = MagicMock(content="Hello traveler!")
+    mock_graph = MagicMock()
+
+    async def mock_astream_events(*args, **kwargs):
+        # Model completes without streaming chunks
+        yield {
+            "event": "on_chat_model_end",
+            "data": {"output": msg},
+        }
+        # Followed by on_chain_end containing the same message
+        yield {
+            "event": "on_chain_end",
+            "name": "travel",
+            "data": {"output": {"messages": [msg]}},
+        }
+
+    mock_graph.astream_events = mock_astream_events
+
+    runner = ChatTurnRunner(
+        graph=mock_graph,
+        queue_manager=mock_queue,
+        client_factory=lambda **kwargs: mock_client,
+        redis_client=MagicMock(),
+    )
+
+    command = ChatTurnCommand(
+        user_id="user-123",
+        session_id="session-456",
+        message="Hello",
+        token="mock_token",
+    )
+
+    events = [event async for event in runner.run(command)]
+    token_events = [e for e in events if isinstance(e, TokenEvent)]
+    emitted_text = "".join(e.data.content for e in token_events)
+
+    # Content should be emitted exactly once, not duplicated
+    assert emitted_text == "Hello traveler!"

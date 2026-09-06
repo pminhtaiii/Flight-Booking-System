@@ -643,6 +643,7 @@ class ChatTurnRunner:
                             message = message[0]
                     content = getattr(message, "content", None)
                     if isinstance(content, str) and content:
+                        saw_model_stream = True
                         async for safe_chunk in pipeline.process_token(content):
                             partial_response += safe_chunk
                             yield TokenEvent(data=TokenPayload(content=safe_chunk))

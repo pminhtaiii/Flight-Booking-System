@@ -25,15 +25,34 @@ class OutputGuardrailBlockedError(Exception):
 _PASSPORT = re.compile(r"(?<![A-Z0-9])[A-Z][0-9]{7,10}(?![A-Z0-9])")
 _PASSPORT_ADJACENT = re.compile(r"(?<![A-Z0-9])[A-Z][0-9]{7,10}(?=[A-Z0-9])")
 _CARD = re.compile(r"(?<![0-9])(?:[0-9][ -]?){12,18}[0-9](?![0-9])")
-_PHONE = re.compile(r"\+?[0-9][0-9 ().-]{5,38}[0-9]")
+_PHONE = re.compile(
+    r"(?<![0-9])\+?(?![\d ().-]*\d{4}-\d{2}-\d{2})[0-9][0-9 ().-]{5,38}[0-9](?![0-9:])"
+)
 _EMAIL = re.compile(r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]{1,64}@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+")
 _EMAIL_LIKE = re.compile(r"\S{1,255}@\S+")
 _CREDENTIAL = re.compile(r"(?:api_key=|access_token=|secret=|bearer )\S{1,505}", re.I)
 _CREDENTIAL_PREFIX = re.compile(r"(?:api_key=|access_token=|secret=|bearer )\S*$", re.I)
 _PASSPORT_PREFIX = re.compile(r"(?<![A-Z0-9])[A-Z][0-9]{0,10}$")
 _CARD_PREFIX = re.compile(r"(?<![0-9])[0-9][0-9 -]{0,35}$")
-_PHONE_PREFIX = re.compile(r"(?:^|(?<=\s))\+?[0-9][0-9 ().-]{0,38}$")
+_PHONE_PREFIX = re.compile(r"(?:^|(?<=\s))\+?(?![\d ().-]*\d{4}-\d{2}-\d{2})[0-9][0-9 ().-]{0,38}$")
 _EMAIL_PREFIX = re.compile(r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]{1,64}@?[A-Za-z0-9.-]*$")
+_DATETIME = re.compile(
+    r"\b\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?\b"
+)
+
+
+def _is_itinerary_or_date(match: re.Match[str], text: str) -> bool:
+    val = match.group(0)
+    if re.search(r"\b\d{4}-\d{2}-\d{2}\b", val):
+        return True
+    end = match.end()
+    if end < len(text) and text[end] == ":":
+        return True
+    start = match.start()
+    for dt_m in _DATETIME.finditer(text):
+        if max(start, dt_m.start()) < min(end, dt_m.end()):
+            return True
+    return False
 
 
 def deterministic_pii_match(text: str, *, include_credentials: bool = True) -> re.Match[str] | None:
@@ -41,7 +60,12 @@ def deterministic_pii_match(text: str, *, include_credentials: bool = True) -> r
         list(_PASSPORT.finditer(text))
         + list(_PASSPORT_ADJACENT.finditer(text))
         + [m for m in _CARD.finditer(text) if is_luhn_valid(m.group(0))]
-        + [m for m in _PHONE.finditer(text) if sum(char.isdigit() for char in m.group(0)) >= 10]
+        + [
+            m
+            for m in _PHONE.finditer(text)
+            if sum(char.isdigit() for char in m.group(0)) >= 10
+            and not _is_itinerary_or_date(m, text)
+        ]
         + list(_EMAIL.finditer(text))
         + (list(_CREDENTIAL.finditer(text)) if include_credentials else [])
     )
@@ -77,7 +101,37 @@ def payload_free_config(config: Any = None) -> dict[str, Any]:
     }
 
 
+def _is_output_guardrail_disabled(config: Any) -> bool:
+    if config is None:
+        return False
+    if getattr(config, "enabled", True) is False:
+        return True
+    og = getattr(config, "output_guardrail", None)
+    if og is not None and getattr(og, "enabled", True) is False:
+        return True
+    if isinstance(config, Mapping):
+        if config.get("enabled") is False:
+            return True
+        og_dict = config.get("output_guardrail")
+        if isinstance(og_dict, Mapping) and og_dict.get("enabled") is False:
+            return True
+        if og_dict is not None and getattr(og_dict, "enabled", True) is False:
+            return True
+        conf = config.get("configurable")
+        if isinstance(conf, Mapping):
+            if conf.get("enabled") is False:
+                return True
+            og_conf = conf.get("output_guardrail")
+            if isinstance(og_conf, Mapping) and og_conf.get("enabled") is False:
+                return True
+            if og_conf is not None and getattr(og_conf, "enabled", True) is False:
+                return True
+    return False
+
+
 async def approved_model_content(content: Any, config: Any = None) -> bool:
+    if _is_output_guardrail_disabled(config):
+        return True
     return isinstance(content, str) and not deterministic_pii_match(content)
 
 
@@ -137,7 +191,7 @@ class OutputGuardrailPipeline:
         return self.buffer.release_raw_prefix(boundary)
 
     async def process_token(self, token: str) -> AsyncGenerator[str, None]:
-        if not getattr(self.config, "enabled", True):
+        if _is_output_guardrail_disabled(self.config):
             yield token
             return
         self.buffer.add_token(token)
@@ -156,7 +210,7 @@ class OutputGuardrailPipeline:
             yield safe
 
     async def flush(self) -> AsyncGenerator[str, None]:
-        if not getattr(self.config, "enabled", True):
+        if _is_output_guardrail_disabled(self.config):
             return
         match = deterministic_pii_match(self.buffer.normalized)
         if match:

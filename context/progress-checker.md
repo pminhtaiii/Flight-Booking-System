@@ -37,6 +37,11 @@ Update this file after every completed feature. Any AI agent reading this should
 - Runtime cleanup: Agent startup and SSE no longer instantiate, probe, or inject the legacy NeMo/MiMo security service. The deterministic `GuardrailGateway` remains the mandatory input boundary; primary chat/router/summary model configuration is unchanged.
 - User-approved legacy migrations: updated `apps/agent/tests/test_output_pipeline.py` and three stale NeMo-oriented assertions in `apps/agent/tests/test_sse.py` to verify the deterministic public contract rather than retired secondary-model calls or private buffer interfaces.
 - Verification: exact GOAL security selection passed 67/67; the complete agent suite passed 718 tests with 4 legacy NeMo-only drills skipped after explicit contract migration; `uv run --package agent ruff check apps/agent` and `ruff format --check apps/agent` passed. The only warning was pytest cache creation being denied under `apps/agent/.pytest_cache`; it did not affect execution.
+- Handoff Fixes & CI Stabilization:
+  - Issue 1: Set `saw_model_stream = True` in `runner.py` on `on_chat_model_end` when non-streaming output processed, preventing duplicate message emissions on enclosing `on_chain_end`.
+  - Issue 2: Refined phone regex and added `_is_itinerary_or_date` check in `output_pipeline.py` to prevent false positive phone detections on itinerary dates/timestamps (`YYYY-MM-DD HH:MM`).
+  - Issue 3: Added `_is_output_guardrail_disabled` helper checking `config.enabled` and `output_guardrail.enabled` across namespaces and mappings in `output_pipeline.py` (`approved_model_content`, `process_token`, `flush`).
+  - CI Smoke/Sanity Fix: Extended retry condition in `tests/smoke/sanity.test.mjs` (T031) to retry on status 410 as well as 404 during offer persistence write-behind window.
 
 ### Feature 023 — Security Systems: Phase 3 US1 (Task T018 Completed & Issues 1-4 Fixed) (2026-09-06)
 
