@@ -5,6 +5,7 @@ from langgraph.graph import END
 from agent.agents.chat_agent import get_chat_model
 from agent.config import get_settings
 from agent.graph.state import AgentState
+from agent.guardrails.output_pipeline import payload_free_config
 from agent.models.requests import RouteDecision
 from agent.observability.chat_observability import ChatTelemetry
 
@@ -59,7 +60,8 @@ async def invoke_router(state: AgentState) -> RouteDecision:
                     "content": "You are an intent classifier. Classify the user's intent into GENERAL, SEARCH, BOOKING_INQUIRY, or CHECKOUT.",
                 },
                 {"role": "user", "content": last_message.content},
-            ]
+            ],
+            config=payload_free_config(),
         )
     except Exception:
         logger.warning("router_output_rejected")

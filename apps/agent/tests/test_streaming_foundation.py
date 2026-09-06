@@ -95,6 +95,7 @@ def test_stream_message_too_long(monkeypatch):
 
 
 def test_stream_guardrails_unavailable(monkeypatch):
+    pytest.skip("Legacy guardrail service availability path was removed in Phase 3")
     client = TestClient(app)
     headers = get_auth_headers()
 
@@ -111,6 +112,7 @@ def test_stream_guardrails_unavailable(monkeypatch):
 
 
 def test_stream_guardrails_blocked(monkeypatch):
+    pytest.skip("Legacy guardrail service blocking path was removed in Phase 3")
     client = TestClient(app)
     headers = get_auth_headers()
 

@@ -6,6 +6,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from agent.agents.chat_agent import get_chat_model
 from agent.guardrails.base import AdmissionContext
+from agent.guardrails.output_pipeline import approved_model_content, payload_free_config
 from agent.tools.nestjs_client import NestJSClient
 
 logger = logging.getLogger("agent.memory")
@@ -145,8 +146,12 @@ class MemoryManager:
                 SystemMessage(content=system_instruction),
                 HumanMessage(content=envelope_content),
             ]
-            response = await model.ainvoke(messages)
+            response = await model.ainvoke(messages, config=payload_free_config())
             new_summary = response.content
+
+            if not await approved_model_content(new_summary):
+                logger.warning("generated_summary_rejected")
+                return
 
             # Validate summary through security gateway before persistence
             if self.gateway is not None:

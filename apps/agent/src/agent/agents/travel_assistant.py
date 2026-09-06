@@ -3,6 +3,7 @@ from langchain_core.runnables import RunnableConfig
 
 from agent.agents.chat_agent import get_chat_model
 from agent.graph.state import AgentState
+from agent.guardrails.output_pipeline import approved_model_content, payload_free_config
 from agent.tools.registry import get_travel_tools
 
 TRAVEL_PROMPT = (
@@ -45,5 +46,9 @@ async def travel_assistant_node(state: AgentState, config: RunnableConfig) -> di
             )
         )
 
-    response = await model_with_tools.ainvoke(messages, config=config)
-    return {"messages": [response]}
+    response = await model_with_tools.ainvoke(messages, config=payload_free_config(config))
+    return (
+        {"messages": [response]}
+        if await approved_model_content(response.content, config)
+        else {"messages": []}
+    )

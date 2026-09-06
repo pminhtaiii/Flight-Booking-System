@@ -25,10 +25,23 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Security Systems (Feature 023) — Phase 3 US1 in progress
-**Last completed:** Task T018: Ingress ASGI Body Limits, Runner Wiring & Memory Boundary (`apps/agent/src/agent/middleware/body_limit.py`, `apps/agent/src/agent/main.py`, `apps/agent/src/agent/chat_turn/runner.py`, `apps/agent/src/agent/streaming/sse.py`, `apps/agent/src/agent/memory/manager.py`, `apps/agent/tests/security/test_memory_boundary.py`, `apps/agent/tests/security/test_lifecycle.py`).
-**In progress:** Phase 3 US1.
-**Next:** T019 output stream tests (`apps/agent/tests/security/test_output_stream.py`).
+**Feature:** Security Systems (Feature 023) — Phase 3 US1 complete
+**Last completed:** Tasks T019–T020: deterministic bounded output streaming, approved-prefix persistence, PII hard-stop, payload-free model callbacks, and non-streamed model-output validation.
+**In progress:** Ready to begin Phase 4 US2.
+**Next:** T021 tool-policy contract tests (`apps/agent/tests/security/test_tool_policy.py`).
+
+### Feature 023 — Security Systems: Phase 3 US1 Final Slice (Tasks T019–T020 Completed) (2026-09-06)
+
+- T019: Added `tests/security/pii-policy.json` and public-boundary suites in `apps/agent/tests/security/test_output_stream.py` and `test_model_output_boundary.py`. Coverage includes exhaustive character partitions, representative three/four-token partitions, punctuation/EOF, width boundaries, NFKC raw mapping, combining marks, interleaved turns, cancellation/lease cleanup, overflow, approved-prefix SSE/persistence, callback/trace canaries, and zero secondary security-model calls.
+- T020: Replaced the output NeMo classifier path with deterministic finite detectors and a turn-local bounded raw/NFKC buffer. Violations close upstream generation, discard undecided text, emit `OUTPUT_GUARDRAIL_BLOCKED`, and persist only approved output. Model and graph dispatches now install payload-free callback configuration, and non-streamed `AIMessage`/summary content is rejected before state export or persistence.
+- Runtime cleanup: Agent startup and SSE no longer instantiate, probe, or inject the legacy NeMo/MiMo security service. The deterministic `GuardrailGateway` remains the mandatory input boundary; primary chat/router/summary model configuration is unchanged.
+- User-approved legacy migrations: updated `apps/agent/tests/test_output_pipeline.py` and three stale NeMo-oriented assertions in `apps/agent/tests/test_sse.py` to verify the deterministic public contract rather than retired secondary-model calls or private buffer interfaces.
+- Verification: exact GOAL security selection passed 67/67; the complete agent suite passed 718 tests with 4 legacy NeMo-only drills skipped after explicit contract migration; `uv run --package agent ruff check apps/agent` and `ruff format --check apps/agent` passed. The only warning was pytest cache creation being denied under `apps/agent/.pytest_cache`; it did not affect execution.
+- Handoff Fixes & CI Stabilization:
+  - Chat Turn Runner Model Output (Handoff Issue 2): Replaced turn-wide `saw_model_stream` boolean in `runner.py` with per-run and per-message tracking (`streamed_run_ids`, `handled_message_ids`, `active_model_streamed`, `streamed_since_last_node_end`), ensuring later model invocations in multi-step turns (tools / `final_answer`) are not dropped while preventing duplicate emissions across `on_chat_model_end` and `on_chain_end`.
+  - Output Guardrail Phone & Itinerary Date Overlap (Handoff Issue 1): Refined `_PHONE` regex lookahead and lookbehind (`(?<!\d)(?<!\d-)\+?(?!\d{4}-\d{2}-\d{2})[0-9](?:[0-9]|[- .()](?!\d{4}-\d{2}-\d{2})){5,38}[0-9](?![0-9:])`) and restricted `_is_itinerary_or_date` in `output_pipeline.py` to matches that strictly fullmatch recognized datetimes/date-ranges or are contained within a datetime subspan, ensuring real phones adjacent to itinerary dates are blocked without false positives on date/time listings.
+  - Output Guardrail Disabled Config Handling: Added `_is_output_guardrail_disabled` helper checking `config.enabled` and `output_guardrail.enabled` across namespaces and mappings in `output_pipeline.py` (`approved_model_content`, `process_token`, `flush`).
+  - CI Smoke/Sanity Fix: Extended retry condition in `tests/smoke/sanity.test.mjs` (T031) to retry on status 410 as well as 404 during offer persistence write-behind window.
 
 ### Feature 023 — Security Systems: Phase 3 US1 (Task T018 Completed & Issues 1-4 Fixed) (2026-09-06)
 

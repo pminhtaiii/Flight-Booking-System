@@ -138,25 +138,6 @@ async def chat_stream(
 
         return EventSourceResponse(pii_error_generator())
 
-    guardrails = getattr(request.app.state, "guardrails", None)
-    if guardrails and body.message:
-        is_allowed, reason = await guardrails.validate_message(body.message)
-        if not is_allowed:
-            if "unavailable" in reason.lower():
-                raise HTTPException(status_code=503, detail="Safety check unavailable")
-
-            async def error_generator():
-                event = ErrorEvent(
-                    data=ErrorPayload(
-                        code="GUARDRAIL_BLOCKED",
-                        message="Your message could not be processed.",
-                        partialMessageId=None,
-                    )
-                )
-                yield {"event": event.event, "data": event.data.model_dump_json()}
-
-            return EventSourceResponse(error_generator())
-
     # 5. Rate Limit / Quota check (accepted-only charge) BEFORE session lock / model / persistence
     quota_started = time.perf_counter()
     try:
@@ -248,7 +229,6 @@ async def chat_stream(
     runner = ChatTurnRunner(
         settings=settings,
         graph=graph,
-        guardrails=guardrails,
         queue_manager=queue_manager,
         redis_client=get_redis_client(),
         client_factory=NestJSClient,

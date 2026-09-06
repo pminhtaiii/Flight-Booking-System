@@ -3,6 +3,7 @@ from langchain_core.runnables import RunnableConfig
 
 from agent.agents.chat_agent import get_chat_model
 from agent.graph.state import AgentState
+from agent.guardrails.output_pipeline import approved_model_content, payload_free_config
 
 GENERAL_PROMPT = (
     "You are a helpful travel assistant for the Flight Booking System. "
@@ -21,5 +22,9 @@ async def general_agent_node(state: AgentState, config: RunnableConfig) -> dict:
     if not has_system:
         messages.insert(0, SystemMessage(content=GENERAL_PROMPT))
 
-    response = await model.ainvoke(messages, config=config)
-    return {"messages": [response]}
+    response = await model.ainvoke(messages, config=payload_free_config(config))
+    return (
+        {"messages": [response]}
+        if await approved_model_content(response.content, config)
+        else {"messages": []}
+    )

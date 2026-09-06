@@ -199,7 +199,7 @@ async def test_step1_rollback_sse_stream_emits_no_action_handoff_on_disabled_fla
         def bind_tools(self, tools: Any, **kwargs: Any) -> Any:
             return self
 
-        def _generate(self, messages: List[BaseMessage], **kwargs: Any) -> ChatResult:
+        def _generate(self, messages: List[BaseMessage], *args: Any, **kwargs: Any) -> ChatResult:
             resp = self.responses.pop(0) if self.responses else AIMessage(content="Hello")
             return ChatResult(generations=[ChatGeneration(message=resp)])
 
