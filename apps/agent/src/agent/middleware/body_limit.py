@@ -40,7 +40,7 @@ class BodyLimitMiddleware:
                 break
 
         if content_length is not None and content_length > self.max_bytes:
-            await self._send_413(send)
+            await self._send_413(scope, send)
             return
 
         # 2. Wrap receive to streamingly count incoming bytes
@@ -67,17 +67,29 @@ class BodyLimitMiddleware:
             await self.app(scope, limited_receive, custom_send)
         except PayloadTooLargeError:
             if not response_started:
-                await self._send_413(send)
+                await self._send_413(scope, send)
 
-    async def _send_413(self, send: Callable[[dict[str, Any]], Any]) -> None:
+    async def _send_413(
+        self,
+        scope: dict[str, Any],
+        send: Callable[[dict[str, Any]], Any],
+    ) -> None:
+        response_headers: list[tuple[bytes, bytes]] = [
+            (b"content-type", b"application/json"),
+            (b"content-length", str(len(ERROR_BODY)).encode("latin-1")),
+        ]
+        headers = scope.get("headers", [])
+        for raw_name, raw_value in headers:
+            if raw_name.lower() == b"origin":
+                response_headers.append((b"access-control-allow-origin", raw_value))
+                response_headers.append((b"vary", b"Origin"))
+                break
+
         await send(
             {
                 "type": "http.response.start",
                 "status": 413,
-                "headers": [
-                    (b"content-type", b"application/json"),
-                    (b"content-length", str(len(ERROR_BODY)).encode("latin-1")),
-                ],
+                "headers": response_headers,
             }
         )
         await send(

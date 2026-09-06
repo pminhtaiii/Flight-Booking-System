@@ -104,6 +104,7 @@ async def validate_origin_middleware(request: Request, call_next):
     return await call_next(request)
 
 
+app.add_middleware(BodyLimitMiddleware, max_bytes=65536)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
@@ -119,7 +120,6 @@ app.add_middleware(
         "x-correlation-id",
     ],
 )
-app.add_middleware(BodyLimitMiddleware, max_bytes=65536)
 
 
 @app.get("/health/live")

@@ -333,7 +333,7 @@ class InjectionSignatureEngine:
     def __init__(
         self,
         max_rounds: int = 2,
-        max_expansion_bytes: int = 8192,
+        max_expansion_bytes: int = 16384,
     ) -> None:
         self.max_rounds = max(1, min(max_rounds, 5))
         self.max_expansion_bytes = max(256, max_expansion_bytes)

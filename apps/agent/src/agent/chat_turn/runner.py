@@ -26,7 +26,7 @@ from agent.chat_turn.events import (
     ToolResultPayload,
 )
 from agent.config import get_settings
-from agent.guardrails.base import AdmissionContext
+from agent.guardrails.base import AdmissionContext, ValidatedInput
 from agent.guardrails.output_pipeline import OutputGuardrailBlockedError, OutputGuardrailPipeline
 from agent.infrastructure.redis import get_redis_client
 from agent.memory.manager import MemoryManager
@@ -254,7 +254,11 @@ class ChatTurnRunner:
 
         return new_persisted, partial_message_id, error_event
 
-    async def run(self, command: ChatTurnCommand) -> AsyncIterator[ChatTurnEvent]:
+    async def run(
+        self,
+        command: ChatTurnCommand,
+        validated_input: Optional[ValidatedInput] = None,
+    ) -> AsyncIterator[ChatTurnEvent]:
         """
         Execute a single chat turn as an async generator yielding ChatTurnEvent items.
         """
@@ -288,7 +292,7 @@ class ChatTurnRunner:
         trace_id = safe_opaque_id(command.trace_id)
         correlation_id = safe_opaque_id(command.correlation_id)
 
-        if self.gateway is not None and command.message:
+        if validated_input is None and self.gateway is not None and command.message:
             context = AdmissionContext(
                 user_id=command.user_id,
                 chat_session_id=command.session_id or "unassigned",
@@ -316,6 +320,7 @@ class ChatTurnRunner:
                     )
                 )
                 return
+            validated_input = decision.validated_data
 
         client = self._create_client(
             token=command.token,
@@ -331,7 +336,11 @@ class ChatTurnRunner:
         user_msg_persisted = False
         persisted = False
         force_persistence = False
-        user_msg_content = command.message or "Action confirmed"
+        user_msg_content = (
+            validated_input.content
+            if validated_input is not None
+            else (command.message or "Action confirmed")
+        )
 
         try:
             # 1. Session resolution / auto-creation

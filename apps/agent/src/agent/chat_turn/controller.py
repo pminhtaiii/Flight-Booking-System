@@ -36,6 +36,7 @@ class ChatController:
             )
             return
 
+        decision = None
         if command.message:
             context = AdmissionContext(
                 user_id=command.user_id,
@@ -65,8 +66,16 @@ class ChatController:
                 )
                 return
 
-        async for event in self.runner.run(command):
-            yield event
+        validated_input = decision.validated_data if decision is not None else None
+        try:
+            runner_gen = self.runner.run(command, validated_input=validated_input)
+        except TypeError:
+            runner_gen = self.runner.run(command)
+        try:
+            async for event in runner_gen:
+                yield event
+        finally:
+            await runner_gen.aclose()
 
 
 __all__ = ["ChatController"]
