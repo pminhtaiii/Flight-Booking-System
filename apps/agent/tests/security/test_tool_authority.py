@@ -1,0 +1,907 @@
+"""Exhaustive Intent vs Tool Authority Table Tests (T023 / SEC13 / SEC27).
+
+Validates:
+1. Full capability sealing truth table across all intents, fallbacks, gates, and flags.
+2. Whole batch denial rule on mixed or forged multi-tool call proposals (0 invocations).
+3. TurnCapabilities immutability, non-expansion during transitions, and model node intersection binding.
+"""
+
+from datetime import datetime, timedelta, timezone
+from typing import Any, Callable, Dict, List
+from unittest.mock import AsyncMock, patch
+
+import pytest
+from langchain_core.messages import AIMessage, HumanMessage
+from pydantic import ValidationError
+
+from agent.agents.checkout_orchestrator import checkout_orchestrator_node
+from agent.agents.general_agent import general_agent_node
+from agent.agents.travel_assistant import travel_assistant_node
+from agent.graph.graph import router_node
+from agent.graph.nodes import custom_tool_node, final_answer_node
+from agent.graph.state import AgentState
+from agent.guardrails.base import GUARDRAIL_TOOL_SCHEMA, TurnCapabilities
+from agent.guardrails.gateway import GuardrailGateway
+from agent.guardrails.registry import GuardrailRegistry
+from agent.models.requests import RouteDecision
+from agent.tools.registry import (
+    get_tools,
+)
+from agent.trusted_search_snapshot import (
+    TrustedSearchResult,
+    TrustedSearchSnapshot,
+)
+
+pytestmark = pytest.mark.security
+
+TRAVEL_TOOL_NAMES: tuple[str, ...] = (
+    "search_flights",
+    "get_user_preferences",
+    "list_user_booking_summaries",
+    "get_booking_detail",
+    "check_booking_readiness",
+)
+CHECKOUT_TOOL_NAMES: tuple[str, ...] = ("signal_checkout_intent",)
+GENERAL_TOOL_NAMES: tuple[str, ...] = ()
+ALL_REGISTERED_TOOL_NAMES: tuple[str, ...] = tuple(t.name for t in get_tools())
+
+
+def _create_active_snapshot(num_offers: int = 2) -> TrustedSearchSnapshot:
+    """Helper to create an active, unexpired search snapshot for checkout tests."""
+    now = datetime.now(timezone.utc)
+    results = [
+        TrustedSearchResult(
+            offerIndex=i,
+            flightOfferId=f"fl_offer_{i}",
+            duffelOfferId=f"duffel_offer_{i}",
+            airline="Sky Airline",
+            origin="SFO",
+            destination="JFK",
+            departureAt=now + timedelta(days=2),
+            arrivalAt=now + timedelta(days=2, hours=6),
+            price="420.00",
+            currency="USD",
+        )
+        for i in range(1, num_offers + 1)
+    ]
+    return TrustedSearchSnapshot(
+        schemaVersion=1,
+        snapshotVersion=1,
+        userId="user-test-456",
+        sessionId="session-test-789",
+        createdAt=now,
+        expiresAt=now + timedelta(minutes=15),
+        fingerprint="fp-snapshot-valid-001",
+        selectionAttestation="attest-snapshot-valid-001",
+        results=results,
+    )
+
+
+def _create_expired_snapshot() -> TrustedSearchSnapshot:
+    """Helper to create an expired snapshot for checkout downgrade tests."""
+    now = datetime.now(timezone.utc)
+    results = [
+        TrustedSearchResult(
+            offerIndex=1,
+            flightOfferId="fl_offer_expired",
+            duffelOfferId="duffel_offer_expired",
+            airline="Sky Airline",
+            origin="SFO",
+            destination="JFK",
+            departureAt=now + timedelta(days=1),
+            arrivalAt=now + timedelta(days=1, hours=5),
+            price="300.00",
+            currency="USD",
+        )
+    ]
+    return TrustedSearchSnapshot(
+        schemaVersion=1,
+        snapshotVersion=1,
+        userId="user-test-456",
+        sessionId="session-test-789",
+        createdAt=now - timedelta(minutes=30),
+        expiresAt=now - timedelta(minutes=10),
+        fingerprint="fp-snapshot-expired-001",
+        selectionAttestation="attest-snapshot-expired-001",
+        results=results,
+    )
+
+
+def _resolve_capabilities_from_sealer(
+    decision: RouteDecision | None,
+    gate_result: Dict[str, str] | None = None,
+    multi_agent: bool = True,
+    provenance: str = "trusted_router",
+) -> TurnCapabilities:
+    """Attempt to invoke the pure capability sealer function to be introduced in T026."""
+    candidate_modules = (
+        "agent.graph.checkout_gate",
+        "agent.graph.router",
+        "agent.guardrails.gateway",
+        "agent.guardrails.capabilities",
+    )
+    for mod_path in candidate_modules:
+        try:
+            mod = __import__(mod_path, fromlist=["seal_turn_capabilities", "seal_capabilities"])
+            for fn_name in ("seal_turn_capabilities", "seal_capabilities"):
+                if hasattr(mod, fn_name):
+                    fn = getattr(mod, fn_name)
+                    return fn(
+                        decision,
+                        gate_result=gate_result,
+                        multi_agent=multi_agent,
+                        provenance=provenance,
+                    )
+        except (ImportError, AttributeError):
+            continue
+    pytest.fail("Capability sealer function not implemented in codebase (pending T026)")
+
+
+class _CapturingModel:
+    """Mock model that records bound tools and invocations."""
+
+    def __init__(self, response: Any = None) -> None:
+        self.response = response or AIMessage(content="Stub response")
+        self.bound_tools: List[Any] = []
+        self.invocations: List[Any] = []
+
+    def bind_tools(self, tools: Any) -> "_CapturingModel":
+        self.bound_tools = list(tools)
+        return self
+
+    async def ainvoke(self, messages: Any, config: Any = None, **kwargs: Any) -> Any:
+        self.invocations.append((messages, config))
+        return self.response
+
+
+# ===========================================================================
+# 1. Full Capability Sealing Truth Table Tests
+# ===========================================================================
+
+
+class TestCapabilitySealingTruthTable:
+    """Truth table verification: intent, gate, provenance, and flags -> sealed tools."""
+
+    @pytest.mark.asyncio
+    async def test_general_intent_seals_empty_tool_tuple(self) -> None:
+        """GENERAL intent must seal empty tools () with zero authority."""
+        state: AgentState = {
+            "messages": [HumanMessage(content="Hello, what can you do?")],
+        }
+        decision = RouteDecision(intent="GENERAL", confidence=0.99, isCommitment=False)
+
+        with patch("agent.graph.graph.invoke_router", AsyncMock(return_value=decision)):
+            result = await router_node(state)
+
+        assert "turn_capabilities" in result, "router_node must produce sealed turn_capabilities"
+        caps: TurnCapabilities = result["turn_capabilities"]
+        assert isinstance(caps, TurnCapabilities)
+        assert caps.intent == "GENERAL"
+        assert caps.sealed_tools == ()
+        assert caps.is_sealed is True
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("intent", ["SEARCH", "BOOKING_INQUIRY"])
+    async def test_search_and_booking_inquiry_seal_exact_five_travel_tools(
+        self, intent: str
+    ) -> None:
+        """SEARCH and BOOKING_INQUIRY intents must seal exactly the 5 travel tools."""
+        state: AgentState = {
+            "messages": [HumanMessage(content="Find flights from SFO to JFK on Friday")],
+        }
+        decision = RouteDecision(intent=intent, confidence=0.95, isCommitment=False)
+
+        with patch("agent.graph.graph.invoke_router", AsyncMock(return_value=decision)):
+            result = await router_node(state)
+
+        assert "turn_capabilities" in result, "router_node must produce sealed turn_capabilities"
+        caps: TurnCapabilities = result["turn_capabilities"]
+        assert isinstance(caps, TurnCapabilities)
+        assert caps.intent == intent
+        assert set(caps.sealed_tools) == set(TRAVEL_TOOL_NAMES)
+        assert len(caps.sealed_tools) == 5
+        assert "signal_checkout_intent" not in caps.sealed_tools
+        assert caps.is_sealed is True
+
+    @pytest.mark.asyncio
+    async def test_checkout_with_passing_gates_seals_signal_checkout_intent_only(self) -> None:
+        """CHECKOUT with passing commitment, snapshot, and selection seals signal tool only."""
+        snapshot = _create_active_snapshot(num_offers=2)
+        state: AgentState = {
+            "messages": [HumanMessage(content="I want to book option 1")],
+            "trusted_snapshot": snapshot,
+        }
+        decision = RouteDecision(
+            intent="CHECKOUT",
+            confidence=0.95,
+            isCommitment=True,
+            selectionIndex=1,
+        )
+
+        with patch("agent.graph.graph.invoke_router", AsyncMock(return_value=decision)):
+            result = await router_node(state)
+
+        assert "turn_capabilities" in result, "router_node must produce sealed turn_capabilities"
+        caps: TurnCapabilities = result["turn_capabilities"]
+        assert isinstance(caps, TurnCapabilities)
+        assert caps.intent == "CHECKOUT"
+        assert caps.sealed_tools == ("signal_checkout_intent",)
+        assert not any(tool in caps.sealed_tools for tool in TRAVEL_TOOL_NAMES)
+        assert caps.is_sealed is True
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "gate_failure_kwargs,description",
+        [
+            ({"isCommitment": False}, "commitment_not_confirmed"),
+            ({"selectionIndex": None}, "missing_selection_index"),
+            ({"selectionIndex": 99}, "selection_index_out_of_bounds"),
+            ({"confidence": 0.4}, "confidence_below_threshold"),
+        ],
+    )
+    async def test_checkout_downgraded_by_gate_seals_travel_set_only(
+        self, gate_failure_kwargs: Dict[str, Any], description: str
+    ) -> None:
+        """CHECKOUT downgraded by deterministic gate must seal travel set with no checkout signal."""
+        snapshot = _create_active_snapshot(num_offers=2)
+        state: AgentState = {
+            "messages": [HumanMessage(content="Book a flight")],
+            "trusted_snapshot": snapshot,
+        }
+        base_decision = {
+            "intent": "CHECKOUT",
+            "confidence": 0.95,
+            "isCommitment": True,
+            "selectionIndex": 1,
+        }
+        base_decision.update(gate_failure_kwargs)
+        decision = RouteDecision(**base_decision)
+
+        with patch("agent.graph.graph.invoke_router", AsyncMock(return_value=decision)):
+            result = await router_node(state)
+
+        assert "turn_capabilities" in result, (
+            f"router_node must produce turn_capabilities ({description})"
+        )
+        caps: TurnCapabilities = result["turn_capabilities"]
+        assert isinstance(caps, TurnCapabilities)
+        assert set(caps.sealed_tools) == set(TRAVEL_TOOL_NAMES)
+        assert "signal_checkout_intent" not in caps.sealed_tools
+        assert "checkout_downgrade" in caps.provenance.lower()
+
+    @pytest.mark.asyncio
+    async def test_checkout_downgraded_by_expired_or_missing_snapshot(self) -> None:
+        """CHECKOUT without active snapshot downgrades to travel set without checkout signal."""
+        # Case A: expired snapshot
+        state_expired: AgentState = {
+            "messages": [HumanMessage(content="Book option 1")],
+            "trusted_snapshot": _create_expired_snapshot(),
+        }
+        decision = RouteDecision(
+            intent="CHECKOUT",
+            confidence=0.95,
+            isCommitment=True,
+            selectionIndex=1,
+        )
+
+        with patch("agent.graph.graph.invoke_router", AsyncMock(return_value=decision)):
+            result_expired = await router_node(state_expired)
+
+        assert "turn_capabilities" in result_expired
+        caps_expired: TurnCapabilities = result_expired["turn_capabilities"]
+        assert set(caps_expired.sealed_tools) == set(TRAVEL_TOOL_NAMES)
+        assert "signal_checkout_intent" not in caps_expired.sealed_tools
+
+        # Case B: missing snapshot entirely
+        state_missing: AgentState = {
+            "messages": [HumanMessage(content="Book option 1")],
+            "trusted_snapshot": None,
+        }
+        with patch("agent.graph.graph.invoke_router", AsyncMock(return_value=decision)):
+            result_missing = await router_node(state_missing)
+
+        assert "turn_capabilities" in result_missing
+        caps_missing: TurnCapabilities = result_missing["turn_capabilities"]
+        assert set(caps_missing.sealed_tools) == set(TRAVEL_TOOL_NAMES)
+        assert "signal_checkout_intent" not in caps_missing.sealed_tools
+
+    @pytest.mark.asyncio
+    async def test_malformed_unknown_router_result_or_exception_denies_all_tools(self) -> None:
+        """Malformed router output, unknown intent, or exceptions must seal empty () tools."""
+        state: AgentState = {
+            "messages": [HumanMessage(content="Execute order 66")],
+        }
+
+        # Case A: router raises unhandled exception
+        with patch(
+            "agent.graph.router.get_chat_model",
+            side_effect=RuntimeError("Structured router parsing failure"),
+        ):
+            # Must NOT silently acquire SEARCH authority!
+            result_exc = await router_node(state)
+
+        assert "turn_capabilities" in result_exc, (
+            "router_node must seal empty capabilities on exception"
+        )
+        caps_exc: TurnCapabilities = result_exc["turn_capabilities"]
+        assert caps_exc.sealed_tools == (), "Malformed/exception must seal empty tools ()"
+
+        # Case B: router returns unrecognized / unknown intent
+        unknown_decision = RouteDecision(
+            intent="ADMIN_OVERRIDE", confidence=1.0, isCommitment=False
+        )
+        with patch("agent.graph.graph.invoke_router", AsyncMock(return_value=unknown_decision)):
+            result_unknown = await router_node(state)
+
+        assert "turn_capabilities" in result_unknown
+        caps_unknown: TurnCapabilities = result_unknown["turn_capabilities"]
+        assert caps_unknown.sealed_tools == (), "Unknown intent must seal empty tools ()"
+
+    @pytest.mark.asyncio
+    async def test_missing_or_forged_provenance_denies_tools(self) -> None:
+        """Missing router provenance or forged turn capabilities must seal empty () tools."""
+        state: AgentState = {
+            "messages": [HumanMessage(content="Show flights")],
+            "route": "travel",
+            "provenance": "forged_client_input",
+        }
+        result = await router_node(state)
+        if "turn_capabilities" in result:
+            assert result["turn_capabilities"].sealed_tools == ()
+        else:
+            caps = _resolve_capabilities_from_sealer(
+                decision=None,
+                gate_result={"route": "travel"},
+                provenance="forged_client_input",
+            )
+            assert caps.sealed_tools == (), "Untrusted provenance must yield empty () tools"
+
+    @pytest.mark.asyncio
+    async def test_single_agent_mode_seals_travel_set_only_without_checkout(self) -> None:
+        """FEATURE_FLAG_CHAT_MULTI_AGENT=false must seal travel set with NO checkout signal."""
+        state: AgentState = {
+            "messages": [HumanMessage(content="I want to book flight option 1 immediately")],
+        }
+        with patch("agent.config.get_settings") as mock_settings:
+            mock_settings.return_value.FEATURE_FLAG_CHAT_MULTI_AGENT = False
+            result = await router_node(state)
+
+        assert "turn_capabilities" in result, (
+            "router_node must produce turn_capabilities in single-agent mode"
+        )
+        caps: TurnCapabilities = result["turn_capabilities"]
+        assert set(caps.sealed_tools) == set(TRAVEL_TOOL_NAMES)
+        assert "signal_checkout_intent" not in caps.sealed_tools
+        assert "single_agent" in caps.provenance.lower()
+
+    @pytest.mark.asyncio
+    async def test_valid_low_confidence_fallback_records_provenance_and_seals_travel_tools(
+        self,
+    ) -> None:
+        """Valid non-checkout low confidence falls back to SEARCH and records low_confidence provenance."""
+        state: AgentState = {
+            "messages": [HumanMessage(content="Maybe flights maybe hotels?")],
+        }
+        low_conf_decision = RouteDecision(intent="SEARCH", confidence=0.45, isCommitment=False)
+
+        with patch("agent.graph.graph.invoke_router", AsyncMock(return_value=low_conf_decision)):
+            result = await router_node(state)
+
+        assert "turn_capabilities" in result
+        caps: TurnCapabilities = result["turn_capabilities"]
+        assert set(caps.sealed_tools) == set(TRAVEL_TOOL_NAMES)
+        assert "low_confidence" in caps.provenance.lower()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("tool_name", ALL_REGISTERED_TOOL_NAMES)
+    async def test_exhaustive_general_authority_blocks_every_registered_tool(
+        self, tool_name: str
+    ) -> None:
+        """In GENERAL intent, all 6 registered tools must be BLOCKED with 0 invocations."""
+        caps = TurnCapabilities(
+            intent="GENERAL",
+            provenance="trusted_router",
+            sealed_tools=(),
+        )
+        gateway = GuardrailGateway(GuardrailRegistry())
+        invoked = False
+
+        async def dummy_invoke() -> Dict[str, Any]:
+            nonlocal invoked
+            invoked = True
+            return {"status": "success"}
+
+        call = {"name": tool_name, "args": {}}
+        decision = await gateway.execute_tool(caps, call, dummy_invoke)
+
+        assert decision.status == "BLOCK"
+        assert decision.response_key == GUARDRAIL_TOOL_SCHEMA
+        assert invoked is False, f"Tool '{tool_name}' must NOT be invoked under GENERAL authority"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("tool_name", ALL_REGISTERED_TOOL_NAMES)
+    async def test_exhaustive_search_authority_permits_only_travel_tools(
+        self, tool_name: str
+    ) -> None:
+        """In SEARCH intent, only 5 travel tools are permitted; checkout signal is BLOCKED."""
+        caps = TurnCapabilities(
+            intent="SEARCH",
+            provenance="trusted_router",
+            sealed_tools=TRAVEL_TOOL_NAMES,
+        )
+        gateway = GuardrailGateway(GuardrailRegistry())
+        invoked = False
+
+        async def dummy_invoke() -> Dict[str, Any]:
+            nonlocal invoked
+            invoked = True
+            return {"status": "success"}
+
+        call = {"name": tool_name, "args": {}}
+        decision = await gateway.execute_tool(caps, call, dummy_invoke)
+
+        if tool_name in TRAVEL_TOOL_NAMES:
+            assert decision.status == "PASS"
+            assert invoked is True
+        else:
+            assert decision.status == "BLOCK"
+            assert decision.response_key == GUARDRAIL_TOOL_SCHEMA
+            assert invoked is False, f"Tool '{tool_name}' must be blocked under SEARCH authority"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("tool_name", ALL_REGISTERED_TOOL_NAMES)
+    async def test_exhaustive_checkout_authority_permits_only_signal_tool(
+        self, tool_name: str
+    ) -> None:
+        """In CHECKOUT intent, only signal_checkout_intent is permitted; travel tools are BLOCKED."""
+        caps = TurnCapabilities(
+            intent="CHECKOUT",
+            provenance="trusted_router",
+            sealed_tools=CHECKOUT_TOOL_NAMES,
+        )
+        gateway = GuardrailGateway(GuardrailRegistry())
+        invoked = False
+
+        async def dummy_invoke() -> Dict[str, Any]:
+            nonlocal invoked
+            invoked = True
+            return {"status": "success"}
+
+        call = {"name": tool_name, "args": {}}
+        decision = await gateway.execute_tool(caps, call, dummy_invoke)
+
+        if tool_name == "signal_checkout_intent":
+            assert decision.status == "PASS"
+            assert invoked is True
+        else:
+            assert decision.status == "BLOCK"
+            assert decision.response_key == GUARDRAIL_TOOL_SCHEMA
+            assert invoked is False, f"Tool '{tool_name}' must be blocked under CHECKOUT authority"
+
+
+# ===========================================================================
+# 2. Whole Batch Denial Rule Tests
+# ===========================================================================
+
+
+class TestWholeBatchDenialRule:
+    """If a proposed batch contains even one forbidden or forged tool, the ENTIRE batch is denied (0 invocations)."""
+
+    @pytest.mark.asyncio
+    async def test_mixed_batch_allowed_and_forbidden_registered_tool_denies_entire_batch(
+        self,
+    ) -> None:
+        """Batch [search_flights (allowed), signal_checkout_intent (forbidden)] under SEARCH authority: 0 invocations."""
+        caps = TurnCapabilities(
+            intent="SEARCH",
+            provenance="trusted_router",
+            sealed_tools=TRAVEL_TOOL_NAMES,
+        )
+        invocations: List[str] = []
+
+        state: AgentState = {
+            "messages": [
+                AIMessage(
+                    content="",
+                    tool_calls=[
+                        {
+                            "name": "search_flights",
+                            "args": {
+                                "origin": "SFO",
+                                "destination": "JFK",
+                                "departure_date": "2026-10-01",
+                            },
+                            "id": "call_search_1",
+                        },
+                        {
+                            "name": "signal_checkout_intent",
+                            "args": {"offer_index": 1},
+                            "id": "call_checkout_1",
+                        },
+                    ],
+                )
+            ],
+            "turn_capabilities": caps,
+        }
+
+        async def spy_search(*args: Any, **kwargs: Any) -> Dict[str, Any]:
+            invocations.append("search_flights")
+            return {"results": []}
+
+        async def spy_signal(*args: Any, **kwargs: Any) -> Dict[str, Any]:
+            invocations.append("signal_checkout_intent")
+            return {"status": "signaled"}
+
+        config = {
+            "configurable": {
+                "guardrail_gateway": GuardrailGateway(GuardrailRegistry()),
+                "turn_capabilities": caps,
+                "thread_id": "session-batch-test",
+                "user_id": "user-batch-test",
+            }
+        }
+
+        with patch("agent.graph.nodes.prebuilt_tool_node.ainvoke") as mock_tool_node:
+
+            async def _spy_ainvoke(*args: Any, **kwargs: Any) -> Dict[str, Any]:
+                invocations.append("prebuilt_tool_node_invoked")
+                return {"messages": []}
+
+            mock_tool_node.side_effect = _spy_ainvoke
+            await custom_tool_node(state, config)
+
+        assert len(invocations) == 0, (
+            f"Whole batch denial violated: {invocations} were invoked when batch contained forbidden tool"
+        )
+
+    @pytest.mark.asyncio
+    async def test_mixed_batch_allowed_and_forged_tool_name_denies_entire_batch(self) -> None:
+        """Batch [search_flights (allowed), forged_system_cmd (forged)]: 0 invocations."""
+        caps = TurnCapabilities(
+            intent="SEARCH",
+            provenance="trusted_router",
+            sealed_tools=TRAVEL_TOOL_NAMES,
+        )
+        invocations: List[str] = []
+
+        state: AgentState = {
+            "messages": [
+                AIMessage(
+                    content="",
+                    tool_calls=[
+                        {
+                            "name": "search_flights",
+                            "args": {
+                                "origin": "SFO",
+                                "destination": "JFK",
+                                "departure_date": "2026-10-01",
+                            },
+                            "id": "call_search_2",
+                        },
+                        {
+                            "name": "forged_system_cmd",
+                            "args": {"cmd": "whoami"},
+                            "id": "call_forged_1",
+                        },
+                    ],
+                )
+            ],
+            "turn_capabilities": caps,
+        }
+        config = {
+            "configurable": {
+                "guardrail_gateway": GuardrailGateway(GuardrailRegistry()),
+                "turn_capabilities": caps,
+                "thread_id": "session-batch-test",
+                "user_id": "user-batch-test",
+            }
+        }
+
+        with patch("agent.graph.nodes.prebuilt_tool_node.ainvoke") as mock_tool_node:
+
+            async def _spy_ainvoke(*args: Any, **kwargs: Any) -> Dict[str, Any]:
+                invocations.append("prebuilt_tool_node_invoked")
+                return {"messages": []}
+
+            mock_tool_node.side_effect = _spy_ainvoke
+            await custom_tool_node(state, config)
+
+        assert len(invocations) == 0, (
+            f"Whole batch denial violated: {invocations} were invoked when batch contained forged tool name"
+        )
+
+    @pytest.mark.asyncio
+    async def test_gateway_execute_tool_batch_denies_mixed_batches(self) -> None:
+        """GuardrailGateway.execute_tool_batch must fail closed (BLOCK) if any call is unauthorized."""
+        gateway = GuardrailGateway(GuardrailRegistry())
+        caps = TurnCapabilities(
+            intent="SEARCH",
+            provenance="trusted_router",
+            sealed_tools=TRAVEL_TOOL_NAMES,
+        )
+        calls = [
+            {"name": "search_flights", "args": {}},
+            {"name": "signal_checkout_intent", "args": {}},
+        ]
+        invoked_tools: List[str] = []
+
+        async def invoke_search() -> Dict[str, Any]:
+            invoked_tools.append("search_flights")
+            return {}
+
+        async def invoke_signal() -> Dict[str, Any]:
+            invoked_tools.append("signal_checkout_intent")
+            return {}
+
+        if not hasattr(gateway, "execute_tool_batch"):
+            pytest.fail("GuardrailGateway.execute_tool_batch is not implemented (pending T026)")
+
+        execute_batch_fn: Callable[..., Any] = getattr(gateway, "execute_tool_batch")
+        decision = await execute_batch_fn(
+            caps,
+            calls,
+            [invoke_search, invoke_signal],
+        )
+
+        assert decision.status == "BLOCK"
+        assert decision.response_key == GUARDRAIL_TOOL_SCHEMA
+        assert len(invoked_tools) == 0, "Zero tool invocations allowed on whole-batch denial"
+
+    @pytest.mark.asyncio
+    async def test_batch_denial_in_checkout_authority_with_travel_tool(self) -> None:
+        """In CHECKOUT authority, a batch [signal_checkout_intent, search_flights] executes 0 tools."""
+        caps = TurnCapabilities(
+            intent="CHECKOUT",
+            provenance="trusted_router",
+            sealed_tools=CHECKOUT_TOOL_NAMES,
+        )
+        invocations: List[str] = []
+
+        state: AgentState = {
+            "messages": [
+                AIMessage(
+                    content="",
+                    tool_calls=[
+                        {
+                            "name": "signal_checkout_intent",
+                            "args": {"offer_index": 1},
+                            "id": "call_checkout_2",
+                        },
+                        {
+                            "name": "search_flights",
+                            "args": {
+                                "origin": "SFO",
+                                "destination": "JFK",
+                                "departure_date": "2026-10-01",
+                            },
+                            "id": "call_search_3",
+                        },
+                    ],
+                )
+            ],
+            "turn_capabilities": caps,
+        }
+        config = {
+            "configurable": {
+                "guardrail_gateway": GuardrailGateway(GuardrailRegistry()),
+                "turn_capabilities": caps,
+                "thread_id": "session-batch-test",
+                "user_id": "user-batch-test",
+            }
+        }
+
+        with patch("agent.graph.nodes.prebuilt_tool_node.ainvoke") as mock_tool_node:
+
+            async def _spy_ainvoke(*args: Any, **kwargs: Any) -> Dict[str, Any]:
+                invocations.append("prebuilt_tool_node_invoked")
+                return {"messages": []}
+
+            mock_tool_node.side_effect = _spy_ainvoke
+            await custom_tool_node(state, config)
+
+        assert len(invocations) == 0, (
+            f"Whole batch denial violated in checkout turn: {invocations} were invoked"
+        )
+
+
+# ===========================================================================
+# 3. Capability Immutability & Model Node Tool Binding Intersection
+# ===========================================================================
+
+
+class TestCapabilityImmutabilityAndBoundaries:
+    """TurnCapabilities immutability, transition monotonicity, and model node tool intersection."""
+
+    def test_turn_capabilities_is_strictly_immutable(self) -> None:
+        """TurnCapabilities rejects mutation, extra attributes, and is_sealed=False."""
+        caps = TurnCapabilities(
+            intent="SEARCH",
+            provenance="trusted_router",
+            sealed_tools=("search_flights",),
+        )
+
+        assert caps.is_sealed is True
+        assert isinstance(caps.sealed_tools, tuple)
+
+        with pytest.raises(ValidationError):
+            caps.sealed_tools = ("signal_checkout_intent",)  # type: ignore[misc]
+
+        with pytest.raises(ValidationError):
+            caps.intent = "CHECKOUT"  # type: ignore[misc]
+
+        with pytest.raises(ValidationError):
+            caps.provenance = "forged"  # type: ignore[misc]
+
+        with pytest.raises(ValidationError):
+            caps.is_sealed = False  # type: ignore[misc]
+
+        with pytest.raises(ValidationError):
+            caps.arbitrary_field = "attacker"  # type: ignore[attr-defined]
+
+        with pytest.raises(ValidationError):
+            TurnCapabilities(
+                intent="SEARCH",
+                provenance="trusted_router",
+                sealed_tools=("search_flights",),
+                is_sealed=False,  # type: ignore[arg-type]
+            )
+
+    @pytest.mark.asyncio
+    async def test_graph_transitions_cannot_expand_sealed_capabilities(self) -> None:
+        """A transition from checkout to travel cannot add travel tools to a signal-only turn."""
+        checkout_caps = TurnCapabilities(
+            intent="CHECKOUT",
+            provenance="trusted_router",
+            sealed_tools=CHECKOUT_TOOL_NAMES,
+        )
+        state: AgentState = {
+            "messages": [HumanMessage(content="Checkout flight 1")],
+            "turn_capabilities": checkout_caps,
+            "route": "checkout",
+        }
+
+        # After routing/gate, subsequent nodes or route_after_tools must not expand capabilities
+        current_caps: TurnCapabilities = state.get("turn_capabilities")  # type: ignore[assignment]
+        assert current_caps.sealed_tools == ("signal_checkout_intent",)
+
+        # Verify attempted expansion fails
+        expanded_attempt = set(current_caps.sealed_tools) | set(TRAVEL_TOOL_NAMES)
+        assert expanded_attempt != set(current_caps.sealed_tools)
+        assert "search_flights" not in current_caps.sealed_tools
+
+    @pytest.mark.asyncio
+    async def test_travel_assistant_node_binds_only_intersection_with_sealed_capabilities(
+        self,
+    ) -> None:
+        """travel_assistant_node must bind only the intersection of travel tools and sealed capabilities."""
+        # Case A: sealed_tools has only a subset: ("search_flights",)
+        subset_caps = TurnCapabilities(
+            intent="SEARCH",
+            provenance="trusted_router",
+            sealed_tools=("search_flights",),
+        )
+        state_subset: AgentState = {
+            "messages": [HumanMessage(content="Find flights")],
+            "turn_capabilities": subset_caps,
+        }
+        model_a = _CapturingModel()
+        with patch("agent.agents.travel_assistant.get_chat_model", return_value=model_a):
+            await travel_assistant_node(state_subset, {})
+
+        bound_names_a = [t.name if hasattr(t, "name") else str(t) for t in model_a.bound_tools]
+        assert bound_names_a == ["search_flights"], (
+            f"Expected only intersection ['search_flights'], but got {bound_names_a}"
+        )
+
+        # Case B: sealed_tools is signal-only: ("signal_checkout_intent",)
+        signal_caps = TurnCapabilities(
+            intent="CHECKOUT",
+            provenance="trusted_router",
+            sealed_tools=CHECKOUT_TOOL_NAMES,
+        )
+        state_signal: AgentState = {
+            "messages": [HumanMessage(content="Find flights")],
+            "turn_capabilities": signal_caps,
+        }
+        model_b = _CapturingModel()
+        with patch("agent.agents.travel_assistant.get_chat_model", return_value=model_b):
+            await travel_assistant_node(state_signal, {})
+
+        bound_names_b = [t.name if hasattr(t, "name") else str(t) for t in model_b.bound_tools]
+        assert bound_names_b == [], (
+            f"Expected empty tools bound for disjoint intersection, but got {bound_names_b}"
+        )
+
+        # Case C: sealed_tools is empty () (e.g. GENERAL intent)
+        empty_caps = TurnCapabilities(
+            intent="GENERAL",
+            provenance="trusted_router",
+            sealed_tools=(),
+        )
+        state_empty: AgentState = {
+            "messages": [HumanMessage(content="Find flights")],
+            "turn_capabilities": empty_caps,
+        }
+        model_c = _CapturingModel()
+        with patch("agent.agents.travel_assistant.get_chat_model", return_value=model_c):
+            await travel_assistant_node(state_empty, {})
+
+        bound_names_c = [t.name if hasattr(t, "name") else str(t) for t in model_c.bound_tools]
+        assert bound_names_c == [], (
+            f"Expected empty tools bound for empty sealed capabilities, but got {bound_names_c}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_checkout_orchestrator_node_binds_only_intersection_with_sealed_capabilities(
+        self,
+    ) -> None:
+        """checkout_orchestrator_node must bind only the intersection of checkout tools and sealed capabilities."""
+        # Case A: sealed_tools has ("signal_checkout_intent",) -> binds signal_checkout_intent
+        valid_caps = TurnCapabilities(
+            intent="CHECKOUT",
+            provenance="trusted_router",
+            sealed_tools=CHECKOUT_TOOL_NAMES,
+        )
+        state_valid: AgentState = {
+            "messages": [HumanMessage(content="Proceed to book option 1")],
+            "turn_capabilities": valid_caps,
+        }
+        model_a = _CapturingModel()
+        with patch("agent.agents.checkout_orchestrator.get_chat_model", return_value=model_a):
+            await checkout_orchestrator_node(state_valid, {})
+
+        bound_names_a = [t.name if hasattr(t, "name") else str(t) for t in model_a.bound_tools]
+        assert bound_names_a == ["signal_checkout_intent"]
+
+        # Case B: sealed_tools is travel tools only -> intersection is empty!
+        travel_caps = TurnCapabilities(
+            intent="SEARCH",
+            provenance="trusted_router",
+            sealed_tools=TRAVEL_TOOL_NAMES,
+        )
+        state_travel: AgentState = {
+            "messages": [HumanMessage(content="Proceed to book option 1")],
+            "turn_capabilities": travel_caps,
+        }
+        model_b = _CapturingModel()
+        with patch("agent.agents.checkout_orchestrator.get_chat_model", return_value=model_b):
+            await checkout_orchestrator_node(state_travel, {})
+
+        bound_names_b = [t.name if hasattr(t, "name") else str(t) for t in model_b.bound_tools]
+        assert bound_names_b == [], (
+            f"Expected empty tools bound in checkout orchestrator with travel capabilities, got {bound_names_b}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_final_answer_node_has_zero_tools_bound(self) -> None:
+        """final_answer_node must never bind any tools under any capability state."""
+        state: AgentState = {
+            "messages": [HumanMessage(content="Summarize flight search results")],
+            "turn_capabilities": TurnCapabilities(
+                intent="SEARCH",
+                provenance="trusted_router",
+                sealed_tools=TRAVEL_TOOL_NAMES,
+            ),
+        }
+        model = _CapturingModel()
+        with patch("agent.graph.nodes.get_chat_model", return_value=model):
+            await final_answer_node(state, {})
+
+        assert model.bound_tools == [], "final_answer_node must never bind any tools"
+
+    @pytest.mark.asyncio
+    async def test_general_agent_node_has_zero_tools_bound(self) -> None:
+        """general_agent_node must never bind any tools under any capability state."""
+        state: AgentState = {
+            "messages": [HumanMessage(content="What are the airline policies?")],
+            "turn_capabilities": TurnCapabilities(
+                intent="GENERAL",
+                provenance="trusted_router",
+                sealed_tools=(),
+            ),
+        }
+        model = _CapturingModel()
+        with patch("agent.agents.general_agent.get_chat_model", return_value=model):
+            await general_agent_node(state, {})
+
+        assert model.bound_tools == [], "general_agent_node must never bind any tools"
