@@ -26,7 +26,7 @@ _PASSPORT = re.compile(r"(?<![A-Z0-9])[A-Z][0-9]{7,10}(?![A-Z0-9])")
 _PASSPORT_ADJACENT = re.compile(r"(?<![A-Z0-9])[A-Z][0-9]{7,10}(?=[A-Z0-9])")
 _CARD = re.compile(r"(?<![0-9])(?:[0-9][ -]?){12,18}[0-9](?![0-9])")
 _PHONE = re.compile(
-    r"(?<![0-9])\+?(?![\d ().-]*\d{4}-\d{2}-\d{2})[0-9][0-9 ().-]{5,38}[0-9](?![0-9:])"
+    r"(?<!\d)(?<!\d-)\+?(?!\d{4}-\d{2}-\d{2})[0-9](?:[0-9]|[- .()](?!\d{4}-\d{2}-\d{2})){5,38}[0-9](?![0-9:])"
 )
 _EMAIL = re.compile(r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]{1,64}@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+")
 _EMAIL_LIKE = re.compile(r"\S{1,255}@\S+")
@@ -34,23 +34,27 @@ _CREDENTIAL = re.compile(r"(?:api_key=|access_token=|secret=|bearer )\S{1,505}",
 _CREDENTIAL_PREFIX = re.compile(r"(?:api_key=|access_token=|secret=|bearer )\S*$", re.I)
 _PASSPORT_PREFIX = re.compile(r"(?<![A-Z0-9])[A-Z][0-9]{0,10}$")
 _CARD_PREFIX = re.compile(r"(?<![0-9])[0-9][0-9 -]{0,35}$")
-_PHONE_PREFIX = re.compile(r"(?:^|(?<=\s))\+?(?![\d ().-]*\d{4}-\d{2}-\d{2})[0-9][0-9 ().-]{0,38}$")
+_PHONE_PREFIX = re.compile(
+    r"(?:^|(?<=\s))\+?(?!\d{4}-\d{2}-\d{2})[0-9](?:[0-9]|[- .()](?!\d{4}-\d{2}-\d{2})){0,38}$"
+)
 _EMAIL_PREFIX = re.compile(r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]{1,64}@?[A-Za-z0-9.-]*$")
 _DATETIME = re.compile(
     r"\b\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?\b"
 )
+_DATE_RANGE = re.compile(
+    r"^\s*\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?"
+    r"\s*(?:-|–|—|to|\/)\s*"
+    r"\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?\s*$"
+)
 
 
 def _is_itinerary_or_date(match: re.Match[str], text: str) -> bool:
-    val = match.group(0)
-    if re.search(r"\b\d{4}-\d{2}-\d{2}\b", val):
+    val = match.group(0).strip()
+    if _DATETIME.fullmatch(val) or _DATE_RANGE.fullmatch(val):
         return True
-    end = match.end()
-    if end < len(text) and text[end] == ":":
-        return True
-    start = match.start()
+    start, end = match.start(), match.end()
     for dt_m in _DATETIME.finditer(text):
-        if max(start, dt_m.start()) < min(end, dt_m.end()):
+        if dt_m.start() <= start and end <= dt_m.end():
             return True
     return False
 

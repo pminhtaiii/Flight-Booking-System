@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 import time
-from typing import Any, AsyncIterator, Callable, Dict, Optional
+from typing import Any, AsyncIterator, Callable, Dict, Optional, Set
 
 from agent.agents.chat_agent import format_messages
 from agent.chat_turn.command import ChatTurnCommand
@@ -615,13 +615,34 @@ class ChatTurnRunner:
             )
 
             tool_started_at: Dict[str, float] = {}
-            saw_model_stream = False
+            streamed_run_ids: Set[str] = set()
+            handled_message_ids: Set[Any] = set()
+            active_model_streamed = False
+            streamed_since_last_node_end = False
 
             async for event in event_stream:
                 kind = event.get("event")
 
-                if kind == "on_chat_model_stream":
-                    saw_model_stream = True
+                if kind == "on_chat_model_start":
+                    active_model_streamed = False
+                    streamed_since_last_node_end = False
+
+                elif kind == "on_chain_start":
+                    node_name = event.get("name")
+                    if node_name in {
+                        "general",
+                        "travel",
+                        "checkout",
+                        "final_answer",
+                    }:
+                        streamed_since_last_node_end = False
+
+                elif kind == "on_chat_model_stream":
+                    run_id = event.get("run_id")
+                    if isinstance(run_id, str) and run_id:
+                        streamed_run_ids.add(run_id)
+                    active_model_streamed = True
+                    streamed_since_last_node_end = True
                     chunk = event.get("data", {}).get("chunk")
                     if chunk and hasattr(chunk, "content") and chunk.content:
                         token_content = str(chunk.content)
@@ -629,26 +650,45 @@ class ChatTurnRunner:
                             partial_response += safe_chunk
                             yield TokenEvent(data=TokenPayload(content=safe_chunk))
 
-                elif kind == "on_chat_model_end" and not saw_model_stream:
+                elif kind == "on_chat_model_end":
                     # Some chat-model adapters implement ``ainvoke`` without
                     # emitting token events. Preserve the streaming contract
                     # by adapting the completed AI message through the same
                     # deterministic pipeline, while avoiding duplication for
                     # adapters that did emit stream chunks.
+                    run_id = event.get("run_id")
+                    has_streamed = (
+                        (run_id in streamed_run_ids)
+                        if isinstance(run_id, str) and run_id
+                        else active_model_streamed
+                    )
+                    active_model_streamed = False
+
                     output = event.get("data", {}).get("output")
                     message = output
                     if isinstance(output, dict):
                         message = output.get("generations") or output.get("message") or output
                         if isinstance(message, list) and message:
                             message = message[0]
-                    content = getattr(message, "content", None)
-                    if isinstance(content, str) and content:
-                        saw_model_stream = True
-                        async for safe_chunk in pipeline.process_token(content):
-                            partial_response += safe_chunk
-                            yield TokenEvent(data=TokenPayload(content=safe_chunk))
+
+                    if message is not None:
+                        handled_message_ids.add(id(message))
+                        if hasattr(message, "message"):
+                            handled_message_ids.add(id(message.message))
+                        msg_id = getattr(message, "id", None)
+                        if isinstance(msg_id, str) and msg_id:
+                            handled_message_ids.add(msg_id)
+
+                    if not has_streamed:
+                        content = getattr(message, "content", None)
+                        if isinstance(content, str) and content:
+                            async for safe_chunk in pipeline.process_token(content):
+                                partial_response += safe_chunk
+                                yield TokenEvent(data=TokenPayload(content=safe_chunk))
 
                 elif kind == "on_tool_start":
+                    active_model_streamed = False
+                    streamed_since_last_node_end = False
                     tool_name = event.get("name")
                     tool_input = event.get("data", {}).get("input")
                     if isinstance(tool_name, str):
@@ -667,7 +707,7 @@ class ChatTurnRunner:
 
                 elif kind == "on_chain_end":
                     node_name = event.get("name")
-                    if not saw_model_stream and node_name in {
+                    if node_name in {
                         "general",
                         "travel",
                         "checkout",
@@ -678,11 +718,25 @@ class ChatTurnRunner:
                             output.get("messages", []) if isinstance(output, dict) else []
                         )
                         if messages_out:
-                            content = getattr(messages_out[-1], "content", None)
-                            if isinstance(content, str) and content:
-                                async for safe_chunk in pipeline.process_token(content):
-                                    partial_response += safe_chunk
-                                    yield TokenEvent(data=TokenPayload(content=safe_chunk))
+                            target_message = messages_out[-1]
+                            is_handled = id(target_message) in handled_message_ids or (
+                                hasattr(target_message, "message")
+                                and id(target_message.message) in handled_message_ids
+                            )
+                            target_id = getattr(target_message, "id", None)
+                            if not is_handled and isinstance(target_id, str) and target_id:
+                                is_handled = target_id in handled_message_ids
+
+                            if not is_handled and not streamed_since_last_node_end:
+                                content = getattr(target_message, "content", None)
+                                if isinstance(content, str) and content:
+                                    handled_message_ids.add(id(target_message))
+                                    if isinstance(target_id, str) and target_id:
+                                        handled_message_ids.add(target_id)
+                                    async for safe_chunk in pipeline.process_token(content):
+                                        partial_response += safe_chunk
+                                        yield TokenEvent(data=TokenPayload(content=safe_chunk))
+                        streamed_since_last_node_end = False
                     if node_name in (
                         "create_handoff_token",
                         "create_handoff_token_node",

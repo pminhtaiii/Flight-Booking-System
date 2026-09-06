@@ -72,6 +72,31 @@ async def test_real_phone_with_itinerary_timestamp_is_blocked() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "text",
+    [
+        "2026-09-10 415-555-2671",
+        "415-555-2671 2026-09-10",
+        "Flight 2026-09-10 415-555-2671 confirmed",
+        "Call 415-555-2671 before 2026-09-10",
+    ],
+)
+async def test_adjacent_date_phone_numbers_are_blocked(text: str) -> None:
+    from agent.guardrails.output_pipeline import deterministic_pii_match
+
+    match = deterministic_pii_match(text)
+    assert match is not None, f"Expected phone number in {text!r} to be matched as PII"
+    assert "415-555-2671" in match.group(0) or "415" in match.group(0)
+
+    pipeline = OutputGuardrailPipeline(SimpleNamespace(enabled=True))
+    with pytest.raises(OutputGuardrailBlockedError):
+        async for _ in pipeline.process_token(text):
+            pass
+        async for _ in pipeline.flush():
+            pass
+
+
+@pytest.mark.asyncio
 async def test_approved_model_content_and_pipeline_respect_disabled_config() -> None:
     from agent.guardrails.output_pipeline import approved_model_content
 
