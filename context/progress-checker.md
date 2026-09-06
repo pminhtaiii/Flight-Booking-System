@@ -26,9 +26,95 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Current Status
 
 **Feature:** Security Systems (Feature 023) — Phase 3 US1 in progress
-**Last completed:** Task T014: Input Layers & Normalization Contract Tests (`apps/agent/src/agent/guardrails/normalization.py`, `apps/agent/tests/security/test_input_layers.py`, `apps/agent/tests/security/test_normalization.py`).
+**Last completed:** Task T018: Ingress ASGI Body Limits, Runner Wiring & Memory Boundary (`apps/agent/src/agent/middleware/body_limit.py`, `apps/agent/src/agent/main.py`, `apps/agent/src/agent/chat_turn/runner.py`, `apps/agent/src/agent/streaming/sse.py`, `apps/agent/src/agent/memory/manager.py`, `apps/agent/tests/security/test_memory_boundary.py`, `apps/agent/tests/security/test_lifecycle.py`).
 **In progress:** Phase 3 US1.
-**Next:** T016 input pipeline validators (`LengthValidator`, `PIIDetector`, `InjectionDetector`, `TopicBoundary`).
+**Next:** T019 output stream tests (`apps/agent/tests/security/test_output_stream.py`).
+
+### Feature 023 — Security Systems: Phase 3 US1 (Task T018 Completed & Issues 1-4 Fixed) (2026-09-06)
+
+- T018: Implemented raw ASGI request body limit middleware, wired mandatory input validation into the chat turn runner, delegated SSE streaming through ChatController, enforced lower-trust memory boundaries, and resolved all 4 slice review issues:
+  - `BodyLimitMiddleware` (`apps/agent/src/agent/middleware/body_limit.py`, `apps/agent/src/agent/main.py`):
+    - Raw ASGI middleware (`__init__(app, max_bytes=65536)`).
+    - Validates `Content-Length` header against 64 KiB ceiling before JSON parsing; returns HTTP 413 `{"detail": "Request payload exceeds maximum allowed size of 64 KiB"}` immediately.
+    - Wraps `receive()` to streamingly count incoming `http.request` bytes, aborting with HTTP 413 when cumulative count exceeds 64 KiB on missing or falsified `Content-Length` headers.
+    - Reordered middleware stack in `apps/agent/src/agent/main.py` so `CORSMiddleware` wraps `BodyLimitMiddleware` as the outermost middleware.
+    - Added defense-in-depth origin inspection in `_send_413`: attaches `(b"access-control-allow-origin", origin)` and `(b"vary", b"Origin")` to ensure 413 responses carry required CORS headers (Issue 2).
+  - `ChatTurnRunner` & `ChatController` (`apps/agent/src/agent/chat_turn/runner.py`, `apps/agent/src/agent/chat_turn/controller.py`, `apps/agent/src/agent/streaming/sse.py`):
+    - `sse.py`: delegated turn streaming through `ChatController(runner=runner, gateway=gateway).stream(command)` ensuring gateway input validation before runner execution.
+    - Single-Pass Admission Control: Updated `runner.run(command, validated_input=decision.validated_data)` and `ChatController.stream` to pass pre-validated input, skipping redundant secondary validation in the runner and asserting `call_count == 1` (Issue 3).
+    - Preserves fail-closed handling on unsafe loaded history (rejecting with `GUARDRAIL_INPUT_INJECTION` / `GUARDRAIL_INPUT_PII` and 0 model/graph calls), and discard of unsafe loaded summaries before model invocation.
+  - Full-Window Prompt Injection Scanning (`apps/agent/src/agent/guardrails/layers/injection.py`, `apps/agent/src/agent/guardrails/normalization.py`, `apps/agent/src/agent/guardrails/layers/input.py`):
+    - Increased `max_expansion_bytes: int = 16384` in `InjectionSignatureEngine.__init__` and `_MAX_REGEX_SCAN_LENGTH: int = 16384` in `normalization.py`.
+    - Extended prompt injection scanning coverage to the full 16 KiB UTF-8 byte boundary, preventing suffix-evasion bypasses between 8 KiB and 16 KiB (Issue 1).
+  - `MemoryManager` (`apps/agent/src/agent/memory/manager.py`):
+    - Enforced lower-trust envelope: instructions in trusted `SystemMessage`, with existing summary and unsummarized messages enclosed in a lower-trust `HumanMessage` data envelope (never interpolated into `SystemMessage`).
+    - Validates newly generated summaries via `gateway.validate_input` before database persistence; discards summary if status is not `PASS`.
+  - Architecture & Progress Synchronization (`context/architecture.md`, `context/progress-checker.md`):
+    - Synchronized architectural documentation with ASGI ingress limits, admission control, input guardrails, and memory security boundary (Issue 4).
+  - Tests & Verification:
+    - `test_injection_detected_beyond_8kib_suffix`: verifies 8400-byte (>8 KiB) input suffix injection is scanned and blocked (`GUARDRAIL_INPUT_INJECTION`).
+    - `test_body_limit_preserves_cors_on_413`: verifies oversized POST (>64 KiB) returns HTTP 413 with `Access-Control-Allow-Origin: http://localhost:3000`.
+    - `test_chat_controller_delegates_single_validation_pass`: verifies `gateway.validate_input` executes strictly once across controller and runner.
+    - Security suite: all 114+ tests passing, clean `ruff check` (0 errors) and `ruff format --check`.
+
+### Feature 023 — Security Systems: Phase 3 US1 (Task T016 Completed) (2026-09-06)
+
+- T016: Implemented `LengthValidator`, `PIIDetector`, `InjectionDetector`, and `TopicBoundary` in `apps/agent/src/agent/guardrails/layers/input.py`, `InputGuardrailPipeline` in `apps/agent/src/agent/guardrails/input_pipeline.py`, and updated `apps/agent/src/agent/guardrails/registry.py` following strict TDD (RED -> GREEN -> REFACTOR):
+  - `LengthValidator`:
+    - Inherits `BaseGuardrailLayer`, key="input.length", stage="input", prerequisites=().
+    - Enforces maximum Unicode scalar length (default 4,000 characters) and maximum UTF-8 byte length (16,384 bytes).
+    - If exceeded: returns `PipelineDecision(status="BLOCK", response_key=GUARDRAIL_INPUT_LENGTH, reason=...)` with `validated_data=None`.
+    - On pass: returns `PipelineDecision(status="PASS", validated_data=ValidatedInput(content=content))`.
+  - `PIIDetector`:
+    - Inherits `BaseGuardrailLayer`, key="input.pii", stage="input", prerequisites=("input.length",).
+    - Detects credit cards (with Luhn validation), passport numbers, email addresses, and phone numbers in raw user input.
+    - Reviewed Travel Exceptions: Allows passenger names, city/airport names, 3-letter IATA codes (e.g., SFO, JFK, HAN, DAD), and flight dates/numbers without false-positive blocking.
+    - If sensitive PII detected: returns `PipelineDecision(status="BLOCK", response_key=GUARDRAIL_INPUT_PII, reason="Input contains sensitive personal information (PII). Please remove credit card, passport, or contact details before continuing.")`.
+    - On pass: returns `PipelineDecision(status="PASS", validated_data=ValidatedInput(content=content))`.
+  - `InjectionDetector`:
+    - Inherits `BaseGuardrailLayer`, key="input.injection", stage="input", prerequisites=("input.length",).
+    - Delegates to `InjectionSignatureEngine` (from `agent.guardrails.layers.injection`).
+    - If injection detected: returns `PipelineDecision(status="BLOCK", response_key=GUARDRAIL_INPUT_INJECTION, reason="Prompt injection detected", validated_data=None)`.
+    - On pass: returns `PipelineDecision(status="PASS", validated_data=ValidatedInput(content=content))`.
+  - `TopicBoundary`:
+    - Inherits `BaseGuardrailLayer`, key="input.topic", stage="input", prerequisites=("input.length",).
+    - Enforces travel/flight domain scope (flights, bookings, luggage, airports, airline policies, greetings, status inquiries).
+    - Unrelated domains (coding/scripting, medical advice, finance/lawsuits, generic hacking, creative writing/essays) return `PipelineDecision(status="BLOCK", response_key=GUARDRAIL_INPUT_TOPIC, reason="Your message appears to be outside our flight booking scope. How can I help with your flights, baggage, or airline reservations?")`.
+    - On pass: returns `PipelineDecision(status="PASS", validated_data=ValidatedInput(content=content))`.
+  - `InputGuardrailPipeline`:
+    - Constructor: `__init__(self, registry: GuardrailRegistry)`.
+    - Method: `async def execute(self, context: AdmissionContext, content: str) -> PipelineDecision[ValidatedInput]`.
+    - Executes input layers in strict dependency order from `registry.ordered_layers("input")`.
+    - Short-circuits on first `BLOCK`.
+    - Returns `PipelineDecision[ValidatedInput]` on `PASS` with normalized content, or `BLOCK` with static response key and `None`.
+  - Registry & Aliases:
+    - Re-exported `LengthValidator`, `PIIDetector`, `InjectionDetector`, `TopicBoundary` in `agent.guardrails.registry`.
+    - Maintained backwards-compatible aliases: `InputLengthLayer = LengthValidator`, `InputPIILayer = PIIDetector`, `InputInjectionLayer = InjectionDetector`, `InputTopicLayer = TopicBoundary`.
+    - Updated `create_production_registry` to register the new layer instances.
+  - Comprehensive Tests:
+    - 76/76 passing tests in `apps/agent/tests/security/test_input_layers.py`.
+    - 175/175 passing tests across the entire security suite (`apps/agent/tests/security`).
+    - Clean `ruff check` and `ruff format --check`.
+
+- T017: Implemented `InjectionSignatureEngine` and compiled regex signatures in `apps/agent/src/agent/guardrails/layers/injection.py` and comprehensive security tests in `apps/agent/tests/security/test_input_layers.py` following strict TDD (RED -> GREEN -> REFACTOR):
+  - Signature Catalog (`INJECTION_SIGNATURES` & `NAMED_INJECTION_SIGNATURES`):
+    - Implemented 60+ compiled regex signatures across all 4 mandatory categories:
+      1. Direct instruction overrides: `direct_ignore_previous`, `direct_disregard_system_prompt`, `direct_forget_rules`, `direct_override_system_directive`, `direct_developer_mode`, `direct_you_are_now_dev_mode`, `direct_reset_system_instructions`, `direct_bypass_guardrails`, `direct_reveal_system_prompt`, `direct_system_prompt_mention`, `direct_reveal_the_prompt`, `direct_forget_what_you`, `direct_disregard_instructions`, `direct_what_were_initial_instructions`, `direct_stop_following_instructions`, `direct_new_instruction_priority`, `direct_clear_memory_context`, `direct_cancel_commands`, `direct_do_not_follow_rules`, `direct_sql_drop_table`, `direct_sql_delete_from`, `direct_sql_union_select`.
+      2. Delimiter & roleplay hijacking: `delimiter_system_header`, `delimiter_inst_tags`, `delimiter_im_start_end`, `delimiter_assistant_header`, `delimiter_code_system`, `delimiter_sys_xml_tags`, `delimiter_special_tokens`, `delimiter_llama_sys_tags`, `delimiter_turn_tags`, `delimiter_markdown_alert_system`, `delimiter_pseudo_system_operation`, `delimiter_system_override_banner`, `delimiter_claude_xml_boundary`, `delimiter_raw_prompt_separator`, `delimiter_inline_system_injection`.
+      3. Jailbreak archetypes: `jailbreak_dan_mode`, `jailbreak_do_anything_now`, `jailbreak_unrestricted_mode`, `jailbreak_evil_twin`, `jailbreak_hypothetical_simulation`, `jailbreak_act_as_opposite`, `jailbreak_disable_safety_ethics`, `jailbreak_machiavelli`, `jailbreak_pretend_unrestricted`, `jailbreak_never_say_no`, `jailbreak_grandma_exploit`, `jailbreak_roleplay_unconstrained`, `jailbreak_disregard_content_filters`, `jailbreak_freed_from_shackles`, `jailbreak_ignore_provider_rules`, `jailbreak_god_mode`.
+      4. Obfuscated encoding & execution directives: `obfuscation_base64_decode_directive`, `obfuscation_hex_directive`, `obfuscation_rot13_directive`, `obfuscation_url_decode_directive`, `obfuscation_binary_decode_directive`, `obfuscation_eval_payload`, `obfuscation_base64_inline_indicator`, `obfuscation_hex_stream`, `obfuscation_reverse_text_directive`, `obfuscation_unicode_escape_directive`, `obfuscation_exec_directive`, `obfuscation_char_code_at`, `obfuscation_atob_directive`, `obfuscation_base64_decode_function`, `obfuscation_echo_base64_pipe`.
+  - Normalization & ReDoS Resistance:
+    - Guaranteed AST safety: verified all patterns pass `is_catastrophic_regex` AST inspection (zero nested quantifiers or branch alternations inside repeats).
+    - Max 2 unmask rounds with UTF-8 byte bounding (`max_expansion_bytes=8192` default).
+    - Multi-stage unmasking leverages `bounded_normalize` (zero-width stripping, Unicode NFKC, recursive URL decode, homoglyph mapping) and `detect_base64_payloads`.
+    - Integrated with `InputInjectionLayer` in `apps/agent/src/agent/guardrails/registry.py`.
+  - Comprehensive Tests (`apps/agent/tests/security/test_input_layers.py`):
+    - `test_injection_signatures_count_and_types`: verifies >= 50 patterns and AST ReDoS safety.
+    - Malicious detection tests across all 4 categories.
+    - Benign query test suite verifying 0 false positives across 12 travel-domain variations.
+    - Bounded normalization and expansion limit tests verifying candidate size clamping.
+    - ReDoS performance safety test verifying sub-second execution on pathological repetitions.
+  - Verification: 71/71 tests passing in `test_input_layers.py`; 170/170 tests passing across full security suite; `ruff check` passes clean.
 
 ### Feature 023 — Security Systems: Phase 3 US1 (Task T014 Completed) (2026-09-05)
 
