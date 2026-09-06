@@ -1,5 +1,15 @@
 from types import MappingProxyType
-from typing import Any, Generic, Literal, Mapping, Protocol, Tuple, TypeVar, runtime_checkable
+from typing import (
+    Any,
+    ClassVar,
+    Generic,
+    Literal,
+    Mapping,
+    Protocol,
+    Tuple,
+    TypeVar,
+    runtime_checkable,
+)
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
@@ -105,6 +115,40 @@ class GuardrailLayer(Protocol[TIn, TOut]):
         context: AdmissionContext | TurnCapabilities,
         data: TIn,
     ) -> PipelineDecision[TOut]: ...
+
+
+class BaseGuardrailLayer:
+    """Standard base implementation satisfying the GuardrailLayer protocol."""
+
+    key: ClassVar[str] = ""
+    stage: ClassVar[Literal["input", "tool", "output"]] = "input"
+    prerequisites: ClassVar[tuple[str, ...]] = ()
+
+    def __init__(
+        self,
+        key: str | None = None,
+        stage: Literal["input", "tool", "output"] | None = None,
+        prerequisites: tuple[str, ...] | None = None,
+    ) -> None:
+        if key is not None:
+            self.key = key
+        if stage is not None:
+            self.stage = stage
+        if prerequisites is not None:
+            self.prerequisites = prerequisites
+
+    async def check(
+        self,
+        context: AdmissionContext | TurnCapabilities,
+        data: Any,
+    ) -> PipelineDecision[Any]:
+        if self.stage == "input":
+            content = data if isinstance(data, str) else getattr(data, "content", str(data))
+            return PipelineDecision(status="PASS", validated_data=ValidatedInput(content=content))
+        if self.stage == "output":
+            content = data if isinstance(data, str) else getattr(data, "content", str(data))
+            return PipelineDecision(status="PASS", validated_data=ApprovedChunk(content=content))
+        return PipelineDecision(status="PASS", validated_data=data)
 
 
 class GuardrailService(Protocol):

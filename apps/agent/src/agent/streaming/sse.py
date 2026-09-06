@@ -13,6 +13,7 @@ from agent.chat_turn import (
     ErrorEvent,
     ErrorPayload,
 )
+from agent.chat_turn.controller import ChatController
 from agent.chat_turn.runner import _persist_response
 from agent.config import get_settings
 from agent.graph.graph import graph
@@ -33,6 +34,7 @@ from agent.trusted_search_snapshot import TrustedSnapshotRepository
 
 __all__ = [
     "ChatBudgetRepository",
+    "ChatController",
     "ChatTurnCommand",
     "ChatTurnRunner",
     "NestJSClient",
@@ -264,7 +266,8 @@ async def chat_stream(
             except ImportError:
                 pass
 
-        generator = runner.run(command)
+        controller = ChatController(runner=runner, gateway=gateway)
+        generator = controller.stream(command)
         try:
             async for event in generator:
                 try:

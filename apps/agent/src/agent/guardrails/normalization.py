@@ -90,7 +90,7 @@ _BASE64_PATTERN: re.Pattern[str] = re.compile(
 
 # Bounds for regex scanning and ReDoS safety
 _MAX_CATASTROPHIC_INPUT_LEN: int = 30
-_MAX_REGEX_SCAN_LENGTH: int = 8192
+_MAX_REGEX_SCAN_LENGTH: int = 16384
 
 
 def normalize_unicode(

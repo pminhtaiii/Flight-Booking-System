@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from agent.config import get_settings
 from agent.guardrails.nemo import NemoGuardrailService
 from agent.middleware.auth import JWTAuthMiddleware
+from agent.middleware.body_limit import BodyLimitMiddleware
 from agent.streaming.sse import router as sse_router
 
 settings = get_settings()
@@ -103,6 +104,7 @@ async def validate_origin_middleware(request: Request, call_next):
     return await call_next(request)
 
 
+app.add_middleware(BodyLimitMiddleware, max_bytes=65536)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
