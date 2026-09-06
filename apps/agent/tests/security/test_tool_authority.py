@@ -17,7 +17,7 @@ from pydantic import ValidationError
 from agent.agents.checkout_orchestrator import checkout_orchestrator_node
 from agent.agents.general_agent import general_agent_node
 from agent.agents.travel_assistant import travel_assistant_node
-from agent.graph.graph import router_node
+from agent.graph.graph import route_after_tools, router_node
 from agent.graph.nodes import custom_tool_node, final_answer_node
 from agent.graph.state import AgentState
 from agent.guardrails.base import GUARDRAIL_TOOL_SCHEMA, TurnCapabilities
@@ -327,7 +327,7 @@ class TestCapabilitySealingTruthTable:
         assert caps_exc.sealed_tools == (), "Malformed/exception must seal empty tools ()"
 
         # Case B: router returns unrecognized / unknown intent
-        unknown_decision = RouteDecision(
+        unknown_decision = RouteDecision.model_construct(
             intent="ADMIN_OVERRIDE", confidence=1.0, isCommitment=False
         )
         with patch("agent.graph.graph.invoke_router", AsyncMock(return_value=unknown_decision)):
@@ -760,14 +760,25 @@ class TestCapabilityImmutabilityAndBoundaries:
             "route": "checkout",
         }
 
-        # After routing/gate, subsequent nodes or route_after_tools must not expand capabilities
-        current_caps: TurnCapabilities = state.get("turn_capabilities")  # type: ignore[assignment]
-        assert current_caps.sealed_tools == ("signal_checkout_intent",)
+        # 1. Call route_after_tools(state) to verify transition to "travel"
+        next_route = route_after_tools(state)
+        assert next_route == "travel"
 
-        # Verify attempted expansion fails
-        expanded_attempt = set(current_caps.sealed_tools) | set(TRAVEL_TOOL_NAMES)
-        assert expanded_attempt != set(current_caps.sealed_tools)
-        assert "search_flights" not in current_caps.sealed_tools
+        # 2. Execute travel_assistant_node(state, {}) with _CapturingModel()
+        model = _CapturingModel()
+        with patch("agent.agents.travel_assistant.get_chat_model", return_value=model):
+            node_result = await travel_assistant_node(state, {})
+
+        # 3. Assert bound_tool_names == [] and "search_flights" not in bound_tool_names
+        bound_tool_names = [t.name if hasattr(t, "name") else str(t) for t in model.bound_tools]
+        assert bound_tool_names == []
+        assert "search_flights" not in bound_tool_names
+
+        # 4. If the node returns "turn_capabilities", it must be a subset of original sealed tools
+        if "turn_capabilities" in node_result:
+            result_caps: TurnCapabilities = node_result["turn_capabilities"]
+            assert set(result_caps.sealed_tools).issubset(set(checkout_caps.sealed_tools))
+            assert "search_flights" not in result_caps.sealed_tools
 
     @pytest.mark.asyncio
     async def test_travel_assistant_node_binds_only_intersection_with_sealed_capabilities(

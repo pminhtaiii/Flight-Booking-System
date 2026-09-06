@@ -520,7 +520,9 @@ async def test_blocked_tool_result_does_not_leak_into_public_sse_events(
             yield {
                 "event": "on_chat_model_stream",
                 "data": {
-                    "chunk": SimpleNamespace(content=f"Safe tokens without {CANARY_PII_CARD}")
+                    "chunk": SimpleNamespace(
+                        content="Safe model output chunk without sensitive data"
+                    )
                 },
             }
 

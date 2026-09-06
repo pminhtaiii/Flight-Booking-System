@@ -124,6 +124,57 @@ async def test_tool_output_max_payload_size_blocked_gateway(
 
 
 @pytest.mark.asyncio
+async def test_tool_output_max_payload_size_boundary_unicode_direct(
+    turn_capabilities: TurnCapabilities,
+) -> None:
+    """Tool output multibyte Unicode payload exactly at limit (65536 bytes) passes SizeStructureValidator."""
+    assert SizeStructureValidator is not None, "T024 SizeStructureValidator not implemented"
+    validator = SizeStructureValidator(max_bytes=MAX_TOOL_BYTES)
+
+    exact_unicode_payload = ("€" * 21845) + "A"
+    assert len(exact_unicode_payload.encode("utf-8")) == MAX_TOOL_BYTES
+    decision = await validator.check(turn_capabilities, exact_unicode_payload)
+
+    assert decision.status == "PASS"
+
+
+@pytest.mark.asyncio
+async def test_tool_output_max_payload_size_blocked_unicode_direct(
+    turn_capabilities: TurnCapabilities,
+) -> None:
+    """Tool output multibyte Unicode payload exceeding 64 KiB in bytes (65537 bytes, char count 21847 < 65536) is blocked."""
+    assert SizeStructureValidator is not None, "T024 SizeStructureValidator not implemented"
+    validator = SizeStructureValidator(max_bytes=MAX_TOOL_BYTES)
+
+    oversized_unicode_payload = ("€" * 21845) + "AA"
+    assert len(oversized_unicode_payload) < MAX_TOOL_BYTES
+    assert len(oversized_unicode_payload.encode("utf-8")) == MAX_TOOL_BYTES + 1
+    decision = await validator.check(turn_capabilities, oversized_unicode_payload)
+
+    assert decision.status == "BLOCK"
+    assert decision.response_key == GUARDRAIL_TOOL_SCHEMA
+    assert decision.validated_data is None
+
+
+@pytest.mark.asyncio
+async def test_tool_output_max_payload_size_blocked_unicode_gateway(
+    gateway: GuardrailGateway,
+    turn_capabilities: TurnCapabilities,
+) -> None:
+    """Gateway execute_tool blocks multibyte Unicode payload exceeding 64 KiB (25000 '✈' = 75000 bytes)."""
+    call = DummyToolCall("search_flights")
+
+    async def invoke_oversized_unicode() -> dict[str, str]:
+        return {"data": "✈" * 25000}
+
+    decision = await gateway.execute_tool(turn_capabilities, call, invoke_oversized_unicode)
+
+    assert decision.status == "BLOCK"
+    assert decision.response_key == GUARDRAIL_TOOL_SCHEMA
+    assert decision.validated_data is None
+
+
+@pytest.mark.asyncio
 async def test_tool_output_nesting_depth_dict_blocked_direct(
     turn_capabilities: TurnCapabilities,
 ) -> None:
