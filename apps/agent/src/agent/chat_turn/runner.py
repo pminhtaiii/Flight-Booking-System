@@ -26,6 +26,7 @@ from agent.chat_turn.events import (
     ToolResultPayload,
 )
 from agent.config import get_settings
+from agent.guardrails.base import AdmissionContext
 from agent.guardrails.output_pipeline import OutputGuardrailBlockedError, OutputGuardrailPipeline
 from agent.infrastructure.redis import get_redis_client
 from agent.memory.manager import MemoryManager
@@ -91,6 +92,8 @@ class ChatTurnRunner:
         redis_client: Any = None,
         client_factory: Optional[Callable[..., Any]] = None,
         telemetry: Any = None,
+        gateway: Optional[Any] = None,
+        require_gateway: bool = False,
     ):
         self._settings = settings
         self._graph = graph
@@ -99,6 +102,8 @@ class ChatTurnRunner:
         self._redis_client = redis_client
         self._client_factory = client_factory
         self._telemetry = telemetry
+        self.gateway = gateway
+        self.require_gateway = require_gateway
 
     @property
     def settings(self) -> Any:
@@ -253,6 +258,26 @@ class ChatTurnRunner:
         """
         Execute a single chat turn as an async generator yielding ChatTurnEvent items.
         """
+        require_gw = bool(self.require_gateway)
+        if not require_gw and self._settings is not None:
+            setting_val = getattr(self._settings, "REQUIRE_GUARDRAIL_GATEWAY", None)
+            if isinstance(setting_val, bool):
+                require_gw = setting_val
+            elif isinstance(setting_val, str):
+                require_gw = setting_val.lower() in ("true", "1", "yes")
+
+        if require_gw and self.gateway is None:
+            yield ErrorEvent(
+                data=ErrorPayload(
+                    code="GUARDRAIL_CONFIGURATION_ERROR",
+                    message=(
+                        "Chat execution rejected: mandatory guardrail gateway is absent "
+                        "or unconfigured."
+                    ),
+                )
+            )
+            return
+
         settings = self.settings
         telemetry = self.telemetry
         queue_manager = self._queue_manager
@@ -262,6 +287,35 @@ class ChatTurnRunner:
 
         trace_id = safe_opaque_id(command.trace_id)
         correlation_id = safe_opaque_id(command.correlation_id)
+
+        if self.gateway is not None and command.message:
+            context = AdmissionContext(
+                user_id=command.user_id,
+                chat_session_id=command.session_id or "unassigned",
+                trace_id=command.trace_id or "trace-default",
+                correlation_id=command.correlation_id,
+                policy_version="2026-09-05",
+            )
+            try:
+                decision = await self.gateway.validate_input(context, command.message)
+            except Exception:
+                yield ErrorEvent(
+                    data=ErrorPayload(
+                        code="GUARDRAIL_INPUT_INJECTION",
+                        message="Input rejected by security guardrail: GUARDRAIL_INPUT_INJECTION",
+                    )
+                )
+                return
+
+            if decision.status == "BLOCK":
+                code = decision.response_key or "GUARDRAIL_INPUT_BLOCKED"
+                yield ErrorEvent(
+                    data=ErrorPayload(
+                        code=code,
+                        message=f"Input rejected by security guardrail: {code}",
+                    )
+                )
+                return
 
         client = self._create_client(
             token=command.token,
@@ -351,6 +405,83 @@ class ChatTurnRunner:
                 if err_event:
                     yield err_event
                 return
+
+            if self.gateway is not None:
+                mem_context = AdmissionContext(
+                    user_id=command.user_id,
+                    chat_session_id=session_id or "unassigned",
+                    trace_id=command.trace_id or "trace-default",
+                    correlation_id=command.correlation_id,
+                    policy_version="2026-09-05",
+                )
+                if summary:
+                    summary_content = (
+                        summary.get("content")
+                        if isinstance(summary, dict)
+                        else (getattr(summary, "content", None) or str(summary))
+                    )
+                    if isinstance(summary, str):
+                        summary_content = summary
+                    try:
+                        summary_decision = await self.gateway.validate_input(
+                            mem_context, summary_content
+                        )
+                        if summary_decision.status == "BLOCK":
+                            logger.warning(
+                                "Unsafe persisted summary discarded by guardrail gateway: %s",
+                                summary_decision.response_key,
+                            )
+                            summary = None
+                    except Exception:
+                        logger.warning(
+                            "Exception validating persisted summary; discarding summary."
+                        )
+                        summary = None
+
+                for msg in history:
+                    msg_content = (
+                        msg.get("content")
+                        if isinstance(msg, dict)
+                        else (getattr(msg, "content", None) or str(msg))
+                    )
+                    if not msg_content or not isinstance(msg_content, str):
+                        continue
+                    try:
+                        history_decision = await self.gateway.validate_input(
+                            mem_context, msg_content
+                        )
+                    except Exception:
+                        history_decision = None
+
+                    if history_decision is None or history_decision.status == "BLOCK":
+                        block_code = (
+                            history_decision.response_key
+                            if history_decision and history_decision.response_key
+                            else "GUARDRAIL_INPUT_INJECTION"
+                        )
+                        logger.warning(
+                            "Unsafe historical conversation context blocked by guardrail gateway: %s",
+                            block_code,
+                        )
+                        _, _, err_event = await self._finalize_cleanup(
+                            session_id=session_id,
+                            req_id=req_id,
+                            queue_manager=queue_manager,
+                            client=client,
+                            pipeline=None,
+                            partial_response=partial_response,
+                            user_msg_content=user_msg_content,
+                            user_msg_persisted=user_msg_persisted,
+                            persisted=persisted,
+                            error_code=block_code,
+                            error_message="Historical conversation context contains unsafe content.",
+                        )
+                        pipeline = None
+                        req_id = None
+                        released = True
+                        if err_event:
+                            yield err_event
+                        return
 
             # 4. TrustedSearchSnapshot loading via lifecycle + telemetry emit
             trusted_snapshot_dict = None
@@ -882,6 +1013,7 @@ class ChatTurnRunner:
                 memory_mgr = MemoryManager(
                     window_size=getattr(settings, "MEMORY_WINDOW_SIZE", 20),
                     token_budget=getattr(settings, "MEMORY_TOKEN_BUDGET", 4000),
+                    gateway=self.gateway,
                 )
                 original_total = (
                     memory_data.get("totalMessageCount", 0) if isinstance(memory_data, dict) else 0

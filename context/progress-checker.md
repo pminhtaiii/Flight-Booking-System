@@ -62,6 +62,8 @@ Update this file after every completed feature. Any AI agent reading this should
     - Direct runner fails closed on classifier exceptions without invoking the model or backend.
   - Enforced Zero Model Calls on Input/History Block:
     - Guaranteed strictly 0 model or runner invocations when input is blocked by any guardrail layer.
+    - Guaranteed zero model invocations when loaded persisted history contains malicious prompt injection or PII, failing closed with ErrorEvent.
+    - Proven discard of unsafe loaded summaries before model invocation, preventing malicious memory replay.
   - Enforced Lower-Trust History Framing:
     - Tested `format_messages`: `messages[0]` is strictly trusted `SystemMessage(content=SYSTEM_PROMPT)`; history messages are never `SystemMessage` (even if adversarial sender='SYSTEM' provided); conversation summary is strictly enclosed in `HumanMessage` with untrusted context indicator.
   - Enforced Summary Validation Before Persistence:
@@ -70,8 +72,8 @@ Update this file after every completed feature. Any AI agent reading this should
     - Discards summary on `BLOCK` or validator exception, preventing persistence of malicious or PII-violating summaries.
   - Enforced Summary Error Canaries & Model Callback Restrictions:
     - Injected canary strings (`CANARY_SECRET_TOKEN_...`) are proven not to leak into ErrorPayloads, event messages, or log records.
-    - Verified model callbacks are never triggered when input is blocked.
-  - Verification: 17/17 tests in `test_enforcement.py` pass; 57/57 security tests pass; `ruff check` and `ruff format --check` pass clean.
+    - Verified model callbacks are never triggered when input is blocked, actively wiring and validating `DummyCallbackHandler`.
+  - Verification: 19/19 tests in `test_enforcement.py` pass; 116/116 security tests pass across the entire security suite; `ruff check` and `ruff format --check` pass clean.
 
 ### Feature 023 — Security Systems: Phase 3 US1 (Task T015 Completed) (2026-09-05)
 

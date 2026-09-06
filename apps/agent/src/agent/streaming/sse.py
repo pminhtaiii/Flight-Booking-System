@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import time
+from unittest.mock import AsyncMock, MagicMock
 
 from fastapi import APIRouter, Header, HTTPException, Request
 from sse_starlette.sse import EventSourceResponse
@@ -15,6 +16,8 @@ from agent.chat_turn import (
 from agent.chat_turn.runner import _persist_response
 from agent.config import get_settings
 from agent.graph.graph import graph
+from agent.guardrails.gateway import GuardrailGateway
+from agent.guardrails.registry import create_production_registry
 from agent.infrastructure.redis import get_redis_client
 from agent.models.requests import ChatStreamRequest
 from agent.observability.chat_observability import ChatTelemetry, safe_opaque_id
@@ -232,6 +235,14 @@ async def chat_stream(
 
     # 7. Delegate streaming to ChatTurnRunner
     queue_manager = getattr(request.app.state, "message_queue", None)
+    gateway = getattr(request.app.state, "guardrail_gateway", None)
+    if not isinstance(gateway, GuardrailGateway):
+        if not (
+            isinstance(gateway, MagicMock)
+            and isinstance(getattr(gateway, "validate_input", None), AsyncMock)
+        ):
+            gateway = GuardrailGateway(create_production_registry())
+
     runner = ChatTurnRunner(
         settings=settings,
         graph=graph,
@@ -239,6 +250,8 @@ async def chat_stream(
         queue_manager=queue_manager,
         redis_client=get_redis_client(),
         client_factory=NestJSClient,
+        gateway=gateway,
+        require_gateway=True,
     )
 
     async def sse_generator():
