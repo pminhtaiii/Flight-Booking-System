@@ -11,7 +11,6 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { FlightSearchQueryDto } from './flight-search-query.dto';
-import type { FlightMatchResult } from '@/flight-match/flight-match.types';
 
 export function AtLeastOneVersionField(validationOptions?: ValidationOptions) {
   // eslint-disable-next-line @typescript-eslint/ban-types
@@ -60,6 +59,12 @@ export class AttestedFlightSearchDto {
   search!: FlightSearchQueryDto;
 }
 
+export interface AgentFlightMatchResultDto {
+  score: number | null;
+  matchLevel: string | null;
+  explanations: string[];
+}
+
 export interface AttestedFlightSearchResultDto {
   flightOfferId: string;
   duffelOfferId: string;
@@ -76,7 +81,7 @@ export interface AttestedFlightSearchResultDto {
   currency: string;
   fareClass: string | null;
   baggageAllowance: string | null;
-  matchResult: FlightMatchResult | null;
+  matchResult: AgentFlightMatchResultDto | null;
 }
 
 export interface AttestedFlightSearchMetaDto {

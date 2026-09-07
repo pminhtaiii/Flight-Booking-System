@@ -297,3 +297,37 @@ async def test_get_booking_detail_error_degradation(mock_client, run_config):
     )
     assert "500" not in result
     assert "Traceback" not in result
+
+
+@pytest.mark.asyncio
+async def test_booking_summaries_fail_closed_on_wrong_modelled_duration_type(
+    mock_client, run_config
+):
+    """The projection rejects malformed source values instead of narrating coerced records."""
+    mock_client.get_gateway_user_booking_summaries.return_value = {
+        "bookings": [{"bookingReference": "bkref_12345", "durationMinutes": "330"}]
+    }
+
+    result = await list_user_booking_summaries.ainvoke({}, config=run_config)
+
+    assert (
+        result
+        == "I couldn't retrieve your booking summaries right now. Please try again in a moment."
+    )
+
+
+@pytest.mark.asyncio
+async def test_booking_detail_fail_closed_on_wrong_modelled_boolean_type(mock_client, run_config):
+    """The detail narration accepts only explicit modelled booleans from upstream."""
+    mock_client.get_gateway_booking_detail.return_value = {
+        "bookingReference": "bkref_12345",
+        "changeable": "yes",
+    }
+
+    result = await get_booking_detail.ainvoke(
+        {"booking_reference": "bkref_12345"}, config=run_config
+    )
+
+    assert (
+        result == "I couldn't retrieve the booking details right now. Please try again in a moment."
+    )

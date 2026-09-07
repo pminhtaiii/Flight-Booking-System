@@ -12,6 +12,17 @@ from agent.tools.nestjs_client import NestJSClient
 _CHECK_USER_ACCESS = NestJSClient.check_user_access
 
 
+class StreamedResponse:
+    def __init__(self, response: httpx.Response) -> None:
+        self.response = response
+
+    async def __aenter__(self) -> httpx.Response:
+        return self.response
+
+    async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
+        return False
+
+
 @pytest.mark.asyncio
 async def test_check_user_access_uses_configured_api_base_once(monkeypatch):
     monkeypatch.setattr(NestJSClient, "check_user_access", _CHECK_USER_ACCESS)
@@ -495,9 +506,9 @@ async def test_get_gateway_flights_search():
     req = httpx.Request("GET", "http://localhost:3001/api/agent-gateway/flights/search")
     mock_response = httpx.Response(200, json={"flights": []}, request=req)
 
-    with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
-        mock_get.return_value = mock_response
-
+    with patch(
+        "httpx.AsyncClient.stream", return_value=StreamedResponse(mock_response)
+    ) as mock_stream:
         result = await client.get_gateway_flights_search(
             origin="SGN", destination="HAN", date="2026-08-01", passengers=2
         )
@@ -506,7 +517,8 @@ async def test_get_gateway_flights_search():
 
         # Verify the headers passed
         headers = client._get_gateway_headers()
-        mock_get.assert_called_once_with(
+        mock_stream.assert_called_once_with(
+            "GET",
             "http://localhost:3001/api/agent-gateway/flights/search",
             params={"origin": "SGN", "destination": "HAN", "date": "2026-08-01", "passengers": 2},
             headers=headers,
@@ -522,15 +534,15 @@ async def test_get_gateway_user_preferences():
     req = httpx.Request("GET", "http://localhost:3001/api/agent-gateway/users/preferences")
     mock_response = httpx.Response(200, json={"preferences": {}}, request=req)
 
-    with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
-        mock_get.return_value = mock_response
-
+    with patch(
+        "httpx.AsyncClient.stream", return_value=StreamedResponse(mock_response)
+    ) as mock_stream:
         result = await client.get_gateway_user_preferences()
         assert result == {"preferences": {}}
 
         headers = client._get_gateway_headers()
-        mock_get.assert_called_once_with(
-            "http://localhost:3001/api/agent-gateway/users/preferences", headers=headers
+        mock_stream.assert_called_once_with(
+            "GET", "http://localhost:3001/api/agent-gateway/users/preferences", headers=headers
         )
 
 
@@ -564,9 +576,9 @@ async def test_get_gateway_user_booking_summaries():
     }
     mock_response = httpx.Response(200, json=mock_payload, request=req)
 
-    with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
-        mock_get.return_value = mock_response
-
+    with patch(
+        "httpx.AsyncClient.stream", return_value=StreamedResponse(mock_response)
+    ) as mock_stream:
         result = await client.get_gateway_user_booking_summaries()
         assert result == mock_payload
 
@@ -575,7 +587,8 @@ async def test_get_gateway_user_booking_summaries():
         assert "X-User-Claim" in headers
         assert headers["X-Trace-ID"] == trace_id
         assert "X-Correlation-ID" in headers
-        mock_get.assert_called_once_with(
+        mock_stream.assert_called_once_with(
+            "GET",
             "http://localhost:3001/api/agent-gateway/users/bookings/summaries",
             headers=headers,
         )
@@ -611,9 +624,9 @@ async def test_get_gateway_booking_detail():
     }
     mock_response = httpx.Response(200, json=mock_payload, request=req)
 
-    with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
-        mock_get.return_value = mock_response
-
+    with patch(
+        "httpx.AsyncClient.stream", return_value=StreamedResponse(mock_response)
+    ) as mock_stream:
         result = await client.get_gateway_booking_detail("bkref_12345")
         assert result == mock_payload
 
@@ -622,7 +635,8 @@ async def test_get_gateway_booking_detail():
         assert "X-User-Claim" in headers
         assert headers["X-Trace-ID"] == trace_id
         assert "X-Correlation-ID" in headers
-        mock_get.assert_called_once_with(
+        mock_stream.assert_called_once_with(
+            "GET",
             "http://localhost:3001/api/agent-gateway/users/bookings/bkref_12345",
             headers=headers,
         )
@@ -645,9 +659,7 @@ async def test_get_gateway_booking_detail_not_found():
         request=req,
     )
 
-    with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
-        mock_get.return_value = mock_response
-
+    with patch("httpx.AsyncClient.stream", return_value=StreamedResponse(mock_response)):
         result = await client.get_gateway_booking_detail("bkref_99999")
         assert (
             result.get("statusCode") == 404
@@ -662,10 +674,10 @@ async def test_get_gateway_booking_detail_malformed_reference():
     token = jwt.encode({"id": "user-123"}, settings.JWT_SECRET, algorithm="HS256")
     client = NestJSClient(base_url="http://localhost:3001/api", token=token)
 
-    with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
+    with patch("httpx.AsyncClient.stream") as mock_stream:
         with pytest.raises(ValueError):
             await client.get_gateway_booking_detail("invalid_ref_no_prefix")
-        mock_get.assert_not_called()
+        mock_stream.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -684,9 +696,7 @@ async def test_get_gateway_flights_search_400_error():
         request=req,
     )
 
-    with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
-        mock_get.return_value = mock_response
-
+    with patch("httpx.AsyncClient.stream", return_value=StreamedResponse(mock_response)):
         result = await client.get_gateway_flights_search(
             origin="SGN", destination="HAN", date="2026-08-01", passengers=1
         )
@@ -694,6 +704,44 @@ async def test_get_gateway_flights_search_400_error():
         assert result == {
             "error": "I can currently only search economy class for adult passengers..."
         }
+
+
+@pytest.mark.asyncio
+async def test_post_gateway_flights_search_v2_uses_streamed_response():
+    settings = get_settings()
+    token = jwt.encode({"id": "user-123"}, settings.JWT_SECRET, algorithm="HS256")
+    client = NestJSClient(base_url="http://localhost:3001/api", token=token)
+    request = httpx.Request("POST", "http://localhost:3001/api/agent-gateway/v2/flights/search")
+    mock_response = httpx.Response(200, json={"flights": []}, request=request)
+
+    with patch(
+        "httpx.AsyncClient.stream", return_value=StreamedResponse(mock_response)
+    ) as mock_stream:
+        result = await client.post_gateway_flights_search_v2(
+            chat_session_id="session-123",
+            proposed_snapshot_version=4,
+            origin="SGN",
+            destination="HAN",
+            date="2026-08-01",
+            passengers=2,
+        )
+
+    assert result == {"flights": []}
+    mock_stream.assert_called_once_with(
+        "POST",
+        "http://localhost:3001/api/agent-gateway/v2/flights/search",
+        json={
+            "chatSessionId": "session-123",
+            "proposedSnapshotVersion": 4,
+            "search": {
+                "origin": "SGN",
+                "destination": "HAN",
+                "date": "2026-08-01",
+                "adults": 2,
+            },
+        },
+        headers=client._get_gateway_headers(),
+    )
 
 
 @pytest.mark.asyncio
@@ -714,9 +762,9 @@ async def test_check_booking_readiness_success():
         request=req,
     )
 
-    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
-        mock_post.return_value = mock_response
-
+    with patch(
+        "httpx.AsyncClient.stream", return_value=StreamedResponse(mock_response)
+    ) as mock_stream:
         result = await client.check_booking_readiness(
             flight_offer_id="offer-123",
             passengers=[{"passengerType": "ADULT", "passengerOrdinal": 1, "sourceType": "inline"}],
@@ -726,7 +774,8 @@ async def test_check_booking_readiness_success():
         assert result.get("nextAction") == "COMPLETE_PROFILE"
 
         headers = client._get_gateway_headers()
-        mock_post.assert_called_once_with(
+        mock_stream.assert_called_once_with(
+            "POST",
             "http://localhost:3001/api/agent-gateway/bookings/readiness",
             json={
                 "flightOfferId": "offer-123",
@@ -777,8 +826,7 @@ async def test_check_booking_readiness_unexpected_keys():
         request=req,
     )
 
-    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
-        mock_post.return_value = mock_response
+    with patch("httpx.AsyncClient.stream", return_value=StreamedResponse(mock_response)):
         result = await client.check_booking_readiness(
             flight_offer_id="offer-123",
             passengers=[{"passengerType": "ADULT", "passengerOrdinal": 1, "sourceType": "inline"}],
@@ -799,8 +847,7 @@ async def test_check_booking_readiness_redacts_value_bearing_gateway_errors():
         request=request,
     )
 
-    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
-        mock_post.return_value = mock_response
+    with patch("httpx.AsyncClient.stream", return_value=StreamedResponse(mock_response)):
         result = await client.check_booking_readiness(
             flight_offer_id="offer-123",
             passengers=[{"passengerType": "ADULT", "passengerOrdinal": 1, "sourceType": "inline"}],
@@ -835,9 +882,7 @@ async def test_check_booking_readiness_rejects_nested_value_bearing_response():
         request=req,
     )
 
-    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
-        mock_post.return_value = mock_response
-
+    with patch("httpx.AsyncClient.stream", return_value=StreamedResponse(mock_response)):
         result = await client.check_booking_readiness(
             flight_offer_id="offer-123",
             passengers=[{"passengerType": "ADULT", "passengerOrdinal": 1, "sourceType": "inline"}],
@@ -858,8 +903,7 @@ async def test_check_booking_readiness_does_not_return_gateway_error_message():
         request=req,
     )
 
-    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
-        mock_post.return_value = mock_response
+    with patch("httpx.AsyncClient.stream", return_value=StreamedResponse(mock_response)):
         result = await client.check_booking_readiness(
             flight_offer_id="offer-123",
             passengers=[{"passengerType": "ADULT", "passengerOrdinal": 1, "sourceType": "inline"}],

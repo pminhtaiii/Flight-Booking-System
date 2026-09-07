@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 from langchain_core.runnables import RunnableConfig
 from pydantic import ValidationError
@@ -19,6 +20,17 @@ from agent.trusted_search_snapshot import (
     TrustedSnapshotRepository,
     models,
 )
+
+
+class StreamedResponse:
+    def __init__(self, response: httpx.Response) -> None:
+        self.response = response
+
+    async def __aenter__(self) -> httpx.Response:
+        return self.response
+
+    async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
+        return False
 
 
 class FakeAsyncRedis:
@@ -227,35 +239,41 @@ async def test_nestjs_client_post_gateway_flights_search_v2():
         trace_id="trace-test-456",
     )
 
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = {
-        "selectionAttestation": "sel_v1_signed-opaque",
-        "snapshotVersion": 3,
-        "snapshotExpiresAt": (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat(),
-        "results": [
-            {
-                "flightOfferId": str(uuid.uuid4()),
-                "duffelOfferId": "off_123",
-                "offerExpiresAt": (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat(),
-                "airline": "VN",
-                "flightNumber": "VN300",
-                "departureAirport": "SGN",
-                "arrivalAirport": "NRT",
-                "departureTime": "2026-09-20T02:00:00.000Z",
-                "arrivalTime": "2026-09-20T08:30:00.000Z",
-                "duration": 330,
-                "stops": 0,
-                "price": "420.00",
-                "currency": "USD",
-                "fareClass": "economy",
-                "baggageAllowance": "1 checked bag",
-            }
-        ],
-    }
-    mock_response.raise_for_status = MagicMock()
+    req = httpx.Request("POST", "http://localhost:3001/api/agent-gateway/v2/flights/search")
+    mock_response = httpx.Response(
+        200,
+        json={
+            "selectionAttestation": "sel_v1_signed-opaque",
+            "snapshotVersion": 3,
+            "snapshotExpiresAt": (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat(),
+            "results": [
+                {
+                    "flightOfferId": str(uuid.uuid4()),
+                    "duffelOfferId": "off_123",
+                    "offerExpiresAt": (
+                        datetime.now(timezone.utc) + timedelta(minutes=15)
+                    ).isoformat(),
+                    "airline": "VN",
+                    "flightNumber": "VN300",
+                    "departureAirport": "SGN",
+                    "arrivalAirport": "NRT",
+                    "departureTime": "2026-09-20T02:00:00.000Z",
+                    "arrivalTime": "2026-09-20T08:30:00.000Z",
+                    "duration": 330,
+                    "stops": 0,
+                    "price": "420.00",
+                    "currency": "USD",
+                    "fareClass": "economy",
+                    "baggageAllowance": "1 checked bag",
+                }
+            ],
+        },
+        request=req,
+    )
 
-    with patch("httpx.AsyncClient.post", return_value=mock_response) as mock_post:
+    with patch(
+        "httpx.AsyncClient.stream", return_value=StreamedResponse(mock_response)
+    ) as mock_stream:
         result = await client.post_gateway_flights_search_v2(
             chat_session_id="session-123",
             proposed_snapshot_version=3,
@@ -265,9 +283,11 @@ async def test_nestjs_client_post_gateway_flights_search_v2():
             passengers=2,
         )
 
-        mock_post.assert_called_once()
-        args, kwargs = mock_post.call_args
-        url = args[0] if args else kwargs.get("url")
+        mock_stream.assert_called_once()
+        args, kwargs = mock_stream.call_args
+        method = args[0] if len(args) > 0 else kwargs.get("method")
+        url = args[1] if len(args) > 1 else kwargs.get("url")
+        assert method == "POST"
         assert url.endswith("/agent-gateway/v2/flights/search")
         assert kwargs["json"]["chatSessionId"] == "session-123"
         assert kwargs["json"]["proposedSnapshotVersion"] == 3
@@ -291,14 +311,17 @@ async def test_nestjs_client_post_gateway_flights_search_v2():
 async def test_nestjs_client_post_gateway_flights_search_v2_handles_400_error():
     client = NestJSClient(base_url="http://localhost:3001/api", token="mock_user_token")
 
-    mock_response = MagicMock()
-    mock_response.status_code = 400
-    mock_response.json.return_value = {
-        "statusCode": 400,
-        "message": "I can currently only search economy class for adult passengers. For other cabin classes or passenger types, please use the search page.",
-    }
+    req = httpx.Request("POST", "http://localhost:3001/api/agent-gateway/v2/flights/search")
+    mock_response = httpx.Response(
+        400,
+        json={
+            "statusCode": 400,
+            "message": "I can currently only search economy class for adult passengers. For other cabin classes or passenger types, please use the search page.",
+        },
+        request=req,
+    )
 
-    with patch("httpx.AsyncClient.post", return_value=mock_response):
+    with patch("httpx.AsyncClient.stream", return_value=StreamedResponse(mock_response)):
         result = await client.post_gateway_flights_search_v2(
             chat_session_id="session-123",
             proposed_snapshot_version=1,
@@ -315,16 +338,20 @@ async def test_nestjs_client_post_gateway_flights_search_v2_handles_400_error():
 async def test_nestjs_client_search_flights_v2_alias():
     client = NestJSClient(base_url="http://localhost:3001/api", token="mock_user_token")
 
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = {
-        "selectionAttestation": "sel_v1_alias_test",
-        "snapshotVersion": 1,
-        "results": [],
-    }
-    mock_response.raise_for_status = MagicMock()
+    req = httpx.Request("POST", "http://localhost:3001/api/agent-gateway/v2/flights/search")
+    mock_response = httpx.Response(
+        200,
+        json={
+            "selectionAttestation": "sel_v1_alias_test",
+            "snapshotVersion": 1,
+            "results": [],
+        },
+        request=req,
+    )
 
-    with patch("httpx.AsyncClient.post", return_value=mock_response) as mock_post:
+    with patch(
+        "httpx.AsyncClient.stream", return_value=StreamedResponse(mock_response)
+    ) as mock_stream:
         result = await client.search_flights_v2(
             chat_session_id="session-alias",
             proposed_snapshot_version=1,
@@ -333,7 +360,7 @@ async def test_nestjs_client_search_flights_v2_alias():
             date="2026-09-21",
             passengers=1,
         )
-        mock_post.assert_called_once()
+        mock_stream.assert_called_once()
         assert result["selectionAttestation"] == "sel_v1_alias_test"
 
 

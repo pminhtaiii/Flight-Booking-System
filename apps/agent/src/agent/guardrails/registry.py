@@ -18,6 +18,12 @@ from agent.guardrails.layers.input import (
     PIIDetector,
     TopicBoundary,
 )
+from agent.guardrails.layers.tool_output import (
+    PIIScanner,
+    SchemaValidator,
+    SizeStructureValidator,
+    UntrustedContentInjectionDetector,
+)
 from agent.sanitization.pii_scrubber import detect_pii
 
 # Re-export and maintain backwards-compatible aliases
@@ -34,6 +40,10 @@ COMPULSORY_PRODUCTION_LAYERS: frozenset[str] = frozenset(
         "input.injection",
         "input.topic",
         "output.pii",
+        "tool.size_structure",
+        "tool.schema",
+        "tool.pii",
+        "tool.untrusted_content_injection",
     }
 )
 
@@ -208,6 +218,10 @@ def create_production_registry(
         InjectionDetector(),
         TopicBoundary(),
         OutputPIILayer(),
+        SizeStructureValidator(),
+        SchemaValidator(),
+        PIIScanner(),
+        UntrustedContentInjectionDetector(),
     )
     for layer in default_layers:
         if layer.key not in effective_disabled:

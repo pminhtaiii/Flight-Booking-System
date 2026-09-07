@@ -4,6 +4,9 @@ import httpx
 import pytest
 from langchain_core.runnables import RunnableConfig
 
+from agent.guardrails.base import TurnCapabilities
+from agent.guardrails.gateway import GuardrailGateway
+from agent.guardrails.registry import create_production_registry
 from agent.tools.base import get_nestjs_client
 from agent.tools.booking_detail import get_booking_detail
 from agent.tools.booking_summaries import list_user_booking_summaries
@@ -539,6 +542,119 @@ async def test_check_booking_readiness_tool_error(
 
     assert "error" in result
     assert "Failed to check booking readiness safely" in result["error"]
+
+
+@pytest.mark.asyncio
+async def test_search_flights_fails_closed_when_a_modelled_upstream_value_has_wrong_type(
+    mock_client, run_config
+):
+    """A typed search projection must reject bad upstream data before narration or state storage."""
+    mock_client.post_gateway_flights_search_v2.return_value = {
+        "snapshotVersion": 1,
+        "snapshotExpiresAt": "2027-07-15T09:30:00Z",
+        "selectionAttestation": "mock_attestation",
+        "results": [
+            {
+                "flightOfferId": "offer-1",
+                "duffelOfferId": "duffel-1",
+                "airline": 99,
+                "departureTime": "2026-07-15T08:30:00Z",
+                "arrivalTime": "2026-07-15T14:00:00Z",
+                "price": "452.00",
+                "currency": "USD",
+            }
+        ],
+    }
+
+    result = await search_flights.ainvoke(
+        {"origin": "HAN", "destination": "NRT", "date": "2026-07-15", "passengers": 1},
+        config=run_config,
+    )
+
+    assert (
+        result
+        == "I couldn't search for flights right now. The flight search service is temporarily unavailable. Please try again in a moment."
+    )
+
+
+@pytest.mark.asyncio
+async def test_preferences_fails_closed_when_a_modelled_upstream_value_has_wrong_type(
+    mock_client, run_config
+):
+    """Preference narration must never coerce untrusted upstream fields."""
+    mock_client.get_gateway_user_preferences.return_value = {
+        "seatPreference": 42,
+        "privateAttestation": "must-not-reach-narration",
+    }
+
+    result = await get_user_preferences.ainvoke({}, config=run_config)
+
+    assert result == "I couldn't retrieve your preferences right now. Please try again in a moment."
+    assert "privateAttestation" not in result
+
+
+@pytest.mark.asyncio
+async def test_readiness_tool_projects_ordinary_success_to_depth_safe_public_shape(
+    mock_client_with_readiness, run_config_with_readiness
+):
+    """An ordinary readiness response remains useful after the full guarded tool pipeline."""
+    mock_client_with_readiness.check_booking_readiness.return_value = {
+        "ready": False,
+        "scope": "INTERNATIONAL",
+        "nextAction": "COMPLETE_PROFILE",
+        "passengers": [
+            {
+                "passengerType": "ADULT",
+                "passengerOrdinal": 1,
+                "sections": [
+                    {
+                        "name": "travel_document",
+                        "fields": [
+                            {"name": "passportNumber", "status": "missing", "reason": "REQUIRED"}
+                        ],
+                    }
+                ],
+            }
+        ],
+        "privateAttestation": "must-not-cross-public-tool-boundary",
+    }
+    result = await check_booking_readiness.ainvoke(
+        {
+            "flight_offer_id": "offer-123",
+            "passengers": [
+                {"passengerType": "ADULT", "passengerOrdinal": 1, "sourceType": "inline"}
+            ],
+        },
+        config=run_config_with_readiness,
+    )
+    gateway = GuardrailGateway(create_production_registry())
+    capabilities = TurnCapabilities(
+        intent="SEARCH",
+        provenance="trusted_router",
+        sealed_tools=("check_booking_readiness",),
+    )
+
+    async def invoke() -> dict:
+        return result
+
+    decision = await gateway.execute_tool(
+        capabilities,
+        type("Call", (), {"name": "check_booking_readiness", "args": {}})(),
+        invoke,
+    )
+
+    assert decision.status == "PASS"
+    assert decision.validated_data is not None
+    passenger = decision.validated_data.data["passengers"][0]
+    assert passenger["issues"] == [
+        {
+            "section": "travel_document",
+            "name": "passportNumber",
+            "status": "missing",
+            "reason": "REQUIRED",
+        }
+    ]
+    assert "privateAttestation" not in decision.validated_data.data
 
 
 def test_project_flight_search_for_narration_matched_mode():

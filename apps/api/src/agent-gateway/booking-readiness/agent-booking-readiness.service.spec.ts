@@ -189,12 +189,7 @@ describe('AgentBookingReadinessService', () => {
         {
           passengerType: PassengerType.ADULT,
           passengerOrdinal: 1,
-          sections: [
-            {
-              name: 'identity',
-              fields: [{ name: 'givenName', status: 'filled', reason: null }],
-            },
-          ],
+          issues: [{ section: 'identity', name: 'givenName', status: 'filled', reason: null }],
         },
       ],
       nextAction: 'CONTINUE_CHECKOUT',
@@ -388,5 +383,64 @@ describe('AgentBookingReadinessService', () => {
       expect(err.getStatus()).toBe(500);
       expect(err.getResponse()).toMatchObject({ code: 'READINESS_REQUEST_FAILED' });
     }
+  });
+
+  it('flattens sections[].fields[] to issues[] and guarantees JSON depth <= 5', async () => {
+    function getJsonDepth(value: unknown): number {
+      if (value === null || typeof value !== 'object') {
+        return 0;
+      }
+      const values = Array.isArray(value) ? value : Object.values(value);
+      if (values.length === 0) {
+        return 1;
+      }
+      return 1 + Math.max(...values.map(getJsonDepth));
+    }
+
+    const rawOffer = { passengers: [{ id: 'offer-passenger-1' }] };
+    prismaService.flightOffer.findUnique.mockResolvedValueOnce({ id: 'offer-1', rawOffer });
+
+    bookingReadinessService.getAdvisoryReadiness.mockResolvedValueOnce({
+      scope: 'INTERNATIONAL',
+      ready: false,
+      passengers: [
+        {
+          passengerType: PassengerType.ADULT,
+          passengerOrdinal: 1,
+          ready: false,
+          sections: [
+            {
+              name: 'identity',
+              fields: [
+                { name: 'givenName', status: 'filled', reason: null },
+                { name: 'familyName', status: 'filled', reason: null },
+              ],
+            },
+            {
+              name: 'travel_document',
+              fields: [
+                { name: 'passportNumber', status: 'missing', reason: 'REQUIRED' },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    const dto = new AgentBookingReadinessRequestDto();
+    dto.flightOfferId = 'offer-1';
+    dto.passengers = [
+      { passengerType: PassengerType.ADULT, passengerOrdinal: 1, sourceType: 'inline' },
+    ];
+
+    const result = await service.checkBookingReadiness('user-1', dto);
+
+    expect(result.passengers[0].issues).toEqual([
+      { section: 'identity', name: 'givenName', status: 'filled', reason: null },
+      { section: 'identity', name: 'familyName', status: 'filled', reason: null },
+      { section: 'travel_document', name: 'passportNumber', status: 'missing', reason: 'REQUIRED' },
+    ]);
+    expect((result.passengers[0] as any).sections).toBeUndefined();
+    expect(getJsonDepth(result)).toBeLessThanOrEqual(5);
   });
 });

@@ -223,14 +223,14 @@ export class AgentBookingReadinessService {
         passengers: result.passengers.map((p) => ({
           passengerType: p.passengerType as PassengerType,
           passengerOrdinal: p.passengerOrdinal,
-          sections: p.sections.map((s) => ({
-            name: s.name,
-            fields: s.fields.map((f) => ({
+          issues: p.sections.flatMap((s) =>
+            s.fields.map((f) => ({
+              section: s.name,
               name: f.name,
               status: f.status,
               reason: f.reason,
             })),
-          })),
+          ),
         })),
         nextAction: result.ready || hasInlinePassengers ? 'CONTINUE_CHECKOUT' : 'COMPLETE_PROFILE',
       };

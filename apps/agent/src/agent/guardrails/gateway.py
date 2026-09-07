@@ -13,6 +13,7 @@ from agent.guardrails.base import (
     ValidatedToolResult,
 )
 from agent.guardrails.registry import GuardrailRegistry
+from agent.guardrails.tool_output_pipeline import ToolOutputGuardrailPipeline
 
 
 class GuardrailGateway:
@@ -135,10 +136,13 @@ class GuardrailGateway:
                     result = await res
                 else:
                     result = res
-            return PipelineDecision(
-                status="PASS",
-                validated_data=ValidatedToolResult(tool_name=tool_name, data=result),
-            )
+            layers = self.registry.ordered_layers("tool")
+            if not layers:
+                return PipelineDecision(
+                    status="PASS",
+                    validated_data=ValidatedToolResult(tool_name=tool_name, data=result),
+                )
+            return await ToolOutputGuardrailPipeline(layers).validate(context, tool_name, result)
         except Exception:
             return PipelineDecision(
                 status="BLOCK",

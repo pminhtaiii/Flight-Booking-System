@@ -139,6 +139,9 @@ Feature 023 establishes a deterministic, multi-layered security architecture tha
      - Fails closed on execution crashes without leaking internal traceback details.
    - `stream_output(context, tokens)`:
      - Yields `ApprovedChunk` instances for safe emitted tokens and terminates safely upon boundary violations.
+   - Tool-result validation is a fixed fail-closed chain: size/iterative structure bounds (max 64 KiB, depth <= 5, nodes <= 500), strict minimized result-schema projection, PII scanning, then untrusted-content injection detection. No invalid result becomes a `ValidatedToolResult`.
+   - The six tool-facing NestJS client operations stream decompressed response bytes through a 64 KiB bound before JSON loading; missing or false `Content-Length` values cannot bypass the cumulative check, and pre-parse JSON delimiter scanning rejects structures with depth > 5 or nodes > 500.
+   - Upstream NestJS agent-gateway search and booking readiness endpoints provide shallow projections (depth <= 5), with the agent runner reconstituting public `sections[].fields[]` structures for the SSE `ACTION_REQUIRED` event to ensure web UI compatibility.
 
 3. **Closed Registry with Topological Dependency Sorting (`apps/agent/src/agent/guardrails/registry.py`)**:
    - Closed keyset enforcement: strictly forbids unverified or arbitrary layer registration.

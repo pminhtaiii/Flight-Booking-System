@@ -5,6 +5,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
+from langchain_core.messages import AIMessage
+from langgraph.graph import END, START, StateGraph
+from langgraph.prebuilt import ToolNode
 
 from agent.tools.signal_checkout_intent import signal_checkout_intent
 
@@ -25,6 +28,36 @@ class TestCheckoutSignalValidCases:
             "offer_index": 2,
             "selected_index": 2,
         }
+
+    def test_compiled_tool_node_injects_trusted_state_without_public_schema_state(self):
+        """ToolNode supplies graph state while the model-callable schema still forbids forged state."""
+        graph = StateGraph(dict)
+        graph.add_node("tools", ToolNode([signal_checkout_intent]))
+        graph.add_edge(START, "tools")
+        graph.add_edge("tools", END)
+        compiled = graph.compile()
+
+        result = compiled.invoke(
+            {
+                "trusted_snapshot": {"results": [{"id": "offer_1"}]},
+                "messages": [
+                    AIMessage(
+                        content="",
+                        tool_calls=[
+                            {
+                                "name": "signal_checkout_intent",
+                                "args": {"offer_index": 1},
+                                "id": "checkout-call",
+                            }
+                        ],
+                    )
+                ],
+            }
+        )
+
+        output = result["messages"][-1]
+        assert output.status != "error"
+        assert json.loads(output.content)["signal"]["offer_index"] == 1
 
     def test_signal_checkout_intent_with_selected_index(self):
         state = {"trusted_snapshot": {"results": [{"id": "offer_1"}, {"id": "offer_2"}]}}
