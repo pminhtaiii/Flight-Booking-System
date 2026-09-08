@@ -420,7 +420,7 @@ describe('Agent Flight Match Parity (E2E)', () => {
   });
 
   describe('100% Parity between Public Web Search and Agent V2 Search', () => {
-    it('asserts 100% parity: exact same MATCHED mode, exact top 5 offers, identical scores, match levels, active weights, and explanation keys in exact same rank order', async () => {
+    it('asserts public parity: exact same MATCHED mode, top 5 offers, scores, match levels, and structured explanations in exact rank order', async () => {
       // 1. Execute Public Web Search (POST /api/flights/search)
       searchesStarted += 1;
       const webRes = await request(app.getHttpServer())
@@ -482,40 +482,24 @@ describe('Agent Flight Match Parity (E2E)', () => {
         expect(agentOffer.matchResult.matchLevel).toBe(webOffer.matchResult.matchLevel);
         expect(typeof agentOffer.matchResult.matchLevel).toBe('string');
 
-        // 100% Parity Assertion 5: Identical eligibility
-        expect(agentOffer.matchResult.eligibility.eligible).toBe(
-          webOffer.matchResult.eligibility.eligible,
-        );
-        expect(agentOffer.matchResult.eligibility.violations).toEqual(
-          webOffer.matchResult.eligibility.violations,
-        );
-
-        // 100% Parity Assertion 6: Identical active weights
-        expect(agentOffer.matchResult.metadata.scoringVersion).toBe(
-          webOffer.matchResult.metadata.scoringVersion,
-        );
-        expect(agentOffer.matchResult.metadata.activeWeights).toEqual(
-          webOffer.matchResult.metadata.activeWeights,
-        );
-
-        // 100% Parity Assertion 7: Identical explanation keys, sub-scores, weights, and contributions
-        expect(agentOffer.matchResult.breakdown).toHaveLength(
-          webOffer.matchResult.breakdown.length,
-        );
-        for (let b = 0; b < agentOffer.matchResult.breakdown.length; b++) {
-          const agentBreakdown = agentOffer.matchResult.breakdown[b];
-          const webBreakdown = webOffer.matchResult.breakdown[b];
-
-          expect(agentBreakdown.dimension).toBe(webBreakdown.dimension);
-          expect(agentBreakdown.score).toBe(webBreakdown.score);
-          expect(agentBreakdown.weight).toBe(webBreakdown.weight);
-          expect(agentBreakdown.contribution).toBe(webBreakdown.contribution);
-          expect(agentBreakdown.signal).toBe(webBreakdown.signal);
-
-          // Explanation key parity
-          expect(agentBreakdown.explanation.key).toBe(webBreakdown.explanation.key);
-          expect(agentBreakdown.explanation.params).toEqual(webBreakdown.explanation.params);
-        }
+        // The agent boundary exposes the same user-facing explanations without
+        // leaking eligibility, active weights, or score-breakdown internals.
+        const expectedExplanations = [
+          ...webOffer.matchResult.breakdown.map(
+            (breakdown: { explanation: { key: string; params: Record<string, unknown> } }) =>
+              breakdown.explanation,
+          ),
+          ...webOffer.matchResult.eligibility.violations.map(
+            (violation: { explanation: { key: string; params: Record<string, unknown> } }) =>
+              violation.explanation,
+          ),
+        ];
+        expect(agentOffer.matchResult.explanations).toEqual(expectedExplanations);
+        expect(Object.keys(agentOffer.matchResult).sort()).toEqual([
+          'explanations',
+          'matchLevel',
+          'score',
+        ]);
       }
 
       // Rank order strictly decreasing or equal score
@@ -644,10 +628,11 @@ describe('Agent Flight Match Parity (E2E)', () => {
       expect(metaJson).not.toContain('off_');
       expect(metaJson).not.toContain('duffel');
 
-      // Every matchResult, breakdown, explanation, and constraint contains zero duffelOfferId
+      // Every minimized matchResult and explanation contains zero provider identifiers.
       for (const result of agentRes.body.results) {
         const matchResult = result.matchResult;
         expect(matchResult).not.toHaveProperty('duffelOfferId');
+        expect(Object.keys(matchResult).sort()).toEqual(['explanations', 'matchLevel', 'score']);
 
         // matchResult JSON must not contain any provider ID substring
         const matchResultJson = JSON.stringify(matchResult);
@@ -656,10 +641,9 @@ describe('Agent Flight Match Parity (E2E)', () => {
         expect(matchResultJson).not.toContain('duffel');
         expect(matchResultJson).not.toContain(result.duffelOfferId);
 
-        // Every breakdown parameter must be allowlisted primitives without provider IDs
-        for (const breakdown of matchResult.breakdown) {
-          expect(breakdown).not.toHaveProperty('duffelOfferId');
-          const explanationJson = JSON.stringify(breakdown.explanation);
+        for (const explanation of matchResult.explanations) {
+          expect(explanation).not.toHaveProperty('duffelOfferId');
+          const explanationJson = JSON.stringify(explanation);
           expect(explanationJson).not.toContain('duffelOfferId');
           expect(explanationJson).not.toContain('off_');
           expect(explanationJson).not.toContain('duffel');

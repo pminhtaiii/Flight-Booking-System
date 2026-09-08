@@ -13,6 +13,7 @@ import {
   AttestedFlightSearchDto,
   AttestedFlightSearchResponseDto,
   AttestedFlightSearchResultDto,
+  AgentFlightMatchResultDto,
 } from '../dto/attested-flight-search.dto';
 import { FlightSearchResponseDto, FlightResultDto } from '../dto/flight-result.dto';
 import { CABIN_KEYWORDS, PASSENGER_KEYWORDS } from '../agent-gateway.constants';
@@ -24,6 +25,33 @@ import {
 import { AgentToolAuditService } from '../audit/agent-tool-audit.service';
 import { FlightsService } from '@/flights/flights.service';
 import { FlightSearchRequestDto } from '@/flights/dto/search-flight.dto';
+import type { FlightMatchResult } from '@/flight-match/flight-match.types';
+
+function projectAgentMatchResult(
+  matchResult: FlightMatchResult | null,
+): AgentFlightMatchResultDto | null {
+  if (!matchResult) return null;
+  const explanations: AgentFlightMatchResultDto['explanations'] = [];
+  if (matchResult.breakdown) {
+    for (const b of matchResult.breakdown) {
+      if (b.explanation?.key) {
+        explanations.push(b.explanation);
+      }
+    }
+  }
+  if (matchResult.eligibility?.violations) {
+    for (const v of matchResult.eligibility.violations) {
+      if (v.explanation?.key) {
+        explanations.push(v.explanation);
+      }
+    }
+  }
+  return {
+    score: matchResult.score,
+    matchLevel: matchResult.matchLevel,
+    explanations,
+  };
+}
 
 @Injectable()
 export class AttestedFlightSearchService {
@@ -257,7 +285,7 @@ export class AttestedFlightSearchService {
           currency: offer.currency,
           fareClass: offer.fareClass,
           baggageAllowance: offer.baggageAllowance,
-          matchResult: offer.matchResult ?? null,
+          matchResult: projectAgentMatchResult(offer.matchResult ?? null),
         });
       }
 
@@ -445,7 +473,7 @@ export class AttestedFlightSearchService {
           currency: offer.currency,
           fareClass: offer.fareClass,
           baggageAllowance: offer.baggageAllowance,
-          matchResult: offer.matchResult ?? null,
+          matchResult: projectAgentMatchResult(offer.matchResult ?? null),
         });
       }
 

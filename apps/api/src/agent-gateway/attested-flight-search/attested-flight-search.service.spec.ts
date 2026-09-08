@@ -12,6 +12,17 @@ import { FlightSearchQueryDto } from '../dto/flight-search-query.dto';
 import { AttestedFlightSearchDto } from '../dto/attested-flight-search.dto';
 import type { FlightMatchResult } from '@/flight-match/flight-match.types';
 
+function getJsonDepth(value: unknown): number {
+  if (value === null || typeof value !== 'object') {
+    return 0;
+  }
+  const values = Array.isArray(value) ? value : Object.values(value);
+  if (values.length === 0) {
+    return 1;
+  }
+  return 1 + Math.max(...values.map(getJsonDepth));
+}
+
 describe('AttestedFlightSearchService', () => {
   let service: AttestedFlightSearchService;
   let prismaService: any;
@@ -217,7 +228,12 @@ describe('AttestedFlightSearchService', () => {
       const result = await service.searchFlights('user-1', validQuery);
 
       expect(result.mode).toBe('MATCHED');
-      expect(result.results[0].matchResult).toEqual(mockMatchResult);
+      expect(result.results[0].matchResult).toEqual({
+        score: mockMatchResult.score,
+        matchLevel: mockMatchResult.matchLevel,
+        explanations: [],
+      });
+      expect(getJsonDepth(result)).toBeLessThanOrEqual(5);
       expect(result.meta?.scoringVersion).toBe('flight-match-v1');
     });
 
@@ -1120,7 +1136,17 @@ describe('AttestedFlightSearchService', () => {
           expect(response.results).toHaveLength(1);
           expect(response.results[0].flightOfferId).toBe('c8a3f9e2-38b7-49d6-94d4-511252199cf8');
           expect(response.results[0].duffelOfferId).toBe('off_duffel_t062_1');
-          expect(response.results[0].matchResult).toEqual(mockMatchResult);
+          expect(response.results[0].matchResult).toEqual({
+            score: mockMatchResult.score,
+            matchLevel: mockMatchResult.matchLevel,
+            explanations: [
+              {
+                key: 'match.price.below_median',
+                params: { currency: 'USD', difference: 20 },
+              },
+            ],
+          });
+          expect(getJsonDepth(response)).toBeLessThanOrEqual(7);
         });
 
         it('serializes RANKED response with mode: RANKED, matchResult: null, and scoringVersion: null in meta', async () => {

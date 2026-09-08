@@ -3,6 +3,7 @@ import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from langchain_core.messages import AIMessage, ToolMessage
 from pydantic import ValidationError
 
 from agent.chat_turn import (
@@ -17,7 +18,10 @@ from agent.chat_turn import (
     ToolCallEvent,
     ToolResultEvent,
 )
+from agent.guardrails.base import ValidatedInput
+from agent.guardrails.gateway import GuardrailGateway
 from agent.guardrails.output_pipeline import OutputGuardrailBlockedError
+from agent.guardrails.registry import create_production_registry
 
 
 def test_chat_turn_command_valid_and_extra_forbid():
@@ -121,6 +125,57 @@ async def test_runner_happy_path_streaming():
 
 
 @pytest.mark.asyncio
+async def test_production_runner_passes_mandatory_gateway_into_graph_config() -> None:
+    """The live graph must receive the same production gateway used at admission."""
+    captured: dict[str, object] = {}
+    mock_client = MagicMock()
+    mock_client.get_memory = AsyncMock(
+        return_value={"recentMessages": [], "summary": None, "totalMessageCount": 0}
+    )
+    mock_client.create_message_batch = AsyncMock(
+        return_value={"messages": [{"id": "msg-agent", "sender": "AGENT"}]}
+    )
+    mock_graph = MagicMock()
+
+    async def capture_astream_events(initial_state, *, config, version):
+        captured.update(initial_state=initial_state, config=config, version=version)
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": MagicMock(content="Safe response")},
+        }
+
+    mock_graph.astream_events = capture_astream_events
+    gateway = GuardrailGateway(create_production_registry())
+    runner = ChatTurnRunner(
+        graph=mock_graph,
+        client_factory=lambda **_kwargs: mock_client,
+        redis_client=None,
+        gateway=gateway,
+        require_gateway=True,
+    )
+
+    events = [
+        event
+        async for event in runner.run(
+            ChatTurnCommand(
+                user_id="user-production-gateway",
+                session_id="session-production-gateway",
+                message="Hello",
+                token="token",
+            ),
+            validated_input=ValidatedInput(content="Hello"),
+        )
+    ]
+
+    assert any(isinstance(event, DoneEvent) for event in events)
+    configurable = captured["config"]["configurable"]
+    assert configurable["guardrail_gateway"] is gateway
+    assert configurable["guardrail_gateway"].registry is gateway.registry
+    assert "turn_capabilities" not in configurable
+    assert "turn_capabilities" not in captured["initial_state"]
+
+
+@pytest.mark.asyncio
 async def test_runner_session_auto_creation_when_none():
     mock_client = MagicMock()
     mock_client.create_session = AsyncMock(return_value={"id": "auto-created-session-999"})
@@ -173,14 +228,51 @@ async def test_runner_tool_calls_and_flight_results():
 
     async def mock_astream_events(*args, **kwargs):
         yield {
-            "event": "on_tool_start",
-            "name": "search_flights",
-            "data": {"input": {"origin": "SFO", "destination": "JFK"}},
+            "event": "on_chain_end",
+            "name": "travel",
+            "data": {
+                "output": {
+                    "messages": [
+                        AIMessage(
+                            content="",
+                            tool_calls=[
+                                {
+                                    "name": "search_flights",
+                                    "args": {
+                                        "origin": "SFO",
+                                        "destination": "JFK",
+                                        "date": "2026-09-01",
+                                    },
+                                    "id": "call-search-1",
+                                }
+                            ],
+                        )
+                    ]
+                }
+            },
         }
         yield {
             "event": "on_tool_end",
             "name": "search_flights",
             "data": {"output": json.dumps({"status": "found", "count": 2})},
+        }
+        # Raw callbacks are telemetry-only; public results come from the
+        # gateway-validated ToolMessage emitted by the tools node.
+        yield {
+            "event": "on_chain_end",
+            "name": "tools",
+            "data": {
+                "output": {
+                    "messages": [
+                        ToolMessage(
+                            content=json.dumps({"status": "found", "count": 2}),
+                            tool_call_id="call-search-1",
+                            name="search_flights",
+                            additional_kwargs={"guardrail_validated": True},
+                        )
+                    ]
+                }
+            },
         }
         yield {
             "event": "on_chat_model_stream",
@@ -229,7 +321,11 @@ async def test_runner_tool_calls_and_flight_results():
         tool_calls = [e for e in events if isinstance(e, ToolCallEvent)]
         assert len(tool_calls) == 1
         assert tool_calls[0].data.name == "search_flights"
-        assert tool_calls[0].data.inputs == {"origin": "SFO", "destination": "JFK"}
+        assert tool_calls[0].data.inputs == {
+            "origin": "SFO",
+            "destination": "JFK",
+            "date": "2026-09-01",
+        }
 
         tool_results = [e for e in events if isinstance(e, ToolResultEvent)]
         assert len(tool_results) == 1
@@ -266,6 +362,13 @@ async def test_runner_check_booking_readiness_sanitized_and_action_required():
     mock_queue.release = AsyncMock()
 
     raw_readiness = {
+        "scope": "INTERNATIONAL",
+        "ready": False,
+        "nextAction": "COMPLETE_PASSENGERS",
+        "passengers": [],
+        "canary": "raw-callback-must-not-drive-action",
+    }
+    validated_readiness = {
         "scope": "DOMESTIC",
         "ready": False,
         "nextAction": "COMPLETE_PROFILE",
@@ -288,6 +391,35 @@ async def test_runner_check_booking_readiness_sanitized_and_action_required():
     mock_graph = MagicMock()
 
     async def mock_astream_events(*args, **kwargs):
+        yield {
+            "event": "on_chain_end",
+            "name": "travel",
+            "data": {
+                "output": {
+                    "messages": [
+                        AIMessage(
+                            content="",
+                            tool_calls=[
+                                {
+                                    "name": "check_booking_readiness",
+                                    "args": {
+                                        "flight_offer_id": "secret_offer_123",
+                                        "passengers": [
+                                            {
+                                                "passengerType": "ADULT",
+                                                "passengerOrdinal": 1,
+                                                "sourceType": "traveler_profile",
+                                            }
+                                        ],
+                                    },
+                                    "id": "call-readiness-1",
+                                }
+                            ],
+                        )
+                    ]
+                }
+            },
+        }
         # Raw tool input with sensitive information must NOT leak
         yield {
             "event": "on_tool_start",
@@ -300,6 +432,22 @@ async def test_runner_check_booking_readiness_sanitized_and_action_required():
             "event": "on_tool_end",
             "name": "check_booking_readiness",
             "data": {"output": raw_readiness},
+        }
+        yield {
+            "event": "on_chain_end",
+            "name": "tools",
+            "data": {
+                "output": {
+                    "messages": [
+                        ToolMessage(
+                            content=json.dumps(validated_readiness),
+                            tool_call_id="call-readiness-1",
+                            name="check_booking_readiness",
+                            additional_kwargs={"guardrail_validated": True},
+                        )
+                    ]
+                }
+            },
         }
 
     mock_graph.astream_events = mock_astream_events
@@ -335,9 +483,69 @@ async def test_runner_check_booking_readiness_sanitized_and_action_required():
     assert act_required[0].data.scope == "DOMESTIC"
     assert act_required[0].data.passengers is not None
     assert act_required[0].data.passengers[0]["passengerType"] == "ADULT"
+    assert "raw-callback-must-not-drive-action" not in repr(events)
 
     # Queue lease released upon action required
     mock_queue.release.assert_awaited_once_with("session-456", "req-1")
+
+
+@pytest.mark.asyncio
+async def test_runner_tool_block_emits_static_guardrail_error_without_raw_callbacks():
+    mock_client = MagicMock()
+    mock_client.get_memory = AsyncMock(return_value={"recentMessages": [], "summary": None})
+    mock_client.create_message_batch = AsyncMock(return_value={"messages": []})
+
+    mock_queue = MagicMock()
+    mock_queue.acquire = AsyncMock(return_value="req-block")
+    mock_queue.get_fence = MagicMock(return_value=1)
+    mock_queue.validate_active_fence = AsyncMock(return_value=True)
+    mock_queue.release = AsyncMock()
+
+    mock_graph = MagicMock()
+
+    async def mock_astream_events(*args, **kwargs):
+        yield {
+            "event": "on_tool_start",
+            "name": "search_flights",
+            "data": {"input": {"secret": "raw callback must not publish"}},
+        }
+        yield {
+            "event": "on_chain_end",
+            "name": "tools",
+            "data": {
+                "output": {
+                    "tool_blocked": True,
+                    "tool_block_response_key": "GUARDRAIL_TOOL_PII",
+                }
+            },
+        }
+
+    mock_graph.astream_events = mock_astream_events
+    runner = ChatTurnRunner(
+        graph=mock_graph,
+        queue_manager=mock_queue,
+        client_factory=lambda **kwargs: mock_client,
+        redis_client=MagicMock(),
+    )
+
+    events = [
+        event
+        async for event in runner.run(
+            ChatTurnCommand(
+                user_id="user-123",
+                session_id="session-block",
+                message="Search safely",
+                token="mock_token",
+            )
+        )
+    ]
+
+    assert not [event for event in events if isinstance(event, ToolCallEvent)]
+    errors = [event for event in events if isinstance(event, ErrorEvent)]
+    assert len(errors) == 1
+    assert errors[0].data.code == "GUARDRAIL_TOOL_PII"
+    assert errors[0].data.message == "Tool execution was blocked for safety reasons."
+    assert "raw callback must not publish" not in repr(events)
 
 
 @pytest.mark.asyncio

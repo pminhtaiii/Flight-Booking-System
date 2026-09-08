@@ -8,7 +8,7 @@ Validates:
 
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Dict, List
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
@@ -22,7 +22,7 @@ from agent.graph.nodes import custom_tool_node, final_answer_node
 from agent.graph.state import AgentState
 from agent.guardrails.base import GUARDRAIL_TOOL_SCHEMA, TurnCapabilities
 from agent.guardrails.gateway import GuardrailGateway
-from agent.guardrails.registry import GuardrailRegistry
+from agent.guardrails.registry import GuardrailRegistry, create_production_registry
 from agent.models.requests import RouteDecision
 from agent.tools.registry import (
     get_tools,
@@ -161,6 +161,14 @@ class _CapturingModel:
 
 class TestCapabilitySealingTruthTable:
     """Truth table verification: intent, gate, provenance, and flags -> sealed tools."""
+
+    @pytest.fixture(autouse=True)
+    def enable_multi_agent_for_truth_table(self) -> Any:
+        """Truth-table cases exercise enabled routing unless a case overrides the flag."""
+        with patch("agent.config.get_settings") as settings:
+            settings.return_value.FEATURE_FLAG_CHAT_MULTI_AGENT = True
+            settings.return_value.ROUTER_CONFIDENCE_THRESHOLD = 0.7
+            yield
 
     @pytest.mark.asyncio
     async def test_general_intent_seals_empty_tool_tuple(self) -> None:
@@ -336,6 +344,40 @@ class TestCapabilitySealingTruthTable:
         assert "turn_capabilities" in result_unknown
         caps_unknown: TurnCapabilities = result_unknown["turn_capabilities"]
         assert caps_unknown.sealed_tools == (), "Unknown intent must seal empty tools ()"
+        assert result_unknown["route"] == "general"
+        assert result_unknown["safe_clarification"] == (
+            "I couldn't safely determine what you need. Please ask me to search flights, "
+            "review a booking, or explain a travel question."
+        )
+
+    @pytest.mark.asyncio
+    async def test_router_parse_failure_uses_static_clarification_without_search_authority(
+        self,
+    ) -> None:
+        """A structured-output parsing failure cannot silently become SEARCH authority."""
+
+        class _BrokenStructuredRouter:
+            def with_structured_output(self, _schema: object) -> "_BrokenStructuredRouter":
+                return self
+
+            async def ainvoke(self, *_args: object, **_kwargs: object) -> object:
+                raise ValueError("malformed router payload")
+
+        state: AgentState = {"messages": [HumanMessage(content="Do the thing")]}
+        with patch("agent.graph.router.get_chat_model", return_value=_BrokenStructuredRouter()):
+            result = await router_node(state)
+
+        caps: TurnCapabilities = result["turn_capabilities"]
+        assert caps.sealed_tools == ()
+        assert result["route"] == "general"
+        assert result["safe_clarification"].startswith("I couldn't safely determine")
+
+        with patch(
+            "agent.agents.general_agent.get_chat_model",
+            side_effect=AssertionError("static clarification must not call a model"),
+        ):
+            response = await general_agent_node(result, {})
+        assert response["messages"][0].content == result["safe_clarification"]
 
     @pytest.mark.asyncio
     async def test_missing_or_forged_provenance_denies_tools(self) -> None:
@@ -524,14 +566,6 @@ class TestWholeBatchDenialRule:
             "turn_capabilities": caps,
         }
 
-        async def spy_search(*args: Any, **kwargs: Any) -> Dict[str, Any]:
-            invocations.append("search_flights")
-            return {"results": []}
-
-        async def spy_signal(*args: Any, **kwargs: Any) -> Dict[str, Any]:
-            invocations.append("signal_checkout_intent")
-            return {"status": "signaled"}
-
         config = {
             "configurable": {
                 "guardrail_gateway": GuardrailGateway(GuardrailRegistry()),
@@ -541,14 +575,11 @@ class TestWholeBatchDenialRule:
             }
         }
 
-        with patch("agent.graph.nodes.prebuilt_tool_node.ainvoke") as mock_tool_node:
-
-            async def _spy_ainvoke(*args: Any, **kwargs: Any) -> Dict[str, Any]:
-                invocations.append("prebuilt_tool_node_invoked")
-                return {"messages": []}
-
-            mock_tool_node.side_effect = _spy_ainvoke
+        # User-authorized correction (2026-09-08): assert the registered-tool
+        # resolver is never reached after whole-batch authorization rejects.
+        with patch("agent.graph.nodes.get_tool_by_name") as resolve_tool:
             await custom_tool_node(state, config)
+        resolve_tool.assert_not_called()
 
         assert len(invocations) == 0, (
             f"Whole batch denial violated: {invocations} were invoked when batch contained forbidden tool"
@@ -597,14 +628,11 @@ class TestWholeBatchDenialRule:
             }
         }
 
-        with patch("agent.graph.nodes.prebuilt_tool_node.ainvoke") as mock_tool_node:
-
-            async def _spy_ainvoke(*args: Any, **kwargs: Any) -> Dict[str, Any]:
-                invocations.append("prebuilt_tool_node_invoked")
-                return {"messages": []}
-
-            mock_tool_node.side_effect = _spy_ainvoke
+        # User-authorized correction (2026-09-08): forged names are rejected
+        # before registry resolution or any tool invocation.
+        with patch("agent.graph.nodes.get_tool_by_name") as resolve_tool:
             await custom_tool_node(state, config)
+        resolve_tool.assert_not_called()
 
         assert len(invocations) == 0, (
             f"Whole batch denial violated: {invocations} were invoked when batch contained forged tool name"
@@ -690,18 +718,60 @@ class TestWholeBatchDenialRule:
             }
         }
 
-        with patch("agent.graph.nodes.prebuilt_tool_node.ainvoke") as mock_tool_node:
-
-            async def _spy_ainvoke(*args: Any, **kwargs: Any) -> Dict[str, Any]:
-                invocations.append("prebuilt_tool_node_invoked")
-                return {"messages": []}
-
-            mock_tool_node.side_effect = _spy_ainvoke
+        # User-authorized correction (2026-09-08): checkout batches cannot
+        # resolve a travel tool when whole-batch authorization fails.
+        with patch("agent.graph.nodes.get_tool_by_name") as resolve_tool:
             await custom_tool_node(state, config)
+        resolve_tool.assert_not_called()
 
         assert len(invocations) == 0, (
             f"Whole batch denial violated in checkout turn: {invocations} were invoked"
         )
+
+    @pytest.mark.asyncio
+    async def test_direct_checkout_tool_receives_injected_state_and_publishes_validated_signal(
+        self,
+    ) -> None:
+        """The gateway executor must preserve InjectedState semantics without ToolNode."""
+        caps = TurnCapabilities(
+            intent="CHECKOUT",
+            provenance="trusted_router",
+            sealed_tools=CHECKOUT_TOOL_NAMES,
+        )
+        state: AgentState = {
+            "messages": [
+                AIMessage(
+                    content="",
+                    tool_calls=[
+                        {
+                            "name": "signal_checkout_intent",
+                            "args": {"offer_index": 1},
+                            "id": "call-checkout-state-injection",
+                        }
+                    ],
+                )
+            ],
+            "trusted_snapshot": {"results": [{"offerIndex": 1}]},
+            "turn_capabilities": caps,
+        }
+        config = {
+            "callbacks": [MagicMock()],
+            "configurable": {
+                "guardrail_gateway": GuardrailGateway(create_production_registry()),
+                "thread_id": "session-checkout-state-injection",
+                "user_id": "user-checkout-state-injection",
+            },
+        }
+
+        result = await custom_tool_node(state, config)
+
+        assert result["signal"] == {
+            "intent": "checkout",
+            "offer_index": 1,
+            "selected_index": 1,
+        }
+        assert result["messages"][0].content == "Checkout intent registered successfully."
+        assert result["messages"][0].additional_kwargs["guardrail_validated"] is True
 
 
 # ===========================================================================

@@ -89,15 +89,18 @@ def _format_explanation(explanation: Any) -> str:
             cleaned = explanation.strip()
             if cleaned.startswith("•"):
                 cleaned = cleaned.lstrip("•").strip()
-            return cleaned or "Matches search criteria"
-
-        if not isinstance(explanation, dict):
+            if cleaned.startswith(("match.", "constraint.")):
+                key = cleaned
+                params = {}
+            else:
+                return cleaned or "Matches search criteria"
+        elif isinstance(explanation, dict):
+            key = explanation.get("key")
+            params = explanation.get("params") or {}
+            if not isinstance(params, dict):
+                params = {}
+        else:
             return "Matches search criteria"
-
-        key = explanation.get("key")
-        params = explanation.get("params") or {}
-        if not isinstance(params, dict):
-            params = {}
 
         if key == "match.price.below_median":
             percent = params.get("percentDiff") or params.get("percentBelow")

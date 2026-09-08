@@ -25,10 +25,28 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Security Systems (Feature 023) — Phase 4 Slice 1 (Tasks T021–T023) complete
-**Last completed:** Tasks T021–T023: Tool Result Boundary & Pre-State Exposure Tests (T021), Strict 6-Tool Schema & Signal Forgery Tests (T022), and Exhaustive Intent vs Tool Authority Table Tests (T023). All test suites created, ruff checks passing cleanly (exit 0), RED verified across all suites as expected before T024–T028 implementation.
-**In progress:** Phase 4 US2: Constrain Tool Authority and Results.
-**Next:** T024: Implement SizeStructureValidator, SchemaValidator, PIIScanner and UntrustedContentInjectionDetector in `apps/agent/src/agent/guardrails/tool_output_pipeline.py`.
+**Feature:** Security Systems (Feature 023) — Phase 4 Slice 2 (Tasks T024–T025, T053) complete
+**Last completed:** Phase 4 Slice 2: Implemented 4-layer tool output guardrail pipeline, strict minimized tool schemas, bounded 64 KiB streamed response reader with pre-parse depth <= 5 checks, NestJS agent-gateway shallow projections (depth <= 5 for search and readiness), readiness harmonization for runner ACTION_REQUIRED, and payload-free exception logging.
+**In progress:** Phase 4 US2 executor integration.
+**Next:** Continue Phase 4 verification after T026 graph integration and review corrections.
+
+### Feature 023 — Phase 4 T026 & Review Corrections (2026-09-08)
+
+- Routed live LangGraph tool execution through sealed per-turn capabilities and the deterministic gateway: whole batches are denied before invocation if any call is unauthorized, model nodes bind only the sealed intersection, validated results alone enter graph state, and public tool-result/readiness events are derived only from validated tool-node output rather than raw callbacks.
+- Raised only the upstream structural node ceiling from 500 to 5,000 under the unchanged 64 KiB byte limit so the non-paginated 50-booking response remains usable.
+- Accepted plain-text `signal_checkout_intent` validation errors as the schema's explicit error variant while retaining JSON checkout signals.
+- Preserved flight-match explanation parameter objects across the NestJS/Python boundary. The global upstream depth ceiling remains 5; only attested V2 search uses a depth-7 allowance required by its nested `{ key, params }` projection.
+
+### Feature 023 — Security Systems: Phase 4 Slice 2 (Tasks T024–T025, T053 Completed) (2026-09-07)
+
+- T024 & T025: Implemented `ToolOutputGuardrailPipeline` with 4 deterministic layers (`SizeStructureValidator`, `SchemaValidator`, `PIIScanner`, `UntrustedContentInjectionDetector`), bounded 64 KiB streamed response reader with pre-parse raw structural limits (depth <= 5, nodes <= 500), and 12 minimized Pydantic tool models with strict validation (`extra = 'forbid'`).
+- Resolved cross-service depth-5 contract findings:
+  - Nested NestJS agent-only booking readiness projection flattened from depth 7 (`passengers -> sections -> fields`) to depth 5 (`passengers -> issues`), with `validate_booking_readiness_response` in Python supporting both `issues` and legacy `sections`.
+  - Reconstituted `sections` in `runner.py` for `ActionRequiredPayload`, preserving the public `ACTION_REQUIRED` SSE event contract and web UI expectations unchanged.
+  - Shallow `AgentFlightMatchResultDto` (`{ score, matchLevel, explanations }`) implemented in NestJS `attested-flight-search` (depth <= 5).
+  - Replaced caught exception logging in `booking_detail.py` and `booking_summaries.py` with payload-free static diagnostics.
+- T053: Replaced obsolete direct `httpx.AsyncClient.get()`/`.post()` mocks in `apps/agent/tests/test_nestjs_client.py` and `apps/agent/tests/test_search_snapshot.py` with an async stream context-manager helper (`StreamedResponse`) for tool-facing NestJS methods.
+- Verification: All NestJS agent-gateway tests passed (8/8 suites, 99/99 tests); all agent security, tool, and search snapshot tests passed (281/281 tests across 8 test suites); ESLint, TypeScript, and Ruff checks passed cleanly with 0 errors.
 
 ### Feature 023 — Security Systems: Phase 4 US2 (Task T022 Completed) (2026-09-06)
 

@@ -1,4 +1,4 @@
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import AIMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 
 from agent.agents.chat_agent import get_chat_model
@@ -12,9 +12,17 @@ GENERAL_PROMPT = (
     "so politely explain that you can help with those tasks if they ask directly."
 )
 
+SAFE_ROUTER_CLARIFICATION = (
+    "I couldn't safely determine what you need. Please ask me to search flights, "
+    "review a booking, or explain a travel question."
+)
+
 
 async def general_agent_node(state: AgentState, config: RunnableConfig) -> dict:
     """Call the LLM without tools bound."""
+    if state.get("safe_clarification") == SAFE_ROUTER_CLARIFICATION:
+        return {"messages": [AIMessage(content=SAFE_ROUTER_CLARIFICATION)]}
+
     model = get_chat_model()
 
     messages = list(state.get("messages", []))

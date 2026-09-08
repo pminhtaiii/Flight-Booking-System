@@ -1,7 +1,9 @@
-import type { FlightMatchResult } from '@/flight-match/flight-match.types';
-import type { AttestedFlightSearchMetaDto } from './attested-flight-search.dto';
+import type {
+  AttestedFlightSearchMetaDto,
+  AgentFlightMatchResultDto,
+} from './attested-flight-search.dto';
 
-export type { AttestedFlightSearchMetaDto };
+export type { AttestedFlightSearchMetaDto, AgentFlightMatchResultDto };
 
 export class FlightResultDto {
   airline!: string;
@@ -16,7 +18,7 @@ export class FlightResultDto {
   currency!: string; // ISO 4217 code
   fareClass?: string | null;
   baggageAllowance?: string | null;
-  matchResult?: FlightMatchResult | null;
+  matchResult?: AgentFlightMatchResultDto | null;
 }
 
 export class FlightSearchResponseDto {

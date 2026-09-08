@@ -13,6 +13,7 @@ from agent.guardrails.base import (
     ValidatedToolResult,
 )
 from agent.guardrails.registry import GuardrailRegistry
+from agent.guardrails.tool_output_pipeline import ToolOutputGuardrailPipeline
 
 
 class GuardrailGateway:
@@ -135,10 +136,7 @@ class GuardrailGateway:
                     result = await res
                 else:
                     result = res
-            return PipelineDecision(
-                status="PASS",
-                validated_data=ValidatedToolResult(tool_name=tool_name, data=result),
-            )
+            return await self.validate_tool_result(context, tool_name, result)
         except Exception:
             return PipelineDecision(
                 status="BLOCK",
@@ -146,6 +144,71 @@ class GuardrailGateway:
                 reason="Tool execution failed closed",
                 validated_data=None,
             )
+
+    async def validate_tool_result(
+        self, context: TurnCapabilities, tool_name: str, result: Any
+    ) -> PipelineDecision[ValidatedToolResult]:
+        """Validate an already-invoked result before it can enter graph state."""
+        if not isinstance(context, TurnCapabilities) or tool_name not in context.sealed_tools:
+            return PipelineDecision(
+                status="BLOCK",
+                response_key=GUARDRAIL_TOOL_SCHEMA,
+                reason="Tool result has no sealed authority",
+                validated_data=None,
+            )
+        try:
+            layers = self.registry.ordered_layers("tool")
+            if not layers:
+                return PipelineDecision(
+                    status="PASS",
+                    validated_data=ValidatedToolResult(tool_name=tool_name, data=result),
+                )
+            return await ToolOutputGuardrailPipeline(layers).validate(context, tool_name, result)
+        except Exception:
+            return PipelineDecision(
+                status="BLOCK",
+                response_key=GUARDRAIL_TOOL_SCHEMA,
+                reason="Tool output validation failed closed",
+                validated_data=None,
+            )
+
+    async def execute_tool_batch(
+        self,
+        context: TurnCapabilities,
+        calls: list[Any],
+        invokes: list[Callable[..., Any]],
+    ) -> PipelineDecision[list[ValidatedToolResult]]:
+        """Authorize the whole proposed batch before invoking any member."""
+        if not isinstance(context, TurnCapabilities) or len(calls) != len(invokes):
+            return PipelineDecision(
+                status="BLOCK",
+                response_key=GUARDRAIL_TOOL_SCHEMA,
+                reason="Invalid tool batch",
+                validated_data=None,
+            )
+        names = [
+            call.get("name") if isinstance(call, dict) else getattr(call, "name", None)
+            for call in calls
+        ]
+        if any(not name or name not in context.sealed_tools for name in names):
+            return PipelineDecision(
+                status="BLOCK",
+                response_key=GUARDRAIL_TOOL_SCHEMA,
+                reason="Tool batch contains unauthorized calls",
+                validated_data=None,
+            )
+        validated: list[ValidatedToolResult] = []
+        for call, invoke in zip(calls, invokes):
+            decision = await self.execute_tool(context, call, invoke)
+            if decision.status != "PASS" or decision.validated_data is None:
+                return PipelineDecision(
+                    status="BLOCK",
+                    response_key=decision.response_key or GUARDRAIL_TOOL_SCHEMA,
+                    reason=decision.reason,
+                    validated_data=None,
+                )
+            validated.append(decision.validated_data)
+        return PipelineDecision(status="PASS", validated_data=validated)
 
     async def stream_output(
         self,

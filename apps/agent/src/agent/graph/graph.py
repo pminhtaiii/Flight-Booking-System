@@ -1,10 +1,10 @@
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
 
+from agent import config as agent_config
 from agent.agents.checkout_orchestrator import checkout_orchestrator_node
-from agent.agents.general_agent import general_agent_node
+from agent.agents.general_agent import SAFE_ROUTER_CLARIFICATION, general_agent_node
 from agent.agents.travel_assistant import travel_assistant_node
-from agent.config import get_settings
 from agent.graph.checkout_gate import evaluate_checkout_gate
 from agent.graph.nodes import (
     create_handoff_token,
@@ -14,15 +14,40 @@ from agent.graph.nodes import (
 )
 from agent.graph.router import invoke_router
 from agent.graph.state import AgentState
+from agent.guardrails.capabilities import seal_turn_capabilities
 
 
 async def router_node(state: AgentState, config: RunnableConfig | None = None) -> dict:
-    settings = get_settings()
+    settings = agent_config.get_settings()
     if not getattr(settings, "FEATURE_FLAG_CHAT_MULTI_AGENT", True):
-        return {"route": "travel", "disambiguation": None}
-    decision = await invoke_router(state)
-    gate_result = evaluate_checkout_gate(state, decision)
-    return gate_result  # Updates 'route' and 'disambiguation' in AgentState
+        gate_result = {"route": "travel", "disambiguation": None}
+        return {
+            **gate_result,
+            "turn_capabilities": seal_turn_capabilities(None, multi_agent=False),
+        }
+    if state.get("provenance") not in (None, "trusted_router"):
+        return {
+            "route": "general",
+            "disambiguation": "none",
+            "safe_clarification": SAFE_ROUTER_CLARIFICATION,
+            "turn_capabilities": seal_turn_capabilities(
+                None, provenance=str(state.get("provenance"))
+            ),
+        }
+    try:
+        decision = await invoke_router(state)
+        if decision.intent not in {"GENERAL", "SEARCH", "BOOKING_INQUIRY", "CHECKOUT"}:
+            raise ValueError("Unsupported router intent")
+        gate_result = evaluate_checkout_gate(state, decision)
+        capabilities = seal_turn_capabilities(decision, gate_result=gate_result)
+    except Exception:
+        gate_result = {
+            "route": "general",
+            "disambiguation": "none",
+            "safe_clarification": SAFE_ROUTER_CLARIFICATION,
+        }
+        capabilities = seal_turn_capabilities(None)
+    return {**gate_result, "turn_capabilities": capabilities}
 
 
 def route_after_router(state: AgentState) -> str:
@@ -43,7 +68,7 @@ def should_continue(state: AgentState) -> str:
     if not getattr(last_message, "tool_calls", None):
         return END
 
-    settings = get_settings()
+    settings = agent_config.get_settings()
     max_iterations = getattr(settings, "AGENT_MAX_ITERATIONS", 5)
     current_iterations = state.get("iteration_count", 0)
 
@@ -53,6 +78,8 @@ def should_continue(state: AgentState) -> str:
 
 
 def route_after_tools(state: AgentState) -> str:
+    if state.get("tool_blocked"):
+        return END
     signal = state.get("signal")
     if signal and signal.get("intent") == "checkout":
         return "validate_handoff"

@@ -1,8 +1,9 @@
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import SystemMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 
 from agent.agents.chat_agent import get_chat_model
 from agent.graph.state import AgentState
+from agent.guardrails.base import TurnCapabilities
 from agent.guardrails.output_pipeline import approved_model_content, payload_free_config
 from agent.tools.registry import get_checkout_tools
 
@@ -19,10 +20,17 @@ CHECKOUT_PROMPT = (
 async def checkout_orchestrator_node(state: AgentState, config: RunnableConfig) -> dict:
     """Call the LLM with Checkout Orchestrator tools bound."""
     model = get_chat_model()
-    tools = get_checkout_tools()
+    capabilities = state.get("turn_capabilities")
+    sealed = set(capabilities.sealed_tools) if isinstance(capabilities, TurnCapabilities) else set()
+    tools = [tool for tool in get_checkout_tools() if tool.name in sealed]
     model_with_tools = model.bind_tools(tools)
 
-    messages = list(state.get("messages", []))
+    messages = [
+        message
+        for message in state.get("messages", [])
+        if not isinstance(message, ToolMessage)
+        or message.additional_kwargs.get("guardrail_validated") is True
+    ]
     has_system = any(isinstance(m, SystemMessage) for m in messages)
     if not has_system:
         messages.insert(0, SystemMessage(content=CHECKOUT_PROMPT))

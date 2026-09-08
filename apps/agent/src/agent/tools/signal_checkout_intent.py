@@ -1,13 +1,16 @@
-import json
 from typing import Annotated, Optional
 
 from langchain_core.tools import tool
 from langgraph.prebuilt import InjectedState
 
+from agent.guardrails.schemas.tools import (
+    SignalCheckoutIntentInvocation,
+    SignalCheckoutIntentToolResult,
+)
 from agent.trusted_search_snapshot import TrustedSearchSnapshotLifecycle
 
 
-@tool
+@tool("signal_checkout_intent", args_schema=SignalCheckoutIntentInvocation)
 def signal_checkout_intent(
     offer_index: Optional[int] = None,
     selected_index: Optional[int] = None,
@@ -36,7 +39,7 @@ def signal_checkout_intent(
     if idx > len(results):
         return f"Invalid offer index. Must be between 1 and {len(results)}."
 
-    return json.dumps(
+    return SignalCheckoutIntentToolResult.model_validate(
         {
             "signal": {
                 "intent": "checkout",
@@ -44,4 +47,4 @@ def signal_checkout_intent(
                 "selected_index": idx,
             }
         }
-    )
+    ).model_dump_json()
