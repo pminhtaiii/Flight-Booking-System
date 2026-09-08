@@ -439,7 +439,14 @@ class CheckoutSignalResult(_ToolSchema):
 
 
 class SignalCheckoutIntentToolResult(_ToolSchema):
-    signal: CheckoutSignalResult
+    signal: CheckoutSignalResult | None = None
+    error: str | None = None
+
+    @model_validator(mode="after")
+    def require_signal_or_error(self) -> "SignalCheckoutIntentToolResult":
+        if (self.signal is None) == (self.error is None):
+            raise ValueError("checkout signal results require exactly one result shape")
+        return self
 
 
 TOOL_INPUT_SCHEMAS: dict[str, type[_ToolSchema]] = {

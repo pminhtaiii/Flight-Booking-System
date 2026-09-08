@@ -27,6 +27,7 @@ from agent.chat_turn.events import (
     ToolResultEvent,
 )
 from agent.chat_turn.runner import ChatTurnRunner
+from agent.graph import nodes as graph_nodes
 from agent.graph.nodes import custom_tool_node
 from agent.guardrails.base import (
     GUARDRAIL_TOOL_PII,
@@ -91,6 +92,19 @@ class _CapturingModel:
         effective_config = config if config is not None else kwargs.get("config")
         self.invocations.append((messages, effective_config))
         return self.response
+
+
+class _CapturingRegisteredTool:
+    """Real tool-dispatch seam double; records only the validated invocation boundary."""
+
+    def __init__(self, name: str, result: object) -> None:
+        self.name = name
+        self.result = result
+        self.invocations: list[tuple[object, object]] = []
+
+    async def ainvoke(self, tool_input: object, config: object = None) -> object:
+        self.invocations.append((tool_input, config))
+        return self.result
 
 
 @pytest.fixture
@@ -261,7 +275,17 @@ async def test_gateway_execute_tool_passes_valid_result(
 ) -> None:
     """gateway.execute_tool passes clean, valid tool results within limits."""
     call = DummyToolCall("search_flights")
-    clean_data = {"flights": [{"id": "FL-123", "price": 250.0}]}
+    clean_data = {
+        "flights": [
+            {
+                "flight_id": "FL-123",
+                "airline": "VN",
+                "price": 250.0,
+                "origin": "SGN",
+                "destination": "HAN",
+            }
+        ]
+    }
 
     async def invoke_ok() -> dict[str, Any]:
         return clean_data
@@ -320,13 +344,14 @@ async def test_blocked_tool_result_does_not_leak_into_tool_message_or_checkpoint
         f"Flight search result: {CANARY_PII_CARD} and instructions {CANARY_INJECTION_SYSTEM}"
     )
 
-    with patch(
-        "agent.graph.nodes.prebuilt_tool_node.ainvoke",
-        return_value={
-            "messages": [ToolMessage(content=tainted_output, tool_call_id="call_leak_test_001")]
-        },
-    ):
+    direct_tool = _CapturingRegisteredTool("search_flights", tainted_output)
+    # User-authorized correction (2026-09-08): this stale contract formerly mocked
+    # ToolNode, the bypass under review. It now requires direct gateway dispatch.
+    with patch("agent.graph.nodes.get_tool_by_name", return_value=direct_tool):
         result = await custom_tool_node(state, config)
+
+    assert len(direct_tool.invocations) == 1
+    assert not hasattr(graph_nodes, "prebuilt_tool_node")
 
     # Assert that no message published to state history contains the canaries
     for msg in result.get("messages", []):
@@ -436,17 +461,16 @@ async def test_blocked_tool_result_does_not_leak_into_callback_traces(
 
     tainted_output = f"Tool output with token {CANARY_PII_TOKEN} and {CANARY_INJECTION_OVERRIDE}"
 
-    with patch(
-        "agent.graph.nodes.prebuilt_tool_node.ainvoke",
-        return_value={
-            "messages": [ToolMessage(content=tainted_output, tool_call_id="call_callback_leak_001")]
-        },
-    ) as mock_ainvoke:
+    direct_tool = _CapturingRegisteredTool("search_flights", tainted_output)
+    # User-authorized correction (2026-09-08): callbacks are checked at the
+    # registered-tool invocation boundary, before any ToolMessage can exist.
+    with patch("agent.graph.nodes.get_tool_by_name", return_value=direct_tool):
         await custom_tool_node(state, config)
 
     # 1. Assert custom_tool_node enforces payload-free policy: caller callbacks stripped
-    assert mock_ainvoke.called
-    dispatched_config = mock_ainvoke.call_args[1].get("config", {})
+    assert len(direct_tool.invocations) == 1
+    assert not hasattr(graph_nodes, "prebuilt_tool_node")
+    dispatched_config = direct_tool.invocations[0][1]
     dispatched_callbacks = (
         dispatched_config.get("callbacks") if isinstance(dispatched_config, dict) else []
     )

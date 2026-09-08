@@ -28,7 +28,14 @@ Update this file after every completed feature. Any AI agent reading this should
 **Feature:** Security Systems (Feature 023) — Phase 4 Slice 2 (Tasks T024–T025, T053) complete
 **Last completed:** Phase 4 Slice 2: Implemented 4-layer tool output guardrail pipeline, strict minimized tool schemas, bounded 64 KiB streamed response reader with pre-parse depth <= 5 checks, NestJS agent-gateway shallow projections (depth <= 5 for search and readiness), readiness harmonization for runner ACTION_REQUIRED, and payload-free exception logging.
 **In progress:** Phase 4 US2 executor integration.
-**Next:** T026: Route all graph tool execution through the gateway before any ToolMessage, state, callback, or event publication.
+**Next:** Continue Phase 4 verification after T026 graph integration and review corrections.
+
+### Feature 023 — Phase 4 T026 & Review Corrections (2026-09-08)
+
+- Routed live LangGraph tool execution through sealed per-turn capabilities and the deterministic gateway: whole batches are denied before invocation if any call is unauthorized, model nodes bind only the sealed intersection, validated results alone enter graph state, and public tool-result/readiness events are derived only from validated tool-node output rather than raw callbacks.
+- Raised only the upstream structural node ceiling from 500 to 5,000 under the unchanged 64 KiB byte limit so the non-paginated 50-booking response remains usable.
+- Accepted plain-text `signal_checkout_intent` validation errors as the schema's explicit error variant while retaining JSON checkout signals.
+- Preserved flight-match explanation parameter objects across the NestJS/Python boundary. The global upstream depth ceiling remains 5; only attested V2 search uses a depth-7 allowance required by its nested `{ key, params }` projection.
 
 ### Feature 023 — Security Systems: Phase 4 Slice 2 (Tasks T024–T025, T053 Completed) (2026-09-07)
 

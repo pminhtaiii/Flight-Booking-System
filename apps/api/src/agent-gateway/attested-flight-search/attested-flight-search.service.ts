@@ -31,18 +31,18 @@ function projectAgentMatchResult(
   matchResult: FlightMatchResult | null,
 ): AgentFlightMatchResultDto | null {
   if (!matchResult) return null;
-  const explanations: string[] = [];
+  const explanations: AgentFlightMatchResultDto['explanations'] = [];
   if (matchResult.breakdown) {
     for (const b of matchResult.breakdown) {
       if (b.explanation?.key) {
-        explanations.push(b.explanation.key);
+        explanations.push(b.explanation);
       }
     }
   }
   if (matchResult.eligibility?.violations) {
     for (const v of matchResult.eligibility.violations) {
       if (v.explanation?.key) {
-        explanations.push(v.explanation.key);
+        explanations.push(v.explanation);
       }
     }
   }

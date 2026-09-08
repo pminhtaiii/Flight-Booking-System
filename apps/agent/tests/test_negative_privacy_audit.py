@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from langchain_core.messages import AIMessage, ToolMessage
 
 from agent.memory.manager import MemoryManager
 from agent.models.events import DisplayInfo, HandoffEvent
@@ -480,6 +481,30 @@ async def test_sse_streaming_chunk_stream_simulation_scan():
     # 2. Mock graph event stream emitting tool calls, results, handoff action, and clean tokens
     async def mock_graph_events(*args, **kwargs):
         yield {
+            "event": "on_chain_end",
+            "name": "travel",
+            "data": {
+                "output": {
+                    "messages": [
+                        AIMessage(
+                            content="",
+                            tool_calls=[
+                                {
+                                    "name": "search_flights",
+                                    "args": {
+                                        "origin": "SGN",
+                                        "destination": "HAN",
+                                        "date": "2026-10-15",
+                                    },
+                                    "id": "call-search-privacy",
+                                }
+                            ],
+                        )
+                    ]
+                }
+            },
+        }
+        yield {
             "event": "on_tool_start",
             "name": "search_flights",
             "data": {"input": {"origin": "SGN", "destination": "HAN"}},
@@ -488,6 +513,45 @@ async def test_sse_streaming_chunk_stream_simulation_scan():
             "event": "on_tool_end",
             "name": "search_flights",
             "data": {"output": {"status": "success", "count": 1}},
+        }
+        yield {
+            "event": "on_chain_end",
+            "name": "tools",
+            "data": {
+                "output": {
+                    "messages": [
+                        ToolMessage(
+                            content=json.dumps({"status": "success", "count": 1}),
+                            tool_call_id="call-search-privacy",
+                            name="search_flights",
+                            additional_kwargs={"guardrail_validated": True},
+                        )
+                    ]
+                }
+            },
+        }
+        yield {
+            "event": "on_chain_end",
+            "name": "travel",
+            "data": {
+                "output": {
+                    "messages": [
+                        AIMessage(
+                            content="",
+                            tool_calls=[
+                                {
+                                    "name": "check_booking_readiness",
+                                    "args": {
+                                        "flight_offer_id": "flight-offer-local-uuid-1234",
+                                        "passengers": [],
+                                    },
+                                    "id": "call-readiness-privacy",
+                                }
+                            ],
+                        )
+                    ]
+                }
+            },
         }
         yield {
             "event": "on_tool_start",
@@ -503,6 +567,29 @@ async def test_sse_streaming_chunk_stream_simulation_scan():
                     "scope": "DOMESTIC",
                     "nextAction": "CONTINUE_CHECKOUT",
                     "passengers": [],
+                }
+            },
+        }
+        yield {
+            "event": "on_chain_end",
+            "name": "tools",
+            "data": {
+                "output": {
+                    "messages": [
+                        ToolMessage(
+                            content=json.dumps(
+                                {
+                                    "ready": True,
+                                    "scope": "DOMESTIC",
+                                    "nextAction": "CONTINUE_CHECKOUT",
+                                    "passengers": [],
+                                }
+                            ),
+                            tool_call_id="call-readiness-privacy",
+                            name="check_booking_readiness",
+                            additional_kwargs={"guardrail_validated": True},
+                        )
+                    ]
                 }
             },
         }

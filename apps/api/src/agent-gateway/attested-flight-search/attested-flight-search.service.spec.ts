@@ -1139,9 +1139,14 @@ describe('AttestedFlightSearchService', () => {
           expect(response.results[0].matchResult).toEqual({
             score: mockMatchResult.score,
             matchLevel: mockMatchResult.matchLevel,
-            explanations: ['match.price.below_median'],
+            explanations: [
+              {
+                key: 'match.price.below_median',
+                params: { currency: 'USD', difference: 20 },
+              },
+            ],
           });
-          expect(getJsonDepth(response)).toBeLessThanOrEqual(5);
+          expect(getJsonDepth(response)).toBeLessThanOrEqual(7);
         });
 
         it('serializes RANKED response with mode: RANKED, matchResult: null, and scoringVersion: null in meta', async () => {

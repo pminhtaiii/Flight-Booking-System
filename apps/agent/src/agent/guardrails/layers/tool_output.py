@@ -242,7 +242,7 @@ class SchemaValidator(BaseGuardrailLayer):
             try:
                 raw_value = json.loads(raw_value)
             except json.JSONDecodeError:
-                return _block_schema("Tool result is not valid JSON")
+                raw_value = {"error": raw_value}
 
         raw_value = _project_registered_fields(schema, raw_value)
 

@@ -265,6 +265,16 @@ async def test_nestjs_client_post_gateway_flights_search_v2():
                     "currency": "USD",
                     "fareClass": "economy",
                     "baggageAllowance": "1 checked bag",
+                    "matchResult": {
+                        "score": 88,
+                        "matchLevel": "STRONG",
+                        "explanations": [
+                            {
+                                "key": "match.price.below_median",
+                                "params": {"currency": "USD", "difference": 20},
+                            }
+                        ],
+                    },
                 }
             ],
         },
@@ -305,6 +315,10 @@ async def test_nestjs_client_post_gateway_flights_search_v2():
 
         assert "selectionAttestation" in result
         assert result["snapshotVersion"] == 3
+        assert result["results"][0]["matchResult"]["explanations"][0]["params"] == {
+            "currency": "USD",
+            "difference": 20,
+        }
 
 
 @pytest.mark.asyncio

@@ -633,3 +633,25 @@ async def test_schema_projection_leaves_modelled_injection_for_the_dedicated_det
 
     detected = await detector.check(turn_capabilities, projected.validated_data)
     assert detected.status == "BLOCK"
+
+
+@pytest.mark.asyncio
+async def test_checkout_signal_plain_text_error_passes_as_safe_error_result(
+    turn_capabilities: TurnCapabilities,
+) -> None:
+    """Legitimate checkout validation errors are not JSON and must remain usable tool results."""
+    from agent.guardrails.layers.tool_output import SchemaValidator, ToolOutput
+
+    decision = await SchemaValidator().check(
+        turn_capabilities,
+        ToolOutput(
+            tool_name="signal_checkout_intent",
+            data="No search results available. Please perform a search first.",
+        ),
+    )
+
+    assert decision.status == "PASS"
+    assert decision.validated_data is not None
+    assert decision.validated_data.data == {
+        "error": "No search results available. Please perform a search first."
+    }

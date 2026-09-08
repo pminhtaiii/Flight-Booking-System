@@ -57,8 +57,9 @@ async def test_bounded_reader_rejects_decompressed_expansion() -> None:
     "body",
     [
         b'{"a":{"b":{"c":{"d":{"e":{"f":1}}}}}}',
-        (b"{" + b",".join(f'"k{i}":0'.encode() for i in range(501)) + b"}"),
+        (b"{" + b",".join(f'"k{i}":0'.encode() for i in range(5_001)) + b"}"),
     ],
+    ids=("depth", "nodes"),
 )
 async def test_bounded_reader_rejects_raw_structure_before_json_decode(body: bytes) -> None:
     """Depth and node overflows must never reach the recursive JSON decoder."""
@@ -89,3 +90,25 @@ async def test_bounded_reader_rejects_malformed_raw_structure_before_json_decode
             await read_bounded_json(response)
 
     decode.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_bounded_reader_accepts_fifty_booking_summaries_within_byte_limit() -> None:
+    """A valid unpaginated booking history must not trip the generic JSON node ceiling."""
+    booking = {
+        "bookingReference": "bkref_1234567890abcdef",
+        "status": "CONFIRMED",
+        "airline": "VN",
+        "origin": "SGN",
+        "destination": "HAN",
+        "departureAt": "2026-10-01T01:00:00Z",
+        "arrivalAt": "2026-10-01T03:00:00Z",
+        "durationMinutes": 120,
+        "stopCount": 0,
+    }
+    body = json.dumps({"bookings": [booking for _ in range(50)]}).encode("utf-8")
+    assert len(body) < 65_536
+
+    response = SyntheticResponse([body])
+
+    assert await read_bounded_json(response) == {"bookings": [booking for _ in range(50)]}

@@ -3,17 +3,18 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
-from langgraph.prebuilt import ToolNode
 
 from agent.agents.chat_agent import get_chat_model
 from agent.agents.travel_assistant import TRAVEL_PROMPT
 from agent.config import get_settings
 from agent.graph.state import AgentState
+from agent.guardrails.base import GUARDRAIL_TOOL_SCHEMA, TurnCapabilities
+from agent.guardrails.gateway import GuardrailGateway
 from agent.guardrails.output_pipeline import approved_model_content, payload_free_config
 from agent.tools.base import get_nestjs_client
-from agent.tools.registry import get_tools
+from agent.tools.registry import get_tool_by_name
 from agent.trusted_search_snapshot import (
     ResolvedOfferSelection,
     TrustedSearchResult,
@@ -48,37 +49,76 @@ async def final_answer_node(state: AgentState, config: RunnableConfig) -> dict:
     )
 
 
-# Create the prebuilt ToolNode
-prebuilt_tool_node = ToolNode(get_tools())
-
-
 async def custom_tool_node(state: AgentState, config: RunnableConfig) -> dict:
-    """Execute prebuilt ToolNode, parse signals from tool messages, and increment iteration count."""
-    result = await prebuilt_tool_node.ainvoke(state, config=config)
+    """Execute an authorized batch and publish only gateway-validated tool results."""
     current_iter = state.get("iteration_count") or 0
-
     update_dict = {"iteration_count": current_iter + 1}
 
-    if isinstance(result, dict) and "messages" in result:
-        messages = result["messages"]
-        update_dict["messages"] = messages
+    configurable = config.get("configurable", {}) if isinstance(config, dict) else {}
+    gateway = configurable.get("guardrail_gateway") if isinstance(configurable, dict) else None
+    capabilities = state.get("turn_capabilities")
+    if capabilities is None:
+        capabilities = (
+            configurable.get("turn_capabilities") if isinstance(configurable, dict) else None
+        )
+    messages_in = state.get("messages", [])
+    calls = list(getattr(messages_in[-1], "tool_calls", []) or []) if messages_in else []
+    if not isinstance(gateway, GuardrailGateway) or not isinstance(capabilities, TurnCapabilities):
+        update_dict["tool_blocked"] = True
+        update_dict["tool_block_response_key"] = GUARDRAIL_TOOL_SCHEMA
+        return update_dict
+    if not calls:
+        return update_dict
 
-        # Parse signal from ToolMessage if present
-        for msg in messages:
-            if hasattr(msg, "content") and isinstance(msg.content, str):
-                try:
-                    data = json.loads(msg.content)
-                    if isinstance(data, dict) and "signal" in data:
-                        update_dict["signal"] = data["signal"]
-                        # Mask the content so the LLM sees a natural response
-                        msg.content = "Checkout intent registered successfully."
-                except json.JSONDecodeError:
-                    logger.debug("non_json_tool_message_ignored")
-    elif isinstance(result, list):
-        update_dict["messages"] = result
-    else:
-        # Fallback if ToolNode returns something else
-        update_dict.update(result)
+    safe_config = payload_free_config(config)
+
+    def build_invoke(call: Any):
+        async def invoke() -> Any:
+            name = call.get("name") if isinstance(call, dict) else getattr(call, "name", None)
+            tool = get_tool_by_name(str(name))
+            raw_args = call.get("args", {}) if isinstance(call, dict) else getattr(call, "args", {})
+            tool_args = dict(raw_args) if isinstance(raw_args, dict) else {}
+            model_fields = getattr(getattr(tool, "args_schema", None), "model_fields", {})
+            if "state" in model_fields:
+                tool_args["state"] = dict(state)
+            return await tool.ainvoke(tool_args, config=safe_config)
+
+        return invoke
+
+    decision = await gateway.execute_tool_batch(
+        capabilities,
+        calls,
+        [build_invoke(call) for call in calls],
+    )
+    if decision.status != "PASS" or decision.validated_data is None:
+        update_dict["tool_blocked"] = True
+        update_dict["tool_block_response_key"] = decision.response_key or GUARDRAIL_TOOL_SCHEMA
+        return update_dict
+
+    messages = []
+    for call, validated in zip(calls, decision.validated_data):
+        data = validated.data
+        content = data if isinstance(data, str) else json.dumps(data, ensure_ascii=False)
+        call_id = call.get("id", "") if isinstance(call, dict) else getattr(call, "id", "")
+        messages.append(
+            ToolMessage(
+                content=content,
+                tool_call_id=call_id,
+                name=validated.tool_name,
+                additional_kwargs={"guardrail_validated": True},
+            )
+        )
+    update_dict["messages"] = messages
+
+    for msg in messages:
+        if isinstance(msg.content, str):
+            try:
+                data = json.loads(msg.content)
+                if isinstance(data, dict) and "signal" in data:
+                    update_dict["signal"] = data["signal"]
+                    msg.content = "Checkout intent registered successfully."
+            except json.JSONDecodeError:
+                logger.debug("non_json_tool_message_ignored")
 
     return update_dict
 

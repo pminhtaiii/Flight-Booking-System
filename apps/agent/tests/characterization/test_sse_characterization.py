@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import jwt
 import pytest
-from langchain_core.messages import AIMessageChunk, HumanMessage
+from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage, ToolMessage
 from pydantic import BaseModel, ConfigDict
 
 from agent.main import app
@@ -413,17 +413,55 @@ class TestSSESequenceOrdering:
                 "event": "on_chat_model_stream",
                 "data": {"chunk": AIMessageChunk(content="flights to Tokyo...")},
             }
-            # 2. tool_call event
+            # 2. The model node records the pending call. Publication waits
+            # for its gateway-validated ToolMessage from the tools node.
             yield {
-                "event": "on_tool_start",
-                "name": "search_flights",
-                "data": {"input": {"origin": "SGN", "destination": "NRT", "date": "2026-09-10"}},
+                "event": "on_chain_end",
+                "name": "travel",
+                "data": {
+                    "output": {
+                        "messages": [
+                            AIMessage(
+                                content="",
+                                tool_calls=[
+                                    {
+                                        "name": "search_flights",
+                                        "args": {
+                                            "origin": "SGN",
+                                            "destination": "NRT",
+                                            "date": "2026-09-10",
+                                        },
+                                        "id": "call-search-sequence",
+                                    }
+                                ],
+                            )
+                        ]
+                    }
+                },
             }
             # 3. tool_result and flight_results events
             yield {
                 "event": "on_tool_end",
                 "name": "search_flights",
                 "data": {"output": "Found 1 flight from SGN to NRT"},
+            }
+            # User-authorized contract correction (2026-09-08): only the
+            # gateway-validated tools-node output may drive public result events.
+            yield {
+                "event": "on_chain_end",
+                "name": "tools",
+                "data": {
+                    "output": {
+                        "messages": [
+                            ToolMessage(
+                                content=json.dumps({"status": "found", "count": 1}),
+                                tool_call_id="call-search-sequence",
+                                name="search_flights",
+                                additional_kwargs={"guardrail_validated": True},
+                            )
+                        ]
+                    }
+                },
             }
             # 4. ACTION_HANDOFF event
             yield {
@@ -547,9 +585,24 @@ class TestSSESequenceOrdering:
                 "data": {"chunk": AIMessageChunk(content="Checking readiness...")},
             }
             yield {
-                "event": "on_tool_start",
-                "name": "check_booking_readiness",
-                "data": {"input": {"message": "Checking booking readiness..."}},
+                "event": "on_chain_end",
+                "name": "checkout",
+                "data": {
+                    "output": {
+                        "messages": [
+                            AIMessage(
+                                content="",
+                                tool_calls=[
+                                    {
+                                        "name": "check_booking_readiness",
+                                        "args": {"message": "Checking booking readiness..."},
+                                        "id": "call-readiness-sequence",
+                                    }
+                                ],
+                            )
+                        ]
+                    }
+                },
             }
             yield {
                 "event": "on_tool_end",
@@ -580,6 +633,46 @@ class TestSSESequenceOrdering:
                             ],
                         }
                     )
+                },
+            }
+            yield {
+                "event": "on_chain_end",
+                "name": "tools",
+                "data": {
+                    "output": {
+                        "messages": [
+                            ToolMessage(
+                                content=json.dumps(
+                                    {
+                                        "ready": False,
+                                        "nextAction": "COMPLETE_PROFILE",
+                                        "scope": "INTERNATIONAL",
+                                        "passengers": [
+                                            {
+                                                "passengerType": "ADULT",
+                                                "passengerOrdinal": 1,
+                                                "sections": [
+                                                    {
+                                                        "name": "identity",
+                                                        "fields": [
+                                                            {
+                                                                "name": "passportNumber",
+                                                                "status": "missing",
+                                                                "reason": "REQUIRED",
+                                                            }
+                                                        ],
+                                                    }
+                                                ],
+                                            }
+                                        ],
+                                    }
+                                ),
+                                tool_call_id="call-readiness-sequence",
+                                name="check_booking_readiness",
+                                additional_kwargs={"guardrail_validated": True},
+                            )
+                        ]
+                    }
                 },
             }
 
@@ -672,6 +765,22 @@ class TestSSEFailureFinalization:
                     "event": "on_tool_end",
                     "name": "check_booking_readiness",
                     "data": {"output": json.dumps({"error": "invalid response"})},
+                }
+                yield {
+                    "event": "on_chain_end",
+                    "name": "tools",
+                    "data": {
+                        "output": {
+                            "messages": [
+                                ToolMessage(
+                                    content=json.dumps({"error": "invalid response"}),
+                                    tool_call_id="call-readiness-invalid",
+                                    name="check_booking_readiness",
+                                    additional_kwargs={"guardrail_validated": True},
+                                )
+                            ]
+                        }
+                    },
                 }
             elif failure_mode == "HANDOFF_FAILED":
                 yield {

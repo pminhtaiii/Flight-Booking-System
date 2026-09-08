@@ -16,38 +16,37 @@ chat_telemetry = ChatTelemetry(logger)
 async def invoke_router(state: AgentState) -> RouteDecision:
     """
     Invoke the Intent Router model to classify the user's latest message.
-    Returns a strict RouteDecision, falling back to Travel Assistant (SEARCH intent)
-    if the output is malformed, unknown, or has low confidence for a non-checkout message.
+    Returns a strict RouteDecision. Missing input and malformed output are surfaced
+    so the graph can fail closed; low-confidence non-checkout input is routed to
+    Travel Assistant while retaining its low-confidence provenance.
     """
     messages = state.get("messages", [])
     if not messages:
-        decision = RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False)
         chat_telemetry.emit_safely(
             "router_decision",
             status="fallback",
             fields={
-                "intent": decision.intent,
-                "confidence_bucket": "high",
+                "intent": "UNKNOWN",
+                "confidence_bucket": "unknown",
                 "outcome": "empty_state",
             },
         )
-        return decision
+        raise RuntimeError("Router input rejected")
 
     last_message = messages[-1]
 
     # We only route HumanMessages.
     if last_message.type != "human":
-        decision = RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False)
         chat_telemetry.emit_safely(
             "router_decision",
             status="fallback",
             fields={
-                "intent": decision.intent,
-                "confidence_bucket": "high",
+                "intent": "UNKNOWN",
+                "confidence_bucket": "unknown",
                 "outcome": "non_human_message",
             },
         )
-        return decision
+        raise RuntimeError("Router input rejected")
 
     model = get_chat_model()
     router_model = model.with_structured_output(RouteDecision)
@@ -65,17 +64,16 @@ async def invoke_router(state: AgentState) -> RouteDecision:
         )
     except Exception:
         logger.warning("router_output_rejected")
-        decision = RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False)
         chat_telemetry.emit_safely(
             "router_decision",
             status="fallback",
             fields={
-                "intent": decision.intent,
-                "confidence_bucket": "high",
+                "intent": "UNKNOWN",
+                "confidence_bucket": "unknown",
                 "outcome": "malformed_output",
             },
         )
-        return decision
+        raise RuntimeError("Router output rejected") from None
 
     # Check for low confidence fallback
     # The requirement says: "Given low confidence for a non-checkout message... fallback to Travel Assistant"
@@ -84,7 +82,11 @@ async def invoke_router(state: AgentState) -> RouteDecision:
         logger.info(
             "Low confidence router decision for non-checkout message, falling back to SEARCH"
         )
-        fallback = RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False)
+        fallback = RouteDecision(
+            intent="SEARCH",
+            confidence=decision.confidence,
+            isCommitment=False,
+        )
         chat_telemetry.emit_safely(
             "router_decision",
             status="fallback",

@@ -5,6 +5,8 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 
 from agent.graph.graph import graph
+from agent.guardrails.gateway import GuardrailGateway
+from agent.guardrails.registry import create_production_registry
 from agent.models.requests import RouteDecision
 from agent.tools.nestjs_client import NestJSClient
 
@@ -22,6 +24,11 @@ def mock_nestjs_client():
 
 
 @pytest.fixture
+def guardrail_gateway() -> GuardrailGateway:
+    return GuardrailGateway(create_production_registry())
+
+
+@pytest.fixture
 def mock_llm():
     mock_model = MagicMock()
     mock_model.ainvoke = AsyncMock()
@@ -34,7 +41,7 @@ def mock_llm():
 
 
 @pytest.mark.asyncio
-async def test_graph_search_flights_integration(mock_nestjs_client, mock_llm):
+async def test_graph_search_flights_integration(mock_nestjs_client, mock_llm, guardrail_gateway):
     mock_model, mock_model_with_tools = mock_llm
 
     # Setup NestJS client mock response in V2 MATCHED format
@@ -107,6 +114,9 @@ async def test_graph_search_flights_integration(mock_nestjs_client, mock_llm):
             "nestjs_client": mock_nestjs_client,
             "thread_id": "test_thread_1",
             "user_id": "user1",
+            # User-authorized correction (2026-09-08): direct graph integration
+            # tests now provide the mandatory production security boundary.
+            "guardrail_gateway": guardrail_gateway,
         },
         configurable_keys=["nestjs_client", "thread_id", "user_id"],
     )
@@ -141,7 +151,9 @@ async def test_graph_search_flights_integration(mock_nestjs_client, mock_llm):
 
 
 @pytest.mark.asyncio
-async def test_graph_get_user_preferences_integration(mock_nestjs_client, mock_llm):
+async def test_graph_get_user_preferences_integration(
+    mock_nestjs_client, mock_llm, guardrail_gateway
+):
     mock_model, mock_model_with_tools = mock_llm
 
     mock_nestjs_client.get_gateway_user_preferences.return_value = {
@@ -161,7 +173,11 @@ async def test_graph_get_user_preferences_integration(mock_nestjs_client, mock_l
     ]
 
     config = RunnableConfig(
-        configurable={"nestjs_client": mock_nestjs_client, "thread_id": "test_thread_2"},
+        configurable={
+            "nestjs_client": mock_nestjs_client,
+            "thread_id": "test_thread_2",
+            "guardrail_gateway": guardrail_gateway,
+        },
         configurable_keys=["nestjs_client", "thread_id"],
     )
 
@@ -184,7 +200,9 @@ async def test_graph_get_user_preferences_integration(mock_nestjs_client, mock_l
 
 
 @pytest.mark.asyncio
-async def test_graph_list_user_booking_summaries_integration(mock_nestjs_client, mock_llm):
+async def test_graph_list_user_booking_summaries_integration(
+    mock_nestjs_client, mock_llm, guardrail_gateway
+):
     mock_model, mock_model_with_tools = mock_llm
 
     mock_nestjs_client.get_gateway_user_booking_summaries.return_value = {
@@ -212,7 +230,11 @@ async def test_graph_list_user_booking_summaries_integration(mock_nestjs_client,
     ]
 
     config = RunnableConfig(
-        configurable={"nestjs_client": mock_nestjs_client, "thread_id": "test_thread_3"},
+        configurable={
+            "nestjs_client": mock_nestjs_client,
+            "thread_id": "test_thread_3",
+            "guardrail_gateway": guardrail_gateway,
+        },
         configurable_keys=["nestjs_client", "thread_id"],
     )
 
@@ -235,7 +257,7 @@ async def test_graph_list_user_booking_summaries_integration(mock_nestjs_client,
 
 
 @pytest.mark.asyncio
-async def test_graph_out_of_bounds_query(mock_nestjs_client, mock_llm):
+async def test_graph_out_of_bounds_query(mock_nestjs_client, mock_llm, guardrail_gateway):
     mock_model, mock_model_with_tools = mock_llm
 
     # Model refuses to answer or call tools
@@ -244,7 +266,11 @@ async def test_graph_out_of_bounds_query(mock_nestjs_client, mock_llm):
     )
 
     config = RunnableConfig(
-        configurable={"nestjs_client": mock_nestjs_client, "thread_id": "test_thread_4"},
+        configurable={
+            "nestjs_client": mock_nestjs_client,
+            "thread_id": "test_thread_4",
+            "guardrail_gateway": guardrail_gateway,
+        },
         configurable_keys=["nestjs_client", "thread_id"],
     )
 
@@ -271,7 +297,7 @@ async def test_graph_out_of_bounds_query(mock_nestjs_client, mock_llm):
 
 
 @pytest.mark.asyncio
-async def test_graph_iteration_limit_capping(mock_nestjs_client, mock_llm):
+async def test_graph_iteration_limit_capping(mock_nestjs_client, mock_llm, guardrail_gateway):
     mock_model, mock_model_with_tools = mock_llm
 
     # 6 loop invocations, returning distinct AIMessage instances with unique IDs to prevent in-place overwriting in add_messages
@@ -299,7 +325,11 @@ async def test_graph_iteration_limit_capping(mock_nestjs_client, mock_llm):
     }
 
     config = RunnableConfig(
-        configurable={"nestjs_client": mock_nestjs_client, "thread_id": "test_thread_5"},
+        configurable={
+            "nestjs_client": mock_nestjs_client,
+            "thread_id": "test_thread_5",
+            "guardrail_gateway": guardrail_gateway,
+        },
         configurable_keys=["nestjs_client", "thread_id"],
     )
 

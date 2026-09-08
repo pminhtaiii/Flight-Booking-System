@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 MAX_UPSTREAM_BODY_BYTES = 65_536
 MAX_UPSTREAM_JSON_DEPTH = 5
-MAX_UPSTREAM_JSON_NODES = 500
+MAX_UPSTREAM_JSON_NODES = 5_000
 
 _JSON_NUMBER = re.compile(r"-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?")
 
@@ -183,6 +183,8 @@ def _raw_json_structure_is_within_limits(
 async def read_bounded_json(
     response: _BoundedResponse,
     max_bytes: int = MAX_UPSTREAM_BODY_BYTES,
+    max_depth: int = MAX_UPSTREAM_JSON_DEPTH,
+    max_nodes: int = MAX_UPSTREAM_JSON_NODES,
 ) -> Any:
     """Read decompressed response bytes within a fixed bound before JSON decoding."""
     content_length = response.headers.get("content-length")
@@ -203,7 +205,7 @@ async def read_bounded_json(
         chunks.append(chunk)
 
     body = b"".join(chunks)
-    if not _raw_json_structure_is_within_limits(body):
+    if not _raw_json_structure_is_within_limits(body, max_depth=max_depth, max_nodes=max_nodes):
         raise UpstreamBodyLimitError("Upstream response body exceeds structural limits")
 
     try:
@@ -630,7 +632,7 @@ class NestJSClient:
                     except (UpstreamBodyLimitError, ValueError):
                         logger.warning("flights_search_v2_error_response_unparseable")
                 response.raise_for_status()
-                return await read_bounded_json(response)
+                return await read_bounded_json(response, max_depth=7)
 
     async def search_flights_v2(
         self,
