@@ -306,6 +306,35 @@ describe('Agent Chat Gateway (E2E)', () => {
       expect(messageDb!.contentAuthTag).not.toBeNull();
     });
 
+    it('should persist an empty agent turn with a complete encrypted envelope', async () => {
+      const user = await prisma.user.create({
+        data: { email: 'empty-agent-user@example.com', password: 'password', status: 'ACTIVE' },
+      });
+
+      const claimToken = mintClaimToken(user.id, Math.floor(Date.now() / 1000));
+      const session = await prisma.chatSession.create({
+        data: { userId: user.id },
+      });
+
+      const turnRes = await request(app.getHttpServer())
+        .post(`/agent-gateway/chat/sessions/${session.id}/turns`)
+        .set('X-Agent-API-Key', apiKey)
+        .set('X-User-Claim', claimToken)
+        .send({ messages: [{ sender: 'AGENT', content: '' }] })
+        .expect(201);
+
+      expect(turnRes.body.messages).toHaveLength(1);
+      expect(turnRes.body.messages[0].content).toBe('');
+
+      const messageDb = await prisma.chatMessage.findUnique({
+        where: { id: turnRes.body.messages[0].id },
+      });
+      expect(messageDb!.contentCiphertext).toBe('');
+      expect(messageDb!.contentNonce).not.toBeNull();
+      expect(messageDb!.contentAuthTag).not.toBeNull();
+      expect(messageDb!.contentKeyVersion).toBe(1);
+    });
+
     it('should force browser writes to USER and STANDARD role/type, rejecting forged AGENT/SUMMARY', async () => {
       const user = await prisma.user.create({
         data: { email: 'browser-forge@example.com', password: 'password', status: 'ACTIVE' },

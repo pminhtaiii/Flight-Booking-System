@@ -1,10 +1,13 @@
 import asyncio
 import inspect
 import json
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from uuid import uuid4
 
 import pytest
+import redis.asyncio as redis
 from pydantic import ValidationError
 
 from agent.trusted_search_snapshot import (
@@ -664,6 +667,61 @@ async def test_create_or_replace_persists_an_owner_scoped_snapshot() -> None:
     assert created.sessionId == owner.chat_session_id
     assert created.snapshotVersion == 4
     assert await lifecycle.load_active(owner) == created
+
+
+@pytest.mark.asyncio
+@pytest.mark.redis_integration
+async def test_save_next_snapshot_uses_atomic_owner_fence_on_local_redis() -> None:
+    """The allocate-and-save primitive preserves Redis state on a stale batch."""
+
+    redis_url = os.environ.get("AGENT_TEST_REDIS_URL", "redis://127.0.0.1:6379/15")
+    client = redis.from_url(redis_url, decode_responses=True)
+    owner = SnapshotOwner(
+        user_id=f"atomic-test-{uuid4().hex}",
+        chat_session_id=f"session-{uuid4().hex}",
+    )
+    repository = TrustedSnapshotRepository(client)
+    snapshot_key = repository._get_key(owner.user_id, owner.chat_session_id)
+    version_key = repository._version_key(owner.user_id, owner.chat_session_id)
+    accepted_key = repository._accepted_key(owner.user_id, owner.chat_session_id)
+
+    try:
+        try:
+            await client.ping()
+        except Exception:
+            pytest.skip("local Redis is unavailable")
+
+        first = TrustedSearchSnapshot.model_validate(_snapshot_payload(owner, version=1))
+        assert await repository.save_next_snapshot(first) is True
+        assert await repository.get_snapshot(owner.user_id, owner.chat_session_id) == first
+
+        stale = TrustedSearchSnapshot.model_validate(
+            _snapshot_payload(
+                owner,
+                version=1,
+                results=[{**_results()[0], "flightOfferId": "stale-flight"}],
+            )
+        )
+        assert await repository.save_next_snapshot(stale) is False
+        assert await repository.get_snapshot(owner.user_id, owner.chat_session_id) == first
+        assert await client.get(version_key) == "1"
+        assert await client.get(accepted_key) == "1"
+
+        second = TrustedSearchSnapshot.model_validate(
+            _snapshot_payload(
+                owner,
+                version=2,
+                results=[{**_results()[0], "flightOfferId": "second-flight"}],
+            )
+        )
+        assert await repository.save_next_snapshot(second) is True
+        assert await repository.get_snapshot(owner.user_id, owner.chat_session_id) == second
+        assert await client.get(snapshot_key)
+        assert await client.get(version_key) == "2"
+        assert await client.get(accepted_key) == "2"
+    finally:
+        await client.delete(snapshot_key, version_key, accepted_key)
+        await client.aclose()
 
 
 @pytest.mark.asyncio

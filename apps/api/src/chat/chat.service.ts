@@ -369,7 +369,7 @@ export class ChatService {
     let contentAuthTag: string | null = null;
     let contentKeyVersion: number | null = null;
 
-    if (content) {
+    if (content !== undefined && content !== null) {
       if (!this.cryptoService.isConfigured()) {
         throw new Error('CHAT_ENCRYPTION_KEY must be configured to store chat messages');
       }
@@ -587,7 +587,7 @@ export class ChatService {
         let contentAuthTag: string | null = null;
         let contentKeyVersion: number | null = null;
 
-        if (content) {
+        if (content !== undefined && content !== null) {
           if (!this.cryptoService.isConfigured()) {
             throw new Error('CHAT_ENCRYPTION_KEY must be configured to store chat messages');
           }
