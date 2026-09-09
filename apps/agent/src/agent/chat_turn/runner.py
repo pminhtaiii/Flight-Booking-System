@@ -795,7 +795,25 @@ class ChatTurnRunner:
                                 )
                                 is True
                             ):
-                                continue
+                                _, _, err_event = await self._finalize_cleanup(
+                                    session_id=session_id,
+                                    req_id=req_id,
+                                    queue_manager=queue_manager,
+                                    client=client,
+                                    pipeline=pipeline,
+                                    partial_response=partial_response,
+                                    user_msg_content=user_msg_content,
+                                    user_msg_persisted=user_msg_persisted,
+                                    persisted=persisted,
+                                    error_code=GUARDRAIL_TOOL_SCHEMA,
+                                    error_message="Tool result was blocked for safety reasons.",
+                                )
+                                pipeline = None
+                                req_id = None
+                                released = True
+                                if err_event:
+                                    yield err_event
+                                return
 
                             tool_name = getattr(tool_message, "name", None)
                             content = tool_message.content

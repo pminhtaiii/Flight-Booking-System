@@ -72,6 +72,11 @@ async def search_flights(
     user_id = configurable.get("user_id") or "default_user"
 
     owner = SnapshotOwner(user_id=user_id, chat_session_id=thread_id)
+    snapshot_staging = configurable.get("_snapshot_staging")
+    snapshot_stage_key = configurable.get("_snapshot_stage_key")
+    defer_snapshot_persistence = isinstance(snapshot_staging, dict) and isinstance(
+        snapshot_stage_key, str
+    )
     try:
         lifecycle = _get_snapshot_lifecycle()
     except Exception as e:
@@ -81,14 +86,27 @@ async def search_flights(
         )
 
     proposed_version = 1
-    try:
-        res = lifecycle.next_version(owner)
-        allocated = await res if inspect.isawaitable(res) else res
-        if isinstance(allocated, int) and not isinstance(allocated, bool) and allocated > 0:
-            proposed_version = allocated
-    except Exception as e:
-        logger.warning("Could not allocate snapshot version: %s", str(e))
-        proposed_version = 1
+    if defer_snapshot_persistence:
+        existing_snapshot = configurable.get("trusted_snapshot")
+        if isinstance(existing_snapshot, dict):
+            existing_version = existing_snapshot.get("snapshotVersion") or existing_snapshot.get(
+                "version"
+            )
+            if (
+                isinstance(existing_version, int)
+                and not isinstance(existing_version, bool)
+                and existing_version > 0
+            ):
+                proposed_version = existing_version + 1
+    else:
+        try:
+            res = lifecycle.next_version(owner)
+            allocated = await res if inspect.isawaitable(res) else res
+            if isinstance(allocated, int) and not isinstance(allocated, bool) and allocated > 0:
+                proposed_version = allocated
+        except Exception as e:
+            logger.warning("Could not allocate snapshot version: %s", str(e))
+            proposed_version = 1
 
     try:
         search_call = getattr(client, "post_gateway_flights_search_v2", None) or getattr(
@@ -231,9 +249,16 @@ async def search_flights(
             results=snapshot_results,
         )
 
-        create_res = lifecycle.create_or_replace(owner, envelope)
-        if inspect.isawaitable(create_res):
-            await create_res
+        if defer_snapshot_persistence:
+            snapshot_staging[snapshot_stage_key] = {
+                "lifecycle": lifecycle,
+                "owner": owner,
+                "envelope": envelope,
+            }
+        else:
+            create_res = lifecycle.create_or_replace(owner, envelope)
+            if inspect.isawaitable(create_res):
+                await create_res
     except Exception as e:
         logger.error("Failed to save trusted snapshot: %s", str(e), exc_info=True)
         return _narration("I encountered an error preparing your search results. Please try again.")

@@ -25,10 +25,10 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Security Systems (Feature 023) — Phase 4 Slice 2 (Tasks T024–T025, T053) complete
-**Last completed:** Phase 4 Slice 2: Implemented 4-layer tool output guardrail pipeline, strict minimized tool schemas, bounded 64 KiB streamed response reader with pre-parse depth <= 5 checks, NestJS agent-gateway shallow projections (depth <= 5 for search and readiness), readiness harmonization for runner ACTION_REQUIRED, and payload-free exception logging.
-**In progress:** Phase 4 US2 executor integration.
-**Next:** Continue Phase 4 verification after T026 graph integration and review corrections.
+**Feature:** Security Systems (Feature 023) — Phase 4 US2 T026/T027/T028 complete
+**Last completed:** Graph-scoped search staging with atomic same-owner snapshot/fence commit, C-01 production-empty-registry fail-closed behavior, bounded owner-bound snapshot-read and commit-failure warnings, API empty-content AES-GCM compatibility, final-fix checkpoints (`349` agent tests/`1` skip, `49` literal GOAL tests, Ruff and live Redis fence green), and the post-atomic T093 flow (`1/1`, exit `0`). See [`docs/security/tool-boundary-validation.md`](../docs/security/tool-boundary-validation.md).
+**In progress:** No remaining work in the Phase 4 US2 T026–T028 slice. Standards and final spec re-review are clean within scope; the final T093 run supersedes the earlier pre-atomic checkpoint.
+**Next:** Continue with the remaining Phase 5–8 checklist tasks; this slice's workflow signoff is complete.
 
 ### Feature 023 — Phase 4 T026 & Review Corrections (2026-09-08)
 
@@ -36,6 +36,20 @@ Update this file after every completed feature. Any AI agent reading this should
 - Raised only the upstream structural node ceiling from 500 to 5,000 under the unchanged 64 KiB byte limit so the non-paginated 50-booking response remains usable.
 - Accepted plain-text `signal_checkout_intent` validation errors as the schema's explicit error variant while retaining JSON checkout signals.
 - Preserved flight-match explanation parameter objects across the NestJS/Python boundary. The global upstream depth ceiling remains 5; only attested V2 search uses a depth-7 allowance required by its nested `{ key, params }` projection.
+
+### Feature 023 — Phase 4 US2 implementation checkpoint (2026-09-08)
+
+The initial T026/T027/T028 checkpoint recorded the pre-atomic implementation and its
+earlier counts. Those historical results, failed attempts, the stale handoff path
+substitution, approved URL/fixture corrections, and the expected legitimate booking
+intent are retained in the validation document; the final atomic evidence below is
+the current status.
+
+### Feature 023 — Phase 4 US2 final atomic closure (2026-09-09)
+
+- S-01 graph-scoped staging keeps attested searches private until the complete tool batch passes; same-owner entries coalesce to the latest envelope, multi-owner batches fail before commit, and one Redis Lua operation writes the snapshot plus issued/accepted fences. Direct `search_flights.ainvoke()` persistence remains compatible.
+- S-02 handoff-read failures emit `validate_handoff_snapshot_read_failed`; commit failures emit `trusted_search_snapshot_batch_commit_failed`. Both warnings are static and payload-free. The production-empty-registry path remains fail-closed.
+- Verification: adjacent agent set `349 passed, 1 skipped`, literal GOAL set `49 passed`, Ruff check/format exited `0`, the live Redis fence regression passed with `redis_integration`, API/shared/gateway/scorer gates passed `18/462`, `23/110`, `12/12`, and `13/13`, and post-atomic T093 passed `1/1`, exit `0`. Standards/spec re-review is clean; T026–T028 closure is recorded. See [`docs/security/tool-boundary-validation.md`](../docs/security/tool-boundary-validation.md).
 
 ### Feature 023 — Security Systems: Phase 4 Slice 2 (Tasks T024–T025, T053 Completed) (2026-09-07)
 

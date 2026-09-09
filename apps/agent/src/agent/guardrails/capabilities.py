@@ -20,9 +20,11 @@ def seal_turn_capabilities(
     *,
     gate_result: Mapping[str, Any] | None = None,
     multi_agent: bool = True,
-    provenance: str = "trusted_router",
+    provenance: str | None = None,
 ) -> TurnCapabilities:
     """Derive immutable authority only from a trusted router result and deterministic gate."""
+    if provenance is None:
+        return TurnCapabilities(intent="UNKNOWN", provenance="missing_provenance", sealed_tools=())
     if provenance != "trusted_router":
         return TurnCapabilities(
             intent="UNKNOWN", provenance="untrusted_provenance", sealed_tools=()
@@ -34,9 +36,18 @@ def seal_turn_capabilities(
             sealed_tools=TRAVEL_TOOL_NAMES,
         )
     if not isinstance(decision, RouteDecision):
-        return TurnCapabilities(intent="UNKNOWN", provenance="router_failure", sealed_tools=())
+        return TurnCapabilities(intent="UNKNOWN", provenance="router_exception", sealed_tools=())
 
-    route = gate_result.get("route") if isinstance(gate_result, Mapping) else None
+    if not isinstance(gate_result, Mapping):
+        return TurnCapabilities(intent="UNKNOWN", provenance="invalid_gate", sealed_tools=())
+
+    route = gate_result.get("route")
+    if route not in {"general", "travel", "checkout"}:
+        return TurnCapabilities(intent="UNKNOWN", provenance="invalid_gate", sealed_tools=())
+
+    if decision.intent not in {"GENERAL", "SEARCH", "BOOKING_INQUIRY", "CHECKOUT"}:
+        return TurnCapabilities(intent="UNKNOWN", provenance="unknown_intent", sealed_tools=())
+
     if decision.intent == "GENERAL" and route == "general":
         return TurnCapabilities(intent="GENERAL", provenance=provenance, sealed_tools=())
     if decision.intent in {"SEARCH", "BOOKING_INQUIRY"} and route == "travel":
@@ -56,7 +67,7 @@ def seal_turn_capabilities(
             provenance=f"{provenance}_checkout_downgrade",
             sealed_tools=TRAVEL_TOOL_NAMES,
         )
-    return TurnCapabilities(intent="UNKNOWN", provenance="router_failure", sealed_tools=())
+    return TurnCapabilities(intent="UNKNOWN", provenance="invalid_gate", sealed_tools=())
 
 
 seal_capabilities = seal_turn_capabilities

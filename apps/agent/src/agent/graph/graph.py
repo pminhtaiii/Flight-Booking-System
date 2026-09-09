@@ -15,39 +15,79 @@ from agent.graph.nodes import (
 from agent.graph.router import invoke_router
 from agent.graph.state import AgentState
 from agent.guardrails.capabilities import seal_turn_capabilities
+from agent.models.requests import RouteDecision
 
 
 async def router_node(state: AgentState, config: RunnableConfig | None = None) -> dict:
     settings = agent_config.get_settings()
-    if not getattr(settings, "FEATURE_FLAG_CHAT_MULTI_AGENT", True):
-        gate_result = {"route": "travel", "disambiguation": None}
-        return {
-            **gate_result,
-            "turn_capabilities": seal_turn_capabilities(None, multi_agent=False),
-        }
-    if state.get("provenance") not in (None, "trusted_router"):
+
+    def safe_failure(provenance: str) -> dict:
         return {
             "route": "general",
             "disambiguation": "none",
             "safe_clarification": SAFE_ROUTER_CLARIFICATION,
+            "routing_provenance": provenance,
             "turn_capabilities": seal_turn_capabilities(
-                None, provenance=str(state.get("provenance"))
+                None,
+                provenance="trusted_router",
             ),
         }
+
+    # Routing provenance is output-only. Any value supplied by a caller is
+    # treated as forged before the classifier can influence authority.
+    if "routing_provenance" in state or "provenance" in state:
+        return safe_failure("missing_provenance")
+
+    if not getattr(settings, "FEATURE_FLAG_CHAT_MULTI_AGENT", True):
+        gate_result = {"route": "travel", "disambiguation": "none"}
+        return {
+            **gate_result,
+            "routing_provenance": "single_agent",
+            "turn_capabilities": seal_turn_capabilities(
+                None,
+                multi_agent=False,
+                provenance="trusted_router",
+            ),
+        }
+
     try:
         decision = await invoke_router(state)
+        if not isinstance(decision, RouteDecision):
+            return safe_failure("router_malformed")
         if decision.intent not in {"GENERAL", "SEARCH", "BOOKING_INQUIRY", "CHECKOUT"}:
-            raise ValueError("Unsupported router intent")
+            return safe_failure("unknown_intent")
         gate_result = evaluate_checkout_gate(state, decision)
-        capabilities = seal_turn_capabilities(decision, gate_result=gate_result)
-    except Exception:
-        gate_result = {
-            "route": "general",
-            "disambiguation": "none",
-            "safe_clarification": SAFE_ROUTER_CLARIFICATION,
+        if not isinstance(gate_result, dict):
+            return safe_failure("invalid_gate")
+        route = gate_result.get("route")
+        disambiguation = gate_result.get("disambiguation")
+        if route not in {"general", "travel", "checkout"} or disambiguation not in {
+            "none",
+            "possible_checkout",
+        }:
+            return safe_failure("invalid_gate")
+        if gate_result.get("routing_provenance") == "invalid_gate":
+            return safe_failure("invalid_gate")
+        capabilities = seal_turn_capabilities(
+            decision,
+            gate_result=gate_result,
+            provenance="trusted_router",
+        )
+        if capabilities.sealed_tools == () and decision.intent != "GENERAL":
+            return safe_failure(
+                "unknown_intent" if capabilities.provenance == "unknown_intent" else "invalid_gate"
+            )
+        routing_provenance = gate_result.get("routing_provenance") or "trusted_router"
+        if decision.intent in {"SEARCH", "BOOKING_INQUIRY"} and decision.confidence < 0.6:
+            routing_provenance = "low_confidence"
+        return {
+            "route": route,
+            "disambiguation": disambiguation,
+            "routing_provenance": routing_provenance,
+            "turn_capabilities": capabilities,
         }
-        capabilities = seal_turn_capabilities(None)
-    return {**gate_result, "turn_capabilities": capabilities}
+    except Exception:
+        return safe_failure("router_exception")
 
 
 def route_after_router(state: AgentState) -> str:

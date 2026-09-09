@@ -75,3 +75,30 @@ def test_checkout_gate_search_intent():
     result = evaluate_checkout_gate(state, decision)
     assert result["route"] == "travel"
     assert result["disambiguation"] == "none"
+
+
+def test_checkout_gate_non_route_decision_fails_closed():
+    state = AgentState(messages=[HumanMessage(content="Book the flight")])
+
+    result = evaluate_checkout_gate(state, object())  # type: ignore[arg-type]
+
+    assert result == {
+        "route": "general",
+        "disambiguation": "none",
+        "routing_provenance": "invalid_gate",
+    }
+
+
+def test_checkout_gate_unknown_constructed_intent_fails_closed():
+    state = AgentState(messages=[HumanMessage(content="Book the flight")])
+    decision = RouteDecision.model_construct(
+        intent="UNKNOWN_INTENT", confidence=1.0, isCommitment=False
+    )
+
+    result = evaluate_checkout_gate(state, decision)
+
+    assert result == {
+        "route": "general",
+        "disambiguation": "none",
+        "routing_provenance": "invalid_gate",
+    }

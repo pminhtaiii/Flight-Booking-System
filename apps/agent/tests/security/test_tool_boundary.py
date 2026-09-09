@@ -328,12 +328,14 @@ async def test_blocked_tool_result_does_not_leak_into_tool_message_or_checkpoint
             ),
         ],
         "iteration_count": 0,
+        # User approval (2026-09-08): fixture follows T026's state-only
+        # capability authority contract; payload assertions remain unchanged.
+        "turn_capabilities": turn_capabilities,
     }
 
     config = {
         "configurable": {
             "guardrail_gateway": gateway,
-            "turn_capabilities": turn_capabilities,
             "thread_id": "session-leak-boundary",
             "user_id": "user-leak-boundary",
         }
@@ -447,13 +449,15 @@ async def test_blocked_tool_result_does_not_leak_into_callback_traces(
             ),
         ],
         "iteration_count": 0,
+        # User approval (2026-09-08): fixture follows T026's state-only
+        # capability authority contract; callback assertions remain unchanged.
+        "turn_capabilities": turn_capabilities,
     }
 
     config = {
         "callbacks": [handler],
         "configurable": {
             "guardrail_gateway": gateway,
-            "turn_capabilities": turn_capabilities,
             "thread_id": "session-callback-leak",
             "user_id": "user-callback-leak",
         },
