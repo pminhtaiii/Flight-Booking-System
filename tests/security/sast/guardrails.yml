@@ -1,0 +1,101 @@
+# Pinned Custom Semgrep Rules for Flight Booking System Guardrails
+# Conforms to Semgrep Rule Specification v1.88.0
+
+rules:
+  - id: no-llm-in-guardrails
+    languages:
+      - python
+    severity: ERROR
+    message: 'Direct LLM initialization or invocation detected inside guardrail boundary. Guardrails must be purely deterministic.'
+    metadata:
+      category: security
+      subcategory: ai-safety
+      cwe: 'CWE-693: Protection Mechanism Failure'
+      interprocedural_note: 'Interprocedural model invocations hidden behind external helper functions require runtime behavioral contract tests in apps/agent/tests/security/.'
+    pattern-either:
+      - pattern: ChatOpenAI(...)
+      - pattern: ChatAnthropic(...)
+      - pattern: ChatGoogleGenerativeAI(...)
+      - pattern: OpenAI(...)
+      - pattern: langchain.$...(...)
+      - pattern: langchain_openai.$...(...)
+      - pattern: $MODEL.invoke(...)
+      - pattern: $MODEL.ainvoke(...)
+
+  - id: no-dynamic-imports-in-guardrails
+    languages:
+      - python
+    severity: ERROR
+    message: 'Dynamic import or code execution sink detected. Dynamic module loading compromises static integrity guarantees.'
+    metadata:
+      category: security
+      subcategory: code-injection
+      cwe: "CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code ('Eval Injection')"
+      interprocedural_note: 'Dynamic handler resolution must use static dictionary mappings; dynamic dispatch requires behavioral contract tests.'
+    pattern-either:
+      - pattern: importlib.import_module(...)
+      - pattern: __import__(...)
+      - pattern: eval(...)
+      - pattern: exec(...)
+
+  - id: no-unshielded-tool-execution
+    languages:
+      - python
+    severity: ERROR
+    message: 'Direct tool invocation detected bypassing security gateway executor. All tool executions must be mediated via gateway.execute_tool().'
+    metadata:
+      category: security
+      subcategory: access-control
+      cwe: 'CWE-285: Improper Authorization'
+      interprocedural_note: 'Indirect tool dispatch through dynamic runners requires runtime capability-sealing behavioral tests in apps/agent/tests/security/test_tool_authority.py.'
+    pattern-either:
+      - pattern: ToolNode(...)
+      - pattern: search_flights(...)
+      - pattern: booking_detail(...)
+      - pattern: booking_summaries(...)
+      - pattern: get_preferences(...)
+      - pattern: check_booking_readiness(...)
+      - pattern: signal_checkout_intent(...)
+      - pattern: tool_function(...)
+
+  - id: no-raw-payload-logging
+    languages:
+      - python
+    severity: ERROR
+    message: 'Logging raw unredacted prompts, messages, user input, or tool output payloads violates privacy and data minimization policies.'
+    metadata:
+      category: security
+      subcategory: information-disclosure
+      cwe: 'CWE-532: Insertion of Sensitive Information into Log File'
+      interprocedural_note: 'Downstream logging after sanitization layers requires privacy scrubbing behavioral contract tests.'
+    patterns:
+      - pattern-either:
+          - pattern: $LOGGER.debug(...)
+          - pattern: $LOGGER.info(...)
+          - pattern: $LOGGER.warning(...)
+          - pattern: $LOGGER.error(...)
+          - pattern: $LOGGER.critical(...)
+          - pattern: $LOGGER.exception(...)
+          - pattern: logging.debug(...)
+          - pattern: logging.info(...)
+          - pattern: logging.warning(...)
+          - pattern: logging.error(...)
+          - pattern: logging.critical(...)
+          - pattern: logging.exception(...)
+      - pattern-regex: '(?i)(prompt|user_input|raw_message|raw_payload|unredacted_output)'
+
+  - id: safe-html-interpolation
+    languages:
+      - typescript
+      - tsx
+    severity: ERROR
+    message: 'Raw HTML interpolation via dangerouslySetInnerHTML introduces XSS vulnerabilities; use sanitized React text elements.'
+    metadata:
+      category: security
+      subcategory: xss
+      cwe: "CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')"
+      interprocedural_note: 'Sanitized client-side rendering should use typed text children; server-side sanitization requires contract tests.'
+    pattern-either:
+      - pattern: 'dangerouslySetInnerHTML={{ __html: ... }}'
+      - pattern: '<$TAG ... dangerouslySetInnerHTML={{ __html: ... }} ... />'
+      - pattern: '<$TAG ... dangerouslySetInnerHTML={{ __html: ... }}>...</$TAG>'

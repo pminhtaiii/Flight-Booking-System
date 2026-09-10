@@ -80,8 +80,10 @@
 │
 ├── tests/
 │   ├── ci/                            → CI workflow contract & network guard tests
-│   ├── security/                      → Security test harnesses, toolchain pins, and corpus manifests
-│   │   └── corpus/                    → schema.json, holdout.jsonl, invariants.jsonl
+│   ├── security/                      → Security test harnesses, toolchain pins, sast runner, and corpus manifests
+│   │   ├── corpus/                    → schema.json, holdout.jsonl, invariants.jsonl
+│   │   └── sast/                      → guardrails.yml, ruleset.yml, and fixtures/ safe/unsafe control matrix
+
 │   └── smoke/                         → Authoritative whole-stack smoke & sanity test harness
 │
 ├── scripts/
@@ -1155,3 +1157,30 @@ Verification plan adds per-layer/boundary tests, static source analysis, separat
 Phase 2 Foundation status (2026-09-05): Tasks T005–T011 implemented. `scripts/security/evaluate-results.mjs` provides the fail-closed results evaluation engine and boundary enforcer (coverage >=95/90%, 0 Critical/High SAST/supply-chain/DAST, stage-local and aggregate TPR >=95%/FPR <=2%, SEC28 stage-reachability, 100% invariants, complete shard union); `scripts/security/validate-corpus.mjs` validates the canonical JSONL corpus against `tests/security/corpus/schema.json` and holdout quotas (100/250, 50/125, 50/125); `scripts/security/write-report.mjs` generates sanitized evidence records with allowlisted fields and privacy redaction. `evaluate-results.mjs` loads `tests/security/coverage-policy.json` and enforces weighted statement/branch thresholds for every exact and wildcard scope, failing closed when a required module is absent or has no measurable branch data. The policy covers chat-turn controller/runner, startup/config, immutable guardrails, ASGI middleware, SSE/chunk streaming, memory, sanitization and tool clients/projections. `agent.guardrails.base` defines strict immutable admission, sealed capability, fail-closed decision, payload, layer and response-key contracts. The closed-registry contract suite is isolated with an explicit expected skip pending T013, so normal agent collection remains green while the contract activates when the registry exists. T007 adds an internal-network Compose stack with synthetic PostgreSQL/Redis/API/agent/mock services, a loopback-pinned transport with request/response bounds, a lifecycle harness that preserves configured Docker context discovery, and dedicated unprivileged API/agent container users. The harness migrates, health-checks, authenticates two isolated users and tears down only its own project; `--smoke` verifies this lifecycle and full detector/DAST execution remains T037–T041.
 
 Feature 023 plan convergence (2026-09-04): admission context is separate from post-router/gate sealed tool authority. The design now specifies bounded PII spans, stage-local DAST oracles and quota profiles, validated generated summaries and payload-free model callbacks. Two independent review cycles closed six planning findings; see `specs/023-security-systems/review-convergence.md`. Runtime implementation remains pending.
+
+### Phase 5 US3 — Static Application Security Testing (SAST) Architecture
+
+1. **Rule Panning and Separation (`tests/security/sast/`)**:
+   - `guardrails.yml`: Pinned custom rules with severity `ERROR` targeting hard boundaries:
+     - `no-llm-in-guardrails`: blocks LLM initialization or invocation inside deterministic guardrails.
+     - `no-dynamic-imports-in-guardrails`: blocks dynamic module loading/eval/exec inside guardrail boundaries.
+     - `no-unshielded-tool-execution`: ensures tool executions are mediated through the security gateway.
+     - `no-raw-payload-logging`: blocks unredacted sensitive payload/prompt logging across services.
+     - `safe-html-interpolation`: forbids raw `dangerouslySetInnerHTML` injections in web UI components.
+   - `ruleset.yml`: Semgrep v1.88.0 ruleset bundling `guardrails.yml`, standard reviewed rulesets (`p/default`, `p/owasp-top-ten`, `p/security-audit`, `p/secrets`), and defining behavioral test requirements for interprocedural state properties.
+   - Fixture separation: Safe/unsafe fixture pairs in `tests/security/sast/fixtures/` strictly segregated from census and production scans.
+
+2. **Scanner Driver & File Census (`scripts/security/run-sast.mjs`)**:
+   - Recursive workspace census validating target file minimums (`apps/agent >= 30`, `apps/api >= 20`, `apps/web >= 20`, `packages/shared >= 1`), failing closed if census drops below thresholds.
+   - Target resolution supporting `--mode full` (scans all workspace source files) and `--mode diff` (filters git diff changed files).
+   - SARIF normalization and fail-closed exit code enforcement on missing tools, scanner crashes, and unbaselined findings.
+   - Platform-aware AST fallback (`runAstFallbackScan`) providing deterministic rule scanning on environments where native Semgrep CLI is unavailable.
+
+3. **Canonical Baseline and <=30-Day Exception Schema (`baseline.json` & `exceptions.json`)**:
+   - `tests/security/sast/baseline.json`: Clean draft 2020-12 baseline format tracking known findings (`ruleId`, `file`, `line`, `fingerprint`, `context`).
+   - `tests/security/exceptions.json`: Strict exception schema requiring `id`, `ruleId`, `file`, `owner`, `rationale`, `compensatingControl`, `createdAt`, `expiresAt`.
+   - Validation engine (`validateException`, `validateExceptionsSchema`, `validateBaselineSchema`) enforces:
+     - Maximum 30-day lifetime from creation date (`expiresAt - createdAt <= 30 days`).
+     - Immediate fail-closed rejection on expired exceptions (`expiresAt < currentDate`).
+     - Non-bypassable hard rules: `no-llm-in-guardrails`, `no-unshielded-tool-execution`, and any Critical or High severity findings can NEVER be suppressed by exceptions.
+
