@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import ts from 'typescript';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -434,7 +435,11 @@ export function validateBaselineSchema(baselineData, options = {}) {
     try {
       data = JSON.parse(readFileSync(data, 'utf8'));
     } catch (err) {
-      return { valid: false, errors: [`Failed to parse baseline JSON file: ${err.message}`], findings: [] };
+      return {
+        valid: false,
+        errors: [`Failed to parse baseline JSON file: ${err.message}`],
+        findings: [],
+      };
     }
   }
 
@@ -589,7 +594,11 @@ export function validateExceptionsSchema(exceptionsData, options = {}) {
     try {
       data = JSON.parse(readFileSync(data, 'utf8'));
     } catch (err) {
-      return { valid: false, errors: [`Failed to parse exceptions JSON file: ${err.message}`], exceptions: [] };
+      return {
+        valid: false,
+        errors: [`Failed to parse exceptions JSON file: ${err.message}`],
+        exceptions: [],
+      };
     }
   }
 
@@ -1197,6 +1206,33 @@ print(json.dumps({'findings': findings, 'errors': errors}))
 
     try {
       const content = readFileSync(fullPath, 'utf8');
+
+      let scriptKind = ts.ScriptKind.JS;
+      if (norm.endsWith('.tsx')) {
+        scriptKind = ts.ScriptKind.TSX;
+      } else if (norm.endsWith('.jsx')) {
+        scriptKind = ts.ScriptKind.JSX;
+      } else if (norm.endsWith('.ts')) {
+        scriptKind = ts.ScriptKind.TS;
+      }
+
+      const sf = ts.createSourceFile(norm, content, ts.ScriptTarget.Latest, true, scriptKind);
+      const parseDiags = sf.parseDiagnostics || [];
+      if (parseDiags.length > 0) {
+        for (const diag of parseDiags) {
+          const diagMsg =
+            typeof diag.messageText === 'string'
+              ? diag.messageText
+              : diag.messageText?.messageText || 'Syntax error';
+          const line =
+            diag.start !== undefined && sf.getLineAndCharacterOfPosition
+              ? sf.getLineAndCharacterOfPosition(diag.start).line + 1
+              : 1;
+          errors.push(`[AST Fallback Error] Syntax error in ${norm} (line ${line}): ${diagMsg}`);
+        }
+        continue;
+      }
+
       const lines = content.split('\n');
       const fileImportsChildProcess =
         content.includes('child_process') &&
@@ -1231,7 +1267,12 @@ print(json.dumps({'findings': findings, 'errors': errors}))
 
           if (hasOwasp) {
             const owaspMsg = 'Unsafe HTML interpolation via dangerouslySetInnerHTML';
-            const owaspFp = computeFindingFingerprint('p/owasp-top-ten:xss', norm, lineNum, owaspMsg);
+            const owaspFp = computeFindingFingerprint(
+              'p/owasp-top-ten:xss',
+              norm,
+              lineNum,
+              owaspMsg,
+            );
             findings.push({
               ruleId: 'p/owasp-top-ten:xss',
               level: 'error',
@@ -1324,9 +1365,17 @@ print(json.dumps({'findings': findings, 'errors': errors}))
               const varName = assignMatch[1];
               const varVal = assignMatch[2].toLowerCase();
               if (
-                !['test', 'dummy', 'mock', 'example', 'change', 'placeholder', 'none', 'todo', 'your_'].some(
-                  (p) => varVal.includes(p),
-                )
+                ![
+                  'test',
+                  'dummy',
+                  'mock',
+                  'example',
+                  'change',
+                  'placeholder',
+                  'none',
+                  'todo',
+                  'your_',
+                ].some((p) => varVal.includes(p))
               ) {
                 const msg = `Hardcoded secret detected in assignment to ${varName}`;
                 const fp = computeFindingFingerprint(
@@ -1428,8 +1477,13 @@ export function runSastScan(options = {}) {
     execFn,
   });
 
-  if (targetResolution.passed === false || (targetResolution.errors && targetResolution.errors.length > 0)) {
-    errors.push(...(targetResolution.errors || ['[Git Diff Error] Failed to resolve target files']));
+  if (
+    targetResolution.passed === false ||
+    (targetResolution.errors && targetResolution.errors.length > 0)
+  ) {
+    errors.push(
+      ...(targetResolution.errors || ['[Git Diff Error] Failed to resolve target files']),
+    );
     return {
       passed: false,
       exitCode: 1,

@@ -884,7 +884,9 @@ test('T031: evaluateFindings handles baseline matching, valid exceptions, expire
     currentDate: '2026-09-10T00:00:00Z',
   });
   assert.equal(resExpired.passed, false);
-  assert.ok(resExpired.errors.some((e) => e.includes('Expired exception') || e.includes('expired')));
+  assert.ok(
+    resExpired.errors.some((e) => e.includes('Expired exception') || e.includes('expired')),
+  );
 
   // 5. Non-bypassable rule cannot be suppressed by exceptions
   const resNonBypassable = evaluateFindings([hardFinding], {
@@ -903,7 +905,11 @@ test('T031: evaluateFindings handles baseline matching, valid exceptions, expire
     currentDate: '2026-09-10T00:00:00Z',
   });
   assert.equal(resNonBypassable.passed, false);
-  assert.ok(resNonBypassable.errors.some((e) => e.includes('Non-bypassable rule') || e.includes('cannot be bypassed')));
+  assert.ok(
+    resNonBypassable.errors.some(
+      (e) => e.includes('Non-bypassable rule') || e.includes('cannot be bypassed'),
+    ),
+  );
 });
 
 test('T031: runSastScan fails closed on census failure, missing semgrep, scanner crash, and unbaselined findings', () => {
@@ -1072,7 +1078,10 @@ const canonicalBaselinePath = resolve(repoRoot, 'tests/security/sast/baseline.js
 const canonicalExceptionsPath = resolve(repoRoot, 'tests/security/exceptions.json');
 
 test('T032: baseline.json exists, is valid JSON, and conforms to baseline format', () => {
-  assert.ok(existsSync(canonicalBaselinePath), `Baseline file must exist at ${canonicalBaselinePath}`);
+  assert.ok(
+    existsSync(canonicalBaselinePath),
+    `Baseline file must exist at ${canonicalBaselinePath}`,
+  );
   const raw = readFileSync(canonicalBaselinePath, 'utf8');
   const data = JSON.parse(raw);
 
@@ -1091,7 +1100,10 @@ test('T032: baseline.json exists, is valid JSON, and conforms to baseline format
 });
 
 test('T032: exceptions.json exists, is valid JSON, and conforms to exception schema', () => {
-  assert.ok(existsSync(canonicalExceptionsPath), `Exceptions file must exist at ${canonicalExceptionsPath}`);
+  assert.ok(
+    existsSync(canonicalExceptionsPath),
+    `Exceptions file must exist at ${canonicalExceptionsPath}`,
+  );
   const raw = readFileSync(canonicalExceptionsPath, 'utf8');
   const data = JSON.parse(raw);
 
@@ -1216,7 +1228,9 @@ test('T032: validateException rejects invalid ISO 8601 dates and durations excee
     expiresAt: '2026-09-20T00:00:00Z',
   });
   assert.equal(invalidCreatedRes.valid, false);
-  assert.ok(invalidCreatedRes.errors.some((e) => e.includes('ISO 8601') || e.includes('createdAt')));
+  assert.ok(
+    invalidCreatedRes.errors.some((e) => e.includes('ISO 8601') || e.includes('createdAt')),
+  );
 
   // Exceeding 30 days duration (40 days between createdAt and expiresAt)
   const excessiveDurationRes = validateException(
@@ -1243,7 +1257,11 @@ test('T032: validateException rejects invalid ISO 8601 dates and durations excee
     },
     { currentDate: '2026-09-05T00:00:00Z' },
   );
-  assert.equal(exact30DaysRes.valid, true, `Expected valid for 30 days: ${exact30DaysRes.errors.join('; ')}`);
+  assert.equal(
+    exact30DaysRes.valid,
+    true,
+    `Expected valid for 30 days: ${exact30DaysRes.errors.join('; ')}`,
+  );
 
   // Omitted createdAt calculates duration from currentDate
   const noCreatedExcessive = validateException(
@@ -1279,7 +1297,11 @@ test('T032: scanner and evaluateFindings fail closed on expired exceptions', () 
     exceptions: [expiredException],
     currentDate: '2026-09-10T00:00:00Z',
   });
-  assert.equal(evalEmptyFindings.passed, false, 'Expired exception must fail evaluation even with 0 findings');
+  assert.equal(
+    evalEmptyFindings.passed,
+    false,
+    'Expired exception must fail evaluation even with 0 findings',
+  );
   assert.ok(evalEmptyFindings.errors.some((e) => e.includes('Expired') || e.includes('expired')));
 
   // evaluateFindings with matching finding fails closed and counts finding as unbaselined
@@ -1324,7 +1346,10 @@ test('T032: validateException and evaluateFindings fail closed on non-bypassable
     assert.equal(valRes.valid, false);
     assert.ok(
       valRes.errors.some(
-        (e) => e.includes('Non-Bypassable') || e.includes('cannot be suppressed') || e.includes('hard boundary'),
+        (e) =>
+          e.includes('Non-Bypassable') ||
+          e.includes('cannot be suppressed') ||
+          e.includes('hard boundary'),
       ),
     );
 
@@ -1347,9 +1372,7 @@ test('T032: validateException and evaluateFindings fail closed on non-bypassable
     assert.equal(evalRes.passed, false);
     assert.equal(evalRes.unbaselinedCount, 1);
     assert.ok(
-      evalRes.errors.some(
-        (e) => e.includes('Non-bypassable') || e.includes('cannot be bypassed'),
-      ),
+      evalRes.errors.some((e) => e.includes('Non-bypassable') || e.includes('cannot be bypassed')),
     );
   }
 
@@ -1385,7 +1408,8 @@ test('T032: validateException and evaluateFindings fail closed on non-bypassable
     assert.equal(evalRes.unbaselinedCount, 1);
     assert.ok(
       evalRes.errors.some(
-        (e) => e.includes('Non-bypassable') || e.includes('cannot be bypassed') || e.includes(severity),
+        (e) =>
+          e.includes('Non-bypassable') || e.includes('cannot be bypassed') || e.includes(severity),
       ),
     );
   }
@@ -1591,25 +1615,33 @@ test('Issue 3: parseSarifResults maps CVSS numeric and string severities, and ER
             ruleId: 'cvss-critical',
             level: 'warning',
             properties: { 'security-severity': 9.8 },
-            locations: [{ physicalLocation: { artifactLocation: { uri: 'apps/agent/src/crit.py' } } }],
+            locations: [
+              { physicalLocation: { artifactLocation: { uri: 'apps/agent/src/crit.py' } } },
+            ],
           },
           {
             ruleId: 'cvss-high',
             level: 'warning',
             properties: { 'security-severity': '7.5' },
-            locations: [{ physicalLocation: { artifactLocation: { uri: 'apps/agent/src/high.py' } } }],
+            locations: [
+              { physicalLocation: { artifactLocation: { uri: 'apps/agent/src/high.py' } } },
+            ],
           },
           {
             ruleId: 'cvss-medium',
             level: 'note',
             properties: { 'security-severity': 5.5 },
-            locations: [{ physicalLocation: { artifactLocation: { uri: 'apps/agent/src/med.py' } } }],
+            locations: [
+              { physicalLocation: { artifactLocation: { uri: 'apps/agent/src/med.py' } } },
+            ],
           },
           {
             ruleId: 'cvss-low',
             level: 'error',
             properties: { 'security-severity': 2.5 },
-            locations: [{ physicalLocation: { artifactLocation: { uri: 'apps/agent/src/low.py' } } }],
+            locations: [
+              { physicalLocation: { artifactLocation: { uri: 'apps/agent/src/low.py' } } },
+            ],
           },
         ],
       },
@@ -1693,9 +1725,17 @@ test('Issue 3: parseSarifResults maps CVSS numeric and string severities, and ER
     exceptions: [exValidObj],
     currentDate: '2026-09-10T00:00:00Z',
   });
-  assert.equal(evalError.passed, false, 'evaluateFindings must block ERROR severity from exceptions');
+  assert.equal(
+    evalError.passed,
+    false,
+    'evaluateFindings must block ERROR severity from exceptions',
+  );
   assert.equal(evalError.unbaselinedCount, 1);
-  assert.ok(evalError.errors.some((e) => e.includes('Non-Bypassable Rule Violation') || e.includes('ERROR')));
+  assert.ok(
+    evalError.errors.some(
+      (e) => e.includes('Non-Bypassable Rule Violation') || e.includes('ERROR'),
+    ),
+  );
 });
 
 // -----------------------------------------------------------------------------
@@ -1745,7 +1785,11 @@ test('Issue 4: exception matching enforces path boundaries, line/fingerprint mat
     exceptions: [exLine10],
     currentDate: '2026-09-10T00:00:00Z',
   });
-  assert.equal(evalLineMismatch.passed, false, 'Line 40 must not match exception specifying line 10');
+  assert.equal(
+    evalLineMismatch.passed,
+    false,
+    'Line 40 must not match exception specifying line 10',
+  );
 
   const findingLine10 = { ...findingLine40, startLine: 10 };
   const evalLineMatch = evaluateFindings([findingLine10], {
@@ -1825,7 +1869,14 @@ test('Issue 4: exception matching enforces path boundaries, line/fingerprint mat
           {
             ruleId: 'rule-fp-test',
             message: { text: 'msg' },
-            locations: [{ physicalLocation: { artifactLocation: { uri: 'test.py' }, region: { startLine: 5 } } }],
+            locations: [
+              {
+                physicalLocation: {
+                  artifactLocation: { uri: 'test.py' },
+                  region: { startLine: 5 },
+                },
+              },
+            ],
           },
         ],
       },
@@ -1885,7 +1936,11 @@ test('Issue 5: malformed SARIF throws in parseSarifResults and fails closed in r
 
   const missingRunsScan = runSastScan({
     rootDir: repoRoot,
-    execFn: () => ({ status: 0, stdout: JSON.stringify({ version: '2.1.0', noRunsHere: true }), stderr: '' }),
+    execFn: () => ({
+      status: 0,
+      stdout: JSON.stringify({ version: '2.1.0', noRunsHere: true }),
+      stderr: '',
+    }),
   });
   assert.equal(missingRunsScan.passed, false);
   assert.equal(missingRunsScan.exitCode, 1);
@@ -1914,7 +1969,9 @@ test('Issue 6: runAstFallbackScan returns { findings, errors }, reports failures
     const pyResult = runAstFallbackScan([brokenPyRel], repoRoot);
     assert.ok(pyResult.errors.length > 0, 'AST syntax error must be reported in errors');
     assert.ok(
-      pyResult.errors.some((e) => e.includes('temp_broken_syntax.py') || e.includes('AST parse error')),
+      pyResult.errors.some(
+        (e) => e.includes('temp_broken_syntax.py') || e.includes('AST parse error'),
+      ),
       `Expected syntax error details in: ${pyResult.errors.join('; ')}`,
     );
 
@@ -1936,7 +1993,11 @@ test('Issue 6: runAstFallbackScan returns { findings, errors }, reports failures
     });
 
     assert.equal(scanWithFallbackErr.passed, false, 'Scan with fallback errors must fail closed');
-    assert.equal(scanWithFallbackErr.exitCode, 1, 'Scan with fallback errors must exit with code 1');
+    assert.equal(
+      scanWithFallbackErr.exitCode,
+      1,
+      'Scan with fallback errors must exit with code 1',
+    );
     assert.ok(
       scanWithFallbackErr.errors.some((e) => e.includes('[AST Fallback Error]')),
       `Expected [AST Fallback Error] in: ${scanWithFallbackErr.errors.join('; ')}`,
@@ -1963,11 +2024,17 @@ test('Issue 7: resolveTargetFiles returns passed: false on git failure and runSa
     }),
   });
 
-  assert.equal(failedDiff.passed, false, 'resolveTargetFiles must report passed: false when git fails');
+  assert.equal(
+    failedDiff.passed,
+    false,
+    'resolveTargetFiles must report passed: false when git fails',
+  );
   assert.equal(failedDiff.files.length, 0);
   assert.ok(failedDiff.errors.length > 0);
   assert.ok(
-    failedDiff.errors.some((e) => e.includes('[Git Diff Error]') || e.includes('git command exited with status 128')),
+    failedDiff.errors.some(
+      (e) => e.includes('[Git Diff Error]') || e.includes('git command exited with status 128'),
+    ),
     `Expected git diff error in: ${failedDiff.errors.join('; ')}`,
   );
 
@@ -1995,7 +2062,11 @@ test('Issue 7: resolveTargetFiles returns passed: false on git failure and runSa
     }),
   });
 
-  assert.equal(failedScan.passed, false, 'runSastScan must fail closed on git failure in diff mode');
+  assert.equal(
+    failedScan.passed,
+    false,
+    'runSastScan must fail closed on git failure in diff mode',
+  );
   assert.equal(failedScan.exitCode, 1, 'runSastScan must exit with code 1 on git failure');
   assert.ok(
     failedScan.errors.some((e) => e.includes('[Git Diff Error]')),
@@ -2070,28 +2141,62 @@ const el = { dangerouslySetInnerHTML: { __html: rawHtml } };
       configs: DEFAULT_STANDARD_RULESETS,
     });
 
-    assert.equal(allPacksResult.errors.length, 0, `Unexpected errors: ${allPacksResult.errors.join('; ')}`);
+    assert.equal(
+      allPacksResult.errors.length,
+      0,
+      `Unexpected errors: ${allPacksResult.errors.join('; ')}`,
+    );
     const ruleIds = allPacksResult.findings.map((f) => f.ruleId);
 
     // Verify p/secrets findings
     assert.ok(ruleIds.includes('p/secrets:hardcoded-secret'), 'Must detect hardcoded secrets');
 
     // Verify p/owasp-top-ten findings
-    assert.ok(ruleIds.includes('p/owasp-top-ten:eval-injection'), 'Must detect eval injection in Python');
-    assert.ok(ruleIds.includes('p/owasp-top-ten:command-injection'), 'Must detect command injection in Python/TS');
-    assert.ok(ruleIds.includes('p/owasp-top-ten:code-injection'), 'Must detect code injection in TS');
-    assert.ok(ruleIds.includes('p/owasp-top-ten:xss'), 'Must detect XSS via dangerouslySetInnerHTML');
+    assert.ok(
+      ruleIds.includes('p/owasp-top-ten:eval-injection'),
+      'Must detect eval injection in Python',
+    );
+    assert.ok(
+      ruleIds.includes('p/owasp-top-ten:command-injection'),
+      'Must detect command injection in Python/TS',
+    );
+    assert.ok(
+      ruleIds.includes('p/owasp-top-ten:code-injection'),
+      'Must detect code injection in TS',
+    );
+    assert.ok(
+      ruleIds.includes('p/owasp-top-ten:xss'),
+      'Must detect XSS via dangerouslySetInnerHTML',
+    );
     assert.ok(ruleIds.includes('p/owasp-top-ten:sql-injection'), 'Must detect SQL injection');
 
     // Verify p/security-audit findings
-    assert.ok(ruleIds.includes('p/security-audit:insecure-deserialization'), 'Must detect pickle insecure deserialization');
-    assert.ok(ruleIds.includes('p/security-audit:insecure-yaml-load'), 'Must detect yaml.load without SafeLoader');
-    assert.ok(ruleIds.includes('p/security-audit:weak-crypto-hash'), 'Must detect weak crypto hash (md5/sha1)');
-    const weakHashFinding = allPacksResult.findings.find((f) => f.ruleId === 'p/security-audit:weak-crypto-hash');
-    assert.equal(weakHashFinding?.severity, 'WARNING', 'Weak hash finding should have WARNING severity');
+    assert.ok(
+      ruleIds.includes('p/security-audit:insecure-deserialization'),
+      'Must detect pickle insecure deserialization',
+    );
+    assert.ok(
+      ruleIds.includes('p/security-audit:insecure-yaml-load'),
+      'Must detect yaml.load without SafeLoader',
+    );
+    assert.ok(
+      ruleIds.includes('p/security-audit:weak-crypto-hash'),
+      'Must detect weak crypto hash (md5/sha1)',
+    );
+    const weakHashFinding = allPacksResult.findings.find(
+      (f) => f.ruleId === 'p/security-audit:weak-crypto-hash',
+    );
+    assert.equal(
+      weakHashFinding?.severity,
+      'WARNING',
+      'Weak hash finding should have WARNING severity',
+    );
 
     // Verify p/default findings
-    assert.ok(ruleIds.includes('p/default:dangerous-module'), 'Must detect dangerous modules (marshal/shelve)');
+    assert.ok(
+      ruleIds.includes('p/default:dangerous-module'),
+      'Must detect dangerous modules (marshal/shelve)',
+    );
     assert.ok(ruleIds.includes('no-generic-eval-exec'), 'Must detect no-generic-eval-exec');
 
     // 2. Selective scan with ONLY p/secrets
@@ -2099,8 +2204,14 @@ const el = { dangerouslySetInnerHTML: { __html: rawHtml } };
       configs: ['p/secrets'],
     });
     const secretsRuleIds = secretsOnly.findings.map((f) => f.ruleId);
-    assert.ok(secretsRuleIds.every((id) => id.startsWith('p/secrets:')), 'Only p/secrets findings should be present');
-    assert.ok(secretsRuleIds.includes('p/secrets:hardcoded-secret'), 'Must detect hardcoded secrets');
+    assert.ok(
+      secretsRuleIds.every((id) => id.startsWith('p/secrets:')),
+      'Only p/secrets findings should be present',
+    );
+    assert.ok(
+      secretsRuleIds.includes('p/secrets:hardcoded-secret'),
+      'Must detect hardcoded secrets',
+    );
 
     // 3. Selective scan with ONLY p/owasp-top-ten
     const owaspOnly = runAstFallbackScan([pyRelPath, tsRelPath], repoRoot, {
@@ -2109,7 +2220,10 @@ const el = { dangerouslySetInnerHTML: { __html: rawHtml } };
     const owaspRuleIds = owaspOnly.findings.map((f) => f.ruleId);
     assert.ok(owaspRuleIds.includes('p/owasp-top-ten:eval-injection'));
     assert.ok(owaspRuleIds.includes('p/owasp-top-ten:command-injection'));
-    assert.ok(!owaspRuleIds.includes('p/security-audit:insecure-deserialization'), 'Should not include security-audit findings');
+    assert.ok(
+      !owaspRuleIds.includes('p/security-audit:insecure-deserialization'),
+      'Should not include security-audit findings',
+    );
 
     // 4. Selective scan with ONLY p/security-audit
     const auditOnly = runAstFallbackScan([pyRelPath, tsRelPath], repoRoot, {
@@ -2126,7 +2240,11 @@ const el = { dangerouslySetInnerHTML: { __html: rawHtml } };
       configs: ['p/unsupported-ruleset@v1.0.0'],
     });
     assert.ok(
-      unsupportedResult.errors.some((e) => e.includes('[SAST Fallback Error] Unsupported standard ruleset: p/unsupported-ruleset@v1.0.0')),
+      unsupportedResult.errors.some((e) =>
+        e.includes(
+          '[SAST Fallback Error] Unsupported standard ruleset: p/unsupported-ruleset@v1.0.0',
+        ),
+      ),
       `Expected unsupported error in: ${unsupportedResult.errors.join('; ')}`,
     );
 
@@ -2139,9 +2257,12 @@ const el = { dangerouslySetInnerHTML: { __html: rawHtml } };
       execFn: () => ({ status: 127, stderr: 'semgrep: command not found', stdout: '' }),
     });
     assert.equal(failedScan.passed, false, 'Scan with standard rule violations must fail');
-    assert.equal(failedScan.exitCode, 1, 'Scan with standard rule violations must exit with code 1');
+    assert.equal(
+      failedScan.exitCode,
+      1,
+      'Scan with standard rule violations must exit with code 1',
+    );
     assert.ok(failedScan.findings.length > 0, 'Scan should record findings');
-
   } finally {
     if (existsSync(pyFullPath)) {
       rmSync(pyFullPath, { force: true });
@@ -2157,8 +2278,185 @@ const el = { dangerouslySetInnerHTML: { __html: rawHtml } };
     repoRoot,
     { configs: DEFAULT_STANDARD_RULESETS },
   );
-  assert.equal(cleanResult.errors.length, 0, `Clean scan should have 0 errors: ${cleanResult.errors.join('; ')}`);
-  assert.equal(cleanResult.findings.length, 0, `Clean scan should have 0 findings: ${JSON.stringify(cleanResult.findings)}`);
+  assert.equal(
+    cleanResult.errors.length,
+    0,
+    `Clean scan should have 0 errors: ${cleanResult.errors.join('; ')}`,
+  );
+  assert.equal(
+    cleanResult.findings.length,
+    0,
+    `Clean scan should have 0 findings: ${JSON.stringify(cleanResult.findings)}`,
+  );
 });
 
+test('Issue 1: runAstFallbackScan detects syntax errors in JS/TS/TSX/MJS files and fails closed', () => {
+  const malformedFiles = [
+    {
+      relPath: 'apps/web/temp_malformed_script.ts',
+      content: 'const x: number = ;\nconst y = 1;',
+      ext: '.ts',
+    },
+    {
+      relPath: 'apps/web/temp_malformed_component.tsx',
+      content: 'export const Button = () => <div><span><span></div>;\n',
+      ext: '.tsx',
+    },
+    {
+      relPath: 'apps/web/temp_malformed_util.js',
+      content: 'function test() { const a = ; return a; }',
+      ext: '.js',
+    },
+    {
+      relPath: 'apps/web/temp_malformed_module.mjs',
+      content: 'export default { foo: , bar: 1 };',
+      ext: '.mjs',
+    },
+  ];
 
+  const validFiles = [
+    {
+      relPath: 'apps/web/temp_valid_script.ts',
+      content: 'const x: number = 42;\nexport const answer = x;',
+      ext: '.ts',
+    },
+    {
+      relPath: 'apps/web/temp_valid_component.tsx',
+      content: 'export const Button = () => <div><span>Valid</span></div>;\n',
+      ext: '.tsx',
+    },
+    {
+      relPath: 'apps/web/temp_valid_util.js',
+      content: 'function test() { const a = 1; return a; }\nmodule.exports = { test };',
+      ext: '.js',
+    },
+    {
+      relPath: 'apps/web/temp_valid_module.mjs',
+      content: 'export default { foo: 1, bar: 2 };',
+      ext: '.mjs',
+    },
+  ];
+
+  try {
+    for (const item of malformedFiles) {
+      writeFileSync(resolve(repoRoot, item.relPath), item.content, 'utf8');
+    }
+    for (const item of validFiles) {
+      writeFileSync(resolve(repoRoot, item.relPath), item.content, 'utf8');
+    }
+
+    // 1. Verify runAstFallbackScan reports syntax errors for all malformed file types (.ts, .tsx, .js, .mjs)
+    for (const item of malformedFiles) {
+      const result = runAstFallbackScan([item.relPath], repoRoot, {
+        configs: DEFAULT_STANDARD_RULESETS,
+      });
+
+      assert.ok(result.errors.length > 0, `Expected syntax errors for ${item.relPath}`);
+      const normRel = item.relPath.replaceAll('\\', '/');
+      assert.ok(
+        result.errors.some(
+          (e) =>
+            e.includes('[AST Fallback Error] Syntax error in ' + normRel) && e.includes('(line '),
+        ),
+        `Error message missing standard format for ${item.relPath}: ${result.errors.join('; ')}`,
+      );
+      // Ensure regex matching was skipped on malformed file
+      assert.equal(
+        result.findings.length,
+        0,
+        `Findings should be empty on malformed file ${item.relPath}`,
+      );
+    }
+
+    // 2. Verify batch scan with multiple malformed files returns errors for each
+    const batchResult = runAstFallbackScan(
+      malformedFiles.map((m) => m.relPath),
+      repoRoot,
+      { configs: DEFAULT_STANDARD_RULESETS },
+    );
+    for (const item of malformedFiles) {
+      const normRel = item.relPath.replaceAll('\\', '/');
+      assert.ok(
+        batchResult.errors.some((e) => e.includes(normRel)),
+        `Batch scan errors missing ${item.relPath}: ${batchResult.errors.join('; ')}`,
+      );
+    }
+
+    // 3. Verify valid files produce 0 syntax errors
+    for (const item of validFiles) {
+      const validResult = runAstFallbackScan([item.relPath], repoRoot, {
+        configs: DEFAULT_STANDARD_RULESETS,
+      });
+      assert.equal(
+        validResult.errors.length,
+        0,
+        `Valid file ${item.relPath} should have 0 errors: ${validResult.errors.join('; ')}`,
+      );
+    }
+
+    // 4. Verify runSastScan fails closed in fallback mode when malformed TS is present in diff mode
+    const failedDiffScan = runSastScan({
+      rootDir: repoRoot,
+      mode: 'diff',
+      gitDiffOutput: malformedFiles[0].relPath,
+      allowAstFallback: true,
+      execFn: () => ({ status: 127, stderr: 'semgrep: command not found', stdout: '' }),
+    });
+    assert.equal(failedDiffScan.passed, false, 'Scan must fail closed on malformed TS file');
+    assert.equal(failedDiffScan.exitCode, 1, 'Scan must exit with 1 on malformed TS file');
+    assert.ok(
+      failedDiffScan.errors.some((e) => e.includes('[AST Fallback Error] Syntax error in ')),
+      `Expected AST fallback error in runSastScan: ${failedDiffScan.errors.join('; ')}`,
+    );
+
+    // 5. Verify runSastScan fails closed for TSX malformed file as well
+    const failedTsxScan = runSastScan({
+      rootDir: repoRoot,
+      mode: 'diff',
+      gitDiffOutput: malformedFiles[1].relPath,
+      allowAstFallback: true,
+      execFn: () => ({ status: 127, stderr: 'semgrep: command not found', stdout: '' }),
+    });
+    assert.equal(failedTsxScan.passed, false, 'Scan must fail closed on malformed TSX file');
+    assert.equal(failedTsxScan.exitCode, 1, 'Scan must exit with 1 on malformed TSX file');
+    assert.ok(
+      failedTsxScan.errors.some((e) => e.includes('[AST Fallback Error] Syntax error in ')),
+      `Expected AST fallback error in TSX scan: ${failedTsxScan.errors.join('; ')}`,
+    );
+
+    // 6. Verify runSastScan fails closed for JS malformed file
+    const failedJsScan = runSastScan({
+      rootDir: repoRoot,
+      mode: 'diff',
+      gitDiffOutput: malformedFiles[2].relPath,
+      allowAstFallback: true,
+      execFn: () => ({ status: 127, stderr: 'semgrep: command not found', stdout: '' }),
+    });
+    assert.equal(failedJsScan.passed, false, 'Scan must fail closed on malformed JS file');
+    assert.equal(failedJsScan.exitCode, 1, 'Scan must exit with 1 on malformed JS file');
+
+    // 7. Verify runSastScan fails closed for MJS malformed file
+    const failedMjsScan = runSastScan({
+      rootDir: repoRoot,
+      mode: 'diff',
+      gitDiffOutput: malformedFiles[3].relPath,
+      allowAstFallback: true,
+      execFn: () => ({ status: 127, stderr: 'semgrep: command not found', stdout: '' }),
+    });
+    assert.equal(failedMjsScan.passed, false, 'Scan must fail closed on malformed MJS file');
+    assert.equal(failedMjsScan.exitCode, 1, 'Scan must exit with 1 on malformed MJS file');
+  } finally {
+    for (const item of malformedFiles) {
+      const p = resolve(repoRoot, item.relPath);
+      if (existsSync(p)) {
+        rmSync(p, { force: true });
+      }
+    }
+    for (const item of validFiles) {
+      const p = resolve(repoRoot, item.relPath);
+      if (existsSync(p)) {
+        rmSync(p, { force: true });
+      }
+    }
+  }
+});

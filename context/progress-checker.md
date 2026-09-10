@@ -71,13 +71,14 @@ Update this file after every completed feature. Any AI agent reading this should
     - Malformed SARIF (invalid JSON, missing runs) fails closed in scanner and driver.
     - AST fallback scanner returns structured errors (`{ findings, errors }`), reporting subprocess, syntax, and read failures to fail closed.
     - AST fallback scanner evaluates configured standard rulesets (`p/default`, `p/owasp-top-ten`, `p/security-audit`, `p/secrets`) detecting hardcoded secrets, code/command/eval injection, SQL injection, insecure deserialization, weak crypto hashing, and dangerous modules.
+    - Fallback AST scanner parses JavaScript, TypeScript, TSX, and MJS files via `ts.createSourceFile` and validates `parseDiagnostics`, immediately failing closed on syntax errors (`errors.push`, `exitCode: 1`) before executing line regexes.
     - Git diff resolution fails closed on non-zero exit status or execution error instead of treating failure as an empty scan.
-  - Expanded test suite in `tests/security/sast-runner.test.mjs` to 37/37 passing tests (exit code 0).
+  - Expanded test suite in `tests/security/sast-runner.test.mjs` to 38/38 passing tests (exit code 0).
 
 ### Current Status
 
 **Feature:** Security Systems (Feature 023) — Phase 5 US3 Static Security Checks
-**Last completed:** T032 SAST Baseline & Temporary Exception Schema hardening in `scripts/security/run-sast.mjs` (37/37 passing in `tests/security/sast-runner.test.mjs`).
+**Last completed:** T032 SAST Baseline & Temporary Exception Schema hardening in `scripts/security/run-sast.mjs` with fallback syntax validation for JS/TS/TSX/MJS (38/38 passing in `tests/security/sast-runner.test.mjs`).
 **In progress:** Phase 5 Slice 1 complete (T029, T030, T031, T032 hardened).
 **Next:** T033 — Implement separate SCA and secret drivers in `scripts/security/run-supply-chain.mjs`.
 
@@ -348,7 +349,6 @@ the current status.
   - Enforced strict anti-patterns: zero dynamic imports (no `__import__(`, `importlib.import_module`, `eval(`, or `exec(`).
   - Verified: `apps/agent/tests/security/test_registry.py` (8/8 passed), `apps/agent/tests/security/test_contracts.py` (9/9 passed), and clean `ruff check` + `ruff format --check` (exit code 0).
 
-
 ### Feature 023 — Security Systems: Phase 2 Final Slice (T007 Completed) (2026-09-05)
 
 - T007: Added `tests/security/compose.security.yml` with loopback-only PostgreSQL (`5433`), Redis (`6380`), API (`3301`), agent (`3302`) and local model/provider stub (`3400`) services. The Compose network is internal, runtime credentials are synthetic, and API/provider/model destinations resolve only to local services. Added narrowly scoped API/agent Dockerfiles and Docker ignore files so build contexts exclude environment files and unrelated workspace data.
@@ -378,7 +378,6 @@ the current status.
   - T068: Created full E2E parity characterization suite in `apps/api/test/agent-flight-match-parity.e2e-spec.ts`. Proved 100% parity between public web search (`POST /api/flights/search`) and agent search (`POST /agent-gateway/v2/flights/search`) across MATCHED and RANKED modes for offers, scores, levels, active weights, explanation keys, and rank order. Verified zero customer PII and zero `duffelOfferId` in gateway responses.
   - T069: Updated characterization fixtures and test assertions in `test_snapshot_characterization.py`, `test_graph.py`, and `test_chat_turn_runner.py` for V2 score-free snapshots. All regressions passing.
   - Verification: E2E parity suite 5/5 PASS (`jest --config test/jest-e2e.json test/agent-flight-match-parity.e2e-spec.ts`); TypeScript typecheck 0 errors (`tsc --noEmit`); `ruff check` & `ruff format --check` 100% clean; 484/484 agent unit tests PASS.
-
 
 - Phase 6 / Slice 1 correctness and API E2E follow-up (2026-09-03): GitHub Actions run `33745578129`, API E2E job `100617447771`, failed 12 tests across the two gateway suites (509 passed). Their fixtures removed airport reference rows that canonical search now validates; cache/order assumptions also predated delegation. The suites now seed airports, exercise the real raw-cache path with distinct user profiles, assert canonical ordering, and check committed V2 offer IDs immediately. Existing mapping and audit behavior remains covered.
   - Fixed the valid attestation race: V2 requests required persistence from `FlightsService` and signs only after the transaction commits; persistence failure returns 503 without an attestation. Browser/V1 persistence remains deferred.
@@ -578,7 +577,6 @@ the current status.
       - WEAK: 0–24 (0 WEAK, 24 WEAK).
     - Ineligible offers verified: score: null, matchLevel: null, breakdown: [].
     - Zero mutation under `deepFreeze` across all contribution, score, and level calculations.
-
 
 - [x] Phase 3 / Slice 3: Weight Resolution, Baseline Collapse Fallback & Degenerate Sets (T029–T030) (2026-09-01):
   - `& '.\node_modules\.bin\jest.CMD' --runInBand src/flight-match/flight-match-scorer.service.spec.ts` from `apps/api`: 123/123 tests passed, exit 0.
