@@ -118,6 +118,73 @@ describe('ChatMessageCryptoService', () => {
     expect(decrypted).toBe(content);
   });
 
+  it('should encrypt and decrypt empty message content with a complete envelope', async () => {
+    const messageId = 'msg-empty';
+    const sessionId = 'session-empty';
+    const sender = 'AGENT';
+    const type = 'STANDARD';
+
+    const encrypted = await service.encryptMessageContent(
+      messageId,
+      sessionId,
+      sender,
+      type,
+      '',
+    );
+
+    expect(encrypted.ciphertext).toBe('');
+    expect(encrypted.nonce).not.toBe('');
+    expect(encrypted.authTag).not.toBe('');
+    expect(encrypted.keyVersion).toBe(1);
+
+    await expect(
+      service.decryptMessageContent({
+        id: messageId,
+        sessionId,
+        sender,
+        type,
+        contentCiphertext: encrypted.ciphertext,
+        contentNonce: encrypted.nonce,
+        contentAuthTag: encrypted.authTag,
+        contentKeyVersion: encrypted.keyVersion,
+      }),
+    ).resolves.toBe('');
+  });
+
+  it('should reject an incomplete empty-content envelope', async () => {
+    const encrypted = await service.encryptMessageContent(
+      'msg-incomplete',
+      'session-incomplete',
+      'AGENT',
+      'STANDARD',
+      '',
+    );
+    const completeEnvelope = {
+      id: 'msg-incomplete',
+      sessionId: 'session-incomplete',
+      sender: 'AGENT',
+      type: 'STANDARD',
+      contentCiphertext: encrypted.ciphertext,
+      contentNonce: encrypted.nonce,
+      contentAuthTag: encrypted.authTag,
+      contentKeyVersion: encrypted.keyVersion,
+    };
+
+    for (const field of [
+      'contentCiphertext',
+      'contentNonce',
+      'contentAuthTag',
+      'contentKeyVersion',
+    ] as const) {
+      await expect(
+        service.decryptMessageContent({
+          ...completeEnvelope,
+          [field]: null,
+        }),
+      ).rejects.toThrow(/missing ciphertext envelope or is corrupted/);
+    }
+  });
+
   it('should provide convenience methods for record-bound session title encryption and decryption', async () => {
     const sessionId = 'session-700';
     const title = 'Hanoi Trip Planning';

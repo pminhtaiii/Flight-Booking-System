@@ -11,6 +11,7 @@ import base64
 import re
 import unicodedata
 import urllib.parse
+from functools import lru_cache
 from typing import Any, Literal
 
 try:
@@ -89,7 +90,6 @@ _BASE64_PATTERN: re.Pattern[str] = re.compile(
 )
 
 # Bounds for regex scanning and ReDoS safety
-_MAX_CATASTROPHIC_INPUT_LEN: int = 30
 _MAX_REGEX_SCAN_LENGTH: int = 16384
 
 
@@ -197,7 +197,8 @@ def bounded_normalize(
     return cleaned
 
 
-def is_catastrophic_regex(pattern_str: str) -> bool:
+@lru_cache(maxsize=256)
+def _is_catastrophic_regex_cached(pattern_str: str) -> bool:
     """
     Statically inspects regex AST to detect nested quantifiers or branch alternations inside
     quantified repetitions that produce catastrophic exponential backtracking (ReDoS).
@@ -230,22 +231,28 @@ def is_catastrophic_regex(pattern_str: str) -> bool:
     return _check(parsed.data)
 
 
+def is_catastrophic_regex(pattern_str: str) -> bool:
+    """Return the bounded, cached ReDoS classification for a regex pattern."""
+    return _is_catastrophic_regex_cached(pattern_str)
+
+
 def safe_regex_match(
     pattern: re.Pattern[str] | str,
     text: str,
     timeout_seconds: float = 0.05,
+    known_safe: bool = False,
 ) -> bool:
     """
     ReDoS-resistant regex matcher with bounded execution timeout or bounded input length.
-    Detects catastrophic backtracking patterns via AST inspection and bounds input length
-    to guarantee termination within bounded time limits.
+    Detects catastrophic backtracking patterns via AST inspection and guarantees termination
+    within bounded time limits. Safe patterns may bypass classification when known_safe=True.
+    Known-catastrophic patterns are fail-closed and rejected to prevent exponential backtracking.
     """
     pattern_str = pattern.pattern if isinstance(pattern, re.Pattern) else pattern
     compiled = pattern if isinstance(pattern, re.Pattern) else re.compile(pattern_str)
 
-    if is_catastrophic_regex(pattern_str):
-        if len(text) > _MAX_CATASTROPHIC_INPUT_LEN:
-            return False
+    if not known_safe and is_catastrophic_regex(pattern_str):
+        return False
 
     bounded_text = text[:_MAX_REGEX_SCAN_LENGTH]
     return compiled.search(bounded_text) is not None

@@ -159,6 +159,13 @@ class GuardrailGateway:
         try:
             layers = self.registry.ordered_layers("tool")
             if not layers:
+                if self.registry.production:
+                    return PipelineDecision(
+                        status="BLOCK",
+                        response_key=GUARDRAIL_TOOL_SCHEMA,
+                        reason="Tool output guardrail pipeline is not configured",
+                        validated_data=None,
+                    )
                 return PipelineDecision(
                     status="PASS",
                     validated_data=ValidatedToolResult(tool_name=tool_name, data=result),

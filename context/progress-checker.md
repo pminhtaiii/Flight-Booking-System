@@ -25,10 +25,20 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Security Systems (Feature 023) — Phase 4 Slice 2 (Tasks T024–T025, T053) complete
-**Last completed:** Phase 4 Slice 2: Implemented 4-layer tool output guardrail pipeline, strict minimized tool schemas, bounded 64 KiB streamed response reader with pre-parse depth <= 5 checks, NestJS agent-gateway shallow projections (depth <= 5 for search and readiness), readiness harmonization for runner ACTION_REQUIRED, and payload-free exception logging.
-**In progress:** Phase 4 US2 executor integration.
-**Next:** Continue Phase 4 verification after T026 graph integration and review corrections.
+**Feature:** Security Systems (Feature 023) — Phase 4 US2 CI remediation completed
+**Last completed:** Graph-scoped search staging with atomic same-owner snapshot/fence commit, C-01 production-empty-registry fail-closed behavior, bounded owner-bound snapshot-read and commit-failure warnings, API empty-content AES-GCM compatibility, final-fix checkpoints (`349` agent tests/`1` skip, `49` literal GOAL tests, Ruff and live Redis fence green), and the post-atomic T093 flow (`1/1`, exit `0`). See [`docs/security/tool-boundary-validation.md`](../docs/security/tool-boundary-validation.md).
+**In progress:** None. Router performance remediation and regex guard integrity resolved: cached ReDoS regex pattern AST inspection (`_is_catastrophic_regex_cached` with `lru_cache(256)`), fail-closed rejection of catastrophic patterns regardless of input length, explicit `known_safe=True` bypass for pre-validated static signatures, and deduplicated candidate generation in `InjectionSignatureEngine.scan`. The full serial non-Redis agent suite passed cleanly with `971 passed, 4 skipped, 12 deselected`, exit code `0` (`test_t098_router_entry_benchmark` p95 at `14.836 ms` vs `100 ms` limit).
+**Next:** Ready for final review and merge.
+
+### Feature 023 — CI regression remediation checkpoint (2026-09-09)
+
+- GitHub Actions run `34320457987`, agent-tests job `102365862281`, recorded 3 failures with `967 passed, 4 skipped, 12 deselected`. The failures were caused by two stale trusted-snapshot fixtures missing the required owner/session fields and one stale assertion expecting `None` instead of the canonical router value `"none"`.
+- With explicit user approval, the test-only correction added `userId`/`sessionId` to `apps/agent/tests/test_rollback_matrix.py` and `apps/agent/tests/test_sse_integration.py`, and updated the router assertion while preserving the security, rollback, and handoff assertions.
+- Focused validation passed `3/3`. The CI-equivalent non-Redis agent suite passed `970`, with `4 skipped` and `12 deselected`, exit `0`; Ruff check and formatting for the two owned files also passed.
+- The router stream-entry performance bottleneck was investigated and resolved:
+  - Hotspot analysis identified ReDoS AST classification overhead across 69 regexes on each candidate, compounded by duplicate candidate evaluation in `InjectionSignatureEngine.scan`.
+  - Remediated with LRU caching (`functools.lru_cache(maxsize=256)`) on `_is_catastrophic_regex_cached`, candidate deduplication in `InjectionSignatureEngine.scan`, explicit `known_safe=True` bypass for vetted static injection/topic signatures, and fail-closed rejection for all unverified catastrophic patterns regardless of input length.
+  - Verified: focused normalization & input layer tests (`115/115 passed`), short-input catastrophic blocking tests, T098 router benchmark (`router_graph_entry` p95 at `14.836 ms` vs `100.0 ms` limit), Ruff check/format clean (`0` warnings, exit `0`).
 
 ### Feature 023 — Phase 4 T026 & Review Corrections (2026-09-08)
 
@@ -36,6 +46,20 @@ Update this file after every completed feature. Any AI agent reading this should
 - Raised only the upstream structural node ceiling from 500 to 5,000 under the unchanged 64 KiB byte limit so the non-paginated 50-booking response remains usable.
 - Accepted plain-text `signal_checkout_intent` validation errors as the schema's explicit error variant while retaining JSON checkout signals.
 - Preserved flight-match explanation parameter objects across the NestJS/Python boundary. The global upstream depth ceiling remains 5; only attested V2 search uses a depth-7 allowance required by its nested `{ key, params }` projection.
+
+### Feature 023 — Phase 4 US2 implementation checkpoint (2026-09-08)
+
+The initial T026/T027/T028 checkpoint recorded the pre-atomic implementation and its
+earlier counts. Those historical results, failed attempts, the stale handoff path
+substitution, approved URL/fixture corrections, and the expected legitimate booking
+intent are retained in the validation document; the final atomic evidence below is
+the current status.
+
+### Feature 023 — Phase 4 US2 final atomic closure (2026-09-09)
+
+- S-01 graph-scoped staging keeps attested searches private until the complete tool batch passes; same-owner entries coalesce to the latest envelope, multi-owner batches fail before commit, and one Redis Lua operation writes the snapshot plus issued/accepted fences. Direct `search_flights.ainvoke()` persistence remains compatible.
+- S-02 handoff-read failures emit `validate_handoff_snapshot_read_failed`; commit failures emit `trusted_search_snapshot_batch_commit_failed`. Both warnings are static and payload-free. The production-empty-registry path remains fail-closed.
+- Verification: adjacent agent set `349 passed, 1 skipped`, literal GOAL set `49 passed`, Ruff check/format exited `0`, the live Redis fence regression passed with `redis_integration`, API/shared/gateway/scorer gates passed `18/462`, `23/110`, `12/12`, and `13/13`, and post-atomic T093 passed `1/1`, exit `0`. Standards/spec re-review is clean; T026–T028 closure is recorded. See [`docs/security/tool-boundary-validation.md`](../docs/security/tool-boundary-validation.md).
 
 ### Feature 023 — Security Systems: Phase 4 Slice 2 (Tasks T024–T025, T053 Completed) (2026-09-07)
 

@@ -280,7 +280,7 @@ class TopicBoundary(BaseGuardrailLayer):
         content = data if isinstance(data, str) else getattr(data, "content", str(data))
 
         for pattern in OUT_OF_DOMAIN_PATTERNS:
-            if safe_regex_match(pattern, content):
+            if safe_regex_match(pattern, content, known_safe=True):
                 return PipelineDecision(
                     status="BLOCK",
                     response_key=GUARDRAIL_INPUT_TOPIC,

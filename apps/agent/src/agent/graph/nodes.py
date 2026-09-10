@@ -1,3 +1,4 @@
+import inspect
 import json
 import logging
 from datetime import datetime, timedelta, timezone
@@ -16,7 +17,9 @@ from agent.guardrails.output_pipeline import approved_model_content, payload_fre
 from agent.tools.base import get_nestjs_client
 from agent.tools.registry import get_tool_by_name
 from agent.trusted_search_snapshot import (
+    AttestedSearchEnvelope,
     ResolvedOfferSelection,
+    SnapshotOwner,
     TrustedSearchResult,
     TrustedSearchSnapshot,
     TrustedSearchSnapshotLifecycle,
@@ -57,10 +60,6 @@ async def custom_tool_node(state: AgentState, config: RunnableConfig) -> dict:
     configurable = config.get("configurable", {}) if isinstance(config, dict) else {}
     gateway = configurable.get("guardrail_gateway") if isinstance(configurable, dict) else None
     capabilities = state.get("turn_capabilities")
-    if capabilities is None:
-        capabilities = (
-            configurable.get("turn_capabilities") if isinstance(configurable, dict) else None
-        )
     messages_in = state.get("messages", [])
     calls = list(getattr(messages_in[-1], "tool_calls", []) or []) if messages_in else []
     if not isinstance(gateway, GuardrailGateway) or not isinstance(capabilities, TurnCapabilities):
@@ -71,8 +70,9 @@ async def custom_tool_node(state: AgentState, config: RunnableConfig) -> dict:
         return update_dict
 
     safe_config = payload_free_config(config)
+    pending_snapshot_stages: dict[str, dict[str, Any]] = {}
 
-    def build_invoke(call: Any):
+    def build_invoke(call: Any, stage_key: str):
         async def invoke() -> Any:
             name = call.get("name") if isinstance(call, dict) else getattr(call, "name", None)
             tool = get_tool_by_name(str(name))
@@ -81,19 +81,66 @@ async def custom_tool_node(state: AgentState, config: RunnableConfig) -> dict:
             model_fields = getattr(getattr(tool, "args_schema", None), "model_fields", {})
             if "state" in model_fields:
                 tool_args["state"] = dict(state)
-            return await tool.ainvoke(tool_args, config=safe_config)
+            tool_config = dict(safe_config)
+            tool_config["configurable"] = {
+                **safe_config.get("configurable", {}),
+                "trusted_snapshot": state.get("trusted_snapshot"),
+                "_snapshot_staging": pending_snapshot_stages,
+                "_snapshot_stage_key": stage_key,
+            }
+            return await tool.ainvoke(tool_args, config=tool_config)
 
         return invoke
 
     decision = await gateway.execute_tool_batch(
         capabilities,
         calls,
-        [build_invoke(call) for call in calls],
+        [build_invoke(call, str(index)) for index, call in enumerate(calls)],
     )
     if decision.status != "PASS" or decision.validated_data is None:
+        pending_snapshot_stages.clear()
         update_dict["tool_blocked"] = True
         update_dict["tool_block_response_key"] = decision.response_key or GUARDRAIL_TOOL_SCHEMA
         return update_dict
+
+    try:
+        latest_by_owner: dict[
+            tuple[str, str],
+            tuple[TrustedSearchSnapshotLifecycle, SnapshotOwner, AttestedSearchEnvelope],
+        ] = {}
+        for staged in pending_snapshot_stages.values():
+            lifecycle = staged.get("lifecycle")
+            owner = staged.get("owner")
+            envelope = staged.get("envelope")
+            if not isinstance(lifecycle, TrustedSearchSnapshotLifecycle):
+                raise ValueError("Invalid trusted snapshot lifecycle")
+            if not isinstance(owner, SnapshotOwner) or not isinstance(
+                envelope, AttestedSearchEnvelope
+            ):
+                raise ValueError("Invalid trusted snapshot stage")
+            latest_by_owner[(owner.user_id, owner.chat_session_id)] = (
+                lifecycle,
+                owner,
+                envelope,
+            )
+
+        if len(latest_by_owner) > 1:
+            raise ValueError("Trusted snapshot batch spans multiple owners")
+        if latest_by_owner:
+            lifecycle, owner, envelope = next(iter(latest_by_owner.values()))
+            committed = lifecycle.commit_next(owner, envelope)
+            if inspect.isawaitable(committed):
+                committed = await committed
+            if not isinstance(committed, TrustedSearchSnapshot):
+                raise ValueError("Invalid committed trusted snapshot")
+            update_dict["trusted_snapshot"] = committed.model_dump(mode="json")
+    except Exception:
+        logger.warning("trusted_search_snapshot_batch_commit_failed")
+        pending_snapshot_stages.clear()
+        update_dict["tool_blocked"] = True
+        update_dict["tool_block_response_key"] = GUARDRAIL_TOOL_SCHEMA
+        return update_dict
+    pending_snapshot_stages.clear()
 
     messages = []
     for call, validated in zip(calls, decision.validated_data):
@@ -110,15 +157,18 @@ async def custom_tool_node(state: AgentState, config: RunnableConfig) -> dict:
         )
     update_dict["messages"] = messages
 
-    for msg in messages:
-        if isinstance(msg.content, str):
-            try:
-                data = json.loads(msg.content)
-                if isinstance(data, dict) and "signal" in data:
-                    update_dict["signal"] = data["signal"]
-                    msg.content = "Checkout intent registered successfully."
-            except json.JSONDecodeError:
-                logger.debug("non_json_tool_message_ignored")
+    for msg, validated in zip(messages, decision.validated_data):
+        if validated.tool_name != "signal_checkout_intent" or not isinstance(msg.content, str):
+            continue
+        try:
+            from agent.guardrails.schemas.tools import SignalCheckoutIntentToolResult
+
+            parsed = SignalCheckoutIntentToolResult.model_validate(json.loads(msg.content))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            continue
+        if parsed.signal is not None:
+            update_dict["signal"] = parsed.signal.model_dump()
+            msg.content = "Checkout intent registered successfully."
 
     return update_dict
 
@@ -207,13 +257,59 @@ async def validate_handoff(state: AgentState, config: RunnableConfig) -> dict:
         logger.info("validate_handoff_invalid_offer_index")
         return {"action": {"error": "Missing checkout signal."}}
 
+    configurable = config.get("configurable", {}) if isinstance(config, dict) else {}
+    repository = (
+        configurable.get("trusted_snapshot_repository") if isinstance(configurable, dict) else None
+    )
+    has_config_snapshot = isinstance(configurable, dict) and "trusted_snapshot" in configurable
     snapshot = norm_state.get("trusted_snapshot")
+    if repository is not None:
+        user_id = configurable.get("user_id")
+        session_id = configurable.get("thread_id")
+        get_snapshot = getattr(repository, "get_snapshot", None)
+        if (
+            not isinstance(user_id, str)
+            or not user_id
+            or not isinstance(session_id, str)
+            or not session_id
+            or not callable(get_snapshot)
+        ):
+            logger.info("validate_handoff_missing_snapshot_owner")
+            return {"action": {"error": "Missing or invalid trusted snapshot."}}
+        try:
+            active_snapshot = await get_snapshot(user_id, session_id)
+        except Exception:
+            logger.warning("validate_handoff_snapshot_read_failed")
+            active_snapshot = None
+        if active_snapshot is None:
+            logger.info("validate_handoff_snapshot_owner_mismatch")
+            return {"action": {"error": "Missing or invalid trusted snapshot."}}
+        snapshot = active_snapshot
+    elif has_config_snapshot:
+        snapshot = configurable.get("trusted_snapshot")
+        if snapshot is None:
+            logger.info("validate_handoff_missing_loaded_snapshot")
+            return {"action": {"error": "Missing or invalid trusted snapshot."}}
     if hasattr(snapshot, "model_dump"):
         snapshot = snapshot.model_dump(mode="json")
 
     if not snapshot or not isinstance(snapshot, dict):
         logger.info("validate_handoff_missing_snapshot")
         return {"action": {"error": "Missing or invalid trusted snapshot."}}
+
+    if repository is not None or has_config_snapshot:
+        expected_user = configurable.get("user_id")
+        expected_session = configurable.get("thread_id")
+        if (
+            isinstance(expected_user, str)
+            and isinstance(expected_session, str)
+            and (
+                snapshot.get("userId") != expected_user
+                or snapshot.get("sessionId") != expected_session
+            )
+        ):
+            logger.info("validate_handoff_snapshot_owner_mismatch")
+            return {"action": {"error": "Missing or invalid trusted snapshot."}}
 
     version = (
         snapshot.get("snapshotVersion")
@@ -262,7 +358,7 @@ async def validate_handoff(state: AgentState, config: RunnableConfig) -> dict:
             logger.info("validate_handoff_snapshot_expiry_parse_error")
             return {"action": {"error": "Search snapshot has expired. Please search again."}}
 
-    return {}
+    return {"trusted_snapshot": snapshot} if repository is not None or has_config_snapshot else {}
 
 
 async def create_handoff_token(state: AgentState, config: RunnableConfig) -> dict:

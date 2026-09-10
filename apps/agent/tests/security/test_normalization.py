@@ -250,6 +250,35 @@ def test_safe_regex_match_terminates_within_strict_bound_on_pathological_input(
     assert result is False
 
 
+@pytest.mark.parametrize(
+    "pattern",
+    [
+        r"(a+)+$",
+        r"(a|aa)+$",
+        r"(x+x+)+y",
+    ],
+)
+def test_safe_regex_match_blocks_catastrophic_patterns_on_short_inputs(
+    pattern: str,
+) -> None:
+    char = "a" if "a" in pattern else "x"
+    short_input = char * 25 + "!"
+
+    durations: list[float] = []
+    result = None
+    for _ in range(5):
+        start = time.perf_counter()
+        result = safe_regex_match(pattern, short_input)
+        durations.append(time.perf_counter() - start)
+        assert result is False
+
+    median_duration = statistics.median(durations)
+    assert median_duration < 0.02, (
+        f"Execution median took {median_duration * 1000:.2f}ms, exceeding 20ms ceiling"
+    )
+    assert result is False
+
+
 def test_safe_regex_match_evaluates_legitimate_patterns_correctly() -> None:
     assert safe_regex_match(r"flights?", "I want to search for flights to Tokyo") is True
     assert safe_regex_match(r"^\d{4}-\d{2}-\d{2}$", "2026-10-15") is True

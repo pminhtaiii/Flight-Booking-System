@@ -11,6 +11,17 @@ class AgentState(TypedDict, total=False):
     iteration_count: int
     route: Literal["general", "travel", "checkout"]
     disambiguation: Literal["none", "possible_checkout"]
+    routing_provenance: Literal[
+        "trusted_router",
+        "low_confidence",
+        "checkout_downgrade",
+        "single_agent",
+        "router_exception",
+        "router_malformed",
+        "unknown_intent",
+        "missing_provenance",
+        "invalid_gate",
+    ]
     snapshot: Optional[dict]
     trusted_snapshot: Optional[dict]
     signal: Optional[dict]

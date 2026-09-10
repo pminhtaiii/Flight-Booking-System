@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Any, Dict
 
-from agent.config import get_settings
+from agent import config as agent_config
 from agent.graph.state import AgentState
 from agent.models.requests import RouteDecision
 from agent.trusted_search_snapshot import (
@@ -50,7 +50,21 @@ def evaluate_checkout_gate(state: AgentState, decision: RouteDecision) -> Dict[s
     isCommitment=True, snapshot exists and is unexpired, and selectionIndex is resolvable against snapshot.
     Returns the target route and disambiguation flag.
     """
-    settings = get_settings()
+    if not isinstance(decision, RouteDecision):
+        return {
+            "route": "general",
+            "disambiguation": "none",
+            "routing_provenance": "invalid_gate",
+        }
+
+    if decision.intent not in {"GENERAL", "SEARCH", "BOOKING_INQUIRY", "CHECKOUT"}:
+        return {
+            "route": "general",
+            "disambiguation": "none",
+            "routing_provenance": "invalid_gate",
+        }
+
+    settings = agent_config.get_settings()
 
     if decision.intent == "GENERAL":
         return {"route": "general", "disambiguation": "none"}
@@ -87,7 +101,14 @@ def evaluate_checkout_gate(state: AgentState, decision: RouteDecision) -> Dict[s
         if confidence_ok and commitment_ok and snapshot_ok and index_ok:
             return {"route": "checkout", "disambiguation": "none"}
         else:
-            return {"route": "travel", "disambiguation": "possible_checkout"}
+            return {
+                "route": "travel",
+                "disambiguation": "possible_checkout",
+                "routing_provenance": "checkout_downgrade",
+            }
 
-    # Default fallback
-    return {"route": "travel", "disambiguation": "none"}
+    return {
+        "route": "general",
+        "disambiguation": "none",
+        "routing_provenance": "invalid_gate",
+    }

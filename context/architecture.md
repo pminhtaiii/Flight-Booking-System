@@ -168,6 +168,54 @@ Feature 023 establishes a deterministic, multi-layered security architecture tha
 
 ---
 
+## Deterministic Tool Boundary and Handoff Validation (Feature 023, Phase 4 US2)
+
+The Phase 4 tool boundary is implemented across the graph, runner, gateway, and
+trusted snapshot lifecycle. Router and checkout-gate code seal output-only
+`TurnCapabilities`; graph dispatch reads the seal from state and rejects configuration
+capability fallbacks. A proposed tool batch is authorized before any member runs, and
+each result passes the size/structure, strict schema, PII, and untrusted-instruction
+layers before it can become a `ToolMessage`, graph update, callback projection,
+checkpoint, model input, or public event. A production registry with no tool layers is
+fail-closed. Runner events and `ACTION_HANDOFF` use only validated output, while
+owner/session snapshot binding and single-lease cleanup remain enforced on block,
+error, cancellation, and disconnect.
+
+For graph search, `search_flights` stages its attested envelope in a private
+graph-scoped map. It does not allocate a snapshot version, write storage, or update
+trusted configuration until the complete tool batch passes validation; a blocked batch
+clears staging and publishes no message. The post-pass node validates all stages,
+coalesces same-owner entries to the last envelope, and commits through one atomic
+`commit_next` lifecycle operation. Direct `search_flights.ainvoke()` calls retain
+their existing persistence behavior for compatibility. A failed or multi-owner batch
+cannot leave an earlier snapshot committed on a blocked turn.
+
+The follow-up graph-state correction passes the latest `state["trusted_snapshot"]`
+into the next tool configuration and writes the validated `TrustedSearchSnapshot`
+returned by `commit_next` back into graph state. Commit failures clear staged work
+and fail closed. The router benchmark latency was resolved via regex ReDoS AST classification
+caching, candidate deduplication in `InjectionSignatureEngine`, and `known_safe=True` bypass for vetted
+signatures, with fail-closed rejection for catastrophic patterns on all input lengths.
+
+Owner-bound handoff snapshot read failures emit only the static
+`validate_handoff_snapshot_read_failed` warning and the generic safe error; exception
+text, identifiers, and payloads stay out of logs. Snapshot commit failures emit only
+the static `trusted_search_snapshot_batch_commit_failed` warning with the same
+payload-free logging boundary.
+
+The API chat persistence boundary accepts an empty plaintext message only as a complete
+AES-256-GCM envelope: an empty ciphertext is valid when nonce, authentication tag, and
+positive key version are present; undefined content is still encrypted before storage,
+and incomplete envelopes fail closed. The validated command counts and scope-limited
+handoff/payment evidence are recorded in
+[`docs/security/tool-boundary-validation.md`](../docs/security/tool-boundary-validation.md).
+The atomic final-fix commands have green observed checkpoints (`349` agent tests with
+one skip and `49` literal GOAL tests), local Redis verifies the new commit primitive,
+and the post-atomic T093 flow passed `1/1` with exit `0`. Phase 4 US2 T026–T028 task
+closure and workflow signoff are complete for this slice.
+
+---
+
 ## Authenticated Booking Dashboard (Feature 021, Phase 6 Finalization)
 
 Feature 021 ships `/dashboard` as the authenticated booking hub without introducing a new cache tier, global layout rewrite, or fabricated travel metrics. The production path is split cleanly between a direct Prisma read model in the API and a server-only loader in the web app.
@@ -924,6 +972,7 @@ The repository uses a single GitHub Actions pull request CI workflow at `.github
 - **Loopback-Only Network Guards**: `node-network-guard.cjs` and `python/sitecustomize.py` restrict outgoing socket connections during CI test/build stages exclusively to loopback addresses (`127.0.0.1`, `::1`, `localhost`) to prevent unauthorized live provider access.
 - **Change Detection & Routing**: `detect-changes` executes contract validation and actionlint, emitting string booleans for `api`, `web`, and `agent` via `dorny/paths-filter`.
 - **Deterministic Test Commands**: API unit CI calls the explicit `test:ci` script rather than forwarding Jest flags through pnpm. Agent Redis coverage enforcement is applied only to the dedicated Redis-marked selection, so the non-Redis and Redis groups validate independently.
+- **Post-fix verification status (2026-09-09)**: Adjacent snapshot/search integration tests passed `74/74`, graph tests passed `6/6`, and the live Redis snapshot check passed `1`, with `39` deselected; Ruff check/format also passed. The router stream-entry benchmark (`test_t098_router_entry_benchmark`) bottleneck was resolved via AST classification caching, short-circuit length bounds, and candidate deduplication (p95 at `14.836 ms` vs `100.0 ms` limit). The complete non-Redis agent suite passed serially with `971 passed, 4 skipped, 12 deselected`, exit code `0`.
 - **Correctness vs. Performance**: Blocking API E2E runs exclude `[.-]performance.e2e-spec.ts` wall-clock benchmarks, which remain available through the opt-in `test:e2e:performance` command for controlled benchmark environments.
 - **Status Evaluation**: The terminal `ci-status` job runs `evaluate-ci-status.mjs` with `always()`, verifying that all relevant service jobs succeeded, irrelevant jobs were safely skipped, and detection ran cleanly. Branch protection requires only `ci-status`.
 
@@ -1095,6 +1144,8 @@ Feature 019 restructures high-leverage boundaries without changing public produc
 ## Planned Feature 023: Deterministic Guardrails and Security Verification
 
 Design baseline established (2026-09-04); current implementation descriptions above remain unchanged. See `specs/023-security-systems/plan.md` and `tasks.md` for the 52-task delivery plan.
+
+Phase 4 staged trusted-search persistence uses owner-scoped graph staging followed by one same-owner `commit_next` lifecycle operation. The repository's Redis Lua commit validates the expected next version and writes the snapshot, issued fence, and accepted fence atomically. A failed or multi-owner batch is rejected before persistence; direct tool invocations retain the existing allocation/save contract.
 
 Proposed flow: authenticated SSE -> thin ChatController -> ChatTurnRunner -> mandatory GuardrailGateway. Runner owns input, guarded tool execution and output streaming enforcement. Tool authorization/result validation must complete before ToolMessages, signal parsing, graph state/checkpoints, model continuation or public events; observing runner tool-end events is insufficient. Preserve existing auth, quotas, encrypted persistence, fencing, snapshots and dedicated handoff channels.
 
