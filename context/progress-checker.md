@@ -101,6 +101,14 @@ Update this file after every completed feature. Any AI agent reading this should
 **In progress:** Phase 5 complete.
 **Next:** Phase 6 US4 — Execute Runtime Penetration Coverage (Tasks T036–T041).
 
+### Feature 023 — CI security scanner remediation checkpoint (2026-09-10)
+
+- Latest GitHub Actions evidence: [run 34489376059](https://github.com/pminhtaiii/Flight-Booking-System/actions/runs/34489376059), artifact `security-supply-chain-artifacts/supply-chain.json`.
+- The SAST job failed closed because the runner had no Semgrep executable (`spawnSync semgrep ENOENT`). The supply-chain job reported 155 records (9 Critical, 108 High, 38 Medium): 105 pnpm advisory records and 50 Gitleaks findings in deterministic tests/docs/example fixtures and generated metadata. No live credential was established from the sanitized report.
+- Remediation applied in `.github/workflows/ci.yml` and `.github/workflows/security-scan.yml`: install the pinned Semgrep `1.88.0`, export the runner-local bin directory for the current shell before `semgrep --version`, and append it to `GITHUB_PATH` for the scan step. `tests/ci/ci-workflow.contract.test.mjs` scopes both checks to the `security-sast` job and verifies install, PATH ordering, and executable verification.
+- Dependency remediation remains blocked by registry timeouts/connection resets while resolving the required patched Next.js major and transitive packages. No broad dependency upgrades, lockfile changes, advisory overrides, or unvalidated Gitleaks allowlists were retained. The scanner remains fail-closed; the 50 fixture/history findings require reviewed fixture handling and history-aware validation before suppression.
+- US4 runtime penetration/DAST tasks T036–T041 and US5 telemetry/performance/rollout tasks T042–T047 remain open, as do release closure tasks T049–T052. They are not represented as completed by this CI-only checkpoint.
+
 ### Feature 023 — CI regression remediation checkpoint (2026-09-09)
 
 - GitHub Actions run `34320457987`, agent-tests job `102365862281`, recorded 3 failures with `967 passed, 4 skipped, 12 deselected`. The failures were caused by two stale trusted-snapshot fixtures missing the required owner/session fields and one stale assertion expecting `None` instead of the canonical router value `"none"`.

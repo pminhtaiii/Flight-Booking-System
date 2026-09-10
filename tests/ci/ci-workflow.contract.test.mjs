@@ -10,6 +10,7 @@ import { evaluateCiStatus, SERVICE_CHAINS } from '../../scripts/ci/evaluate-ci-s
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const evaluatorPath = resolve(root, 'scripts/ci/evaluate-ci-status.mjs');
 const workflowPath = resolve(root, '.github/workflows/ci.yml');
+const scheduledWorkflowPath = resolve(root, '.github/workflows/security-scan.yml');
 const services = SERVICE_CHAINS;
 const securityJobs = ['security-sast', 'security-supply-chain'];
 const jobIds = ['detect-changes', ...Object.values(services).flat()];
@@ -45,6 +46,14 @@ function validResults(changes = {}) {
 function workflow() {
   assert.ok(existsSync(workflowPath), 'expected .github/workflows/ci.yml to exist');
   return readFileSync(workflowPath, 'utf8');
+}
+
+function scheduledWorkflow() {
+  assert.ok(
+    existsSync(scheduledWorkflowPath),
+    'expected .github/workflows/security-scan.yml to exist',
+  );
+  return readFileSync(scheduledWorkflowPath, 'utf8');
 }
 
 function jobBlock(source, jobId) {
@@ -858,6 +867,60 @@ test('workflow declares dedicated security jobs with bounded permissions and dep
   }
 });
 
+test('security-sast installs and verifies the pinned Semgrep CLI before scanning', () => {
+  const source = workflow();
+  const sast = jobBlock(source, 'security-sast');
+  const semgrepInstall = stepBlock(sast, 'Install pinned Semgrep 1.88.0');
+
+  assertContains(
+    semgrepInstall,
+    /uv tool install --python 3\.11 --bin-dir "\$RUNNER_TEMP\/semgrep-bin" semgrep==1\.88\.0/,
+    'security-sast must install the pinned Semgrep CLI',
+  );
+  assertContains(
+    semgrepInstall,
+    /echo "\$RUNNER_TEMP\/semgrep-bin" >> "\$GITHUB_PATH"/,
+    'security-sast must expose the pinned Semgrep binary to later steps',
+  );
+  assertContains(
+    semgrepInstall,
+    /export PATH="\$RUNNER_TEMP\/semgrep-bin:\$PATH"[\s\S]*echo "\$RUNNER_TEMP\/semgrep-bin" >> "\$GITHUB_PATH"[\s\S]*semgrep --version/,
+    'security-sast must make Semgrep available in the install step before verifying it',
+  );
+  assertContains(
+    semgrepInstall,
+    /semgrep --version/,
+    'security-sast must verify the Semgrep executable before scanning',
+  );
+});
+
+test('scheduled security-sast installs and verifies the pinned Semgrep CLI', () => {
+  const source = scheduledWorkflow();
+  const sast = jobBlock(source, 'security-sast');
+  const semgrepInstall = stepBlock(sast, 'Install pinned Semgrep 1.88.0');
+
+  assertContains(
+    semgrepInstall,
+    /uv tool install --python 3\.11 --bin-dir "\$RUNNER_TEMP\/semgrep-bin" semgrep==1\.88\.0/,
+    'scheduled security-sast must install the pinned Semgrep CLI',
+  );
+  assertContains(
+    semgrepInstall,
+    /echo "\$RUNNER_TEMP\/semgrep-bin" >> "\$GITHUB_PATH"/,
+    'scheduled security-sast must expose the pinned Semgrep binary',
+  );
+  assertContains(
+    semgrepInstall,
+    /export PATH="\$RUNNER_TEMP\/semgrep-bin:\$PATH"[\s\S]*echo "\$RUNNER_TEMP\/semgrep-bin" >> "\$GITHUB_PATH"[\s\S]*semgrep --version/,
+    'scheduled security-sast must make Semgrep available in the install step before verifying it',
+  );
+  assertContains(
+    semgrepInstall,
+    /semgrep --version/,
+    'scheduled security-sast must verify the Semgrep executable',
+  );
+});
+
 test('path filtering triggers security jobs on security-sensitive changes', () => {
   const source = workflow();
   const detect = jobBlock(source, 'detect-changes');
@@ -957,4 +1020,3 @@ test('maintains single branch protection rule requiring only ci-status on develo
     );
   }
 });
-
