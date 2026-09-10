@@ -47,6 +47,7 @@ jobs:
       - name: Run SAST scan
         run: node scripts/security/run-sast.mjs --sarif artifacts/security/sast.sarif
       - name: Upload security artifacts
+        if: always()
         uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb99ba8edd # v4.6.1
         with:
           name: security-sast-artifacts
@@ -88,9 +89,14 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Install Agent dependencies from root lock
         run: uv sync --locked --package agent
+      - name: Install Gitleaks 8.18.4
+        run: |
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v8.18.4/gitleaks_8.18.4_linux_x64.tar.gz" | tar -xz -C /tmp gitleaks
+          sudo install -m 755 /tmp/gitleaks /usr/local/bin/gitleaks
       - name: Run supply chain scan
         run: node scripts/security/run-supply-chain.mjs --strict
       - name: Upload security artifacts
+        if: always()
         uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb99ba8edd # v4.6.1
         with:
           name: security-supply-chain-artifacts
