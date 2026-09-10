@@ -533,10 +533,13 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Install Agent dependencies from root lock
         run: uv sync --locked --package agent
-      - name: Install Gitleaks 8.18.4
+      - name: Install checksum-verified Gitleaks 8.18.4
         run: |
-          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v8.18.4/gitleaks_8.18.4_linux_x64.tar.gz" | tar -xz -C /tmp gitleaks
-          sudo install -m 755 /tmp/gitleaks /usr/local/bin/gitleaks
+          curl --fail --location --silent --show-error --output gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v8.18.4/gitleaks_8.18.4_linux_x64.tar.gz
+          echo 'ba6dbb656933921c775ee5a2d1c13a91046e7952e9d919f9bac4cec61d628e7d  gitleaks.tar.gz' | sha256sum --check --status
+          tar --extract --gzip --file gitleaks.tar.gz gitleaks
+          sudo install -m 755 gitleaks /usr/local/bin/gitleaks
+          rm -f gitleaks.tar.gz gitleaks
       - name: Run supply chain scan
         run: node scripts/security/run-supply-chain.mjs --strict
       - name: Upload security artifacts
