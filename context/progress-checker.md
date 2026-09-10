@@ -86,10 +86,13 @@ Update this file after every completed feature. Any AI agent reading this should
   - Verified 29/29 tests passing with exit code 0.
 - **T035 CI Workflow Integration & Aggregated Security Evaluation**:
   - Integrated `security-sast` and `security-supply-chain` jobs into `.github/workflows/ci.yml` with pinned action SHAs, minimal permissions (`contents: read`), change-detection gating, and artifact upload.
-  - Updated `detect-changes` in `ci.yml` to publish `security` output based on security-relevant paths (scripts, tests, guardrails, auth, package files, lockfiles).
+  - Updated `detect-changes` in `ci.yml` to publish `security` output based on security-relevant paths (scripts, tests, full application source files across agent, api, web, shared, package files, lockfiles).
   - Updated `ci-status` in `ci.yml` to depend on `security-sast` and `security-supply-chain` and pass conclusions to `scripts/ci/evaluate-ci-status.mjs`.
-  - Updated `scripts/ci/evaluate-ci-status.mjs` to include `security` in `SERVICE_CHAINS`, parse `SECURITY_CHANGED`, `SECURITY_SAST_RESULT`, and `SECURITY_SUPPLY_CHAIN_RESULT`, inspect available security reports (`sast.json`/SARIF, `supply-chain.json`), and enforce the security gate.
-  - Verified `tests/ci/ci-workflow.contract.test.mjs` (29/29 passing), `tests/security/evaluate-results.test.mjs` (34/34 passing), and `tests/security/supply-chain.test.mjs` (11/11 passing).
+  - Added `.github/workflows/security-scan.yml` for scheduled nightly full scans (`0 2 * * *`) and workflow dispatch.
+  - Added `pip-audit==2.7.3` to `apps/agent/pyproject.toml` dev group, updated `uv.lock`, and configured `--strict` supply chain scanning in CI.
+  - Enhanced `runSecretScan` in `scripts/security/run-supply-chain.mjs` to write temporary JSON reports, fail closed on nonzero exit codes with no findings, and removed obsolete commentary.
+  - Updated `scripts/ci/evaluate-ci-status.mjs` and `tests/ci/evaluate-ci-status.test.mjs` with clean imports, removed dead code, and included security conclusions in tests.
+  - Verified `tests/ci/ci-workflow.contract.test.mjs` (29/29 passing), `tests/ci/evaluate-ci-status.test.mjs` (6/6 passing), and `tests/security/supply-chain.test.mjs` (13/13 passing).
 
 ### Current Status
 

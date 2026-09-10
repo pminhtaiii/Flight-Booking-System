@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
@@ -540,3 +540,67 @@ test('T033 - main CLI entry point: handles arguments and exit codes', () => {
     rmSync(tempDir, { recursive: true, force: true });
   }
 });
+
+test('T033 - runSecretScan: writes and parses from report file', () => {
+  const tempDir = createTempDir();
+  const reportPath = join(tempDir, 'test-gitleaks-report.json');
+
+  let execCalledWithReportPath = false;
+  const mockExecFn = (cmd, args) => {
+    const reportPathIdx = args.indexOf('--report-path');
+    if (reportPathIdx !== -1) {
+      execCalledWithReportPath = true;
+      const targetPath = args[reportPathIdx + 1];
+      const findings = [
+        {
+          RuleID: 'aws-secret-key',
+          Description: 'AWS Secret Key detected',
+          File: 'apps/api/secret.env',
+          StartLine: 4,
+          Secret: 'AKIAIOSFODNN7EXAMPLE',
+        },
+      ];
+      writeFileSync(targetPath, JSON.stringify(findings));
+      return { status: 1, stdout: '', stderr: '' };
+    }
+    return { status: 0, stdout: '[]', stderr: '' };
+  };
+
+  try {
+    const result = runSecretScan({
+      rootDir: repoRoot,
+      reportPath,
+      execFn: mockExecFn,
+    });
+
+    assert.equal(execCalledWithReportPath, true);
+    assert.equal(result.findings.length, 1);
+    assert.equal(result.findings[0].ruleId, 'aws-secret-key');
+    assert.equal(result.counts.Critical, 1);
+    assert.equal(result.errors.length, 0);
+    assert.equal(existsSync(reportPath), false);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('T033 - runSecretScan: fails closed on nonzero exit code with no findings', () => {
+  const mockExecFn = (_cmd, _args) => {
+    return {
+      status: 2,
+      stdout: '',
+      stderr: 'fatal: invalid argument --unknown-flag',
+    };
+  };
+
+  const result = runSecretScan({
+    rootDir: repoRoot,
+    execFn: mockExecFn,
+  });
+
+  assert.equal(result.findings.length, 0);
+  assert.equal(result.errors.length, 1);
+  assert.match(result.errors[0], /\[Secret Scanner Error\] Gitleaks exited with code 2/);
+  assert.match(result.errors[0], /invalid argument/);
+});
+

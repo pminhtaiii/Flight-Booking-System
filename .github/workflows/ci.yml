@@ -92,9 +92,13 @@ jobs:
             security:
               - 'scripts/security/**'
               - 'tests/security/**'
+              - 'apps/agent/**'
               - 'apps/agent/src/agent/guardrails/**'
+              - 'apps/api/**'
               - 'apps/api/src/auth/**'
+              - 'apps/web/**'
               - 'apps/web/**auth**'
+              - 'packages/shared/**'
               - 'package.json'
               - 'pnpm-lock.yaml'
               - 'pyproject.toml'
@@ -529,7 +533,7 @@ jobs:
       - name: Install Agent dependencies from root lock
         run: uv sync --locked --package agent
       - name: Run supply chain scan
-        run: node scripts/security/run-supply-chain.mjs
+        run: node scripts/security/run-supply-chain.mjs --strict
       - name: Upload security artifacts
         uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb99ba8edd # v4.6.1
         with:

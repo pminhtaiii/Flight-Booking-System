@@ -1,8 +1,6 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
-import { evaluateSast, evaluateSupplyChain } from '../security/evaluate-results.mjs';
 
 export const SERVICE_CHAINS = {
   api: ['api-gate', 'api-unit-tests', 'api-e2e-tests'],
@@ -26,7 +24,7 @@ function getConclusion(results, job) {
   return results?.jobs?.[job] ?? results?.[job];
 }
 
-export function evaluateCiStatus(results, options = {}) {
+export function evaluateCiStatus(results) {
   if (results === null || typeof results !== 'object' || Array.isArray(results)) {
     return fail('results must be an object');
   }
@@ -67,65 +65,6 @@ export function evaluateCiStatus(results, options = {}) {
     return fail(
       `smoke-and-sanity concluded ${String(smokeAndSanityConclusion)}, expected ${expectedSmokeAndSanityConclusion} because ${anySmokeDomainChanged ? 'at least one domain changed' : 'all domains are unchanged'}`,
     );
-  }
-
-  const targetReportsDir =
-    typeof options === 'string'
-      ? options
-      : (options?.reportsDir ?? options?.directory ?? results?.reportsDir ?? process.env.SECURITY_REPORTS_DIR);
-
-  if (targetReportsDir) {
-    const reportsDir = resolve(targetReportsDir);
-    if (!existsSync(reportsDir)) {
-      return fail(`security reports directory does not exist: ${reportsDir}`);
-    }
-
-    // 1. Inspect SAST
-    const sastJsonPath = join(reportsDir, 'sast.json');
-    const sastSarifPath = join(reportsDir, 'sast.sarif');
-    let sastData = null;
-
-    if (existsSync(sastJsonPath)) {
-      try {
-        sastData = JSON.parse(readFileSync(sastJsonPath, 'utf8'));
-      } catch (err) {
-        return fail(`failed to parse SAST report: ${err.message}`);
-      }
-    } else if (existsSync(sastSarifPath)) {
-      try {
-        sastData = JSON.parse(readFileSync(sastSarifPath, 'utf8'));
-      } catch (err) {
-        return fail(`failed to parse SAST SARIF report: ${err.message}`);
-      }
-    }
-
-    if (sastData !== null) {
-      const sastEval = evaluateSast(sastData);
-      if (!sastEval.passed) {
-        return fail(`security SAST gate failed: ${sastEval.errors.join('; ')}`);
-      }
-    }
-
-    // 2. Inspect Supply Chain
-    const supplyChainPath = join(reportsDir, 'supply-chain.json');
-    let supplyChainData = null;
-
-    if (existsSync(supplyChainPath)) {
-      try {
-        supplyChainData = JSON.parse(readFileSync(supplyChainPath, 'utf8'));
-      } catch (err) {
-        return fail(`failed to parse supply chain report: ${err.message}`);
-      }
-    }
-
-    if (supplyChainData !== null) {
-      const scEval = evaluateSupplyChain(supplyChainData, {
-        currentDate: options?.currentDate,
-      });
-      if (!scEval.passed) {
-        return fail(`security supply chain gate failed: ${scEval.errors.join('; ')}`);
-      }
-    }
   }
 
   return { passed: true, reason: 'all required CI jobs reached their expected conclusions' };

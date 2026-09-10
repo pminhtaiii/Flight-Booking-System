@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -32,9 +33,6 @@ export function computeFindingFingerprint(scanner, target, line, id = '') {
     .digest('hex');
 }
 
-/**
- * Deeply redacts sensitive strings across an object or array.
- */
 export function deepRedact(val) {
   if (typeof val === 'string') {
     return redactSensitiveText(val);
@@ -62,9 +60,6 @@ export function deepRedact(val) {
   return val;
 }
 
-/**
- * Parses pip-audit JSON output into normalized findings and severity counts.
- */
 export function parsePipAuditOutput(rawOutput) {
   let parsed;
   if (typeof rawOutput === 'string') {
@@ -118,9 +113,6 @@ export function parsePipAuditOutput(rawOutput) {
   return { counts, findings };
 }
 
-/**
- * Parses pnpm audit JSON output into normalized findings and severity counts.
- */
 export function parsePnpmAuditOutput(rawOutput) {
   let parsed;
   if (typeof rawOutput === 'string') {
@@ -138,7 +130,6 @@ export function parsePnpmAuditOutput(rawOutput) {
   const findings = [];
   const counts = { Critical: 0, High: 0, Medium: 0, Low: 0, Informational: 0 };
 
-  // 1. Advisories map (pnpm / npm v1 format)
   if (parsed.advisories && typeof parsed.advisories === 'object') {
     for (const [advId, adv] of Object.entries(parsed.advisories)) {
       if (!adv || typeof adv !== 'object') continue;
@@ -168,7 +159,6 @@ export function parsePnpmAuditOutput(rawOutput) {
       });
     }
   } else if (parsed.vulnerabilities && typeof parsed.vulnerabilities === 'object') {
-    // 2. npm v2 format
     for (const [pkgName, vInfo] of Object.entries(parsed.vulnerabilities)) {
       if (!vInfo || typeof vInfo !== 'object') continue;
       const sevStr = String(vInfo.severity || '').toLowerCase();
@@ -196,7 +186,6 @@ export function parsePnpmAuditOutput(rawOutput) {
     }
   }
 
-  // Reconcile with metadata.vulnerabilities if findings is empty but metadata counts exist
   if (findings.length === 0 && parsed.metadata?.vulnerabilities) {
     const mv = parsed.metadata.vulnerabilities;
     counts.Critical = Number(mv.critical) || 0;
@@ -209,10 +198,6 @@ export function parsePnpmAuditOutput(rawOutput) {
   return { counts, findings };
 }
 
-/**
- * Parses Gitleaks JSON output into normalized findings and severity counts,
- * enforcing secret redaction invariants.
- */
 export function parseGitleaksOutput(rawOutput) {
   let parsed;
   if (typeof rawOutput === 'string') {
@@ -268,9 +253,6 @@ export function parseGitleaksOutput(rawOutput) {
   return { counts, findings };
 }
 
-/**
- * Built-in fallback secret scanner across workspaces when Gitleaks is not installed.
- */
 export function scanWorkspaceForSecrets(rootDir) {
   const workspaces = ['apps/agent', 'apps/api', 'apps/web', 'packages/shared'];
   const ignoredDirs = new Set([
@@ -398,9 +380,6 @@ export function scanWorkspaceForSecrets(rootDir) {
   return { counts, findings, errors };
 }
 
-/**
- * Runs pip-audit against apps/agent/pyproject.toml or uv.lock.
- */
 export function runPipAudit(options = {}) {
   const rootDir = options.rootDir || defaultRepoRoot;
   const execFn = options.execFn || spawnSync;
@@ -486,9 +465,6 @@ export function runPipAudit(options = {}) {
   };
 }
 
-/**
- * Runs pnpm audit across workspace dependencies.
- */
 export function runPnpmAudit(options = {}) {
   const rootDir = options.rootDir || defaultRepoRoot;
   const execFn = options.execFn || spawnSync;
@@ -549,20 +525,21 @@ export function runPnpmAudit(options = {}) {
   };
 }
 
-/**
- * Runs secret detection (Gitleaks or fallback).
- */
 export function runSecretScan(options = {}) {
   const rootDir = options.rootDir || defaultRepoRoot;
   const execFn = options.execFn || spawnSync;
   const strict = Boolean(options.strict);
   const errors = [];
 
+  const reportPath =
+    options.reportPath ||
+    join(tmpdir(), `gitleaks-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
+
   let cmdRes;
   try {
     cmdRes = execFn(
       'gitleaks',
-      ['detect', '--source', rootDir, '--verbose', '--report-format', 'json', '--redact'],
+      ['detect', '--source', rootDir, '--report-format', 'json', '--report-path', reportPath, '--redact'],
       {
         cwd: rootDir,
         encoding: 'utf8',
@@ -573,19 +550,34 @@ export function runSecretScan(options = {}) {
     cmdRes = { error: err };
   }
 
-  const rawOut = cmdRes?.stdout?.trim() || '';
-  if (rawOut.startsWith('[') || rawOut.startsWith('{')) {
+  let parsed;
+  if (existsSync(reportPath)) {
     try {
-      const parsed = parseGitleaksOutput(rawOut);
-      return {
-        timestamp: new Date().toISOString(),
-        counts: parsed.counts,
-        findings: parsed.findings,
-        errors: [],
-      };
+      const content = readFileSync(reportPath, 'utf8');
+      parsed = parseGitleaksOutput(content);
     } catch (err) {
-      errors.push(`[Secret Scanner Error] Failed to parse gitleaks output: ${err.message}`);
+      errors.push(`[Secret Scanner Error] Failed to parse gitleaks report: ${err.message}`);
+    } finally {
+      rmSync(reportPath, { force: true });
     }
+  } else {
+    const rawOut = cmdRes?.stdout?.trim() || '';
+    if (rawOut.startsWith('[') || rawOut.startsWith('{')) {
+      try {
+        parsed = parseGitleaksOutput(rawOut);
+      } catch (err) {
+        errors.push(`[Secret Scanner Error] Failed to parse gitleaks output: ${err.message}`);
+      }
+    }
+  }
+
+  if (parsed) {
+    return {
+      timestamp: new Date().toISOString(),
+      counts: parsed.counts,
+      findings: parsed.findings,
+      errors: [],
+    };
   }
 
   const stderr = (cmdRes?.stderr || '').toLowerCase();
@@ -620,6 +612,12 @@ export function runSecretScan(options = {}) {
     };
   }
 
+  if (cmdRes?.status !== 0 || cmdRes?.error) {
+    errors.push(
+      `[Secret Scanner Error] Gitleaks exited with code ${cmdRes?.status}: ${cmdRes?.stderr || 'No report produced'}`,
+    );
+  }
+
   return {
     timestamp: new Date().toISOString(),
     counts: { Critical: 0, High: 0, Medium: 0, Low: 0, Informational: 0 },
@@ -628,9 +626,6 @@ export function runSecretScan(options = {}) {
   };
 }
 
-/**
- * Top-level supply chain and secret scan driver.
- */
 export function runSupplyChainScan(options = {}) {
   const rootDir = options.rootDir ? resolve(options.rootDir) : defaultRepoRoot;
   const outputPath = options.output
@@ -642,32 +637,27 @@ export function runSupplyChainScan(options = {}) {
 
   const errors = [];
 
-  // 1. Run pip-audit
   const pipResult = runPipAudit({ rootDir, execFn: options.execFn, strict, offline });
   if (pipResult.errors && pipResult.errors.length > 0) {
     errors.push(...pipResult.errors);
   }
 
-  // 2. Run pnpm audit
   const pnpmResult = runPnpmAudit({ rootDir, execFn: options.execFn, strict, offline });
   if (pnpmResult.errors && pnpmResult.errors.length > 0) {
     errors.push(...pnpmResult.errors);
   }
 
-  // 3. Run secret detection
   const secretResult = runSecretScan({ rootDir, execFn: options.execFn, strict, offline });
   if (secretResult.errors && secretResult.errors.length > 0) {
     errors.push(...secretResult.errors);
   }
 
-  // Combine findings
   const allFindings = [
     ...(pipResult.findings || []),
     ...(pnpmResult.findings || []),
     ...(secretResult.findings || []),
   ];
 
-  // Aggregated severity counts
   const counts = {
     Critical: 0,
     High: 0,
@@ -683,7 +673,6 @@ export function runSupplyChainScan(options = {}) {
     }
   }
 
-  // Format raw report
   const rawReport = {
     version: '1.0.0',
     timestamp: new Date().toISOString(),
@@ -711,10 +700,8 @@ export function runSupplyChainScan(options = {}) {
     errors,
   };
 
-  // Strip disallowed fields and redact all sensitive strings
   const sanitizedReport = deepRedact(stripDisallowedFields(rawReport));
 
-  // Write report to destination
   try {
     mkdirSync(dirname(outputPath), { recursive: true });
     writeFileSync(outputPath, JSON.stringify(sanitizedReport, null, 2) + '\n', 'utf8');
@@ -724,7 +711,6 @@ export function runSupplyChainScan(options = {}) {
     );
   }
 
-  // Suppression and policy evaluation
   const validExceptionIds = new Set(
     exceptions
       .filter((e) => !e.expiry || Date.parse(e.expiry) > Date.now())
@@ -757,9 +743,6 @@ export function runSupplyChainScan(options = {}) {
   };
 }
 
-/**
- * Main CLI entry point.
- */
 export function main(argv = process.argv.slice(2), dependencies = {}) {
   const rootDir = dependencies.rootDir || defaultRepoRoot;
   const exitFn = dependencies.exitFn || process.exit;

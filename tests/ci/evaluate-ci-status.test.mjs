@@ -15,6 +15,7 @@ function flatResults({ api, web, agent, smoke }) {
     api,
     web,
     agent,
+    security: 'false',
     'detect-changes': 'success',
     'api-gate': api === 'true' ? 'success' : 'skipped',
     'api-unit-tests': api === 'true' ? 'success' : 'skipped',
@@ -23,13 +24,15 @@ function flatResults({ api, web, agent, smoke }) {
     'web-build': web === 'true' ? 'success' : 'skipped',
     'agent-gate': agent === 'true' ? 'success' : 'skipped',
     'agent-tests': agent === 'true' ? 'success' : 'skipped',
+    'security-sast': 'skipped',
+    'security-supply-chain': 'skipped',
     [SMOKE_JOB]: smoke,
   };
 }
 
 function nestedResults(flat) {
-  const { api, web, agent, ...jobs } = flat;
-  return { outputs: { api, web, agent }, jobs };
+  const { api, web, agent, security, ...jobs } = flat;
+  return { outputs: { api, web, agent, security }, jobs };
 }
 
 // These expectations are hand-derived from the aggregate contract: only the
