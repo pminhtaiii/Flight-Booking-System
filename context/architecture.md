@@ -87,8 +87,8 @@
 │   └── smoke/                         → Authoritative whole-stack smoke & sanity test harness
 │
 ├── scripts/
-│   ├── ci/                            → CI status and gate evaluation scripts
-│   └── security/                      → evaluate-results.mjs, validate-corpus.mjs, write-report.mjs, and security harness tooling
+│   ├── ci/                            → CI status and gate evaluation scripts (evaluate-ci-status.mjs)
+│   └── security/                      → run-supply-chain.mjs, run-sast.mjs, evaluate-results.mjs, validate-corpus.mjs, write-report.mjs, and security harness tooling
 │
 ├── docs/
 │   ├── adr/                           → Architectural Decision Records

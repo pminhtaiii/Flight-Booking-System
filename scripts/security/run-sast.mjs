@@ -1770,7 +1770,7 @@ export function main(argv = process.argv.slice(2), dependencies = {}) {
         return exitFn(1);
       }
       mode = val;
-    } else if (arg === '--sarif-output') {
+    } else if (arg === '--sarif-output' || arg === '--sarif') {
       sarifOutput = argv[++i];
     } else if (arg === '--baseline') {
       baseline = argv[++i];

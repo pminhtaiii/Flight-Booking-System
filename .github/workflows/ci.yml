@@ -22,6 +22,7 @@ jobs:
       api: ${{ steps.filter.outputs.api }}
       web: ${{ steps.filter.outputs.web }}
       agent: ${{ steps.filter.outputs.agent }}
+      security: ${{ steps.filter.outputs.security }}
     steps:
       - name: Use LF checkout behavior
         run: git config --global core.autocrlf input
@@ -86,6 +87,16 @@ jobs:
               - 'tests/smoke/**'
               - 'scripts/ci/run-smoke-sanity.mjs'
               - 'docker-compose.yml'
+              - 'pyproject.toml'
+              - 'uv.lock'
+            security:
+              - 'scripts/security/**'
+              - 'tests/security/**'
+              - 'apps/agent/src/agent/guardrails/**'
+              - 'apps/api/src/auth/**'
+              - 'apps/web/**auth**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
               - 'pyproject.toml'
               - 'uv.lock'
 
@@ -434,6 +445,98 @@ jobs:
           TIKTOKEN_CACHE_DIR: ${{ github.workspace }}/.tiktoken_cache
         run: uv run --package agent pytest apps/agent/tests -m redis_integration --strict-markers
 
+  security-sast:
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.security == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Use LF checkout behavior
+        run: git config --global core.autocrlf input
+      - name: Checkout pull request
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up pnpm 10.34.5
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 10.34.5
+      - name: Set up Node 20
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Set up uv 0.12.0 and Python 3.11
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: 0.12.0
+          python-version: '3.11'
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - name: Install Python 3.11
+        run: uv python install 3.11
+      - name: Install Node dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Agent dependencies from root lock
+        run: uv sync --locked --package agent
+      - name: Run SAST scan
+        run: node scripts/security/run-sast.mjs --sarif artifacts/security/sast.sarif
+      - name: Upload security artifacts
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb99ba8edd # v4.6.1
+        with:
+          name: security-sast-artifacts
+          path: artifacts/security/
+          if-no-files-found: ignore
+
+  security-supply-chain:
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.security == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Use LF checkout behavior
+        run: git config --global core.autocrlf input
+      - name: Checkout pull request
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up pnpm 10.34.5
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 10.34.5
+      - name: Set up Node 20
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Set up uv 0.12.0 and Python 3.11
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: 0.12.0
+          python-version: '3.11'
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - name: Install Python 3.11
+        run: uv python install 3.11
+      - name: Install Node dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Agent dependencies from root lock
+        run: uv sync --locked --package agent
+      - name: Run supply chain scan
+        run: node scripts/security/run-supply-chain.mjs
+      - name: Upload security artifacts
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb99ba8edd # v4.6.1
+        with:
+          name: security-supply-chain-artifacts
+          path: artifacts/security/
+          if-no-files-found: ignore
+
   smoke-and-sanity:
     needs: [detect-changes, api-unit-tests, api-e2e-tests, web-build, agent-tests]
     if: >-
@@ -562,6 +665,8 @@ jobs:
         agent-gate,
         agent-tests,
         smoke-and-sanity,
+        security-sast,
+        security-supply-chain,
       ]
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -570,6 +675,7 @@ jobs:
       API_CHANGED: ${{ needs.detect-changes.outputs.api }}
       WEB_CHANGED: ${{ needs.detect-changes.outputs.web }}
       AGENT_CHANGED: ${{ needs.detect-changes.outputs.agent }}
+      SECURITY_CHANGED: ${{ needs.detect-changes.outputs.security }}
       API_GATE_RESULT: ${{ needs.api-gate.result }}
       API_UNIT_TESTS_RESULT: ${{ needs.api-unit-tests.result }}
       API_E2E_TESTS_RESULT: ${{ needs.api-e2e-tests.result }}
@@ -578,6 +684,8 @@ jobs:
       AGENT_GATE_RESULT: ${{ needs.agent-gate.result }}
       AGENT_TESTS_RESULT: ${{ needs.agent-tests.result }}
       SMOKE_AND_SANITY_RESULT: ${{ needs.smoke-and-sanity.result }}
+      SECURITY_SAST_RESULT: ${{ needs.security-sast.result }}
+      SECURITY_SUPPLY_CHAIN_RESULT: ${{ needs.security-supply-chain.result }}
     steps:
       - name: Use LF checkout behavior
         run: git config --global core.autocrlf input

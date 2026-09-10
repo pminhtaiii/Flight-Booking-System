@@ -11,6 +11,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const evaluatorPath = resolve(root, 'scripts/ci/evaluate-ci-status.mjs');
 const workflowPath = resolve(root, '.github/workflows/ci.yml');
 const services = SERVICE_CHAINS;
+const securityJobs = ['security-sast', 'security-supply-chain'];
 const jobIds = ['detect-changes', ...Object.values(services).flat()];
 const smokeAndSanityJob = 'smoke-and-sanity';
 const workflowJobIds = [...jobIds, smokeAndSanityJob];
@@ -20,6 +21,7 @@ function validResults(changes = {}) {
     api: changes.api ? 'true' : 'false',
     web: changes.web ? 'true' : 'false',
     agent: changes.agent ? 'true' : 'false',
+    security: changes.security ? 'true' : 'false',
     'detect-changes': 'success',
     [smokeAndSanityJob]: ['api', 'web', 'agent'].some((service) => changes[service])
       ? 'success'
@@ -31,8 +33,14 @@ function validResults(changes = {}) {
       results[job] = changes[service] ? 'success' : 'skipped';
     }
   }
+  for (const job of securityJobs) {
+    if (!(job in results)) {
+      results[job] = changes.security ? 'success' : 'skipped';
+    }
+  }
   return results;
 }
+
 
 function workflow() {
   assert.ok(existsSync(workflowPath), 'expected .github/workflows/ci.yml to exist');
@@ -219,7 +227,12 @@ test('evaluator rejects every false-green job result', () => {
 test('evaluator accepts nested GitHub-summary shaped results and never throws for invalid input', () => {
   const flat = validResults({ api: true, agent: true });
   const nested = {
-    outputs: { api: flat.api, web: flat.web, agent: flat.agent },
+    outputs: {
+      api: flat.api,
+      web: flat.web,
+      agent: flat.agent,
+      security: flat.security,
+    },
     jobs: Object.fromEntries(workflowJobIds.map((job) => [job, flat[job]])),
   };
   assert.equal(evaluateCiStatus(nested).passed, true);
@@ -716,3 +729,231 @@ test('ci-status consumes the shared smoke-and-sanity result', () => {
     'ci-status must pass the shared job conclusion to the evaluator',
   );
 });
+
+test('SERVICE_CHAINS defines security chain with security-sast and security-supply-chain', () => {
+  assert.ok(
+    SERVICE_CHAINS.security,
+    'SERVICE_CHAINS must include security chain',
+  );
+  assert.deepEqual(
+    SERVICE_CHAINS.security,
+    securityJobs,
+    'security chain must include security-sast and security-supply-chain',
+  );
+});
+
+test('evaluator requires successful security jobs when security changes are detected', () => {
+  const passing = validResults({ security: true });
+  const result = evaluateCiStatus(passing);
+  assert.equal(
+    result.passed,
+    true,
+    'evaluator must pass when active security chain jobs conclude success',
+  );
+
+  for (const job of securityJobs) {
+    for (const conclusion of ['failure', 'cancelled', 'skipped', undefined]) {
+      const failing = {
+        ...validResults({ security: true }),
+        [job]: conclusion,
+      };
+      const res = evaluateCiStatus(failing);
+      assert.equal(
+        res.passed,
+        false,
+        `${job}=${String(conclusion)} under active security changes must cause evaluateCiStatus to fail`,
+      );
+    }
+  }
+});
+
+test('evaluator requires skipped security jobs when security changes are not detected', () => {
+  const passing = validResults({ security: false });
+  const result = evaluateCiStatus(passing);
+  assert.equal(
+    result.passed,
+    true,
+    'evaluator must pass when inactive security chain jobs conclude skipped',
+  );
+
+  for (const job of securityJobs) {
+    for (const conclusion of ['success', 'failure', 'cancelled', undefined]) {
+      const failing = {
+        ...validResults({ security: false }),
+        [job]: conclusion,
+      };
+      const res = evaluateCiStatus(failing);
+      assert.equal(
+        res.passed,
+        false,
+        `${job}=${String(conclusion)} under inactive security changes must cause evaluateCiStatus to fail`,
+      );
+    }
+  }
+});
+
+test('evaluator rejects malformed or missing security change detection', () => {
+  for (const malformed of [true, false, 'TRUE', 'yes', '', undefined]) {
+    const result = evaluateCiStatus({ ...validResults(), security: malformed });
+    assert.equal(result.passed, false, `security=${String(malformed)} must be rejected`);
+  }
+});
+
+test('evaluator CLI parses security environment variables and fails on failed security job', () => {
+  const failing = spawnSync(process.execPath, [evaluatorPath], {
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      DETECT_CHANGES_RESULT: 'success',
+      API_CHANGED: 'false',
+      WEB_CHANGED: 'false',
+      AGENT_CHANGED: 'false',
+      SECURITY_CHANGED: 'true',
+      API_GATE_RESULT: 'skipped',
+      API_UNIT_TESTS_RESULT: 'skipped',
+      API_E2E_TESTS_RESULT: 'skipped',
+      WEB_GATE_RESULT: 'skipped',
+      WEB_BUILD_RESULT: 'skipped',
+      AGENT_GATE_RESULT: 'skipped',
+      AGENT_TESTS_RESULT: 'skipped',
+      SMOKE_AND_SANITY_RESULT: 'skipped',
+      SECURITY_SAST_RESULT: 'failure',
+      SECURITY_SUPPLY_CHAIN_RESULT: 'success',
+    },
+  });
+  assert.equal(failing.status, 1, 'evaluator CLI must exit 1 when security-sast fails');
+  assert.equal(JSON.parse(failing.stdout).passed, false);
+});
+
+test('workflow declares dedicated security jobs with bounded permissions and dependencies', () => {
+  const source = workflow();
+  const sast = jobBlock(source, 'security-sast');
+  const supplyChain = jobBlock(source, 'security-supply-chain');
+
+  for (const [jobName, block] of [
+    ['security-sast', sast],
+    ['security-supply-chain', supplyChain],
+  ]) {
+    assertContains(
+      block,
+      /^    runs-on:\s+ubuntu-latest\s*$/m,
+      `${jobName} must use ubuntu-latest`,
+    );
+    assertContains(
+      block,
+      /^    timeout-minutes:\s+\d+\s*$/m,
+      `${jobName} must declare a timeout`,
+    );
+    assertContains(
+      block,
+      new RegExp(`^    needs:\\s+(?:detect-changes|\\[[^\\]]*detect-changes[^\\]]*\\])\\s*$`, 'm'),
+      `${jobName} must depend on detect-changes`,
+    );
+    assertContains(
+      block,
+      /needs\.detect-changes\.outputs\.security\s*==\s*['"]true['"]/,
+      `${jobName} must be gated on security detection output`,
+    );
+  }
+});
+
+test('path filtering triggers security jobs on security-sensitive changes', () => {
+  const source = workflow();
+  const detect = jobBlock(source, 'detect-changes');
+
+  assertContains(
+    detect,
+    /^\s+security:\s+\$\{\{\s*steps\..*\.outputs\.security\s*\}\}/m,
+    'detect-changes must publish security output',
+  );
+
+  const filter = filterBlock(detect, 'security');
+  const expectedPaths = [
+    'scripts/security/**',
+    'tests/security/**',
+    'apps/agent/src/agent/guardrails/**',
+    'apps/api/src/auth/**',
+    'apps/web/**auth**',
+    'package.json',
+    'pnpm-lock.yaml',
+    'pyproject.toml',
+    'uv.lock',
+  ];
+
+  for (const path of expectedPaths) {
+    assert.ok(
+      filter.includes(path),
+      `security routing filter must include '${path}'`,
+    );
+  }
+});
+
+test('ci-status rollup includes dedicated security jobs and passes conclusions to evaluator', () => {
+  const source = workflow();
+  const summary = jobBlock(source, 'ci-status');
+
+  for (const job of securityJobs) {
+    assertContains(
+      summary,
+      new RegExp(`^    needs:\\s+\\[[^\\]]*${job}[^\\]]*\\]\\s*$|^\\s+- ${job}\\s*$`, 'm'),
+      `ci-status must need ${job}`,
+    );
+  }
+
+  assertContains(
+    summary,
+    /SECURITY_CHANGED:\s*\$\{\{\s*needs\.detect-changes\.outputs\.security\s*\}\}/,
+    'ci-status must pass security change detection output to evaluator',
+  );
+  assertContains(
+    summary,
+    /SECURITY_SAST_RESULT:\s*\$\{\{\s*needs\.security-sast\.result\s*\}\}/,
+    'ci-status must pass security-sast result to evaluator',
+  );
+  assertContains(
+    summary,
+    /SECURITY_SUPPLY_CHAIN_RESULT:\s*\$\{\{\s*needs\.security-supply-chain\.result\s*\}\}/,
+    'ci-status must pass security-supply-chain result to evaluator',
+  );
+});
+
+test('maintains single branch protection rule requiring only ci-status on development', () => {
+  const source = workflow();
+  const summary = jobBlock(source, 'ci-status');
+
+  const agentsContent = readFileSync(resolve(root, 'AGENTS.md'), 'utf8');
+  assertContains(
+    agentsContent,
+    /Only require `ci-status` on branch protection rules for `development`/,
+    'AGENTS.md must mandate that only ci-status is required on development branch protection',
+  );
+
+  assertContains(
+    source,
+    /^on:\s*\n\s+pull_request:\s*\n\s+branches:\s*(?:\[development\]|\n\s+- development)\s*$/m,
+    'workflow must target development pull requests only',
+  );
+
+  assertContains(
+    summary,
+    /^    if:\s+\$\{\{\s*always\(\)\s*\}\}\s*$/m,
+    'ci-status must always evaluate all results',
+  );
+
+  assert.doesNotMatch(
+    source,
+    /needs:[^\n]*ci-status/,
+    'no job may depend on ci-status; it must remain the sole terminal status check',
+  );
+
+  for (const job of [...jobIds]) {
+    if (job === 'ci-status' || job === 'smoke-and-sanity') continue;
+    const block = jobBlock(source, job);
+    assert.doesNotMatch(
+      block,
+      /^\s*if:\s*\$\{\{\s*always\(\)\s*\}\}\s*$/m,
+      `${job} must not run unconditionally with always() so it can be skipped when unaffected`,
+    );
+  }
+});
+

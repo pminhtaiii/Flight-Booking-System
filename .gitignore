@@ -36,6 +36,7 @@ docs/superpowers/
 test-results/
 playwright-report/
 apps/web/playwright-report/
+artifacts/
 
 # Smoke test diagnostics and process logs
 .smoke-diagnostics/

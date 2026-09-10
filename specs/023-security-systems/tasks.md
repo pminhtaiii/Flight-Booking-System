@@ -63,9 +63,9 @@ Goal: reproducible static gates. Independent test: injected vulnerable fixture f
 - [x] T030 [US3] Implement pinned custom rules in `tests/security/sast/guardrails.yml` plus reviewed generic rules in `tests/security/sast/ruleset.yml`; satisfy T029 and document which interprocedural properties need behavioral tests.
 - [x] T031 [P] [US3] Implement source/exclusion census and full/diff scan driver in `scripts/security/run-sast.mjs`; enforce pinned rules, fixture separation, expected scanned-file counts and nonzero exit on rule/scanner errors.
 - [x] T032 [US3] Establish full-source baseline and <=30-day exception schema in `tests/security/sast/baseline.json` and `tests/security/exceptions.json`; block hard boundary rules and unresolved Critical/High, with owner/rationale/compensating control for eligible lower findings.
-- [ ] T033 [P] [US3] Implement separate SCA and secret drivers in `scripts/security/run-supply-chain.mjs`; test synthetic vulnerability/secret controls, unavailable feeds and report sanitization in `tests/security/supply-chain.test.mjs`.
-- [ ] T034 [US3] Extend `tests/ci/ci-workflow.contract.test.mjs` and evaluator tests for security jobs, path-filter changes, missing/cancelled/applicable-skipped jobs and reports; preserve explicit not-applicable behavior and sole ci-status requirement.
-- [ ] T035 [US3] Integrate security jobs into `.github/workflows/ci.yml` and `scripts/ci/evaluate-ci-status.mjs`; include corpus/rules/config/scripts/lockfile/auth changes, pinned actions, least permissions, failure artifact upload and periodic full scans without privileged untrusted PR execution.
+- [x] T033 [P] [US3] Implement separate SCA and secret drivers in `scripts/security/run-supply-chain.mjs`; test synthetic vulnerability/secret controls, unavailable feeds and report sanitization in `tests/security/supply-chain.test.mjs`.
+- [x] T034 [US3] Extend `tests/ci/ci-workflow.contract.test.mjs` and evaluator tests for security jobs, path-filter changes, missing/cancelled/applicable-skipped jobs and reports; preserve explicit not-applicable behavior and sole ci-status requirement.
+- [x] T035 [US3] Integrate security jobs into `.github/workflows/ci.yml` and `scripts/ci/evaluate-ci-status.mjs`; include corpus/rules/config/scripts/lockfile/auth changes, pinned actions, least permissions, failure artifact upload and periodic full scans without privileged untrusted PR execution.
 
 ## Phase 6: US4 — Execute Runtime Penetration Coverage (P1)
 

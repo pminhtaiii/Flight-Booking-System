@@ -73,14 +73,30 @@ Update this file after every completed feature. Any AI agent reading this should
     - AST fallback scanner evaluates configured standard rulesets (`p/default`, `p/owasp-top-ten`, `p/security-audit`, `p/secrets`) detecting hardcoded secrets, code/command/eval injection, SQL injection, insecure deserialization, weak crypto hashing, and dangerous modules.
     - Fallback AST scanner parses JavaScript, TypeScript, TSX, and MJS files via `ts.createSourceFile` and validates `parseDiagnostics`, immediately failing closed on syntax errors (`errors.push`, `exitCode: 1`) before executing line regexes.
     - Git diff resolution fails closed on non-zero exit status or execution error instead of treating failure as an empty scan.
-  - Expanded test suite in `tests/security/sast-runner.test.mjs` to 38/38 passing tests (exit code 0).
+- **T033 Supply Chain & Secret Scanning Driver**:
+  - Implemented `scripts/security/run-supply-chain.mjs`:
+    - Separate SCA checks: `pip-audit` against `apps/agent/pyproject.toml` / `uv.lock`, capturing vulnerability severity counts (Critical, High, Medium, Low, Informational) and advisory database timestamps with cache support; `pnpm audit` across workspace dependencies capturing advisory metadata, vulnerability counts, and advisory timestamps.
+    - Secret detection: `gitleaks` driver across git history and working tree, with built-in regex fallback scanning (`scanWorkspaceForSecrets`) across workspace files when CLI is absent, detecting hardcoded API keys, private keys, JWT secrets, and personal access tokens.
+    - Report sanitization invariant: passes findings and raw reports through `deepRedact` / `redactSensitiveText` to mask all matched secrets and PII; outputs report conforming to version `1.0.0` matching `evaluateSupplyChain` in `scripts/security/evaluate-results.mjs`.
+    - Testability: injectable `execFn`, `exitFn`, `logFn`, `errFn`, CLI arguments (`--output`, `--strict`, `--offline`).
+  - Added comprehensive TDD test suite in `tests/security/supply-chain.test.mjs` (11/11 tests passing, exit code 0) verifying positive controls (synthetic vulnerable pip package, pnpm package, detected secret), negative controls (clean state with 0 findings), scanner unavailability fail-closed behavior in strict mode, offline handling, and secret redaction invariants.
+
+- **T034 CI Workflow Contract & Evaluator Tests**:
+  - Extended `tests/ci/ci-workflow.contract.test.mjs` with comprehensive contract tests for security jobs (`security-sast`, `security-supply-chain`), change-detection path filters, fail-closed handling for failed/missing security jobs, and strict single branch protection (`ci-status` only).
+  - Verified 29/29 tests passing with exit code 0.
+- **T035 CI Workflow Integration & Aggregated Security Evaluation**:
+  - Integrated `security-sast` and `security-supply-chain` jobs into `.github/workflows/ci.yml` with pinned action SHAs, minimal permissions (`contents: read`), change-detection gating, and artifact upload.
+  - Updated `detect-changes` in `ci.yml` to publish `security` output based on security-relevant paths (scripts, tests, guardrails, auth, package files, lockfiles).
+  - Updated `ci-status` in `ci.yml` to depend on `security-sast` and `security-supply-chain` and pass conclusions to `scripts/ci/evaluate-ci-status.mjs`.
+  - Updated `scripts/ci/evaluate-ci-status.mjs` to include `security` in `SERVICE_CHAINS`, parse `SECURITY_CHANGED`, `SECURITY_SAST_RESULT`, and `SECURITY_SUPPLY_CHAIN_RESULT`, inspect available security reports (`sast.json`/SARIF, `supply-chain.json`), and enforce the security gate.
+  - Verified `tests/ci/ci-workflow.contract.test.mjs` (29/29 passing), `tests/security/evaluate-results.test.mjs` (34/34 passing), and `tests/security/supply-chain.test.mjs` (11/11 passing).
 
 ### Current Status
 
 **Feature:** Security Systems (Feature 023) — Phase 5 US3 Static Security Checks
-**Last completed:** T032 SAST Baseline & Temporary Exception Schema hardening in `scripts/security/run-sast.mjs` with fallback syntax validation for JS/TS/TSX/MJS (38/38 passing in `tests/security/sast-runner.test.mjs`).
-**In progress:** Phase 5 Slice 1 complete (T029, T030, T031, T032 hardened).
-**Next:** T033 — Implement separate SCA and secret drivers in `scripts/security/run-supply-chain.mjs`.
+**Last completed:** T035 CI Workflow Integration & Aggregated Security Evaluation (all 29/29 tests passing in `tests/ci/ci-workflow.contract.test.mjs`). Phase 5 (Tasks T029–T035) complete.
+**In progress:** Phase 5 complete.
+**Next:** Phase 6 US4 — Execute Runtime Penetration Coverage (Tasks T036–T041).
 
 ### Feature 023 — CI regression remediation checkpoint (2026-09-09)
 
