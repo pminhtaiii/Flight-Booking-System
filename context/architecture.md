@@ -1175,7 +1175,7 @@ Feature 023 plan convergence (2026-09-04): admission context is separate from po
    - Target resolution supporting `--mode full` (scans all workspace source files) and `--mode diff` (filters git diff changed files, failing closed on git failure).
    - Semgrep configuration passing custom rules and default reviewed packages (`p/default`, `p/owasp-top-ten`, `p/security-audit`, `p/secrets`).
    - SARIF normalization (CVSS score parsing, rule metadata, and level mapping) and fail-closed exit code enforcement on missing tools, malformed SARIF, scanner crashes, and unbaselined findings.
-   - Platform-aware AST fallback (`runAstFallbackScan`) providing deterministic rule scanning on environments where native Semgrep CLI is unavailable, propagating read and syntax errors.
+   - Platform-aware AST fallback (`runAstFallbackScan`) providing deterministic rule scanning on environments where native Semgrep CLI is unavailable, evaluating custom guardrail rules and configured standard rulesets (`p/default`, `p/owasp-top-ten`, `p/security-audit`, `p/secrets`) while propagating read and syntax errors.
 
 3. **Canonical Baseline and <=30-Day Exception Schema (`baseline.json` & `exceptions.json`)**:
    - `tests/security/sast/baseline.json`: Clean draft 2020-12 baseline format tracking known findings (`ruleId`, `file`, `line`, `fingerprint`, `context`). Baseline matching requires path-boundary matching and cannot suppress hard rules or Critical/High/Error findings.

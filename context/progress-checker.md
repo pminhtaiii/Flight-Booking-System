@@ -70,13 +70,14 @@ Update this file after every completed feature. Any AI agent reading this should
     - Exception matching scopes by path boundary, optional `line`, and optional `fingerprint`, with single-use consumption preventing cross-finding suppression.
     - Malformed SARIF (invalid JSON, missing runs) fails closed in scanner and driver.
     - AST fallback scanner returns structured errors (`{ findings, errors }`), reporting subprocess, syntax, and read failures to fail closed.
+    - AST fallback scanner evaluates configured standard rulesets (`p/default`, `p/owasp-top-ten`, `p/security-audit`, `p/secrets`) detecting hardcoded secrets, code/command/eval injection, SQL injection, insecure deserialization, weak crypto hashing, and dangerous modules.
     - Git diff resolution fails closed on non-zero exit status or execution error instead of treating failure as an empty scan.
-  - Expanded test suite in `tests/security/sast-runner.test.mjs` to 36/36 passing tests (exit code 0).
+  - Expanded test suite in `tests/security/sast-runner.test.mjs` to 37/37 passing tests (exit code 0).
 
 ### Current Status
 
 **Feature:** Security Systems (Feature 023) — Phase 5 US3 Static Security Checks
-**Last completed:** T032 SAST Baseline & Temporary Exception Schema hardening in `scripts/security/run-sast.mjs` (36/36 passing in `tests/security/sast-runner.test.mjs`).
+**Last completed:** T032 SAST Baseline & Temporary Exception Schema hardening in `scripts/security/run-sast.mjs` (37/37 passing in `tests/security/sast-runner.test.mjs`).
 **In progress:** Phase 5 Slice 1 complete (T029, T030, T031, T032 hardened).
 **Next:** T033 — Implement separate SCA and secret drivers in `scripts/security/run-supply-chain.mjs`.
 

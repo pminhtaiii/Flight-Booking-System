@@ -36,6 +36,13 @@ export const DEFAULT_STANDARD_RULESETS = [
   'p/secrets@v1.88.0',
 ];
 
+export const SUPPORTED_STANDARD_RULESETS = new Set([
+  'p/default',
+  'p/owasp-top-ten',
+  'p/security-audit',
+  'p/secrets',
+]);
+
 export const NON_BYPASSABLE_RULES = new Set([
   'no-llm-in-guardrails',
   'no-unshielded-tool-execution',
@@ -781,19 +788,67 @@ export function evaluateFindings(findings = [], options = {}) {
 /**
  * Deterministic Python and TSX AST/semantic rule scanner when Semgrep CLI is unavailable.
  */
-export function runAstFallbackScan(targetFiles, rootDir) {
+export function runAstFallbackScan(targetFiles, rootDir, options = {}) {
   const findings = [];
   const errors = [];
+  const configs = options.configs || DEFAULT_STANDARD_RULESETS;
+
+  const enabledStandardPacks = new Set();
+  for (const cfg of configs) {
+    if (typeof cfg !== 'string') continue;
+    if (cfg.startsWith('p/') || cfg.startsWith('r/')) {
+      const basePack = cfg.split('@')[0];
+      if (SUPPORTED_STANDARD_RULESETS.has(basePack)) {
+        enabledStandardPacks.add(basePack);
+      } else {
+        errors.push(`[SAST Fallback Error] Unsupported standard ruleset: ${cfg}`);
+      }
+    }
+  }
+
+  const hasSecrets = enabledStandardPacks.has('p/secrets');
+  const hasOwasp = enabledStandardPacks.has('p/owasp-top-ten');
+  const hasSecurityAudit = enabledStandardPacks.has('p/security-audit');
+  const hasDefault = enabledStandardPacks.has('p/default');
+  const hasCustomRules =
+    !options.configs ||
+    configs.some(
+      (cfg) =>
+        typeof cfg === 'string' &&
+        (cfg.includes('guardrails') || cfg.endsWith('.yml') || cfg.endsWith('.yaml')),
+    );
+
   const pyFiles = targetFiles.filter((f) => f.endsWith('.py'));
-  const tsxFiles = targetFiles.filter((f) => f.endsWith('.tsx') || f.endsWith('.jsx'));
+  const jsTsFiles = targetFiles.filter(
+    (f) =>
+      f.endsWith('.ts') ||
+      f.endsWith('.tsx') ||
+      f.endsWith('.js') ||
+      f.endsWith('.mjs') ||
+      f.endsWith('.jsx'),
+  );
 
   if (pyFiles.length > 0) {
     const pythonScript = `
-import ast, sys, json, os
+import ast, sys, json, os, re
 
-files = json.loads(sys.stdin.read())
+raw_input = json.loads(sys.stdin.read())
+if isinstance(raw_input, dict):
+    files = raw_input.get('files', [])
+    packs = set(raw_input.get('packs', []))
+    has_custom = bool(raw_input.get('hasCustomRules', True))
+else:
+    files = raw_input
+    packs = {'p/default', 'p/owasp-top-ten', 'p/security-audit', 'p/secrets'}
+    has_custom = True
+
 findings = []
 errors = []
+
+has_secrets = 'p/secrets' in packs
+has_owasp = 'p/owasp-top-ten' in packs
+has_security_audit = 'p/security-audit' in packs
+has_default = 'p/default' in packs
 
 tool_names = {
     'ToolNode', 'search_flights', 'booking_detail', 'booking_summaries',
@@ -801,9 +856,23 @@ tool_names = {
 }
 sensitive_tokens = {'prompt', 'user_input', 'raw_message', 'raw_payload', 'unredacted_output'}
 
+SECRET_PATTERNS = [
+    (re.compile(r'-----BEGIN (?:[A-Z0-9_-]+ )?PRIVATE KEY-----'), 'Hardcoded private key detected'),
+    (re.compile(r'\\b(?:AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16}\\b'), 'Hardcoded AWS access key detected'),
+    (re.compile(r'\\b(?:ghp|gho|ghu|ghs|ghr)_[0-9a-zA-Z]{36}\\b|\\bgithub_pat_[0-9a-zA-Z_]{82}\\b'), 'Hardcoded GitHub token detected'),
+    (re.compile(r'\\bxox[baprs]-[0-9a-zA-Z-]{10,}\\b'), 'Hardcoded Slack token detected'),
+    (re.compile(r'\\b(?:sk|rk)_(?:live|test)_[0-9a-zA-Z]{24,}\\b'), 'Hardcoded Stripe token detected'),
+]
+
 for rel_path, full_path in files:
     norm_rel = rel_path.replace('\\\\', '/')
-    is_test = '/tests/' in norm_rel or '/test/' in norm_rel or os.path.basename(norm_rel).startswith('test_') or norm_rel.endswith('.spec.ts') or norm_rel.endswith('.test.ts')
+    is_test = (
+        '/tests/' in norm_rel or
+        '/test/' in norm_rel or
+        os.path.basename(norm_rel).startswith('test_') or
+        norm_rel.endswith('.spec.ts') or
+        norm_rel.endswith('.test.ts')
+    )
     if is_test:
         continue
 
@@ -813,39 +882,199 @@ for rel_path, full_path in files:
 
     try:
         with open(full_path, 'rb') as f:
-            tree = ast.parse(f.read())
+            raw_bytes = f.read()
+            tree = ast.parse(raw_bytes)
     except Exception as e:
         errors.append(f"AST parse error in {norm_rel}: {str(e)}")
         continue
 
     is_guardrails = 'guardrails' in norm_rel
     is_agent = 'agent' in norm_rel
+    secret_lines = set()
+
+    if has_secrets:
+        try:
+            content_lines = raw_bytes.decode('utf-8', errors='replace').splitlines()
+            for line_idx, line in enumerate(content_lines, start=1):
+                trimmed = line.strip()
+                if trimmed.startswith('#'):
+                    continue
+                for pat, msg in SECRET_PATTERNS:
+                    if pat.search(line):
+                        secret_lines.add(line_idx)
+                        findings.append({
+                            'ruleId': 'p/secrets:hardcoded-secret',
+                            'file': norm_rel,
+                            'line': line_idx,
+                            'message': msg,
+                            'severity': 'ERROR',
+                            'level': 'error'
+                        })
+                        break
+        except Exception:
+            pass
 
     class Visitor(ast.NodeVisitor):
+        def visit_Import(self, node):
+            if has_default:
+                for alias in node.names:
+                    if alias.name in ('marshal', 'shelve'):
+                        findings.append({
+                            'ruleId': 'p/default:dangerous-module',
+                            'file': norm_rel,
+                            'line': node.lineno,
+                            'message': f'Dangerous module imported: {alias.name}',
+                            'severity': 'ERROR',
+                            'level': 'error'
+                        })
+            self.generic_visit(node)
+
+        def visit_ImportFrom(self, node):
+            if has_default:
+                if node.module in ('marshal', 'shelve'):
+                    findings.append({
+                        'ruleId': 'p/default:dangerous-module',
+                        'file': norm_rel,
+                        'line': node.lineno,
+                        'message': f'Dangerous module imported: {node.module}',
+                        'severity': 'ERROR',
+                        'level': 'error'
+                    })
+            self.generic_visit(node)
+
+        def visit_Assign(self, node):
+            if has_secrets and node.lineno not in secret_lines:
+                for target in node.targets:
+                    target_name = ''
+                    if isinstance(target, ast.Name):
+                        target_name = target.id
+                    elif isinstance(target, ast.Attribute):
+                        target_name = target.attr
+                    if target_name:
+                        lower_name = target_name.lower()
+                        is_sec = (
+                            any(k in lower_name for k in ('api_key', 'secret_key', 'private_key', 'auth_token', 'access_token', 'password', 'client_secret')) or
+                            lower_name in ('secret', 'token', 'api_key')
+                        )
+                        if is_sec:
+                            val_str = None
+                            if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+                                val_str = node.value.value
+                            if val_str:
+                                val_t = val_str.strip()
+                                if len(val_t) >= 16 and not any(p in val_t.lower() for p in ('test', 'dummy', 'mock', 'example', 'change', 'placeholder', 'none', 'todo', 'your_')):
+                                    secret_lines.add(node.lineno)
+                                    findings.append({
+                                        'ruleId': 'p/secrets:hardcoded-secret',
+                                        'file': norm_rel,
+                                        'line': node.lineno,
+                                        'message': f'Hardcoded secret detected in assignment to {target_name}',
+                                        'severity': 'ERROR',
+                                        'level': 'error'
+                                    })
+                                    break
+            self.generic_visit(node)
+
         def visit_Call(self, node):
             func = node.func
-            if is_guardrails:
+            if has_custom and is_guardrails:
                 if isinstance(func, ast.Name) and func.id in ('ChatOpenAI', 'ChatAnthropic', 'ChatGoogleGenerativeAI', 'OpenAI'):
-                    findings.append({'ruleId': 'no-llm-in-guardrails', 'file': norm_rel, 'line': node.lineno, 'message': 'LLM model initialization inside guardrails'})
+                    findings.append({'ruleId': 'no-llm-in-guardrails', 'file': norm_rel, 'line': node.lineno, 'message': 'LLM model initialization inside guardrails', 'severity': 'ERROR', 'level': 'error'})
                 elif isinstance(func, ast.Attribute) and func.attr in ('invoke', 'ainvoke'):
-                    findings.append({'ruleId': 'no-llm-in-guardrails', 'file': norm_rel, 'line': node.lineno, 'message': 'LLM invoke call inside guardrails'})
+                    findings.append({'ruleId': 'no-llm-in-guardrails', 'file': norm_rel, 'line': node.lineno, 'message': 'LLM invoke call inside guardrails', 'severity': 'ERROR', 'level': 'error'})
 
                 if isinstance(func, ast.Name) and func.id in ('eval', 'exec', '__import__'):
-                    findings.append({'ruleId': 'no-dynamic-imports-in-guardrails', 'file': norm_rel, 'line': node.lineno, 'message': 'Dynamic code execution/import in guardrails'})
+                    findings.append({'ruleId': 'no-dynamic-imports-in-guardrails', 'file': norm_rel, 'line': node.lineno, 'message': 'Dynamic code execution/import in guardrails', 'severity': 'ERROR', 'level': 'error'})
                 elif isinstance(func, ast.Attribute) and func.attr == 'import_module':
                     if isinstance(func.value, ast.Name) and func.value.id == 'importlib':
-                        findings.append({'ruleId': 'no-dynamic-imports-in-guardrails', 'file': norm_rel, 'line': node.lineno, 'message': 'Dynamic importlib call in guardrails'})
+                        findings.append({'ruleId': 'no-dynamic-imports-in-guardrails', 'file': norm_rel, 'line': node.lineno, 'message': 'Dynamic importlib call in guardrails', 'severity': 'ERROR', 'level': 'error'})
 
-            if is_guardrails or is_agent:
+            if has_custom and (is_guardrails or is_agent):
                 if isinstance(func, ast.Name) and func.id in tool_names:
-                    findings.append({'ruleId': 'no-unshielded-tool-execution', 'file': norm_rel, 'line': node.lineno, 'message': 'Direct unshielded tool invocation'})
+                    findings.append({'ruleId': 'no-unshielded-tool-execution', 'file': norm_rel, 'line': node.lineno, 'message': 'Direct unshielded tool invocation', 'severity': 'ERROR', 'level': 'error'})
+
+            # Standard Rules: eval/exec
+            is_eval_exec = False
+            if isinstance(func, ast.Name) and func.id in ('eval', 'exec'):
+                is_eval_exec = True
+            elif isinstance(func, ast.Attribute) and func.attr in ('eval', 'exec'):
+                if isinstance(func.value, ast.Name) and func.value.id in ('builtins', '__builtins__'):
+                    is_eval_exec = True
+
+            if is_eval_exec:
+                if has_owasp:
+                    findings.append({'ruleId': 'p/owasp-top-ten:eval-injection', 'file': norm_rel, 'line': node.lineno, 'message': 'Code injection via eval or exec', 'severity': 'ERROR', 'level': 'error'})
+                if has_default:
+                    findings.append({'ruleId': 'no-generic-eval-exec', 'file': norm_rel, 'line': node.lineno, 'message': 'Dynamic code execution via eval/exec', 'severity': 'ERROR', 'level': 'error'})
+
+            # Standard Rules: Command Injection (os.system, os.popen, subprocess with shell=True)
+            if has_owasp:
+                is_cmd = False
+                if isinstance(func, ast.Attribute) and func.attr in ('system', 'popen'):
+                    if isinstance(func.value, ast.Name) and func.value.id == 'os':
+                        is_cmd = True
+                elif ((isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name) and func.value.id == 'subprocess') or
+                      (isinstance(func, ast.Name) and func.id in ('run', 'Popen', 'call', 'check_output', 'check_call'))):
+                    for kw in node.keywords:
+                        if kw.arg == 'shell':
+                            if isinstance(kw.value, ast.Constant) and bool(kw.value.value):
+                                is_cmd = True
+                            elif hasattr(ast, 'NameConstant') and isinstance(kw.value, ast.NameConstant) and bool(kw.value.value):
+                                is_cmd = True
+                if is_cmd:
+                    findings.append({'ruleId': 'p/owasp-top-ten:command-injection', 'file': norm_rel, 'line': node.lineno, 'message': 'Command injection via os.system or subprocess with shell=True', 'severity': 'ERROR', 'level': 'error'})
+
+            # Standard Rules: Insecure Deserialization & weak crypto (p/security-audit)
+            if has_security_audit:
+                if isinstance(func, ast.Attribute) and func.attr in ('loads', 'load', 'Unpickler'):
+                    if isinstance(func.value, ast.Name) and func.value.id in ('pickle', '_pickle'):
+                        findings.append({'ruleId': 'p/security-audit:insecure-deserialization', 'file': norm_rel, 'line': node.lineno, 'message': 'Insecure deserialization via pickle', 'severity': 'ERROR', 'level': 'error'})
+
+                if isinstance(func, ast.Attribute) and func.attr == 'load':
+                    if isinstance(func.value, ast.Name) and func.value.id == 'yaml':
+                        loader_kw = next((kw for kw in node.keywords if kw.arg == 'Loader'), None)
+                        safe = False
+                        if loader_kw:
+                            val_str = ast.unparse(loader_kw.value) if hasattr(ast, 'unparse') else str(loader_kw.value)
+                            if 'SafeLoader' in val_str or 'CSafeLoader' in val_str:
+                                safe = True
+                        if not safe:
+                            findings.append({'ruleId': 'p/security-audit:insecure-yaml-load', 'file': norm_rel, 'line': node.lineno, 'message': 'Insecure yaml.load without SafeLoader', 'severity': 'ERROR', 'level': 'error'})
+
+                is_weak_hash = False
+                if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name) and func.value.id == 'hashlib':
+                    if func.attr in ('md5', 'sha1'):
+                        is_weak_hash = True
+                    elif func.attr == 'new' and node.args:
+                        first_arg = node.args[0]
+                        if isinstance(first_arg, ast.Constant) and str(first_arg.value).lower() in ('md5', 'sha1'):
+                            is_weak_hash = True
+                if is_weak_hash:
+                    findings.append({'ruleId': 'p/security-audit:weak-crypto-hash', 'file': norm_rel, 'line': node.lineno, 'message': 'Use of weak cryptographic hash (MD5/SHA1)', 'severity': 'WARNING', 'level': 'warning'})
+
+            # Standard Rules: SQL Injection via formatted query string
+            if has_owasp:
+                if isinstance(func, ast.Attribute) and func.attr in ('execute', 'raw', '$queryRawUnsafe'):
+                    if node.args:
+                        first_arg = node.args[0]
+                        is_sqli = False
+                        if isinstance(first_arg, ast.JoinedStr):
+                            arg_text = ast.unparse(first_arg).upper() if hasattr(ast, 'unparse') else ''
+                            if any(w in arg_text for w in ('SELECT', 'INSERT', 'UPDATE', 'DELETE', 'FROM', 'WHERE')):
+                                is_sqli = True
+                        elif isinstance(first_arg, ast.BinOp) and isinstance(first_arg.op, ast.Mod):
+                            arg_text = ast.unparse(first_arg.left).upper() if hasattr(ast, 'unparse') else ''
+                            if any(w in arg_text for w in ('SELECT', 'INSERT', 'UPDATE', 'DELETE', 'FROM', 'WHERE')):
+                                is_sqli = True
+                        if is_sqli:
+                            findings.append({'ruleId': 'p/owasp-top-ten:sql-injection', 'file': norm_rel, 'line': node.lineno, 'message': 'SQL injection via dynamically formatted query string', 'severity': 'ERROR', 'level': 'error'})
 
             is_log = False
             if isinstance(func, ast.Attribute) and func.attr in ('debug', 'info', 'warning', 'error', 'critical', 'exception'):
-                if (isinstance(func.value, ast.Name) and ('logger' in func.value.id.lower() or func.value.id == 'logging')) or \\
-                   (isinstance(func.value, ast.Attribute) and 'logger' in func.value.attr.lower()):
+                if ((isinstance(func.value, ast.Name) and ('logger' in func.value.id.lower() or func.value.id == 'logging')) or
+                    (isinstance(func.value, ast.Attribute) and 'logger' in func.value.attr.lower())):
                     is_log = True
-            if is_log:
+            if has_custom and is_log:
                 found = False
                 for arg in node.args:
                     arg_str = ast.unparse(arg).lower() if hasattr(ast, 'unparse') else str(arg)
@@ -857,7 +1086,7 @@ for rel_path, full_path in files:
                         if any(t in kw_str for t in sensitive_tokens):
                             found = True; break
                 if found:
-                    findings.append({'ruleId': 'no-raw-payload-logging', 'file': norm_rel, 'line': node.lineno, 'message': 'Raw payload logging detected'})
+                    findings.append({'ruleId': 'no-raw-payload-logging', 'file': norm_rel, 'line': node.lineno, 'message': 'Raw payload logging detected', 'severity': 'ERROR', 'level': 'error'})
             self.generic_visit(node)
 
     Visitor().visit(tree)
@@ -865,7 +1094,11 @@ for rel_path, full_path in files:
 print(json.dumps({'findings': findings, 'errors': errors}))
 `;
     try {
-      const inputPayload = JSON.stringify(pyFiles.map((f) => [f, resolve(rootDir, f)]));
+      const inputPayload = JSON.stringify({
+        files: pyFiles.map((f) => [f, resolve(rootDir, f)]),
+        packs: Array.from(enabledStandardPacks),
+        hasCustomRules,
+      });
       const res = spawnSync('python', ['-c', pythonScript], {
         input: inputPayload,
         encoding: 'utf8',
@@ -889,8 +1122,8 @@ print(json.dumps({'findings': findings, 'errors': errors}))
             const fp = computeFindingFingerprint(m.ruleId, normFile, m.line, m.message);
             findings.push({
               ruleId: m.ruleId,
-              level: 'error',
-              severity: 'ERROR',
+              level: m.level || 'error',
+              severity: m.severity || 'ERROR',
               file: normFile,
               startLine: m.line,
               endLine: m.line,
@@ -909,46 +1142,220 @@ print(json.dumps({'findings': findings, 'errors': errors}))
     }
   }
 
-  for (const f of tsxFiles) {
+  const SECRET_PATTERNS_JS = [
+    {
+      pattern: /-----BEGIN (?:[A-Z0-9_-]+ )?PRIVATE KEY-----/,
+      msg: 'Hardcoded private key detected',
+    },
+    {
+      pattern: /\b(?:AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16}\b/,
+      msg: 'Hardcoded AWS access key detected',
+    },
+    {
+      pattern: /\b(?:ghp|gho|ghu|ghs|ghr)_[0-9a-zA-Z]{36}\b|\bgithub_pat_[0-9a-zA-Z_]{82}\b/,
+      msg: 'Hardcoded GitHub token detected',
+    },
+    {
+      pattern: /\bxox[baprs]-[0-9a-zA-Z-]{10,}\b/,
+      msg: 'Hardcoded Slack token detected',
+    },
+    {
+      pattern: /\b(?:sk|rk)_(?:live|test)_[0-9a-zA-Z]{24,}\b/,
+      msg: 'Hardcoded Stripe token detected',
+    },
+  ];
+
+  const GENERIC_SECRET_ASSIGN_JS =
+    /(?:const|let|var)\s+([A-Za-z0-9_$]*(?:api[_-]?key|secret[_-]?key|password|auth[_-]?token|access[_-]?token|private[_-]?key)[A-Za-z0-9_$]*)\s*=\s*['"]([A-Za-z0-9_\-+/=]{16,})['"]/i;
+
+  for (const f of jsTsFiles) {
     const fullPath = resolve(rootDir, f);
     const norm = f.replaceAll('\\', '/');
     if (
       norm.includes('/tests/') ||
       norm.includes('/test/') ||
       norm.endsWith('.spec.tsx') ||
-      norm.endsWith('.test.tsx')
+      norm.endsWith('.test.tsx') ||
+      norm.endsWith('.spec.ts') ||
+      norm.endsWith('.test.ts') ||
+      norm.endsWith('.spec.js') ||
+      norm.endsWith('.test.js') ||
+      norm.endsWith('.spec.mjs') ||
+      norm.endsWith('.test.mjs')
     ) {
       continue;
     }
 
     if (!existsSync(fullPath)) {
-      errors.push(`[AST Fallback Error] TSX file does not exist: ${f}`);
+      if (f.endsWith('.tsx') || f.endsWith('.jsx')) {
+        errors.push(`[AST Fallback Error] TSX file does not exist: ${f}`);
+      } else {
+        errors.push(`[AST Fallback Error] File does not exist: ${f}`);
+      }
       continue;
     }
 
     try {
       const content = readFileSync(fullPath, 'utf8');
-      if (content.includes('dangerouslySetInnerHTML')) {
-        const lines = content.split('\n');
-        for (let l = 0; l < lines.length; l++) {
-          if (lines[l].includes('dangerouslySetInnerHTML')) {
+      const lines = content.split('\n');
+      const fileImportsChildProcess =
+        content.includes('child_process') &&
+        /(?:import\s*\{[^}]*\bexec\b[^}]*\}\s*from|require\(['"](?:node:)?child_process['"]\))/.test(
+          content,
+        );
+
+      for (let l = 0; l < lines.length; l++) {
+        const line = lines[l];
+        const lineNum = l + 1;
+        const trimmed = line.trim();
+        if (trimmed.startsWith('//') || trimmed.startsWith('/*') || trimmed.startsWith('*')) {
+          continue;
+        }
+
+        // 1. dangerouslySetInnerHTML
+        if (line.includes('dangerouslySetInnerHTML')) {
+          if (hasCustomRules) {
             const msg = 'Unsafe HTML interpolation via dangerouslySetInnerHTML';
-            const fp = computeFindingFingerprint('safe-html-interpolation', norm, l + 1, msg);
+            const fp = computeFindingFingerprint('safe-html-interpolation', norm, lineNum, msg);
             findings.push({
               ruleId: 'safe-html-interpolation',
               level: 'error',
               severity: 'ERROR',
               file: norm,
-              startLine: l + 1,
-              endLine: l + 1,
+              startLine: lineNum,
+              endLine: lineNum,
+              message: msg,
+              fingerprint: fp,
+            });
+          }
+
+          if (hasOwasp) {
+            const owaspMsg = 'Unsafe HTML interpolation via dangerouslySetInnerHTML';
+            const owaspFp = computeFindingFingerprint('p/owasp-top-ten:xss', norm, lineNum, owaspMsg);
+            findings.push({
+              ruleId: 'p/owasp-top-ten:xss',
+              level: 'error',
+              severity: 'ERROR',
+              file: norm,
+              startLine: lineNum,
+              endLine: lineNum,
+              message: owaspMsg,
+              fingerprint: owaspFp,
+            });
+          }
+        }
+
+        // 2. eval(...) and new Function(...)
+        if (hasOwasp) {
+          if (/\beval\s*\(/.test(line) || /\bnew\s+Function\s*\(/.test(line)) {
+            const msg = 'Code injection via eval() or new Function()';
+            const fp = computeFindingFingerprint(
+              'p/owasp-top-ten:code-injection',
+              norm,
+              lineNum,
+              msg,
+            );
+            findings.push({
+              ruleId: 'p/owasp-top-ten:code-injection',
+              level: 'error',
+              severity: 'ERROR',
+              file: norm,
+              startLine: lineNum,
+              endLine: lineNum,
+              message: msg,
+              fingerprint: fp,
+            });
+          }
+
+          // 3. child_process.exec(...)
+          if (
+            /(?:child_process|childProcess|cp)\.exec\s*\(/.test(line) ||
+            (fileImportsChildProcess && /\bexec\s*\(/.test(line) && !line.includes('.exec('))
+          ) {
+            const msg = 'Command injection via child_process.exec';
+            const fp = computeFindingFingerprint(
+              'p/owasp-top-ten:command-injection',
+              norm,
+              lineNum,
+              msg,
+            );
+            findings.push({
+              ruleId: 'p/owasp-top-ten:command-injection',
+              level: 'error',
+              severity: 'ERROR',
+              file: norm,
+              startLine: lineNum,
+              endLine: lineNum,
               message: msg,
               fingerprint: fp,
             });
           }
         }
+
+        // 4. Hardcoded secrets in JS/TS
+        if (hasSecrets) {
+          let secretFound = false;
+          for (const sp of SECRET_PATTERNS_JS) {
+            if (sp.pattern.test(line)) {
+              secretFound = true;
+              const fp = computeFindingFingerprint(
+                'p/secrets:hardcoded-secret',
+                norm,
+                lineNum,
+                sp.msg,
+              );
+              findings.push({
+                ruleId: 'p/secrets:hardcoded-secret',
+                level: 'error',
+                severity: 'ERROR',
+                file: norm,
+                startLine: lineNum,
+                endLine: lineNum,
+                message: sp.msg,
+                fingerprint: fp,
+              });
+              break;
+            }
+          }
+
+          if (!secretFound) {
+            const assignMatch = GENERIC_SECRET_ASSIGN_JS.exec(line);
+            if (assignMatch) {
+              const varName = assignMatch[1];
+              const varVal = assignMatch[2].toLowerCase();
+              if (
+                !['test', 'dummy', 'mock', 'example', 'change', 'placeholder', 'none', 'todo', 'your_'].some(
+                  (p) => varVal.includes(p),
+                )
+              ) {
+                const msg = `Hardcoded secret detected in assignment to ${varName}`;
+                const fp = computeFindingFingerprint(
+                  'p/secrets:hardcoded-secret',
+                  norm,
+                  lineNum,
+                  msg,
+                );
+                findings.push({
+                  ruleId: 'p/secrets:hardcoded-secret',
+                  level: 'error',
+                  severity: 'ERROR',
+                  file: norm,
+                  startLine: lineNum,
+                  endLine: lineNum,
+                  message: msg,
+                  fingerprint: fp,
+                });
+              }
+            }
+          }
+        }
       }
     } catch (err) {
-      errors.push(`[AST Fallback Error] Failed to read TSX file ${f}: ${err.message}`);
+      if (f.endsWith('.tsx') || f.endsWith('.jsx')) {
+        errors.push(`[AST Fallback Error] Failed to read TSX file ${f}: ${err.message}`);
+      } else {
+        errors.push(`[AST Fallback Error] Failed to read file ${f}: ${err.message}`);
+      }
     }
   }
 
@@ -1153,7 +1560,7 @@ export function runSastScan(options = {}) {
 
   if (isMissingSemgrep) {
     if (canUseFallback) {
-      const fallbackResult = runAstFallbackScan(targetFiles, rootDir);
+      const fallbackResult = runAstFallbackScan(targetFiles, rootDir, { configs });
       const fallbackFindings = fallbackResult.findings || [];
       if (fallbackResult.errors && fallbackResult.errors.length > 0) {
         errors.push(...fallbackResult.errors);

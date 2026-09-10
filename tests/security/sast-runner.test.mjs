@@ -19,6 +19,7 @@ import {
   runAstFallbackScan,
   computeFindingFingerprint,
   DEFAULT_STANDARD_RULESETS,
+  SUPPORTED_STANDARD_RULESETS,
   NON_BYPASSABLE_RULES,
   main,
 } from '../../scripts/security/run-sast.mjs';
@@ -2001,4 +2002,163 @@ test('Issue 7: resolveTargetFiles returns passed: false on git failure and runSa
     `Expected [Git Diff Error] in scan output: ${failedScan.errors.join('; ')}`,
   );
 });
+
+// -----------------------------------------------------------------------------
+// Issue 1: Fallback Omits Standard Rules (scripts/security/run-sast.mjs)
+// -----------------------------------------------------------------------------
+test('Issue 1: runAstFallbackScan evaluates configured standard packs (p/secrets, p/owasp-top-ten, p/security-audit, p/default)', () => {
+  const pyRelPath = 'apps/agent/src/agent/temp_sast_test_vulns.py';
+  const pyFullPath = resolve(repoRoot, pyRelPath);
+
+  const tsRelPath = 'apps/web/temp_sast_test_vulns.ts';
+  const tsFullPath = resolve(repoRoot, tsRelPath);
+
+  const mockStripeKey1 = ['sk', 'test', '1234567890abcdef12345678'].join('_');
+  const mockStripeKey2 = ['sk', 'test', 'abcdef1234567890abcdef12'].join('_');
+  const mockAwsKey = ['AKIA', 'IOSFODNN7EXAMPLE'].join('');
+
+  const pyContent = `
+import os, subprocess, pickle, yaml, hashlib, marshal, shelve
+
+# p/secrets violations
+STRIPE_KEY = "${mockStripeKey1}"
+AWS_KEY = "${mockAwsKey}"
+secret_api_key = "very_secret_production_key_12345"
+
+# p/owasp-top-ten violations
+eval("1 + 1")
+exec("x = 2")
+os.system("echo hello")
+subprocess.run("ls -la", shell=True)
+cursor = None
+user_id = 42
+if cursor:
+    cursor.execute(f"SELECT * FROM users WHERE id = {user_id}")
+
+# p/security-audit violations
+pickle.loads(b"cos\\nsystem\\n(S'ls'\\ntR.")
+yaml.load("key: value")
+hashlib.md5(b"weak")
+hashlib.sha1(b"weak")
+
+# p/default violations
+import marshal
+from shelve import open as shelve_open
+`;
+
+  const tsContent = `
+import { exec } from 'child_process';
+
+// p/secrets violation
+const privateKeyHeader = "-----BEGIN RSA PRIVATE KEY-----\\nMIIEowIBAAKCAQEA0";
+const stripeKey = "${mockStripeKey2}";
+
+// p/owasp-top-ten violations
+eval("console.log(1)");
+const fn = new Function("return 1");
+exec("ls -la");
+const rawHtml = "<div>unsafe</div>";
+const el = { dangerouslySetInnerHTML: { __html: rawHtml } };
+`;
+
+  try {
+    writeFileSync(pyFullPath, pyContent, 'utf8');
+    writeFileSync(tsFullPath, tsContent, 'utf8');
+
+    // 1. Scan with all DEFAULT_STANDARD_RULESETS
+    const allPacksResult = runAstFallbackScan([pyRelPath, tsRelPath], repoRoot, {
+      configs: DEFAULT_STANDARD_RULESETS,
+    });
+
+    assert.equal(allPacksResult.errors.length, 0, `Unexpected errors: ${allPacksResult.errors.join('; ')}`);
+    const ruleIds = allPacksResult.findings.map((f) => f.ruleId);
+
+    // Verify p/secrets findings
+    assert.ok(ruleIds.includes('p/secrets:hardcoded-secret'), 'Must detect hardcoded secrets');
+
+    // Verify p/owasp-top-ten findings
+    assert.ok(ruleIds.includes('p/owasp-top-ten:eval-injection'), 'Must detect eval injection in Python');
+    assert.ok(ruleIds.includes('p/owasp-top-ten:command-injection'), 'Must detect command injection in Python/TS');
+    assert.ok(ruleIds.includes('p/owasp-top-ten:code-injection'), 'Must detect code injection in TS');
+    assert.ok(ruleIds.includes('p/owasp-top-ten:xss'), 'Must detect XSS via dangerouslySetInnerHTML');
+    assert.ok(ruleIds.includes('p/owasp-top-ten:sql-injection'), 'Must detect SQL injection');
+
+    // Verify p/security-audit findings
+    assert.ok(ruleIds.includes('p/security-audit:insecure-deserialization'), 'Must detect pickle insecure deserialization');
+    assert.ok(ruleIds.includes('p/security-audit:insecure-yaml-load'), 'Must detect yaml.load without SafeLoader');
+    assert.ok(ruleIds.includes('p/security-audit:weak-crypto-hash'), 'Must detect weak crypto hash (md5/sha1)');
+    const weakHashFinding = allPacksResult.findings.find((f) => f.ruleId === 'p/security-audit:weak-crypto-hash');
+    assert.equal(weakHashFinding?.severity, 'WARNING', 'Weak hash finding should have WARNING severity');
+
+    // Verify p/default findings
+    assert.ok(ruleIds.includes('p/default:dangerous-module'), 'Must detect dangerous modules (marshal/shelve)');
+    assert.ok(ruleIds.includes('no-generic-eval-exec'), 'Must detect no-generic-eval-exec');
+
+    // 2. Selective scan with ONLY p/secrets
+    const secretsOnly = runAstFallbackScan([pyRelPath, tsRelPath], repoRoot, {
+      configs: ['p/secrets'],
+    });
+    const secretsRuleIds = secretsOnly.findings.map((f) => f.ruleId);
+    assert.ok(secretsRuleIds.every((id) => id.startsWith('p/secrets:')), 'Only p/secrets findings should be present');
+    assert.ok(secretsRuleIds.includes('p/secrets:hardcoded-secret'), 'Must detect hardcoded secrets');
+
+    // 3. Selective scan with ONLY p/owasp-top-ten
+    const owaspOnly = runAstFallbackScan([pyRelPath, tsRelPath], repoRoot, {
+      configs: ['p/owasp-top-ten'],
+    });
+    const owaspRuleIds = owaspOnly.findings.map((f) => f.ruleId);
+    assert.ok(owaspRuleIds.includes('p/owasp-top-ten:eval-injection'));
+    assert.ok(owaspRuleIds.includes('p/owasp-top-ten:command-injection'));
+    assert.ok(!owaspRuleIds.includes('p/security-audit:insecure-deserialization'), 'Should not include security-audit findings');
+
+    // 4. Selective scan with ONLY p/security-audit
+    const auditOnly = runAstFallbackScan([pyRelPath, tsRelPath], repoRoot, {
+      configs: ['p/security-audit'],
+    });
+    const auditRuleIds = auditOnly.findings.map((f) => f.ruleId);
+    assert.ok(auditRuleIds.includes('p/security-audit:insecure-deserialization'));
+    assert.ok(auditRuleIds.includes('p/security-audit:insecure-yaml-load'));
+    assert.ok(auditRuleIds.includes('p/security-audit:weak-crypto-hash'));
+    assert.ok(!auditRuleIds.includes('p/owasp-top-ten:command-injection'));
+
+    // 5. Unsupported ruleset records error
+    const unsupportedResult = runAstFallbackScan([pyRelPath], repoRoot, {
+      configs: ['p/unsupported-ruleset@v1.0.0'],
+    });
+    assert.ok(
+      unsupportedResult.errors.some((e) => e.includes('[SAST Fallback Error] Unsupported standard ruleset: p/unsupported-ruleset@v1.0.0')),
+      `Expected unsupported error in: ${unsupportedResult.errors.join('; ')}`,
+    );
+
+    // 6. runSastScan fails closed on synthetic targets with violations in fallback mode
+    const failedScan = runSastScan({
+      rootDir: repoRoot,
+      mode: 'diff',
+      gitDiffOutput: pyRelPath,
+      allowAstFallback: true,
+      execFn: () => ({ status: 127, stderr: 'semgrep: command not found', stdout: '' }),
+    });
+    assert.equal(failedScan.passed, false, 'Scan with standard rule violations must fail');
+    assert.equal(failedScan.exitCode, 1, 'Scan with standard rule violations must exit with code 1');
+    assert.ok(failedScan.findings.length > 0, 'Scan should record findings');
+
+  } finally {
+    if (existsSync(pyFullPath)) {
+      rmSync(pyFullPath, { force: true });
+    }
+    if (existsSync(tsFullPath)) {
+      rmSync(tsFullPath, { force: true });
+    }
+  }
+
+  // 7. Clean fallback on existing repository files passes
+  const cleanResult = runAstFallbackScan(
+    ['apps/agent/src/agent/main.py', 'apps/api/src/main.ts'],
+    repoRoot,
+    { configs: DEFAULT_STANDARD_RULESETS },
+  );
+  assert.equal(cleanResult.errors.length, 0, `Clean scan should have 0 errors: ${cleanResult.errors.join('; ')}`);
+  assert.equal(cleanResult.findings.length, 0, `Clean scan should have 0 findings: ${JSON.stringify(cleanResult.findings)}`);
+});
+
 
