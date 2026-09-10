@@ -25,10 +25,20 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Security Systems (Feature 023) — Phase 4 US2 T026/T027/T028 complete
+**Feature:** Security Systems (Feature 023) — Phase 4 US2 CI remediation completed
 **Last completed:** Graph-scoped search staging with atomic same-owner snapshot/fence commit, C-01 production-empty-registry fail-closed behavior, bounded owner-bound snapshot-read and commit-failure warnings, API empty-content AES-GCM compatibility, final-fix checkpoints (`349` agent tests/`1` skip, `49` literal GOAL tests, Ruff and live Redis fence green), and the post-atomic T093 flow (`1/1`, exit `0`). See [`docs/security/tool-boundary-validation.md`](../docs/security/tool-boundary-validation.md).
-**In progress:** No remaining work in the Phase 4 US2 T026–T028 slice. Standards and final spec re-review are clean within scope; the final T093 run supersedes the earlier pre-atomic checkpoint.
-**Next:** Continue with the remaining Phase 5–8 checklist tasks; this slice's workflow signoff is complete.
+**In progress:** None. Router performance remediation successfully resolved: cached ReDoS regex pattern AST inspection (`_is_catastrophic_regex_cached` with `lru_cache(256)`), short-circuited catastrophic inspection for strings under `_MAX_CATASTROPHIC_INPUT_LEN`, and deduplicated candidate generation in `InjectionSignatureEngine.scan`. The full serial non-Redis agent suite passed cleanly with `971 passed, 4 skipped, 12 deselected`, exit code `0` (`test_t098_router_entry_benchmark` p95 at `14.836 ms` vs `100 ms` limit).
+**Next:** Ready for final review and merge.
+
+### Feature 023 — CI regression remediation checkpoint (2026-09-09)
+
+- GitHub Actions run `34320457987`, agent-tests job `102365862281`, recorded 3 failures with `967 passed, 4 skipped, 12 deselected`. The failures were caused by two stale trusted-snapshot fixtures missing the required owner/session fields and one stale assertion expecting `None` instead of the canonical router value `"none"`.
+- With explicit user approval, the test-only correction added `userId`/`sessionId` to `apps/agent/tests/test_rollback_matrix.py` and `apps/agent/tests/test_sse_integration.py`, and updated the router assertion while preserving the security, rollback, and handoff assertions.
+- Focused validation passed `3/3`. The CI-equivalent non-Redis agent suite passed `970`, with `4 skipped` and `12 deselected`, exit `0`; Ruff check and formatting for the two owned files also passed.
+- The router stream-entry performance bottleneck was investigated and resolved:
+  - Hotspot analysis identified ReDoS AST classification overhead across 69 regexes on each candidate, compounded by duplicate candidate evaluation in `InjectionSignatureEngine.scan`.
+  - Remediated with LRU caching (`functools.lru_cache(maxsize=256)`) on `_is_catastrophic_regex_cached`, short-circuiting ReDoS checks for text lengths `<= _MAX_CATASTROPHIC_INPUT_LEN` (30 chars) in `safe_regex_match`, and candidate deduplication in `InjectionSignatureEngine.scan`.
+  - Verified: focused normalization & input layer tests (`112/112 passed`), T098 router benchmark (`router_graph_entry` p95 at `14.836 ms` vs `100.0 ms` limit), Ruff check/format clean (`0` warnings, exit `0`), and full serial non-Redis agent suite (`971 passed, 4 skipped, 12 deselected`, exit code `0`).
 
 ### Feature 023 — Phase 4 T026 & Review Corrections (2026-09-08)
 

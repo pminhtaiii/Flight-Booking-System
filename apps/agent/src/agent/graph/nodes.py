@@ -84,6 +84,7 @@ async def custom_tool_node(state: AgentState, config: RunnableConfig) -> dict:
             tool_config = dict(safe_config)
             tool_config["configurable"] = {
                 **safe_config.get("configurable", {}),
+                "trusted_snapshot": state.get("trusted_snapshot"),
                 "_snapshot_staging": pending_snapshot_stages,
                 "_snapshot_stage_key": stage_key,
             }
@@ -129,7 +130,10 @@ async def custom_tool_node(state: AgentState, config: RunnableConfig) -> dict:
             lifecycle, owner, envelope = next(iter(latest_by_owner.values()))
             committed = lifecycle.commit_next(owner, envelope)
             if inspect.isawaitable(committed):
-                await committed
+                committed = await committed
+            if not isinstance(committed, TrustedSearchSnapshot):
+                raise ValueError("Invalid committed trusted snapshot")
+            update_dict["trusted_snapshot"] = committed.model_dump(mode="json")
     except Exception:
         logger.warning("trusted_search_snapshot_batch_commit_failed")
         pending_snapshot_stages.clear()

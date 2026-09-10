@@ -351,7 +351,9 @@ class InjectionSignatureEngine:
         # Generate candidates through bounded unmasking rounds
         candidates: list[str] = [bounded_input]
         normalized_input = bounded_normalize(bounded_input, max_rounds=self.max_rounds)
-        candidates.append(_bound_text(normalized_input, self.max_expansion_bytes))
+        bounded_norm = _bound_text(normalized_input, self.max_expansion_bytes)
+        if bounded_norm not in candidates:
+            candidates.append(bounded_norm)
 
         # Perform bounded base64 extraction up to max_rounds
         current_layer_texts = [bounded_input, normalized_input]

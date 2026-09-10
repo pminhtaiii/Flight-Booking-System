@@ -190,6 +190,13 @@ coalesces same-owner entries to the last envelope, and commits through one atomi
 their existing persistence behavior for compatibility. A failed or multi-owner batch
 cannot leave an earlier snapshot committed on a blocked turn.
 
+The follow-up graph-state correction passes the latest `state["trusted_snapshot"]`
+into the next tool configuration and writes the validated `TrustedSearchSnapshot`
+returned by `commit_next` back into graph state. Commit failures clear staged work
+and fail closed. The router benchmark latency was resolved via regex ReDoS AST classification
+caching, short-circuited length checking for safe inputs, and candidate deduplication in
+`InjectionSignatureEngine`, allowing the full non-Redis agent test suite to pass cleanly (`971 passed, 4 skipped, 12 deselected`).
+
 Owner-bound handoff snapshot read failures emit only the static
 `validate_handoff_snapshot_read_failed` warning and the generic safe error; exception
 text, identifiers, and payloads stay out of logs. Snapshot commit failures emit only
@@ -965,6 +972,7 @@ The repository uses a single GitHub Actions pull request CI workflow at `.github
 - **Loopback-Only Network Guards**: `node-network-guard.cjs` and `python/sitecustomize.py` restrict outgoing socket connections during CI test/build stages exclusively to loopback addresses (`127.0.0.1`, `::1`, `localhost`) to prevent unauthorized live provider access.
 - **Change Detection & Routing**: `detect-changes` executes contract validation and actionlint, emitting string booleans for `api`, `web`, and `agent` via `dorny/paths-filter`.
 - **Deterministic Test Commands**: API unit CI calls the explicit `test:ci` script rather than forwarding Jest flags through pnpm. Agent Redis coverage enforcement is applied only to the dedicated Redis-marked selection, so the non-Redis and Redis groups validate independently.
+- **Post-fix verification status (2026-09-09)**: Adjacent snapshot/search integration tests passed `74/74`, graph tests passed `6/6`, and the live Redis snapshot check passed `1`, with `39` deselected; Ruff check/format also passed. The router stream-entry benchmark (`test_t098_router_entry_benchmark`) bottleneck was resolved via AST classification caching, short-circuit length bounds, and candidate deduplication (p95 at `14.836 ms` vs `100.0 ms` limit). The complete non-Redis agent suite passed serially with `971 passed, 4 skipped, 12 deselected`, exit code `0`.
 - **Correctness vs. Performance**: Blocking API E2E runs exclude `[.-]performance.e2e-spec.ts` wall-clock benchmarks, which remain available through the opt-in `test:e2e:performance` command for controlled benchmark environments.
 - **Status Evaluation**: The terminal `ci-status` job runs `evaluate-ci-status.mjs` with `always()`, verifying that all relevant service jobs succeeded, irrelevant jobs were safely skipped, and detection ran cleanly. Branch protection requires only `ci-status`.
 

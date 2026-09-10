@@ -171,6 +171,10 @@ async def test_step1_rollback_sse_stream_emits_no_action_handoff_on_disabled_fla
     headers = get_auth_headers()
 
     trusted_snapshot = {
+        # User-approved CI fixture correction (2026-09-09): trusted snapshots
+        # must identify the authenticated owner and session for handoff validation.
+        "userId": "12345",
+        "sessionId": "session-step1-rollback",
         "version": 1,
         "attestation": "test_attestation_token",
         "fingerprint": "test_fingerprint",
@@ -335,7 +339,9 @@ async def test_step2_rollback_router_node_bypasses_router_llm():
         decision = await router_node(state, config)
 
         assert decision["route"] == "travel"
-        assert decision["disambiguation"] is None
+        # User-approved CI fixture correction (2026-09-09): single-agent
+        # routing uses the canonical "none" disambiguation value.
+        assert decision["disambiguation"] == "none"
         capabilities = decision["turn_capabilities"]
         assert capabilities.is_sealed is True
         assert capabilities.provenance == "trusted_router_single_agent"

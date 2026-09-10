@@ -588,6 +588,147 @@ async def test_two_real_searches_commit_latest_owner_snapshot_once(
 
 
 @pytest.mark.asyncio
+async def test_deferred_search_uses_committed_snapshot_version_on_next_graph_iteration(
+    search_capabilities: TurnCapabilities,
+) -> None:
+    """A later graph iteration must fence its search against the committed snapshot."""
+
+    existing_snapshot = {
+        "schemaVersion": 1,
+        "snapshotVersion": 4,
+        "userId": "owner-search-iterations",
+        "sessionId": "session-search-iterations",
+        "createdAt": "2099-09-09T08:00:00Z",
+        "expiresAt": "2099-09-09T15:00:00Z",
+        "fingerprint": "existing-iteration-fingerprint",
+        "selectionAttestation": "existing-iteration-attestation",
+        "results": [
+            {
+                "offerIndex": 1,
+                "flightOfferId": "existing-iteration-flight",
+                "duffelOfferId": "existing-iteration-duffel",
+                "airline": "VN",
+                "origin": "HAN",
+                "destination": "NRT",
+                "departureAt": "2099-09-10T08:30:00Z",
+                "arrivalAt": "2099-09-10T15:00:00Z",
+                "price": "452.00",
+                "currency": "USD",
+            }
+        ],
+    }
+
+    class RecordingSnapshotRepository:
+        def __init__(self) -> None:
+            self.current_version = 4
+            self.committed_snapshots: list[object] = []
+
+        async def save_next_snapshot(self, snapshot: object, *, max_ttl: int) -> bool:
+            expected_version = self.current_version + 1
+            if getattr(snapshot, "snapshotVersion", None) != expected_version:
+                return False
+            self.current_version = expected_version
+            self.committed_snapshots.append(snapshot)
+            return True
+
+    repository = RecordingSnapshotRepository()
+    lifecycle = TrustedSearchSnapshotLifecycle(repository)
+    client = MagicMock()
+
+    async def search_response(**kwargs: object) -> dict[str, object]:
+        proposed_version = kwargs["proposed_snapshot_version"]
+        return {
+            "snapshotVersion": proposed_version,
+            "snapshotExpiresAt": "2099-09-10T15:00:00Z",
+            "selectionAttestation": f"attestation-{proposed_version}",
+            "results": [
+                {
+                    "flightOfferId": f"offer-{proposed_version}",
+                    "duffelOfferId": f"duffel-{proposed_version}",
+                    "airline": "VN",
+                    "departureAirport": "HAN",
+                    "arrivalAirport": "NRT",
+                    "departureTime": "2099-09-10T08:30:00Z",
+                    "arrivalTime": "2099-09-10T15:00:00Z",
+                    "price": "452.00",
+                    "currency": "USD",
+                }
+            ],
+        }
+
+    client.post_gateway_flights_search_v2 = AsyncMock(side_effect=search_response)
+    config = {
+        "configurable": {
+            "guardrail_gateway": GuardrailGateway(create_production_registry()),
+            "nestjs_client": client,
+            "thread_id": "session-search-iterations",
+            "user_id": "owner-search-iterations",
+            "trusted_snapshot": existing_snapshot,
+        }
+    }
+    first_state: AgentState = {
+        "messages": [
+            AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "name": "search_flights",
+                        "args": {
+                            "origin": "HAN",
+                            "destination": "NRT",
+                            "date": "2099-09-10",
+                            "passengers": 1,
+                        },
+                        "id": "call-search-iteration-first",
+                    }
+                ],
+            )
+        ],
+        "iteration_count": 0,
+        "turn_capabilities": search_capabilities,
+        "trusted_snapshot": existing_snapshot,
+    }
+
+    with patch("agent.tools.search_flights._get_snapshot_lifecycle", return_value=lifecycle):
+        first_update = await custom_tool_node(first_state, config)
+
+        assert first_update.get("tool_blocked") is not True
+        assert first_update["trusted_snapshot"]["snapshotVersion"] == 5
+        assert len(repository.committed_snapshots) == 1
+
+        second_state: AgentState = {
+            **first_state,
+            **first_update,
+            "messages": [
+                AIMessage(
+                    content="",
+                    tool_calls=[
+                        {
+                            "name": "search_flights",
+                            "args": {
+                                "origin": "SGN",
+                                "destination": "NRT",
+                                "date": "2099-09-10",
+                                "passengers": 1,
+                            },
+                            "id": "call-search-iteration-second",
+                        }
+                    ],
+                )
+            ],
+        }
+        second_update = await custom_tool_node(second_state, config)
+
+    assert second_update.get("tool_blocked") is not True
+    assert second_update["trusted_snapshot"]["snapshotVersion"] == 6
+    assert [snapshot.snapshotVersion for snapshot in repository.committed_snapshots] == [5, 6]
+    assert [
+        call.kwargs["proposed_snapshot_version"]
+        for call in client.post_gateway_flights_search_v2.await_args_list
+    ] == [5, 6]
+
+
+@pytest.mark.asyncio
 async def test_mixed_batch_denial_invokes_zero_members(
     production_gateway: GuardrailGateway,
     search_capabilities: TurnCapabilities,

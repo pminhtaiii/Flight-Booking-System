@@ -560,6 +560,10 @@ async def test_sse_action_handoff_ordering_and_schema(mock_nestjs_client, multi_
     headers = get_auth_headers()
 
     trusted_snapshot = {
+        # User-approved CI fixture correction (2026-09-09): trusted snapshots
+        # must identify the authenticated owner and session for handoff validation.
+        "userId": "12345",
+        "sessionId": "session-handoff",
         "version": 1,
         "attestation": "test_attestation",
         "fingerprint": "test_fingerprint",
