@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, mkdirSync, writeFileSync, rmSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
@@ -12,9 +12,14 @@ import {
   parseSarifResults,
   evaluateFindings,
   runSastScan,
+  validateBaselineFinding,
   validateBaselineSchema,
   validateException,
   validateExceptionsSchema,
+  runAstFallbackScan,
+  computeFindingFingerprint,
+  DEFAULT_STANDARD_RULESETS,
+  NON_BYPASSABLE_RULES,
   main,
 } from '../../scripts/security/run-sast.mjs';
 
@@ -1415,5 +1420,585 @@ test('T032: valid active exception correctly suppresses eligible lower-severity 
   assert.equal(evalRes.unbaselinedCount, 0);
   assert.equal(evalRes.exceptedCount, 1);
   assert.equal(evalRes.errors.length, 0);
+});
+
+// -----------------------------------------------------------------------------
+// Issue 1: Standard Rulesets Never Run (scripts/security/run-sast.mjs:736-739)
+// -----------------------------------------------------------------------------
+test('Issue 1: default scan configs include pinned standard rulesets and skip existsSync for registry packages', () => {
+  // 1. DEFAULT_STANDARD_RULESETS constant is exported and has required rulesets
+  assert.ok(Array.isArray(DEFAULT_STANDARD_RULESETS), 'DEFAULT_STANDARD_RULESETS must be an array');
+  assert.equal(DEFAULT_STANDARD_RULESETS.length, 4);
+  assert.ok(DEFAULT_STANDARD_RULESETS.includes('p/default@v1.88.0'));
+  assert.ok(DEFAULT_STANDARD_RULESETS.includes('p/owasp-top-ten@v1.88.0'));
+  assert.ok(DEFAULT_STANDARD_RULESETS.includes('p/security-audit@v1.88.0'));
+  assert.ok(DEFAULT_STANDARD_RULESETS.includes('p/secrets@v1.88.0'));
+
+  // 2. Default configs passed to Semgrep include guardrails.yml, ruleset.yml, and DEFAULT_STANDARD_RULESETS
+  let capturedArgs = null;
+  const mockCleanSarif = JSON.stringify({
+    version: '2.1.0',
+    runs: [{ tool: { driver: { name: 'semgrep' } }, results: [] }],
+  });
+
+  const res = runSastScan({
+    rootDir: repoRoot,
+    execFn: (cmd, args) => {
+      capturedArgs = args;
+      return { status: 0, stdout: mockCleanSarif, stderr: '' };
+    },
+  });
+
+  assert.equal(res.passed, true, `Expected scan to pass: ${res.errors.join('; ')}`);
+  assert.ok(capturedArgs, 'Semgrep must have been invoked');
+
+  // Verify each default config is present in args
+  const configIndices = [];
+  for (let i = 0; i < capturedArgs.length; i++) {
+    if (capturedArgs[i] === '--config') {
+      configIndices.push(capturedArgs[i + 1]);
+    }
+  }
+
+  assert.ok(configIndices.some((c) => c.endsWith('guardrails.yml')));
+  assert.ok(configIndices.some((c) => c.endsWith('ruleset.yml')));
+  for (const standardRuleset of DEFAULT_STANDARD_RULESETS) {
+    assert.ok(
+      configIndices.includes(standardRuleset),
+      `CLI arguments must include registry config ${standardRuleset}`,
+    );
+  }
+
+  // 3. Custom registry configs (starting with p/ or r/) do not fail existsSync
+  let customRegistryArgs = null;
+  const customRegistryRes = runSastScan({
+    rootDir: repoRoot,
+    configs: ['p/my-custom-pack@v1.0.0', 'r/ruleset@v2.0.0'],
+    execFn: (cmd, args) => {
+      customRegistryArgs = args;
+      return { status: 0, stdout: mockCleanSarif, stderr: '' };
+    },
+  });
+  assert.equal(customRegistryRes.passed, true);
+  assert.ok(customRegistryArgs.includes('p/my-custom-pack@v1.0.0'));
+  assert.ok(customRegistryArgs.includes('r/ruleset@v2.0.0'));
+});
+
+// -----------------------------------------------------------------------------
+// Issue 2: Baseline Bypasses Blocking Checks (scripts/security/run-sast.mjs:522-532)
+// -----------------------------------------------------------------------------
+test('Issue 2: validateBaselineFinding and evaluateFindings reject non-bypassable rules and blocking severities with path boundary matching', () => {
+  // 1. validateBaselineFinding rejects non-bypassable rules
+  for (const ruleId of NON_BYPASSABLE_RULES) {
+    const res = validateBaselineFinding({ ruleId, file: 'apps/agent/src/agent/guardrails/bad.py' });
+    assert.equal(res.valid, false, `Baseline finding for ${ruleId} should be rejected`);
+    assert.ok(res.errors.some((e) => e.includes('non-bypassable')));
+  }
+
+  // 2. validateBaselineFinding rejects CRITICAL, HIGH, and ERROR severities
+  for (const severity of ['CRITICAL', 'HIGH', 'ERROR']) {
+    const res = validateBaselineFinding({
+      ruleId: 'no-raw-payload-logging',
+      file: 'apps/agent/src/agent/tools/debug.py',
+      severity,
+    });
+    assert.equal(res.valid, false, `Baseline finding with severity ${severity} must be rejected`);
+    assert.ok(res.errors.some((e) => e.includes('non-bypassable') || e.includes(severity)));
+  }
+
+  // Lower severity in baseline finding is accepted
+  const validLow = validateBaselineFinding({
+    ruleId: 'no-raw-payload-logging',
+    file: 'apps/agent/src/agent/tools/debug.py',
+    severity: 'LOW',
+  });
+  assert.equal(validLow.valid, true);
+
+  // 3. evaluateFindings fails closed if matching baseline targets non-bypassable rule or CRITICAL/HIGH/ERROR
+  const hardFinding = {
+    ruleId: 'no-llm-in-guardrails',
+    file: 'apps/agent/src/agent/guardrails/bad.py',
+    startLine: 15,
+    severity: 'MEDIUM',
+    message: 'Hard violation',
+  };
+  const evalHard = evaluateFindings([hardFinding], {
+    baseline: [{ ruleId: 'no-llm-in-guardrails', file: 'apps/agent/src/agent/guardrails/bad.py' }],
+  });
+  assert.equal(evalHard.passed, false, 'Non-bypassable rule in baseline must fail closed');
+  assert.equal(evalHard.baselinedCount, 0);
+  assert.equal(evalHard.unbaselinedCount, 1);
+  assert.ok(evalHard.errors.some((e) => e.includes('Non-Bypassable Rule Violation')));
+
+  for (const sev of ['CRITICAL', 'HIGH', 'ERROR']) {
+    const blockingFinding = {
+      ruleId: 'no-raw-payload-logging',
+      file: 'apps/agent/src/agent/tools/leak.py',
+      startLine: 20,
+      severity: sev,
+      message: `${sev} leak`,
+    };
+    const evalBlocking = evaluateFindings([blockingFinding], {
+      baseline: [{ ruleId: 'no-raw-payload-logging', file: 'apps/agent/src/agent/tools/leak.py' }],
+    });
+    assert.equal(evalBlocking.passed, false, `Severity ${sev} in baseline must fail closed`);
+    assert.equal(evalBlocking.baselinedCount, 0);
+    assert.equal(evalBlocking.unbaselinedCount, 1);
+    assert.ok(evalBlocking.errors.some((e) => e.includes('Non-Bypassable Rule Violation')));
+  }
+
+  // 4. Suffix matching respects path boundaries
+  const findingNotMain = {
+    ruleId: 'no-raw-payload-logging',
+    file: 'apps/agent/src/agent/notmain.py',
+    startLine: 1,
+    severity: 'LOW',
+    message: 'Test',
+  };
+  const evalBoundaryMismatch = evaluateFindings([findingNotMain], {
+    baseline: [{ ruleId: 'no-raw-payload-logging', file: 'main.py' }],
+  });
+  assert.equal(evalBoundaryMismatch.passed, false, 'notmain.py must NOT match baseline main.py');
+  assert.equal(evalBoundaryMismatch.unbaselinedCount, 1);
+
+  const findingMain = {
+    ruleId: 'no-raw-payload-logging',
+    file: 'apps/agent/src/agent/main.py',
+    startLine: 1,
+    severity: 'LOW',
+    message: 'Test',
+  };
+  const evalBoundaryMatch = evaluateFindings([findingMain], {
+    baseline: [{ ruleId: 'no-raw-payload-logging', file: 'agent/main.py' }],
+  });
+  assert.equal(evalBoundaryMatch.passed, true, 'agent/main.py must match baseline agent/main.py');
+  assert.equal(evalBoundaryMatch.baselinedCount, 1);
+});
+
+// -----------------------------------------------------------------------------
+// Issue 3: Severity Mapping Allows Suppression (scripts/security/run-sast.mjs:216-220)
+// -----------------------------------------------------------------------------
+test('Issue 3: parseSarifResults maps CVSS numeric and string severities, and ERROR is recognized as blocking', () => {
+  // 1. Numeric CVSS scores
+  const mockSarifCVSS = {
+    version: '2.1.0',
+    runs: [
+      {
+        tool: { driver: { name: 'semgrep', rules: [] } },
+        results: [
+          {
+            ruleId: 'cvss-critical',
+            level: 'warning',
+            properties: { 'security-severity': 9.8 },
+            locations: [{ physicalLocation: { artifactLocation: { uri: 'apps/agent/src/crit.py' } } }],
+          },
+          {
+            ruleId: 'cvss-high',
+            level: 'warning',
+            properties: { 'security-severity': '7.5' },
+            locations: [{ physicalLocation: { artifactLocation: { uri: 'apps/agent/src/high.py' } } }],
+          },
+          {
+            ruleId: 'cvss-medium',
+            level: 'note',
+            properties: { 'security-severity': 5.5 },
+            locations: [{ physicalLocation: { artifactLocation: { uri: 'apps/agent/src/med.py' } } }],
+          },
+          {
+            ruleId: 'cvss-low',
+            level: 'error',
+            properties: { 'security-severity': 2.5 },
+            locations: [{ physicalLocation: { artifactLocation: { uri: 'apps/agent/src/low.py' } } }],
+          },
+        ],
+      },
+    ],
+  };
+
+  const cvssFindings = parseSarifResults(mockSarifCVSS);
+  assert.equal(cvssFindings.length, 4);
+  assert.equal(cvssFindings[0].severity, 'CRITICAL');
+  assert.equal(cvssFindings[1].severity, 'HIGH');
+  assert.equal(cvssFindings[2].severity, 'MEDIUM');
+  assert.equal(cvssFindings[3].severity, 'LOW');
+
+  // 2. Rule metadata severity fallback
+  const mockRuleMetaSarif = {
+    version: '2.1.0',
+    runs: [
+      {
+        tool: {
+          driver: {
+            name: 'semgrep',
+            rules: [
+              { id: 'rule-critical', properties: { 'security-severity': '9.0' } },
+              { id: 'rule-error-str', properties: { severity: 'error' } },
+            ],
+          },
+        },
+        results: [
+          {
+            ruleId: 'rule-critical',
+            locations: [{ physicalLocation: { artifactLocation: { uri: 'apps/agent/src/a.py' } } }],
+          },
+          {
+            ruleId: 'rule-error-str',
+            locations: [{ physicalLocation: { artifactLocation: { uri: 'apps/agent/src/b.py' } } }],
+          },
+        ],
+      },
+    ],
+  };
+
+  const ruleMetaFindings = parseSarifResults(mockRuleMetaSarif);
+  assert.equal(ruleMetaFindings[0].severity, 'CRITICAL');
+  assert.equal(ruleMetaFindings[1].severity, 'ERROR');
+
+  // 3. validateException blocks ERROR severity
+  const exError = {
+    id: 'EX-ERR-001',
+    ruleId: 'some-rule',
+    file: 'apps/agent/src/agent.py',
+    owner: 'sec-eng',
+    rationale: 'Suppression test',
+    compensatingControl: 'None',
+    severity: 'ERROR',
+    createdAt: '2026-09-01T00:00:00Z',
+    expiresAt: '2026-09-20T00:00:00Z',
+  };
+  const valExRes = validateException(exError, { currentDate: '2026-09-10T00:00:00Z' });
+  assert.equal(valExRes.valid, false, 'validateException must reject ERROR severity');
+  assert.ok(valExRes.errors.some((e) => e.includes('ERROR')));
+
+  // 4. evaluateFindings blocks ERROR severity from being excepted
+  const findingError = {
+    ruleId: 'generic-rule',
+    file: 'apps/agent/src/agent.py',
+    startLine: 10,
+    severity: 'ERROR',
+    message: 'Error finding',
+  };
+  const exValidObj = {
+    id: 'EX-VALID-BUT-SEV-BLOCKED',
+    ruleId: 'generic-rule',
+    file: 'apps/agent/src/agent.py',
+    owner: 'sec-eng',
+    rationale: 'Suppression test',
+    compensatingControl: 'None',
+    createdAt: '2026-09-01T00:00:00Z',
+    expiresAt: '2026-09-20T00:00:00Z',
+  };
+  const evalError = evaluateFindings([findingError], {
+    exceptions: [exValidObj],
+    currentDate: '2026-09-10T00:00:00Z',
+  });
+  assert.equal(evalError.passed, false, 'evaluateFindings must block ERROR severity from exceptions');
+  assert.equal(evalError.unbaselinedCount, 1);
+  assert.ok(evalError.errors.some((e) => e.includes('Non-Bypassable Rule Violation') || e.includes('ERROR')));
+});
+
+// -----------------------------------------------------------------------------
+// Issue 4: Exceptions Suppress Unrelated Findings (scripts/security/run-sast.mjs:536-540)
+// -----------------------------------------------------------------------------
+test('Issue 4: exception matching enforces path boundaries, line/fingerprint matching, and single consumption', () => {
+  // 1. Path boundary enforcement for exceptions
+  const findingSafe = {
+    ruleId: 'no-raw-payload-logging',
+    file: 'apps/agent/src/agent/safe_bad.py',
+    startLine: 10,
+    severity: 'LOW',
+    message: 'Test',
+  };
+  const exBad = {
+    id: 'EX-BAD-FILE',
+    ruleId: 'no-raw-payload-logging',
+    file: 'bad.py',
+    owner: 'sec-eng',
+    rationale: 'Specific file exception',
+    compensatingControl: 'Audit',
+    createdAt: '2026-09-01T00:00:00Z',
+    expiresAt: '2026-09-20T00:00:00Z',
+  };
+  const evalPathMismatch = evaluateFindings([findingSafe], {
+    exceptions: [exBad],
+    currentDate: '2026-09-10T00:00:00Z',
+  });
+  assert.equal(evalPathMismatch.passed, false, 'safe_bad.py must NOT match exception bad.py');
+  assert.equal(evalPathMismatch.unbaselinedCount, 1);
+
+  // 2. Line matching enforcement
+  const findingLine40 = {
+    ruleId: 'no-raw-payload-logging',
+    file: 'apps/agent/src/agent/bad.py',
+    startLine: 40,
+    severity: 'LOW',
+    message: 'Test',
+  };
+  const exLine10 = {
+    ...exBad,
+    id: 'EX-LINE-10',
+    file: 'apps/agent/src/agent/bad.py',
+    line: 10,
+  };
+  const evalLineMismatch = evaluateFindings([findingLine40], {
+    exceptions: [exLine10],
+    currentDate: '2026-09-10T00:00:00Z',
+  });
+  assert.equal(evalLineMismatch.passed, false, 'Line 40 must not match exception specifying line 10');
+
+  const findingLine10 = { ...findingLine40, startLine: 10 };
+  const evalLineMatch = evaluateFindings([findingLine10], {
+    exceptions: [exLine10],
+    currentDate: '2026-09-10T00:00:00Z',
+  });
+  assert.equal(evalLineMatch.passed, true, 'Line 10 must match exception specifying line 10');
+
+  // 3. Fingerprint matching enforcement
+  const findingFp1 = {
+    ruleId: 'no-raw-payload-logging',
+    file: 'apps/agent/src/agent/bad.py',
+    startLine: 10,
+    severity: 'LOW',
+    fingerprint: 'fp-target-12345',
+    message: 'Test',
+  };
+  const exFpMismatch = {
+    ...exBad,
+    id: 'EX-FP-MISMATCH',
+    file: 'apps/agent/src/agent/bad.py',
+    fingerprint: 'fp-other-99999',
+  };
+  const evalFpMismatch = evaluateFindings([findingFp1], {
+    exceptions: [exFpMismatch],
+    currentDate: '2026-09-10T00:00:00Z',
+  });
+  assert.equal(evalFpMismatch.passed, false, 'Fingerprint mismatch must not match exception');
+
+  const exFpMatch = { ...exFpMismatch, id: 'EX-FP-MATCH', fingerprint: 'fp-target-12345' };
+  const evalFpMatch = evaluateFindings([findingFp1], {
+    exceptions: [exFpMatch],
+    currentDate: '2026-09-10T00:00:00Z',
+  });
+  assert.equal(evalFpMatch.passed, true, 'Matching fingerprint must be suppressed');
+
+  // 4. Consumed exception IDs - single exception cannot suppress multiple findings
+  const findingA = {
+    ruleId: 'no-raw-payload-logging',
+    file: 'apps/agent/src/agent/bad.py',
+    startLine: 10,
+    severity: 'LOW',
+    message: 'Leak 1',
+  };
+  const findingB = {
+    ruleId: 'no-raw-payload-logging',
+    file: 'apps/agent/src/agent/bad.py',
+    startLine: 20,
+    severity: 'LOW',
+    message: 'Leak 2',
+  };
+  const singleEx = {
+    id: 'EX-SINGLE-USE',
+    ruleId: 'no-raw-payload-logging',
+    file: 'apps/agent/src/agent/bad.py',
+    owner: 'sec-eng',
+    rationale: 'Only one finding allowed',
+    compensatingControl: 'Audit',
+    createdAt: '2026-09-01T00:00:00Z',
+    expiresAt: '2026-09-20T00:00:00Z',
+  };
+  const evalDoubleUse = evaluateFindings([findingA, findingB], {
+    exceptions: [singleEx],
+    currentDate: '2026-09-10T00:00:00Z',
+  });
+  assert.equal(evalDoubleUse.passed, false, 'Single exception cannot suppress both findings');
+  assert.equal(evalDoubleUse.exceptedCount, 1, 'Exactly one finding must be excepted');
+  assert.equal(evalDoubleUse.unbaselinedCount, 1, 'Second finding must remain unbaselined');
+
+  // 5. Deterministic fingerprint presence in parseSarifResults and computeFindingFingerprint
+  const fpRes = parseSarifResults({
+    version: '2.1.0',
+    runs: [
+      {
+        tool: { driver: { name: 'semgrep' } },
+        results: [
+          {
+            ruleId: 'rule-fp-test',
+            message: { text: 'msg' },
+            locations: [{ physicalLocation: { artifactLocation: { uri: 'test.py' }, region: { startLine: 5 } } }],
+          },
+        ],
+      },
+    ],
+  });
+  assert.ok(fpRes[0].fingerprint, 'Finding must have a deterministic fingerprint');
+  const expectedFp = computeFindingFingerprint('rule-fp-test', 'test.py', 5, 'msg');
+  assert.equal(fpRes[0].fingerprint, expectedFp);
+
+  // 6. validateException validates line and fingerprint if present
+  const invalidLineEx = validateException({ ...singleEx, line: -5 });
+  assert.equal(invalidLineEx.valid, false, 'Negative line number must be rejected');
+
+  const invalidFpEx = validateException({ ...singleEx, fingerprint: '   ' });
+  assert.equal(invalidFpEx.valid, false, 'Empty string fingerprint must be rejected');
+});
+
+// -----------------------------------------------------------------------------
+// Issue 5: Malformed SARIF Passes Cleanly (scripts/security/run-sast.mjs:198-206)
+// -----------------------------------------------------------------------------
+test('Issue 5: malformed SARIF throws in parseSarifResults and fails closed in runSastScan', () => {
+  // 1. parseSarifResults throws SyntaxError on invalid JSON string
+  assert.throws(
+    () => parseSarifResults('{ invalid json syntax'),
+    (err) => err instanceof SyntaxError,
+    'Invalid JSON string must throw SyntaxError',
+  );
+
+  // 2. parseSarifResults throws Error on object without runs array (when not empty object {})
+  assert.throws(
+    () => parseSarifResults({ version: '2.1.0', wrongKey: [] }),
+    (err) => err.message.includes('runs'),
+    'SARIF missing runs array must throw an error',
+  );
+
+  assert.throws(
+    () => parseSarifResults({ runs: 'not-an-array' }),
+    (err) => err.message.includes('runs'),
+    'SARIF with non-array runs must throw an error',
+  );
+
+  // Empty object {} returns []
+  assert.deepEqual(parseSarifResults({}), []);
+  assert.deepEqual(parseSarifResults(null), []);
+
+  // 3. runSastScan catches parse error, logs [SAST Parse Error], and returns passed: false, exitCode: 1
+  const malformedScan = runSastScan({
+    rootDir: repoRoot,
+    execFn: () => ({ status: 0, stdout: '<<< NOT JSON AT ALL >>>', stderr: '' }),
+  });
+  assert.equal(malformedScan.passed, false, 'Malformed SARIF scan must fail');
+  assert.equal(malformedScan.exitCode, 1, 'Malformed SARIF scan must exit with code 1');
+  assert.ok(
+    malformedScan.errors.some((e) => e.includes('[SAST Parse Error]')),
+    `Expected [SAST Parse Error] in: ${malformedScan.errors.join('; ')}`,
+  );
+
+  const missingRunsScan = runSastScan({
+    rootDir: repoRoot,
+    execFn: () => ({ status: 0, stdout: JSON.stringify({ version: '2.1.0', noRunsHere: true }), stderr: '' }),
+  });
+  assert.equal(missingRunsScan.passed, false);
+  assert.equal(missingRunsScan.exitCode, 1);
+  assert.ok(
+    missingRunsScan.errors.some((e) => e.includes('[SAST Parse Error]')),
+    `Expected [SAST Parse Error] for missing runs in: ${missingRunsScan.errors.join('; ')}`,
+  );
+});
+
+// -----------------------------------------------------------------------------
+// Issue 6: Fallback Silently Skips Failures (scripts/security/run-sast.mjs:621-625)
+// -----------------------------------------------------------------------------
+test('Issue 6: runAstFallbackScan returns { findings, errors }, reports failures, and runSastScan fails closed', () => {
+  // 1. runAstFallbackScan returns { findings, errors }
+  const cleanResult = runAstFallbackScan([], repoRoot);
+  assert.ok(cleanResult && typeof cleanResult === 'object');
+  assert.ok(Array.isArray(cleanResult.findings));
+  assert.ok(Array.isArray(cleanResult.errors));
+
+  // 2. Python source file with syntax error reports in errors
+  const brokenPyRel = 'apps/agent/src/agent/temp_broken_syntax.py';
+  const brokenPyPath = resolve(repoRoot, brokenPyRel);
+  writeFileSync(brokenPyPath, 'def broken_syntax(:\n    pass\n', 'utf8');
+
+  try {
+    const pyResult = runAstFallbackScan([brokenPyRel], repoRoot);
+    assert.ok(pyResult.errors.length > 0, 'AST syntax error must be reported in errors');
+    assert.ok(
+      pyResult.errors.some((e) => e.includes('temp_broken_syntax.py') || e.includes('AST parse error')),
+      `Expected syntax error details in: ${pyResult.errors.join('; ')}`,
+    );
+
+    // 3. TSX read error reports in errors
+    const nonExistentTsx = 'apps/web/non_existent_file.tsx';
+    const tsxResult = runAstFallbackScan([nonExistentTsx], repoRoot);
+    assert.ok(
+      tsxResult.errors.some((e) => e.includes('non_existent_file.tsx')),
+      `Expected TSX error in: ${tsxResult.errors.join('; ')}`,
+    );
+
+    // 4. runSastScan fails closed when fallback scanner reports errors
+    const scanWithFallbackErr = runSastScan({
+      rootDir: repoRoot,
+      allowAstFallback: true,
+      execFn: () => ({ status: 127, stderr: 'semgrep: command not found', stdout: '' }),
+      gitDiffOutput: brokenPyRel,
+      mode: 'diff',
+    });
+
+    assert.equal(scanWithFallbackErr.passed, false, 'Scan with fallback errors must fail closed');
+    assert.equal(scanWithFallbackErr.exitCode, 1, 'Scan with fallback errors must exit with code 1');
+    assert.ok(
+      scanWithFallbackErr.errors.some((e) => e.includes('[AST Fallback Error]')),
+      `Expected [AST Fallback Error] in: ${scanWithFallbackErr.errors.join('; ')}`,
+    );
+  } finally {
+    if (existsSync(brokenPyPath)) {
+      rmSync(brokenPyPath, { force: true });
+    }
+  }
+});
+
+// -----------------------------------------------------------------------------
+// Issue 7: Git Failure Becomes Success (scripts/security/run-sast.mjs:132-146)
+// -----------------------------------------------------------------------------
+test('Issue 7: resolveTargetFiles returns passed: false on git failure and runSastScan fails closed', () => {
+  // 1. resolveTargetFiles with mode: 'diff' fails when git fails
+  const failedDiff = resolveTargetFiles({
+    mode: 'diff',
+    rootDir: repoRoot,
+    execFn: () => ({
+      status: 128,
+      stdout: '',
+      stderr: 'fatal: not a git repository (or any of the parent directories): .git',
+    }),
+  });
+
+  assert.equal(failedDiff.passed, false, 'resolveTargetFiles must report passed: false when git fails');
+  assert.equal(failedDiff.files.length, 0);
+  assert.ok(failedDiff.errors.length > 0);
+  assert.ok(
+    failedDiff.errors.some((e) => e.includes('[Git Diff Error]') || e.includes('git command exited with status 128')),
+    `Expected git diff error in: ${failedDiff.errors.join('; ')}`,
+  );
+
+  // 2. resolveTargetFiles with exec error (e.g. ENOENT / crash)
+  const threwDiff = resolveTargetFiles({
+    mode: 'diff',
+    rootDir: repoRoot,
+    execFn: () => {
+      const err = new Error('git spawn ENOENT');
+      err.code = 'ENOENT';
+      throw err;
+    },
+  });
+  assert.equal(threwDiff.passed, false);
+  assert.ok(threwDiff.errors.some((e) => e.includes('[Git Diff Error]')));
+
+  // 3. runSastScan in diff mode fails closed when git diff fails
+  const failedScan = runSastScan({
+    mode: 'diff',
+    rootDir: repoRoot,
+    execFn: () => ({
+      status: 128,
+      stdout: '',
+      stderr: 'fatal: ambiguous argument "origin/development...HEAD"',
+    }),
+  });
+
+  assert.equal(failedScan.passed, false, 'runSastScan must fail closed on git failure in diff mode');
+  assert.equal(failedScan.exitCode, 1, 'runSastScan must exit with code 1 on git failure');
+  assert.ok(
+    failedScan.errors.some((e) => e.includes('[Git Diff Error]')),
+    `Expected [Git Diff Error] in scan output: ${failedScan.errors.join('; ')}`,
+  );
 });
 

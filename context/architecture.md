@@ -1172,15 +1172,16 @@ Feature 023 plan convergence (2026-09-04): admission context is separate from po
 
 2. **Scanner Driver & File Census (`scripts/security/run-sast.mjs`)**:
    - Recursive workspace census validating target file minimums (`apps/agent >= 30`, `apps/api >= 20`, `apps/web >= 20`, `packages/shared >= 1`), failing closed if census drops below thresholds.
-   - Target resolution supporting `--mode full` (scans all workspace source files) and `--mode diff` (filters git diff changed files).
-   - SARIF normalization and fail-closed exit code enforcement on missing tools, scanner crashes, and unbaselined findings.
-   - Platform-aware AST fallback (`runAstFallbackScan`) providing deterministic rule scanning on environments where native Semgrep CLI is unavailable.
+   - Target resolution supporting `--mode full` (scans all workspace source files) and `--mode diff` (filters git diff changed files, failing closed on git failure).
+   - Semgrep configuration passing custom rules and default reviewed packages (`p/default`, `p/owasp-top-ten`, `p/security-audit`, `p/secrets`).
+   - SARIF normalization (CVSS score parsing, rule metadata, and level mapping) and fail-closed exit code enforcement on missing tools, malformed SARIF, scanner crashes, and unbaselined findings.
+   - Platform-aware AST fallback (`runAstFallbackScan`) providing deterministic rule scanning on environments where native Semgrep CLI is unavailable, propagating read and syntax errors.
 
 3. **Canonical Baseline and <=30-Day Exception Schema (`baseline.json` & `exceptions.json`)**:
-   - `tests/security/sast/baseline.json`: Clean draft 2020-12 baseline format tracking known findings (`ruleId`, `file`, `line`, `fingerprint`, `context`).
-   - `tests/security/exceptions.json`: Strict exception schema requiring `id`, `ruleId`, `file`, `owner`, `rationale`, `compensatingControl`, `createdAt`, `expiresAt`.
+   - `tests/security/sast/baseline.json`: Clean draft 2020-12 baseline format tracking known findings (`ruleId`, `file`, `line`, `fingerprint`, `context`). Baseline matching requires path-boundary matching and cannot suppress hard rules or Critical/High/Error findings.
+   - `tests/security/exceptions.json`: Strict exception schema requiring `id`, `ruleId`, `file`, `owner`, `rationale`, `compensatingControl`, `createdAt`, `expiresAt`. Exceptions scope by path boundary, optional `line`, and optional `fingerprint`, with single-use consumption preventing cross-finding suppression.
    - Validation engine (`validateException`, `validateExceptionsSchema`, `validateBaselineSchema`) enforces:
      - Maximum 30-day lifetime from creation date (`expiresAt - createdAt <= 30 days`).
      - Immediate fail-closed rejection on expired exceptions (`expiresAt < currentDate`).
-     - Non-bypassable hard rules: `no-llm-in-guardrails`, `no-unshielded-tool-execution`, and any Critical or High severity findings can NEVER be suppressed by exceptions.
+     - Non-bypassable hard rules: `no-llm-in-guardrails`, `no-unshielded-tool-execution`, and any Critical, High, or Error severity findings can NEVER be suppressed by baseline or exceptions.
 

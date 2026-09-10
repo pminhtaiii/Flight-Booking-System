@@ -63,12 +63,21 @@ Update this file after every completed feature. Any AI agent reading this should
     - Added deterministic AST fallback scanner `runAstFallbackScan` for Windows and non-CLI environments to scan target files for custom guardrail rules without crashing.
   - Added comprehensive test suite in `tests/security/sast-runner.test.mjs` (29/29 tests passing, exit code 0).
   - Verified `node scripts/security/run-sast.mjs --mode full` and `node scripts/security/run-sast.mjs --mode diff` exit 0 on current codebase.
+  - Hardened SAST scan driver (`scripts/security/run-sast.mjs`) resolving 7 security issues:
+    - Standard rulesets (`p/default`, `p/owasp-top-ten`, `p/security-audit`, `p/secrets`) loaded by default in Semgrep configs; registry packages skip file-existence checks.
+    - Baseline evaluation enforces non-bypassable hard rules and blocking severities (`CRITICAL`, `HIGH`, `ERROR`), with strict path-boundary matching.
+    - Full CVSS numeric (>=7.0 -> HIGH, >=9.0 -> CRITICAL) and string severity parsing from SARIF properties/metadata; `ERROR` recognized as blocking everywhere.
+    - Exception matching scopes by path boundary, optional `line`, and optional `fingerprint`, with single-use consumption preventing cross-finding suppression.
+    - Malformed SARIF (invalid JSON, missing runs) fails closed in scanner and driver.
+    - AST fallback scanner returns structured errors (`{ findings, errors }`), reporting subprocess, syntax, and read failures to fail closed.
+    - Git diff resolution fails closed on non-zero exit status or execution error instead of treating failure as an empty scan.
+  - Expanded test suite in `tests/security/sast-runner.test.mjs` to 36/36 passing tests (exit code 0).
 
 ### Current Status
 
 **Feature:** Security Systems (Feature 023) — Phase 5 US3 Static Security Checks
-**Last completed:** T032 SAST Baseline & Temporary Exception Schema in `scripts/security/run-sast.mjs`, `tests/security/sast/baseline.json`, `tests/security/exceptions.json` (29/29 passing in `tests/security/sast-runner.test.mjs`).
-**In progress:** Phase 5 Slice 1 complete (T029, T030, T031, T032 complete).
+**Last completed:** T032 SAST Baseline & Temporary Exception Schema hardening in `scripts/security/run-sast.mjs` (36/36 passing in `tests/security/sast-runner.test.mjs`).
+**In progress:** Phase 5 Slice 1 complete (T029, T030, T031, T032 hardened).
 **Next:** T033 — Implement separate SCA and secret drivers in `scripts/security/run-supply-chain.mjs`.
 
 ### Feature 023 — CI regression remediation checkpoint (2026-09-09)

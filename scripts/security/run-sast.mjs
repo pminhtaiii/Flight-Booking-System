@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -28,10 +29,27 @@ export const DEFAULT_IGNORED_DIRS = new Set([
   '.git',
 ]);
 
+export const DEFAULT_STANDARD_RULESETS = [
+  'p/default@v1.88.0',
+  'p/owasp-top-ten@v1.88.0',
+  'p/security-audit@v1.88.0',
+  'p/secrets@v1.88.0',
+];
+
 export const NON_BYPASSABLE_RULES = new Set([
   'no-llm-in-guardrails',
   'no-unshielded-tool-execution',
 ]);
+
+/**
+ * Computes deterministic finding fingerprint.
+ */
+export function computeFindingFingerprint(ruleId, file, line, message = '') {
+  const normFile = String(file || '').replaceAll('\\', '/');
+  return createHash('sha256')
+    .update(`${ruleId || ''}:${normFile}:${line || 1}:${message || ''}`)
+    .digest('hex');
+}
 
 /**
  * Recursively counts target source files across target workspaces.
@@ -128,25 +146,57 @@ export function resolveTargetFiles(options = {}) {
 
   if (mode === 'diff') {
     let diffOutput = options.gitDiffOutput;
+    const errors = [];
     if (diffOutput === undefined) {
       const execFn = options.execFn || spawnSync;
       const base = options.diffBase || 'origin/development...HEAD';
       let res;
+      let gitSuccess = false;
       try {
         res = execFn('git', ['diff', '--name-only', '--diff-filter=ACMRTUXB', base], {
           cwd: rootDir,
           encoding: 'utf8',
         });
+        if (res && res.status === 0 && !res.error) {
+          gitSuccess = true;
+          diffOutput = res.stdout || '';
+        }
       } catch {
-        res = execFn('git', ['diff', '--name-only', '--diff-filter=ACMRTUXB', 'HEAD'], {
-          cwd: rootDir,
-          encoding: 'utf8',
-        });
+        // Fall back to HEAD
       }
-      diffOutput = res && res.stdout ? res.stdout : '';
+
+      if (!gitSuccess) {
+        try {
+          res = execFn('git', ['diff', '--name-only', '--diff-filter=ACMRTUXB', 'HEAD'], {
+            cwd: rootDir,
+            encoding: 'utf8',
+          });
+          if (res && res.status === 0 && !res.error) {
+            gitSuccess = true;
+            diffOutput = res.stdout || '';
+          }
+        } catch (err) {
+          res = { error: err };
+        }
+      }
+
+      if (!gitSuccess) {
+        const errMsg =
+          res?.error?.message ||
+          res?.stderr?.trim() ||
+          `git command exited with status ${res?.status ?? 'unknown'}`;
+        errors.push(`[Git Diff Error] Failed to determine git diff files: ${errMsg}`);
+        return {
+          mode: 'diff',
+          files: [],
+          workspaces,
+          passed: false,
+          errors,
+        };
+      }
     }
 
-    const lines = diffOutput
+    const lines = (diffOutput || '')
       .split(/\r?\n/)
       .map((l) => l.trim().replaceAll('\\', '/'))
       .filter((l) => l.length > 0);
@@ -170,6 +220,8 @@ export function resolveTargetFiles(options = {}) {
       mode: 'diff',
       files: filtered,
       workspaces,
+      passed: true,
+      errors: [],
     };
   }
 
@@ -184,6 +236,8 @@ export function resolveTargetFiles(options = {}) {
     mode: 'full',
     files: census.fileList,
     workspaces,
+    passed: census.passed,
+    errors: census.errors,
   };
 }
 
@@ -191,19 +245,24 @@ export function resolveTargetFiles(options = {}) {
  * Parses SARIF v2.1.0 output and extracts normalized findings.
  */
 export function parseSarifResults(sarifData) {
-  if (!sarifData) return [];
+  if (sarifData === null || sarifData === undefined) return [];
 
   let data = sarifData;
   if (typeof data === 'string') {
-    try {
-      data = JSON.parse(data);
-    } catch {
-      return [];
-    }
+    data = JSON.parse(data);
   }
 
-  if (typeof data !== 'object' || !Array.isArray(data.runs)) {
+  if (
+    typeof data === 'object' &&
+    data !== null &&
+    !Array.isArray(data) &&
+    Object.keys(data).length === 0
+  ) {
     return [];
+  }
+
+  if (typeof data !== 'object' || data === null || !Array.isArray(data.runs)) {
+    throw new Error('Invalid SARIF format: expected an object with a "runs" array');
   }
 
   const findings = [];
@@ -211,13 +270,56 @@ export function parseSarifResults(sarifData) {
   for (const run of data.runs) {
     if (!Array.isArray(run?.results)) continue;
 
+    const rulesMap = new Map();
+    const driverRules = run?.tool?.driver?.rules;
+    if (Array.isArray(driverRules)) {
+      driverRules.forEach((r, idx) => {
+        if (r?.id) rulesMap.set(r.id, r);
+        rulesMap.set(idx, r);
+      });
+    }
+    const extRules = run?.tool?.extensions;
+    if (Array.isArray(extRules)) {
+      for (const ext of extRules) {
+        if (Array.isArray(ext?.rules)) {
+          ext.rules.forEach((r) => {
+            if (r?.id) rulesMap.set(r.id, r);
+          });
+        }
+      }
+    }
+
     for (const result of run.results) {
       const ruleId = result.ruleId || result.rule?.id || 'unknown-rule';
-      const level = result.level || 'warning';
+      const rule =
+        (result.ruleIndex !== undefined ? rulesMap.get(result.ruleIndex) : null) ||
+        rulesMap.get(ruleId) ||
+        result.rule;
+
+      const rawSec =
+        result.properties?.['security-severity'] ??
+        rule?.properties?.['security-severity'] ??
+        result.properties?.severity ??
+        rule?.properties?.severity ??
+        rule?.defaultConfiguration?.level;
+
       let severity = 'MEDIUM';
-      if (level === 'error') severity = 'ERROR';
-      else if (level === 'warning') severity = 'WARNING';
-      else if (level === 'note' || level === 'none') severity = 'LOW';
+      if (rawSec !== undefined && rawSec !== null && String(rawSec).trim() !== '') {
+        const num = Number(rawSec);
+        if (!isNaN(num)) {
+          if (num >= 9.0) severity = 'CRITICAL';
+          else if (num >= 7.0) severity = 'HIGH';
+          else if (num >= 4.0) severity = 'MEDIUM';
+          else severity = 'LOW';
+        } else {
+          severity = String(rawSec).toUpperCase();
+        }
+      } else {
+        const level = result.level || 'warning';
+        if (level === 'error') severity = 'ERROR';
+        else if (level === 'warning') severity = 'WARNING';
+        else if (level === 'note' || level === 'none') severity = 'LOW';
+      }
 
       const location = result.locations?.[0]?.physicalLocation;
       const fileUri = location?.artifactLocation?.uri || 'unknown-file';
@@ -227,14 +329,27 @@ export function parseSarifResults(sarifData) {
       const message =
         typeof result.message === 'string' ? result.message : result.message?.text || '';
 
+      const rawFp =
+        result.fingerprint ||
+        result.fingerprints?.['matchBasedId/v1'] ||
+        (result.fingerprints ? Object.values(result.fingerprints)[0] : null) ||
+        result.partialFingerprints?.primaryLocationLineHash ||
+        (result.partialFingerprints ? Object.values(result.partialFingerprints)[0] : null);
+
+      const fingerprint =
+        typeof rawFp === 'string' && rawFp.trim() !== ''
+          ? rawFp.trim()
+          : computeFindingFingerprint(ruleId, normalizedFile, startLine, message);
+
       findings.push({
         ruleId,
-        level,
+        level: result.level || 'warning',
         severity,
         file: normalizedFile,
         startLine,
         endLine,
         message,
+        fingerprint,
         raw: result,
       });
     }
@@ -270,9 +385,28 @@ export function validateBaselineFinding(finding, index = 0) {
   if (typeof filePath !== 'string' || filePath.trim() === '') {
     errors.push(`Baseline finding [${index}] missing required field: file`);
   }
-  if (finding.line !== undefined && finding.line !== null && (typeof finding.line !== 'number' || finding.line < 1)) {
+  if (
+    finding.line !== undefined &&
+    finding.line !== null &&
+    (typeof finding.line !== 'number' || finding.line < 1 || !Number.isInteger(finding.line))
+  ) {
     errors.push(`Baseline finding [${index}] field 'line' must be a positive integer`);
   }
+
+  const ruleId = typeof finding.ruleId === 'string' ? finding.ruleId.trim() : '';
+  if (NON_BYPASSABLE_RULES.has(ruleId)) {
+    errors.push(
+      `[Non-Bypassable Rule Violation] Baseline finding [${index}] targets non-bypassable rule '${ruleId}' which cannot be baselined`,
+    );
+  }
+
+  const severity = finding.severity ? String(finding.severity).toUpperCase() : null;
+  if (severity && ['CRITICAL', 'HIGH', 'ERROR'].includes(severity)) {
+    errors.push(
+      `[Non-Bypassable Rule Violation] Baseline finding [${index}] targets non-bypassable severity '${severity}' which cannot be baselined`,
+    );
+  }
+
   return {
     valid: errors.length === 0,
     errors,
@@ -365,13 +499,27 @@ export function validateException(exception, options = {}) {
   }
 
   const severity = exception.severity ? String(exception.severity).toUpperCase() : null;
-  if (severity && (severity === 'CRITICAL' || severity === 'HIGH')) {
+  if (severity && ['CRITICAL', 'HIGH', 'ERROR'].includes(severity)) {
     errors.push(
-      `[Non-Bypassable Rule Violation] Non-bypassable rule or High/Critical finding cannot be suppressed by exception and cannot be bypassed (${severity})`,
+      `[Non-Bypassable Rule Violation] Non-bypassable rule or High/Critical/Error finding cannot be suppressed by exception and cannot be bypassed (${severity})`,
     );
   }
 
-  // 3. Date & Duration checks
+  // 3. Optional line and fingerprint validation
+  const exLine = exception.line ?? exception.startLine;
+  if (exLine !== undefined && exLine !== null) {
+    if (typeof exLine !== 'number' || exLine < 1 || !Number.isInteger(exLine)) {
+      errors.push("Exception field 'line' (or 'startLine') must be a positive integer");
+    }
+  }
+
+  if (exception.fingerprint !== undefined && exception.fingerprint !== null) {
+    if (typeof exception.fingerprint !== 'string' || exception.fingerprint.trim() === '') {
+      errors.push("Exception field 'fingerprint' must be a non-empty string");
+    }
+  }
+
+  // 4. Date & Duration checks
   let createdDate = null;
   if (exception.createdAt !== undefined && exception.createdAt !== null) {
     if (!isValidIso8601(exception.createdAt)) {
@@ -514,6 +662,8 @@ export function evaluateFindings(findings = [], options = {}) {
   let baselinedCount = 0;
   let exceptedCount = 0;
   const unbaselined = [];
+  const usedExceptionIds = new Set();
+  const usedExceptions = new Set();
 
   for (const finding of findings) {
     const findingFile = finding.file.replaceAll('\\', '/');
@@ -521,32 +671,72 @@ export function evaluateFindings(findings = [], options = {}) {
     // 1. Check baseline
     const inBaseline = baselineList.some((b) => {
       const bFile = (b.file || b.path || '').replaceAll('\\', '/');
-      const fileMatches = bFile === findingFile || findingFile.endsWith(bFile);
+      const fileMatches =
+        bFile === findingFile || (bFile.length > 0 && findingFile.endsWith('/' + bFile));
       const ruleMatches = b.ruleId === finding.ruleId;
       const lineMatches = b.line === undefined || b.line === null || b.line === finding.startLine;
       return ruleMatches && fileMatches && lineMatches;
     });
 
     if (inBaseline) {
+      const isHardRule = NON_BYPASSABLE_RULES.has(finding.ruleId);
+      const isBlockingSeverity = ['CRITICAL', 'HIGH', 'ERROR'].includes(
+        String(finding.severity || '').toUpperCase(),
+      );
+      if (isHardRule || isBlockingSeverity) {
+        errors.push(
+          `[Non-Bypassable Rule Violation] Non-bypassable rule or High/Critical/Error finding ${finding.ruleId} (${finding.severity}) in ${finding.file}:${finding.startLine} cannot be baselined`,
+        );
+        unbaselined.push(finding);
+        continue;
+      }
       baselinedCount += 1;
       continue;
     }
 
     // 2. Check exceptions
     const matchingException = exceptionList.find((ex) => {
+      if (usedExceptions.has(ex) || (ex.id && usedExceptionIds.has(ex.id))) {
+        return false;
+      }
+
+      if (ex.ruleId !== finding.ruleId) return false;
+
       const exFile = (ex.file || ex.path || '').replaceAll('\\', '/');
-      return (
-        ex.ruleId === finding.ruleId && (exFile === findingFile || findingFile.endsWith(exFile))
-      );
+      const fileMatches =
+        exFile === findingFile || (exFile.length > 0 && findingFile.endsWith('/' + exFile));
+      if (!fileMatches) return false;
+
+      const exLine = ex.line ?? ex.startLine;
+      if (exLine !== undefined && exLine !== null && exLine !== finding.startLine) {
+        return false;
+      }
+
+      if (
+        ex.fingerprint !== undefined &&
+        ex.fingerprint !== null &&
+        ex.fingerprint !== finding.fingerprint
+      ) {
+        return false;
+      }
+
+      return true;
     });
 
     if (matchingException) {
-      // Non-bypassable rules and high/critical severities
+      usedExceptions.add(matchingException);
+      if (matchingException.id) {
+        usedExceptionIds.add(matchingException.id);
+      }
+
+      // Non-bypassable rules and high/critical/error severities
       const isHardRule = NON_BYPASSABLE_RULES.has(finding.ruleId);
-      const isHighOrCritical = ['CRITICAL', 'HIGH'].includes(String(finding.severity).toUpperCase());
-      if (isHardRule || isHighOrCritical) {
+      const isBlockingSeverity = ['CRITICAL', 'HIGH', 'ERROR'].includes(
+        String(finding.severity || '').toUpperCase(),
+      );
+      if (isHardRule || isBlockingSeverity) {
         errors.push(
-          `[Non-Bypassable Rule Violation] Non-bypassable rule or High/Critical finding ${finding.ruleId} (${finding.severity}) in ${finding.file}:${finding.startLine} cannot be bypassed by exception ${matchingException.id || 'N/A'}`,
+          `[Non-Bypassable Rule Violation] Non-bypassable rule or High/Critical/Error finding ${finding.ruleId} (${finding.severity}) in ${finding.file}:${finding.startLine} cannot be bypassed by exception ${matchingException.id || 'N/A'}`,
         );
         unbaselined.push(finding);
         continue;
@@ -593,6 +783,7 @@ export function evaluateFindings(findings = [], options = {}) {
  */
 export function runAstFallbackScan(targetFiles, rootDir) {
   const findings = [];
+  const errors = [];
   const pyFiles = targetFiles.filter((f) => f.endsWith('.py'));
   const tsxFiles = targetFiles.filter((f) => f.endsWith('.tsx') || f.endsWith('.jsx'));
 
@@ -602,6 +793,7 @@ import ast, sys, json, os
 
 files = json.loads(sys.stdin.read())
 findings = []
+errors = []
 
 tool_names = {
     'ToolNode', 'search_flights', 'booking_detail', 'booking_summaries',
@@ -610,18 +802,20 @@ tool_names = {
 sensitive_tokens = {'prompt', 'user_input', 'raw_message', 'raw_payload', 'unredacted_output'}
 
 for rel_path, full_path in files:
-    if not os.path.exists(full_path):
-        continue
-
     norm_rel = rel_path.replace('\\\\', '/')
     is_test = '/tests/' in norm_rel or '/test/' in norm_rel or os.path.basename(norm_rel).startswith('test_') or norm_rel.endswith('.spec.ts') or norm_rel.endswith('.test.ts')
     if is_test:
         continue
 
+    if not os.path.exists(full_path):
+        errors.append(f"File not found: {norm_rel}")
+        continue
+
     try:
         with open(full_path, 'rb') as f:
             tree = ast.parse(f.read())
-    except Exception:
+    except Exception as e:
+        errors.append(f"AST parse error in {norm_rel}: {str(e)}")
         continue
 
     is_guardrails = 'guardrails' in norm_rel
@@ -668,7 +862,7 @@ for rel_path, full_path in files:
 
     Visitor().visit(tree)
 
-print(json.dumps(findings))
+print(json.dumps({'findings': findings, 'errors': errors}))
 `;
     try {
       const inputPayload = JSON.stringify(pyFiles.map((f) => [f, resolve(rootDir, f)]));
@@ -676,54 +870,89 @@ print(json.dumps(findings))
         input: inputPayload,
         encoding: 'utf8',
       });
-      if (res.status === 0 && res.stdout.trim()) {
-        const pyMatches = JSON.parse(res.stdout);
-        for (const m of pyMatches) {
-          findings.push({
-            ruleId: m.ruleId,
-            level: 'error',
-            severity: 'ERROR',
-            file: m.file,
-            startLine: m.line,
-            endLine: m.line,
-            message: m.message,
-          });
+      if (res.error) {
+        errors.push(`[AST Fallback Error] Python process failed to spawn: ${res.error.message}`);
+      } else if (res.status !== 0) {
+        errors.push(
+          `[AST Fallback Error] Python process exited with status ${res.status}: ${res.stderr || res.stdout || 'Unknown error'}`,
+        );
+      } else if (res.stdout && res.stdout.trim()) {
+        try {
+          const parsed = JSON.parse(res.stdout);
+          const pyMatches = Array.isArray(parsed) ? parsed : parsed.findings || [];
+          const pyErrors = parsed.errors || [];
+          for (const err of pyErrors) {
+            errors.push(`[AST Fallback Error] ${err}`);
+          }
+          for (const m of pyMatches) {
+            const normFile = m.file.replaceAll('\\', '/');
+            const fp = computeFindingFingerprint(m.ruleId, normFile, m.line, m.message);
+            findings.push({
+              ruleId: m.ruleId,
+              level: 'error',
+              severity: 'ERROR',
+              file: normFile,
+              startLine: m.line,
+              endLine: m.line,
+              message: m.message,
+              fingerprint: fp,
+            });
+          }
+        } catch (jsonErr) {
+          errors.push(
+            `[AST Fallback Error] Failed to parse Python fallback JSON output: ${jsonErr.message}`,
+          );
         }
       }
-    } catch {
-      // Ignore
+    } catch (err) {
+      errors.push(`[AST Fallback Error] Python execution failed: ${err.message}`);
     }
   }
 
   for (const f of tsxFiles) {
     const fullPath = resolve(rootDir, f);
-    if (!existsSync(fullPath)) continue;
     const norm = f.replaceAll('\\', '/');
-    if (norm.includes('/tests/') || norm.includes('/test/') || norm.endsWith('.spec.tsx') || norm.endsWith('.test.tsx')) continue;
+    if (
+      norm.includes('/tests/') ||
+      norm.includes('/test/') ||
+      norm.endsWith('.spec.tsx') ||
+      norm.endsWith('.test.tsx')
+    ) {
+      continue;
+    }
+
+    if (!existsSync(fullPath)) {
+      errors.push(`[AST Fallback Error] TSX file does not exist: ${f}`);
+      continue;
+    }
+
     try {
       const content = readFileSync(fullPath, 'utf8');
       if (content.includes('dangerouslySetInnerHTML')) {
         const lines = content.split('\n');
         for (let l = 0; l < lines.length; l++) {
           if (lines[l].includes('dangerouslySetInnerHTML')) {
+            const msg = 'Unsafe HTML interpolation via dangerouslySetInnerHTML';
+            const fp = computeFindingFingerprint('safe-html-interpolation', norm, l + 1, msg);
             findings.push({
               ruleId: 'safe-html-interpolation',
               level: 'error',
               severity: 'ERROR',
-              file: f.replaceAll('\\', '/'),
+              file: norm,
               startLine: l + 1,
               endLine: l + 1,
-              message: 'Unsafe HTML interpolation via dangerouslySetInnerHTML',
+              message: msg,
+              fingerprint: fp,
             });
           }
         }
       }
-    } catch {
-      // Ignore
+    } catch (err) {
+      errors.push(`[AST Fallback Error] Failed to read TSX file ${f}: ${err.message}`);
     }
   }
 
-  return findings;
+  return { findings, errors };
 }
 
 /**
@@ -736,6 +965,7 @@ export function runSastScan(options = {}) {
   const configs = options.configs || [
     resolve(rootDir, 'tests/security/sast/guardrails.yml'),
     resolve(rootDir, 'tests/security/sast/ruleset.yml'),
+    ...DEFAULT_STANDARD_RULESETS,
   ];
   const sarifOutput = options.sarifOutput ? resolve(rootDir, options.sarifOutput) : null;
 
@@ -791,6 +1021,19 @@ export function runSastScan(options = {}) {
     execFn,
   });
 
+  if (targetResolution.passed === false || (targetResolution.errors && targetResolution.errors.length > 0)) {
+    errors.push(...(targetResolution.errors || ['[Git Diff Error] Failed to resolve target files']));
+    return {
+      passed: false,
+      exitCode: 1,
+      census,
+      targetResolution,
+      findings: [],
+      unbaselinedFindings: [],
+      errors,
+    };
+  }
+
   const targetFiles = targetResolution.files;
 
   // In diff mode with 0 files, pass immediately
@@ -836,7 +1079,8 @@ export function runSastScan(options = {}) {
   // Step 4: Build Semgrep CLI execution arguments
   const semgrepArgs = ['--sarif'];
   for (const cfg of configs) {
-    if (!existsSync(cfg)) {
+    const isRegistry = cfg.startsWith('p/') || cfg.startsWith('r/');
+    if (!isRegistry && !existsSync(cfg)) {
       errors.push(`[SAST Config Error] Required config file does not exist: ${cfg}`);
       return {
         passed: false,
@@ -909,7 +1153,12 @@ export function runSastScan(options = {}) {
 
   if (isMissingSemgrep) {
     if (canUseFallback) {
-      const fallbackFindings = runAstFallbackScan(targetFiles, rootDir);
+      const fallbackResult = runAstFallbackScan(targetFiles, rootDir);
+      const fallbackFindings = fallbackResult.findings || [];
+      if (fallbackResult.errors && fallbackResult.errors.length > 0) {
+        errors.push(...fallbackResult.errors);
+      }
+
       const evalResult = evaluateFindings(fallbackFindings, {
         baseline,
         exceptions,
@@ -992,7 +1241,21 @@ export function runSastScan(options = {}) {
     }
   }
 
-  const findings = parseSarifResults(sarifRaw);
+  let findings = [];
+  try {
+    findings = parseSarifResults(sarifRaw);
+  } catch (err) {
+    errors.push(`[SAST Parse Error] Failed to parse SARIF output: ${err.message}`);
+    return {
+      passed: false,
+      exitCode: 1,
+      census,
+      targetResolution,
+      findings: [],
+      unbaselinedFindings: [],
+      errors,
+    };
+  }
 
   const evalResult = evaluateFindings(findings, {
     baseline,
