@@ -379,7 +379,7 @@ class InjectionSignatureEngine:
         # Scan candidates against compiled signatures
         for candidate in candidates:
             for name, pattern in NAMED_INJECTION_SIGNATURES:
-                if safe_regex_match(pattern, candidate):
+                if safe_regex_match(pattern, candidate, known_safe=True):
                     return True, name
 
         return False, None

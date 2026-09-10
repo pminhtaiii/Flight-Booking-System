@@ -194,8 +194,8 @@ The follow-up graph-state correction passes the latest `state["trusted_snapshot"
 into the next tool configuration and writes the validated `TrustedSearchSnapshot`
 returned by `commit_next` back into graph state. Commit failures clear staged work
 and fail closed. The router benchmark latency was resolved via regex ReDoS AST classification
-caching, short-circuited length checking for safe inputs, and candidate deduplication in
-`InjectionSignatureEngine`, allowing the full non-Redis agent test suite to pass cleanly (`971 passed, 4 skipped, 12 deselected`).
+caching, candidate deduplication in `InjectionSignatureEngine`, and `known_safe=True` bypass for vetted
+signatures, with fail-closed rejection for catastrophic patterns on all input lengths.
 
 Owner-bound handoff snapshot read failures emit only the static
 `validate_handoff_snapshot_read_failed` warning and the generic safe error; exception

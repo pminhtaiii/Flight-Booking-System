@@ -90,7 +90,6 @@ _BASE64_PATTERN: re.Pattern[str] = re.compile(
 )
 
 # Bounds for regex scanning and ReDoS safety
-_MAX_CATASTROPHIC_INPUT_LEN: int = 30
 _MAX_REGEX_SCAN_LENGTH: int = 16384
 
 
@@ -241,16 +240,18 @@ def safe_regex_match(
     pattern: re.Pattern[str] | str,
     text: str,
     timeout_seconds: float = 0.05,
+    known_safe: bool = False,
 ) -> bool:
     """
     ReDoS-resistant regex matcher with bounded execution timeout or bounded input length.
-    Detects catastrophic backtracking patterns via AST inspection and bounds input length
-    to guarantee termination within bounded time limits.
+    Detects catastrophic backtracking patterns via AST inspection and guarantees termination
+    within bounded time limits. Safe patterns may bypass classification when known_safe=True.
+    Known-catastrophic patterns are fail-closed and rejected to prevent exponential backtracking.
     """
     pattern_str = pattern.pattern if isinstance(pattern, re.Pattern) else pattern
     compiled = pattern if isinstance(pattern, re.Pattern) else re.compile(pattern_str)
 
-    if len(text) > _MAX_CATASTROPHIC_INPUT_LEN and is_catastrophic_regex(pattern_str):
+    if not known_safe and is_catastrophic_regex(pattern_str):
         return False
 
     bounded_text = text[:_MAX_REGEX_SCAN_LENGTH]
