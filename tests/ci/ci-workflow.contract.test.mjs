@@ -338,6 +338,7 @@ test('workflow pins actions, disables credential persistence, and avoids unsafe 
     'pnpm/action-setup': '0977fd99725f1db4007ccb2928dbb4e90d06cc86',
     'dorny/paths-filter': 'fbd0ab8f3e69293af611ebaee6363fc25e6d187d',
     'astral-sh/setup-uv': 'c771a70e6277c0a99b617c7a806ffedaca235ff9',
+    'actions/upload-artifact': '4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1',
   })) {
     assertContains(
       source,

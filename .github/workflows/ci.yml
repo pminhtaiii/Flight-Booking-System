@@ -490,7 +490,7 @@ jobs:
         run: node scripts/security/run-sast.mjs --sarif artifacts/security/sast.sarif
       - name: Upload security artifacts
         if: always()
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb99ba8edd # v4.6.1
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
         with:
           name: security-sast-artifacts
           path: artifacts/security/
@@ -544,7 +544,7 @@ jobs:
         run: node scripts/security/run-supply-chain.mjs --strict
       - name: Upload security artifacts
         if: always()
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb99ba8edd # v4.6.1
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
         with:
           name: security-supply-chain-artifacts
           path: artifacts/security/
