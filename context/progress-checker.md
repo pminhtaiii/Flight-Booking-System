@@ -23,12 +23,64 @@ Update this file after every completed feature. Any AI agent reading this should
 - T009: Added the Phase 3 closed-registry RED contract suite in `apps/agent/tests/security/test_registry.py`, covering unknown and duplicate keys, prohibited dynamic imports, compulsory production layers, prerequisite ordering/missing/cyclic dependencies, and isolated test-only injection. Collection intentionally remains RED until T013 implements `agent.guardrails.registry`.
 - T011: Registered the `security` pytest marker and added `tests/security/coverage-policy.json` with >=95% statement and >=90% branch targets for the seven security module scopes defined by this slice.
 
+### Feature 023 — Security Systems: Phase 5 US3 Static Security Checks (Task T029 Completed) (2026-09-10)
+
+- T029: Implemented Safe & Unsafe SAST Fixture Matrix in `tests/security/sast/fixtures/` and verified contract test suite in `tests/security/sast-runner.test.mjs` (8/8 tests passing, exit code 0):
+  - 10 paired control fixtures covering all 5 targeted SAST security categories:
+    1. Model Calls in Guardrails: `llm-guardrails.unsafe.py` (LangChain `ChatOpenAI` invoke/ainvoke) vs `llm-guardrails.safe.py` (deterministic regex / algorithmic parsing).
+    2. Dynamic Imports: `dynamic-imports.unsafe.py` (`__import__`, `importlib.import_module`, `eval`, `exec`) vs `dynamic-imports.safe.py` (static dictionary / Callable factory mapping).
+    3. Bypass Tool Dispatch: `tool-execution.unsafe.py` (direct tool function execution bypassing gateway) vs `tool-execution.safe.py` (routing strictly through `gateway.execute_tool()`).
+    4. Raw Payload Logging: `payload-logging.unsafe.py` (logging raw prompt, user_input, unredacted outputs) vs `payload-logging.safe.py` (logging payload-free metadata: status, event, token_count, duration_ms).
+    5. Unsafe HTML Injection: `html-interpolation.unsafe.tsx` (`dangerouslySetInnerHTML={{ __html: rawHtml }}`) vs `html-interpolation.safe.tsx` (safe React `{sanitizedContent}` child rendering).
+  - TDD contract suite verifies existence, Python syntax parsing via AST, TSX syntax parsing via TypeScript API, and positive/negative rule trigger assertions.
+- **T030 Pinned Custom Semgrep Rules & Ruleset**:
+  - Implemented 5 pinned custom Semgrep rules in `tests/security/sast/guardrails.yml` with `severity: ERROR`, language-scoping, CWE mappings, and interprocedural behavioral test documentation:
+    1. `no-llm-in-guardrails` (python): flags model initializations (`ChatOpenAI`, etc.) and invocations (`invoke`/`ainvoke`).
+    2. `no-dynamic-imports-in-guardrails` (python): flags dynamic reflection (`__import__`, `importlib.import_module`, `eval`, `exec`).
+    3. `no-unshielded-tool-execution` (python): flags direct tool functions or `ToolNode` invocations bypassing `gateway.execute_tool()`.
+    4. `no-raw-payload-logging` (python): flags logger invocations containing sensitive prompt, user input, or unredacted variables.
+    5. `safe-html-interpolation` (typescript, tsx): flags raw `dangerouslySetInnerHTML={{ __html: ... }}` injections.
+  - Implemented `tests/security/sast/ruleset.yml` pinned to Semgrep version `1.88.0`, including `guardrails.yml`, standard reviewed rulesets (`p/default`, `p/owasp-top-ten`, `p/security-audit`, `p/secrets`), generic eval/exec and HTML rules, and interprocedural verification requirements.
+  - Added T030 TDD contract and deterministic AST verification suite in `tests/security/sast-runner.test.mjs` verifying valid YAML syntax, rule schemas, and positive/negative fixture matches (13/13 passing).
+
+- **T031 SAST Scan Driver & File Census Validation**:
+  - Implemented `scripts/security/run-sast.mjs`:
+    - Full source file census recursively scanning workspaces (`apps/agent`, `apps/api`, `apps/web`, `packages/shared`) for target extensions (`.py`, `.ts`, `.tsx`, `.js`, `.mjs`), strictly ignoring `node_modules`, `dist`, `.next`, `.venv`, `__pycache__`, `.pytest_cache`, `.git`, and `tests/security/sast/fixtures`.
+    - Validates minimum expected file count per workspace (`apps/agent >= 30`, `apps/api >= 20`, `apps/web >= 20`, `packages/shared >= 1`), failing closed if any threshold is not met.
+    - Resolves targets for both `--mode full` (entire codebase) and `--mode diff` (git diff changed files).
+    - Parses SARIF v2.1.0 output into normalized finding objects (`ruleId`, `level`, `severity`, `file`, `startLine`, `endLine`, `message`).
+    - Evaluates findings against baseline and exceptions with fail-closed non-bypassable rule checks (`no-llm-in-guardrails`, `no-unshielded-tool-execution`, Critical severity) and expired exception checks.
+    - Implemented high-level `runSastScan` and CLI `main` runner with fail-closed semantics on missing Semgrep, syntax errors, scanner crashes, and unbaselined findings.
+  - Added unit, integration, and mock CLI contract tests in `tests/security/sast-runner.test.mjs` verifying census calculation, census failure threshold, ignored directory exclusion, diff vs full file resolution, SARIF parsing, baseline and exception handling, scanner crash/error detection, and CLI exit codes (21/21 passing, exit code 0).
+
+- **T032 SAST Baseline and Temporary Exception Schema**:
+  - Established canonical `tests/security/sast/baseline.json` with draft 2020-12 schema, version 1.0.0, and clean initial findings list.
+  - Established canonical `tests/security/exceptions.json` with draft 2020-12 schema, version 1.0.0, and clean initial exceptions list.
+  - Implemented validation engine in `scripts/security/run-sast.mjs`:
+    - `validateBaselineFinding` and `validateBaselineSchema`: validates root version, findings array, and per-finding ruleId/file/line/fingerprint/context fields.
+    - `validateException` and `validateExceptionsSchema`: enforces required fields (`id`, `ruleId`, `file`, `owner`, `rationale`, `compensatingControl`, `expiresAt`), ISO 8601 validation for dates, maximum 30-day exception duration limit (`expiresAt - createdAt <= 30 days`), fail-closed immediate failure on expired exceptions (`expiresAt < currentDate`), and hard non-bypassable rejection for `no-llm-in-guardrails`, `no-unshielded-tool-execution`, or Critical/High findings.
+    - Integrated schema validation into `evaluateFindings` and `runSastScan` with automatic default paths (`tests/security/sast/baseline.json` and `tests/security/exceptions.json`).
+    - Added deterministic AST fallback scanner `runAstFallbackScan` for Windows and non-CLI environments to scan target files for custom guardrail rules without crashing.
+  - Added comprehensive test suite in `tests/security/sast-runner.test.mjs` (29/29 tests passing, exit code 0).
+  - Verified `node scripts/security/run-sast.mjs --mode full` and `node scripts/security/run-sast.mjs --mode diff` exit 0 on current codebase.
+  - Hardened SAST scan driver (`scripts/security/run-sast.mjs`) resolving 7 security issues:
+    - Standard rulesets (`p/default`, `p/owasp-top-ten`, `p/security-audit`, `p/secrets`) loaded by default in Semgrep configs; registry packages skip file-existence checks.
+    - Baseline evaluation enforces non-bypassable hard rules and blocking severities (`CRITICAL`, `HIGH`, `ERROR`), with strict path-boundary matching.
+    - Full CVSS numeric (>=7.0 -> HIGH, >=9.0 -> CRITICAL) and string severity parsing from SARIF properties/metadata; `ERROR` recognized as blocking everywhere.
+    - Exception matching scopes by path boundary, optional `line`, and optional `fingerprint`, with single-use consumption preventing cross-finding suppression.
+    - Malformed SARIF (invalid JSON, missing runs) fails closed in scanner and driver.
+    - AST fallback scanner returns structured errors (`{ findings, errors }`), reporting subprocess, syntax, and read failures to fail closed.
+    - AST fallback scanner evaluates configured standard rulesets (`p/default`, `p/owasp-top-ten`, `p/security-audit`, `p/secrets`) detecting hardcoded secrets, code/command/eval injection, SQL injection, insecure deserialization, weak crypto hashing, and dangerous modules.
+    - Fallback AST scanner parses JavaScript, TypeScript, TSX, and MJS files via `ts.createSourceFile` and validates `parseDiagnostics`, immediately failing closed on syntax errors (`errors.push`, `exitCode: 1`) before executing line regexes.
+    - Git diff resolution fails closed on non-zero exit status or execution error instead of treating failure as an empty scan.
+  - Expanded test suite in `tests/security/sast-runner.test.mjs` to 38/38 passing tests (exit code 0).
+
 ### Current Status
 
-**Feature:** Security Systems (Feature 023) — Phase 4 US2 CI remediation completed
-**Last completed:** Graph-scoped search staging with atomic same-owner snapshot/fence commit, C-01 production-empty-registry fail-closed behavior, bounded owner-bound snapshot-read and commit-failure warnings, API empty-content AES-GCM compatibility, final-fix checkpoints (`349` agent tests/`1` skip, `49` literal GOAL tests, Ruff and live Redis fence green), and the post-atomic T093 flow (`1/1`, exit `0`). See [`docs/security/tool-boundary-validation.md`](../docs/security/tool-boundary-validation.md).
-**In progress:** None. Router performance remediation and regex guard integrity resolved: cached ReDoS regex pattern AST inspection (`_is_catastrophic_regex_cached` with `lru_cache(256)`), fail-closed rejection of catastrophic patterns regardless of input length, explicit `known_safe=True` bypass for pre-validated static signatures, and deduplicated candidate generation in `InjectionSignatureEngine.scan`. The full serial non-Redis agent suite passed cleanly with `971 passed, 4 skipped, 12 deselected`, exit code `0` (`test_t098_router_entry_benchmark` p95 at `14.836 ms` vs `100 ms` limit).
-**Next:** Ready for final review and merge.
+**Feature:** Security Systems (Feature 023) — Phase 5 US3 Static Security Checks
+**Last completed:** T032 SAST Baseline & Temporary Exception Schema hardening in `scripts/security/run-sast.mjs` with fallback syntax validation for JS/TS/TSX/MJS (38/38 passing in `tests/security/sast-runner.test.mjs`).
+**In progress:** Phase 5 Slice 1 complete (T029, T030, T031, T032 hardened).
+**Next:** T033 — Implement separate SCA and secret drivers in `scripts/security/run-supply-chain.mjs`.
 
 ### Feature 023 — CI regression remediation checkpoint (2026-09-09)
 
@@ -297,7 +349,6 @@ the current status.
   - Enforced strict anti-patterns: zero dynamic imports (no `__import__(`, `importlib.import_module`, `eval(`, or `exec(`).
   - Verified: `apps/agent/tests/security/test_registry.py` (8/8 passed), `apps/agent/tests/security/test_contracts.py` (9/9 passed), and clean `ruff check` + `ruff format --check` (exit code 0).
 
-
 ### Feature 023 — Security Systems: Phase 2 Final Slice (T007 Completed) (2026-09-05)
 
 - T007: Added `tests/security/compose.security.yml` with loopback-only PostgreSQL (`5433`), Redis (`6380`), API (`3301`), agent (`3302`) and local model/provider stub (`3400`) services. The Compose network is internal, runtime credentials are synthetic, and API/provider/model destinations resolve only to local services. Added narrowly scoped API/agent Dockerfiles and Docker ignore files so build contexts exclude environment files and unrelated workspace data.
@@ -327,7 +378,6 @@ the current status.
   - T068: Created full E2E parity characterization suite in `apps/api/test/agent-flight-match-parity.e2e-spec.ts`. Proved 100% parity between public web search (`POST /api/flights/search`) and agent search (`POST /agent-gateway/v2/flights/search`) across MATCHED and RANKED modes for offers, scores, levels, active weights, explanation keys, and rank order. Verified zero customer PII and zero `duffelOfferId` in gateway responses.
   - T069: Updated characterization fixtures and test assertions in `test_snapshot_characterization.py`, `test_graph.py`, and `test_chat_turn_runner.py` for V2 score-free snapshots. All regressions passing.
   - Verification: E2E parity suite 5/5 PASS (`jest --config test/jest-e2e.json test/agent-flight-match-parity.e2e-spec.ts`); TypeScript typecheck 0 errors (`tsc --noEmit`); `ruff check` & `ruff format --check` 100% clean; 484/484 agent unit tests PASS.
-
 
 - Phase 6 / Slice 1 correctness and API E2E follow-up (2026-09-03): GitHub Actions run `33745578129`, API E2E job `100617447771`, failed 12 tests across the two gateway suites (509 passed). Their fixtures removed airport reference rows that canonical search now validates; cache/order assumptions also predated delegation. The suites now seed airports, exercise the real raw-cache path with distinct user profiles, assert canonical ordering, and check committed V2 offer IDs immediately. Existing mapping and audit behavior remains covered.
   - Fixed the valid attestation race: V2 requests required persistence from `FlightsService` and signs only after the transaction commits; persistence failure returns 503 without an attestation. Browser/V1 persistence remains deferred.
@@ -527,7 +577,6 @@ the current status.
       - WEAK: 0–24 (0 WEAK, 24 WEAK).
     - Ineligible offers verified: score: null, matchLevel: null, breakdown: [].
     - Zero mutation under `deepFreeze` across all contribution, score, and level calculations.
-
 
 - [x] Phase 3 / Slice 3: Weight Resolution, Baseline Collapse Fallback & Degenerate Sets (T029–T030) (2026-09-01):
   - `& '.\node_modules\.bin\jest.CMD' --runInBand src/flight-match/flight-match-scorer.service.spec.ts` from `apps/api`: 123/123 tests passed, exit 0.
