@@ -478,7 +478,7 @@ jobs:
           UV_TOOL_BIN_DIR: ${{ runner.temp }}/semgrep-bin
         run: |
           uv tool install --python 3.11 --with "setuptools<80" semgrep==1.88.0
-          echo "$UV_TOOL_BIN_DIR" >> $GITHUB_PATH
+          echo "$UV_TOOL_BIN_DIR" >> "$GITHUB_PATH"
       - name: Run SAST scanner
         run: node scripts/security/run-sast.mjs --mode full --sarif-output artifacts/security/sast.json --strict-scanner
       - name: Upload SAST results
