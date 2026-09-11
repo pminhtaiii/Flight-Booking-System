@@ -88,7 +88,7 @@
 │
 ├── scripts/
 │   ├── ci/                            → CI status and gate evaluation scripts
-│   └── security/                      → evaluate-results.mjs, validate-corpus.mjs, write-report.mjs, and security harness tooling
+│   └── security/                      → run-supply-chain.mjs, run-sast.mjs, evaluate-results.mjs, validate-corpus.mjs, write-report.mjs
 │
 ├── docs/
 │   ├── adr/                           → Architectural Decision Records

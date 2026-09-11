@@ -22,6 +22,7 @@ jobs:
       api: ${{ steps.filter.outputs.api }}
       web: ${{ steps.filter.outputs.web }}
       agent: ${{ steps.filter.outputs.agent }}
+      security: ${{ steps.filter.outputs.security }}
     steps:
       - name: Use LF checkout behavior
         run: git config --global core.autocrlf input
@@ -88,6 +89,19 @@ jobs:
               - 'docker-compose.yml'
               - 'pyproject.toml'
               - 'uv.lock'
+            security:
+              - 'scripts/security/**'
+              - 'tests/security/**'
+              - 'tests/security/toolchain.json'
+              - 'tests/security/exceptions.json'
+              - 'docs/security/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pyproject.toml'
+              - 'apps/agent/pyproject.toml'
+              - 'uv.lock'
+              - 'apps/api/src/auth/**'
+              - 'apps/web/**auth**'
 
   api-gate:
     needs: detect-changes
@@ -434,6 +448,81 @@ jobs:
           TIKTOKEN_CACHE_DIR: ${{ github.workspace }}/.tiktoken_cache
         run: uv run --package agent pytest apps/agent/tests -m redis_integration --strict-markers
 
+  security-sast:
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.security == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Use LF checkout behavior
+        run: git config --global core.autocrlf input
+      - name: Checkout pull request
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node 20
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 20
+      - name: Set up uv 0.12.0 and Python 3.11
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: 0.12.0
+          python-version: '3.11'
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - name: Install Semgrep
+        env:
+          UV_TOOL_BIN_DIR: ${{ runner.temp }}/semgrep-bin
+        run: |
+          uv tool install --python 3.11 --with "setuptools<80" semgrep==1.88.0
+          echo "$UV_TOOL_BIN_DIR" >> $GITHUB_PATH
+      - name: Run SAST scanner
+        run: node scripts/security/run-sast.mjs --mode full --sarif-output artifacts/security/sast.json --strict-scanner
+      - name: Upload SAST results
+        if: always()
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        with:
+          name: security-sast-results
+          path: artifacts/security/
+          retention-days: 5
+
+  security-supply-chain:
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.security == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Use LF checkout behavior
+        run: git config --global core.autocrlf input
+      - name: Checkout pull request
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node 20
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 20
+      - name: Install Gitleaks
+        run: |
+          curl --fail --location --silent --show-error --output gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v8.18.4/gitleaks_8.18.4_linux_x64.tar.gz
+          echo 'ba6dbb656933921c775ee5a2d1c13a91046e7952e9d919f9bac4cec61d628e7d  gitleaks.tar.gz' | sha256sum --check --status
+          tar --extract --gzip --file gitleaks.tar.gz gitleaks
+          sudo mv gitleaks /usr/local/bin/
+      - name: Run supply chain scanner
+        run: node scripts/security/run-supply-chain.mjs --output artifacts/security/supply-chain.json --strict
+      - name: Upload Supply Chain results
+        if: always()
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        with:
+          name: security-supply-chain-results
+          path: artifacts/security/
+          retention-days: 5
+
   smoke-and-sanity:
     needs: [detect-changes, api-unit-tests, api-e2e-tests, web-build, agent-tests]
     if: >-
@@ -561,6 +650,8 @@ jobs:
         web-build,
         agent-gate,
         agent-tests,
+        security-sast,
+        security-supply-chain,
         smoke-and-sanity,
       ]
     runs-on: ubuntu-latest
@@ -570,6 +661,7 @@ jobs:
       API_CHANGED: ${{ needs.detect-changes.outputs.api }}
       WEB_CHANGED: ${{ needs.detect-changes.outputs.web }}
       AGENT_CHANGED: ${{ needs.detect-changes.outputs.agent }}
+      SECURITY_CHANGED: ${{ needs.detect-changes.outputs.security }}
       API_GATE_RESULT: ${{ needs.api-gate.result }}
       API_UNIT_TESTS_RESULT: ${{ needs.api-unit-tests.result }}
       API_E2E_TESTS_RESULT: ${{ needs.api-e2e-tests.result }}
@@ -577,7 +669,10 @@ jobs:
       WEB_BUILD_RESULT: ${{ needs.web-build.result }}
       AGENT_GATE_RESULT: ${{ needs.agent-gate.result }}
       AGENT_TESTS_RESULT: ${{ needs.agent-tests.result }}
+      SECURITY_SAST_RESULT: ${{ needs.security-sast.result }}
+      SECURITY_SUPPLY_CHAIN_RESULT: ${{ needs.security-supply-chain.result }}
       SMOKE_AND_SANITY_RESULT: ${{ needs.smoke-and-sanity.result }}
+      SECURITY_REPORT_DIRECTORY: artifacts/security
     steps:
       - name: Use LF checkout behavior
         run: git config --global core.autocrlf input
@@ -585,6 +680,20 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Download SAST artifact
+        if: always()
+        continue-on-error: true
+        uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4.1.9
+        with:
+          name: security-sast-results
+          path: artifacts/security
+      - name: Download Supply Chain artifact
+        if: always()
+        continue-on-error: true
+        uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4.1.9
+        with:
+          name: security-supply-chain-results
+          path: artifacts/security
       - name: Set up Node 20
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:

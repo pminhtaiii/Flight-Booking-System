@@ -35,8 +35,6 @@ export function BookingDetail({ booking: initialBooking }: BookingDetailProps) {
 
   useEffect(() => {
     setBooking(initialBooking);
-    setConflictError(null);
-    setActionSuccess(null);
   }, [initialBooking]);
 
   const [cancellationStatus, setCancellationStatus] = useState<CancellationStatusView | null>(null);

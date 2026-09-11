@@ -75,12 +75,25 @@ Update this file after every completed feature. Any AI agent reading this should
     - Git diff resolution fails closed on non-zero exit status or execution error instead of treating failure as an empty scan.
   - Expanded test suite in `tests/security/sast-runner.test.mjs` to 38/38 passing tests (exit code 0).
 
+- **T033 Supply Chain & Secret Scanner Driver (`scripts/security/run-supply-chain.mjs`)**:
+  - Implemented pinned Python SCA (`pip-audit 2.7.3` via `uv export --package agent --locked --no-dev`), Node SCA (`pnpm audit --audit-level moderate --json`), and dual-scope secret scanning with Gitleaks v8.18.4 (git history `--log-opts=--all` and working tree `--no-git`).
+  - Output report conforms to schema v1.0.0, includes honest tool freshness metadata without fabricating timestamps, redacts secrets/PII, and fails closed on scanner errors or Critical/High findings.
+  - Test suite in `tests/security/supply-chain.test.mjs` (8/8 tests passing).
+
+- **T034/T035 CI Security Gate & Workflow Integration (`.github/workflows/ci.yml`, `scripts/ci/evaluate-ci-status.mjs`)**:
+  - Integrated `security` path detection filter into `detect-changes` in `.github/workflows/ci.yml`.
+  - Added parallel least-privilege CI jobs: `security-sast` (Semgrep v1.88.0 with `setuptools<80` pin, raw SARIF v2.1.0 output) and `security-supply-chain` (Gitleaks v8.18.4 with sha256 checksum verification, pip-audit, and pnpm audit).
+  - Wired `ci-status` aggregate evaluator to download security artifacts (`if: always()`, `continue-on-error: true`) and evaluate static security results via `evaluateSecurityResults({ scope: 'static' })` failing closed on missing/invalid/stale/vulnerable reports.
+  - Fixed booking disruption conflict error clearing bug on 409 in `apps/web/components/bookings/BookingDetail.tsx`.
+  - Fixed Semgrep rule parsing error in `tests/security/sast/ruleset.yml` and diagnostic masking in `scripts/security/run-sast.mjs`.
+  - Verified 30/30 tests in `tests/ci/evaluate-ci-status.test.mjs` and `tests/ci/ci-workflow.contract.test.mjs` passing.
+
 ### Current Status
 
-**Feature:** Security Systems (Feature 023) — Phase 5 US3 Static Security Checks
-**Last completed:** T032 SAST Baseline & Temporary Exception Schema hardening in `scripts/security/run-sast.mjs` with fallback syntax validation for JS/TS/TSX/MJS (38/38 passing in `tests/security/sast-runner.test.mjs`).
-**In progress:** Phase 5 Slice 1 complete (T029, T030, T031, T032 hardened).
-**Next:** T033 — Implement separate SCA and secret drivers in `scripts/security/run-supply-chain.mjs`.
+**Feature:** Security Systems (Feature 023) — Phase 5 US3 Static Security Checks Complete
+**Last completed:** T033–T035 supply-chain & secret scanning, CI security jobs/evaluator, and workflow contract verification.
+**In progress:** Phase 5 complete.
+**Next:** Phase 6 US4 — Execute Runtime Penetration Coverage (T036–T041).
 
 ### Feature 023 — CI regression remediation checkpoint (2026-09-09)
 

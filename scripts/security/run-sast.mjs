@@ -1659,9 +1659,11 @@ export function runSastScan(options = {}) {
   }
 
   if (scanRes.status !== 0 && scanRes.status !== 1) {
-    errors.push(
-      `[SAST Crash] Semgrep crashed with exit status ${scanRes.status}:\n${scanRes.stderr || scanRes.stdout}`,
-    );
+    const diag = [
+      scanRes.stderr ? `STDERR:\n${scanRes.stderr}` : '',
+      scanRes.stdout ? `STDOUT:\n${scanRes.stdout}` : '',
+    ].filter(Boolean).join('\n');
+    errors.push(`[SAST Crash] Semgrep crashed with exit status ${scanRes.status}:\n${diag || 'No output captured'}`);
     return {
       passed: false,
       exitCode: 1,
