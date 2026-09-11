@@ -16,6 +16,7 @@ __pycache__/
 .pytest_cache/
 .tiktoken_cache/
 .t093-uv-cache/
+.pip-audit-cache/
 *.pyc
 *.pyo
 *.pyd

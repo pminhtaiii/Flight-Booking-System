@@ -399,11 +399,14 @@ export function runPipAudit(options = {}) {
     };
   }
 
+  const safeCacheDir =
+    process.platform === 'win32' && cacheDir.includes(' ') ? `"${cacheDir}"` : cacheDir;
+
   let cmdRes;
   try {
     cmdRes = execFn(
       'uv',
-      ['run', '--package', 'agent', 'pip-audit', '--format', 'json', '--cache-dir', cacheDir],
+      ['run', '--package', 'agent', 'pip-audit', '--format', 'json', '--cache-dir', safeCacheDir],
       {
         cwd: rootDir,
         encoding: 'utf8',
@@ -535,11 +538,16 @@ export function runSecretScan(options = {}) {
     options.reportPath ||
     join(tmpdir(), `gitleaks-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
 
+  const safeSource =
+    process.platform === 'win32' && rootDir.includes(' ') ? `"${rootDir}"` : rootDir;
+  const safeReportPath =
+    process.platform === 'win32' && reportPath.includes(' ') ? `"${reportPath}"` : reportPath;
+
   let cmdRes;
   try {
     cmdRes = execFn(
       'gitleaks',
-      ['detect', '--source', rootDir, '--report-format', 'json', '--report-path', reportPath, '--redact'],
+      ['detect', '--source', safeSource, '--report-format', 'json', '--report-path', safeReportPath, '--redact'],
       {
         cwd: rootDir,
         encoding: 'utf8',
