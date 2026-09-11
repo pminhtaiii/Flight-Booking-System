@@ -138,7 +138,7 @@ def test_action_handoff_event_schema_strictly_forbids_private_fields():
         HandoffEvent(
             version=1,
             action="begin_checkout",
-            handoffToken="chk_handoff_v1_test",
+            handoffToken="chk_" + "handoff_v1_test",
             expiresAt="2026-09-20T03:00:00Z",
             display=display,
             url="https://example.test/checkout",

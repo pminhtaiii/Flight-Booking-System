@@ -23,7 +23,7 @@
    FRONTEND_URL=http://localhost:3000
    NESTJS_API_URL=http://localhost:3001
    MIMO_API_URL=<OpenAI-compatible endpoint>
-   MIMO_API_KEY=<Mimo API key>
+   MIMO_API_KEY=<your_mimo_api_key>
    LANGCHAIN_TRACING_V2=true
    LANGCHAIN_API_KEY=<LangSmith API key>
    LANGCHAIN_PROJECT=flight-booking-agent

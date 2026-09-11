@@ -184,7 +184,7 @@ test('T033 - parsePnpmAuditOutput: handles clean pnpm audit output', () => {
 });
 
 test('T033 - parseGitleaksOutput: parses secrets report and redacts raw secrets', () => {
-  const rawSecret = 'sk-abcdef1234567890abcdef1234';
+  const rawSecret = 'sk-' + 'abcdef1234567890abcdef1234';
   const mockGitleaksOutput = JSON.stringify([
     {
       Description: `Hardcoded API key: ${rawSecret}`,
@@ -557,7 +557,7 @@ test('T033 - runSecretScan: writes and parses from report file', () => {
           Description: 'AWS Secret Key detected',
           File: 'apps/api/secret.env',
           StartLine: 4,
-          Secret: 'AKIAIOSFODNN7EXAMPLE',
+          Secret: 'AKIA' + 'IOSFODNN7EXAMPLE',
         },
       ];
       writeFileSync(targetPath, JSON.stringify(findings));

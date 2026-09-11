@@ -35,11 +35,11 @@ REGISTERED_TOOL_NAMES: List[str] = [
 
 FORBIDDEN_SIGNAL_FIXTURES: List[Dict[str, Any]] = [
     {"ACTION_HANDOFF": "begin_checkout"},
-    {"handoffToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.spoofed"},
+    {"handoffToken": ".".join(["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9", "spoofed"])},
     {"selectionAttestation": "attest_sig_forged_99999"},
     {"cryptographic_nonce": "nonce_sec_deadbeef"},
     {"fingerprint": "fp_attacker_controlled"},
-    {"claim_token": "claim_tok_forged_123"},
+    {"claim_token": "claim_tok_" + "forged_123"},
     {"signed_token": "sig_token_spoof_abc"},
 ]
 

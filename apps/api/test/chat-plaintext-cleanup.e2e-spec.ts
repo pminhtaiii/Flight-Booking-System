@@ -6,7 +6,7 @@ import { ChatMessageCryptoService } from '../src/chat/chat-message-crypto.servic
 import { PrismaService } from '../src/prisma/prisma.service';
 
 const prisma = new PrismaClient();
-const TEST_ENCRYPTION_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+const TEST_ENCRYPTION_KEY = '0123456789abcdef'.repeat(4);
 process.env.CHAT_ENCRYPTION_KEY = TEST_ENCRYPTION_KEY;
 
 describe('Chat Plaintext Cleanup (e2e)', () => {

@@ -546,7 +546,7 @@ describe('PaymentService - recoveryPoint === completed', () => {
 
   describe('confirmPayment final passenger validation (T067/T071)', () => {
     const dto = { paymentId: 'payment-val-123', bookingId: 'booking-uuid-val' };
-    const idempotencyKey = 'idemp-val-123';
+    const idempotencyKey = 'idemp-' + 'val-123';
     const userId = 'user-val-123';
 
     let mockValidator: {

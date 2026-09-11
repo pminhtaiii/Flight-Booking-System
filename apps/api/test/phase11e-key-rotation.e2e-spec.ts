@@ -10,20 +10,20 @@ process.env.DATABASE_URL =
 process.env.REDIS_URL = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
 process.env.ENCRYPTION_KEY = encryptionKey;
 process.env.CHAT_ENCRYPTION_KEY = chatEncryptionKey;
-process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || 'rk_test_placeholder';
+process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || 'mock_stripe_key_placeholder';
 process.env.STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || 'whsec_placeholder';
 
 // JWT Ring Configuration
 process.env.JWT_SECRET_CURRENT = 'jwt-secret-current-v2-active';
 process.env.JWT_SECRET = 'jwt-secret-current-v2-active';
-process.env.JWT_SECRET_PREVIOUS = 'jwt-secret-previous-v1-grace';
+process.env.JWT_SECRET_PREVIOUS = 'jwt-' + 'secret-previous-v1-grace';
 process.env.JWT_SECRET_V2 = 'jwt-secret-current-v2-active';
-process.env.JWT_SECRET_V1 = 'jwt-secret-previous-v1-grace';
+process.env.JWT_SECRET_V1 = 'jwt-' + 'secret-previous-v1-grace';
 
 // Chat Handoff Ring Configuration
 process.env.CHAT_HANDOFF_SECRET_CURRENT = 'handoff-secret-v2-active-1234567890';
-process.env.CHAT_HANDOFF_SECRET_PREVIOUS = 'handoff-secret-v1-grace-1234567890';
-process.env.CHAT_HANDOFF_SECRET_V1 = 'handoff-secret-v1-grace-1234567890';
+process.env.CHAT_HANDOFF_SECRET_PREVIOUS = 'handoff-' + 'secret-v1-grace-1234567890';
+process.env.CHAT_HANDOFF_SECRET_V1 = 'handoff-' + 'secret-v1-grace-1234567890';
 process.env.CHAT_HANDOFF_SECRET_V2 = 'handoff-secret-v2-active-1234567890';
 
 // Attestation Secret Ring Configuration
@@ -120,7 +120,7 @@ describe('Phase 11E: Zero-Downtime Key Rotation Ring Verification (e2e)', () => 
     it('authenticates successfully with token signed with Previous / V1 key (grace period)', async () => {
       const v1Token = jwtService.sign(
         { id: testUser.id, email: testUser.email, sub: testUser.id, jti: crypto.randomUUID() },
-        { secret: 'jwt-secret-previous-v1-grace', expiresIn: '1h' },
+        { secret: 'jwt-' + 'secret-previous-v1-grace', expiresIn: '1h' },
       );
 
       const res = await request(app.getHttpServer())

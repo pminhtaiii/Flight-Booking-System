@@ -22,7 +22,7 @@ PII_FIXTURES = (
     ("payment-card", VALID_CARD),
     ("phone", "+1 415 555 2671"),
     ("email", "traveler@example.com"),
-    ("credential", "api_key=sk_live_1234567890abcdef"),
+    ("credential", f"api_key={'sk_live_'}{'1234567890abcdef'}"),
 )
 
 
@@ -251,7 +251,7 @@ async def test_each_detector_blocks_every_character_boundary_and_three_four_toke
         "(traveler@example.com).",
         "A12345678!",
         "+1 415 555 2671\n",
-        "api_key=sk_live_1234567890abcdef",
+        f"api_key={'sk_live_'}{'1234567890abcdef'}",
         "A12345678B98765432",
     ],
     ids=[

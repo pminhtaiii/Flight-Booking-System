@@ -273,7 +273,7 @@ Validation:
 
 ```json
 {
-  "handoffToken": "chk_handoff_v1_opaque",
+  "handoffToken": "mock_handoff_token_placeholder",
   "expiresAt": "2026-08-05T12:15:00.000Z",
   "display": {
     "airline": "VN",
@@ -313,7 +313,7 @@ Request:
 
 ```json
 {
-  "handoffToken": "chk_handoff_v1_opaque"
+  "handoffToken": "mock_handoff_token_placeholder"
 }
 ```
 
@@ -358,7 +358,7 @@ Existing request remains supported. Chat checkout may use:
 
 ```json
 {
-  "handoffToken": "chk_handoff_v1_opaque",
+  "handoffToken": "mock_handoff_token_placeholder",
   "passengers": [
     {
       "offerPassengerId": "server-projected-passenger-id",

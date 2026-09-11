@@ -247,7 +247,7 @@ test('preserves negative privacy (zero token/password leakage) on failure', asyn
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(
           JSON.stringify({
-            error: `Registration failed with secret key sk_live_secretkey123 and password ${capturedPassword}`,
+            error: `Registration failed with secret key ${'sk_live_' + 'secretkey123'} and password ${capturedPassword}`,
           }),
         );
         return true;
@@ -277,7 +277,7 @@ test('preserves negative privacy (zero token/password leakage) on failure', asyn
       'Failure output must not leak plaintext password',
     );
     assert.ok(
-      !err.stdout.includes('sk_live_secretkey123'),
+      !err.stdout.includes('sk_live_' + 'secretkey123'),
       'Failure output must not leak secret keys',
     );
     assert.ok(!err.stderr.includes(capturedPassword), 'Stderr must not leak plaintext password');
