@@ -48,7 +48,7 @@ jobs:
         env:
           UV_TOOL_BIN_DIR: ${{ runner.temp }}/semgrep-bin
         run: |
-          uv tool install --python 3.11 semgrep==1.88.0
+          uv tool install --python 3.11 --with setuptools semgrep==1.88.0
           export PATH="$UV_TOOL_BIN_DIR:$PATH"
           echo "$UV_TOOL_BIN_DIR" >> "$GITHUB_PATH"
           semgrep --version

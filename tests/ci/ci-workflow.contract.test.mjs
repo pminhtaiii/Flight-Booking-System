@@ -879,7 +879,7 @@ test('security-sast installs and verifies the pinned Semgrep CLI before scanning
   );
   assertContains(
     semgrepInstall,
-    /uv tool install --python 3\.11 semgrep==1\.88\.0/,
+    /uv tool install --python 3\.11 --with setuptools semgrep==1\.88\.0/,
     'security-sast must install the pinned Semgrep CLI',
   );
   assert.doesNotMatch(
@@ -916,7 +916,7 @@ test('scheduled security-sast installs and verifies the pinned Semgrep CLI', () 
   );
   assertContains(
     semgrepInstall,
-    /uv tool install --python 3\.11 semgrep==1\.88\.0/,
+    /uv tool install --python 3\.11 --with setuptools semgrep==1\.88\.0/,
     'scheduled security-sast must install the pinned Semgrep CLI',
   );
   assert.doesNotMatch(
