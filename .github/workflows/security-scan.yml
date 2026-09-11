@@ -45,10 +45,12 @@ jobs:
       - name: Install Agent dependencies from root lock
         run: uv sync --locked --package agent
       - name: Install pinned Semgrep 1.88.0
+        env:
+          UV_TOOL_BIN_DIR: ${{ runner.temp }}/semgrep-bin
         run: |
-          uv tool install --python 3.11 --bin-dir "$RUNNER_TEMP/semgrep-bin" semgrep==1.88.0
-          export PATH="$RUNNER_TEMP/semgrep-bin:$PATH"
-          echo "$RUNNER_TEMP/semgrep-bin" >> "$GITHUB_PATH"
+          uv tool install --python 3.11 semgrep==1.88.0
+          export PATH="$UV_TOOL_BIN_DIR:$PATH"
+          echo "$UV_TOOL_BIN_DIR" >> "$GITHUB_PATH"
           semgrep --version
       - name: Run SAST scan
         run: node scripts/security/run-sast.mjs --sarif artifacts/security/sast.sarif

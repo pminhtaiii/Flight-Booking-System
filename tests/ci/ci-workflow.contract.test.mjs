@@ -874,17 +874,27 @@ test('security-sast installs and verifies the pinned Semgrep CLI before scanning
 
   assertContains(
     semgrepInstall,
-    /uv tool install --python 3\.11 --bin-dir "\$RUNNER_TEMP\/semgrep-bin" semgrep==1\.88\.0/,
-    'security-sast must install the pinned Semgrep CLI',
+    /UV_TOOL_BIN_DIR:\s*\$\{\{\s*runner\.temp\s*\}\}\/semgrep-bin/,
+    'security-sast must isolate Semgrep executables in the runner temp directory',
   );
   assertContains(
     semgrepInstall,
-    /echo "\$RUNNER_TEMP\/semgrep-bin" >> "\$GITHUB_PATH"/,
+    /uv tool install --python 3\.11 semgrep==1\.88\.0/,
+    'security-sast must install the pinned Semgrep CLI',
+  );
+  assert.doesNotMatch(
+    semgrepInstall,
+    /--bin-dir/,
+    'security-sast must use the supported uv tool executable directory configuration',
+  );
+  assertContains(
+    semgrepInstall,
+    /echo "\$UV_TOOL_BIN_DIR" >> "\$GITHUB_PATH"/,
     'security-sast must expose the pinned Semgrep binary to later steps',
   );
   assertContains(
     semgrepInstall,
-    /export PATH="\$RUNNER_TEMP\/semgrep-bin:\$PATH"[\s\S]*echo "\$RUNNER_TEMP\/semgrep-bin" >> "\$GITHUB_PATH"[\s\S]*semgrep --version/,
+    /export PATH="\$UV_TOOL_BIN_DIR:\$PATH"[\s\S]*echo "\$UV_TOOL_BIN_DIR" >> "\$GITHUB_PATH"[\s\S]*semgrep --version/,
     'security-sast must make Semgrep available in the install step before verifying it',
   );
   assertContains(
@@ -901,17 +911,27 @@ test('scheduled security-sast installs and verifies the pinned Semgrep CLI', () 
 
   assertContains(
     semgrepInstall,
-    /uv tool install --python 3\.11 --bin-dir "\$RUNNER_TEMP\/semgrep-bin" semgrep==1\.88\.0/,
-    'scheduled security-sast must install the pinned Semgrep CLI',
+    /UV_TOOL_BIN_DIR:\s*\$\{\{\s*runner\.temp\s*\}\}\/semgrep-bin/,
+    'scheduled security-sast must isolate Semgrep executables in the runner temp directory',
   );
   assertContains(
     semgrepInstall,
-    /echo "\$RUNNER_TEMP\/semgrep-bin" >> "\$GITHUB_PATH"/,
+    /uv tool install --python 3\.11 semgrep==1\.88\.0/,
+    'scheduled security-sast must install the pinned Semgrep CLI',
+  );
+  assert.doesNotMatch(
+    semgrepInstall,
+    /--bin-dir/,
+    'scheduled security-sast must use the supported uv tool executable directory configuration',
+  );
+  assertContains(
+    semgrepInstall,
+    /echo "\$UV_TOOL_BIN_DIR" >> "\$GITHUB_PATH"/,
     'scheduled security-sast must expose the pinned Semgrep binary',
   );
   assertContains(
     semgrepInstall,
-    /export PATH="\$RUNNER_TEMP\/semgrep-bin:\$PATH"[\s\S]*echo "\$RUNNER_TEMP\/semgrep-bin" >> "\$GITHUB_PATH"[\s\S]*semgrep --version/,
+    /export PATH="\$UV_TOOL_BIN_DIR:\$PATH"[\s\S]*echo "\$UV_TOOL_BIN_DIR" >> "\$GITHUB_PATH"[\s\S]*semgrep --version/,
     'scheduled security-sast must make Semgrep available in the install step before verifying it',
   );
   assertContains(
