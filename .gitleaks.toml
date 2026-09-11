@@ -1,0 +1,8 @@
+# Gitleaks configuration pinned in tests/security/toolchain.json
+title = "Flight Booking System Gitleaks Configuration"
+
+[allowlist]
+description = "Allowlist generated graphify metadata and AST hashes"
+paths = [
+  '''^graphify-out/''',
+]
