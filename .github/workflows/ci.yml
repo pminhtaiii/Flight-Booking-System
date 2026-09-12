@@ -3,6 +3,8 @@ name: Pull Request CI
 on:
   pull_request:
     branches: [development]
+  schedule:
+    - cron: '0 3 * * 1'
 
 permissions:
   contents: read
@@ -19,10 +21,10 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-      api: ${{ steps.filter.outputs.api }}
-      web: ${{ steps.filter.outputs.web }}
-      agent: ${{ steps.filter.outputs.agent }}
-      security: ${{ steps.filter.outputs.security }}
+      api: ${{ github.event_name == 'schedule' && 'false' || steps.filter.outputs.api }}
+      web: ${{ github.event_name == 'schedule' && 'false' || steps.filter.outputs.web }}
+      agent: ${{ github.event_name == 'schedule' && 'false' || steps.filter.outputs.agent }}
+      security: ${{ github.event_name == 'schedule' || steps.filter.outputs.security == 'true' }}
     steps:
       - name: Use LF checkout behavior
         run: git config --global core.autocrlf input
@@ -44,6 +46,7 @@ jobs:
           ./actionlint .github/workflows/ci.yml
       - name: Detect affected services
         id: filter
+        if: ${{ github.event_name != 'schedule' }}
         uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
         with:
           filters: |
@@ -90,6 +93,10 @@ jobs:
               - 'pyproject.toml'
               - 'uv.lock'
             security:
+              - '.github/workflows/**'
+              - '.gitleaks.toml'
+              - 'apps/**'
+              - 'packages/**'
               - 'scripts/security/**'
               - 'tests/security/**'
               - 'tests/security/toolchain.json'
@@ -102,6 +109,9 @@ jobs:
               - 'uv.lock'
               - 'apps/api/src/auth/**'
               - 'apps/web/**auth**'
+              - 'apps/api/src/**'
+              - 'apps/agent/src/**'
+              - 'apps/web/components/**'
 
   api-gate:
     needs: detect-changes
@@ -462,10 +472,18 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Set up pnpm 9.15.4
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 9.15.4
       - name: Set up Node 20
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install Node dependencies
+        run: pnpm install --frozen-lockfile
       - name: Set up uv 0.12.0 and Python 3.11
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
@@ -473,6 +491,8 @@ jobs:
           python-version: '3.11'
           enable-cache: true
           cache-dependency-glob: uv.lock
+      - name: Install Python 3.11
+        run: uv python install 3.11
       - name: Install Semgrep
         env:
           UV_TOOL_BIN_DIR: ${{ runner.temp }}/semgrep-bin
@@ -503,10 +523,24 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
+      - name: Set up pnpm 9.15.4
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 9.15.4
       - name: Set up Node 20
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 20
+      - name: Set up uv 0.12.0 and Python 3.11
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: 0.12.0
+          python-version: '3.11'
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - name: Install Python 3.11
+        run: uv python install 3.11
       - name: Install Gitleaks
         run: |
           curl --fail --location --silent --show-error --output gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v8.18.4/gitleaks_8.18.4_linux_x64.tar.gz

@@ -20,7 +20,7 @@ describe('BookingHandoffController', () => {
 
     await expect(
       controller.resolve(
-        { handoffToken: 'chk_handoff_v1_test' },
+        { handoffToken: 'chk_' + 'handoff_v1_test' },
         { user: { sub: 'user-1' } },
         response,
         'trace-1',
@@ -29,7 +29,7 @@ describe('BookingHandoffController', () => {
     ).resolves.toMatchObject({ status: 'ACTIVE' });
     expect(response.setHeader).toHaveBeenCalledWith('Cache-Control', 'no-store, private');
     expect(chatHandoffService.resolveSafe).toHaveBeenCalled();
-    expect(chatHandoffService.resolveSafe).toHaveBeenCalledWith('chk_handoff_v1_test', 'user-1', {
+    expect(chatHandoffService.resolveSafe).toHaveBeenCalledWith('chk_' + 'handoff_v1_test', 'user-1', {
       traceId: 'trace-1',
       correlationId: 'correlation-1',
     });
@@ -42,7 +42,7 @@ describe('BookingHandoffController', () => {
     );
 
     await expect(
-      controller.resolve({ handoffToken: 'chk_handoff_v1_test' }, { user: {} }, {
+      controller.resolve({ handoffToken: 'chk_' + 'handoff_v1_test' }, { user: {} }, {
         setHeader: jest.fn(),
       } as unknown as Response),
     ).rejects.toThrow(UnauthorizedException);

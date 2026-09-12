@@ -1094,8 +1094,25 @@ function validateStaticSupplyChainFreshness(supplyChainData, options = {}) {
     }
 
     const advisoryTimestamp =
-      freshness.advisoryDatabaseTimestamp ?? scanner.advisoryDatabaseTimestamp;
-    if (advisoryTimestamp !== undefined && advisoryTimestamp !== null) {
+      freshness.advisoryDatabaseTimestamp ??
+      freshness.advisoryQueriedAt ??
+      scanner.advisoryDatabaseTimestamp;
+    const requiresAdvisoryFreshness = key === 'pipAudit' || key === 'pnpmAudit';
+    if (requiresAdvisoryFreshness && (advisoryTimestamp === undefined || advisoryTimestamp === null)) {
+      errors.push(`[Static Freshness Error] ${label} advisory timestamp is missing`);
+    } else if (
+      requiresAdvisoryFreshness &&
+      ((freshness.advisoryTimestampKind !== 'database' &&
+        freshness.advisoryTimestampKind !== 'queried-at') ||
+        (freshness.advisoryTimestampKind === 'database' &&
+          (typeof freshness.advisoryDatabaseTimestamp !== 'string' ||
+            freshness.advisoryTimestampEvidence !== 'scanner-provided advisory database timestamp')) ||
+        (freshness.advisoryTimestampKind === 'queried-at' &&
+          (typeof freshness.advisoryQueriedAt !== 'string' ||
+            freshness.advisoryTimestampEvidence !== 'live registry query observed at checkedAt')))
+    ) {
+      errors.push(`[Static Freshness Error] ${label} advisory timestamp provenance is missing`);
+    } else if (advisoryTimestamp !== undefined && advisoryTimestamp !== null) {
       if (!isValidTimestamp(advisoryTimestamp)) {
         errors.push(`[Static Freshness Error] ${label} advisory timestamp is invalid`);
       } else if (Number.isFinite(currentDateMs)) {

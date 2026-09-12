@@ -96,8 +96,9 @@ This document defines the verified security scanner toolchain for the Flight Boo
     --cache-dir .pip-audit-cache
   ```
 - **Advisory Freshness**:
-  - The `--cache-dir` TTL must not exceed 24 hours (`maxAdvisoryAgeHours: 24`).
-  - Stale caches (>24h) trigger cache invalidation and a re-fetch from PyPA.
+  - CI uses `scripts/security/run-supply-chain.mjs`, which exports locked agent requirements and invokes pinned pip-audit with a new temporary cache for every execution, including when the raw report directory is reused.
+  - Successful queries record `advisoryQueriedAt` separately from `advisoryDatabaseTimestamp`. Scanner execution time is never presented as database publication time.
+  - The strict runner and static evaluator require recognized provenance and enforce a maximum age of 24 hours for pip-audit and pnpm audit. Missing, stale, or future advisory evidence fails the gate.
 - **Exit Code Semantics**:
   - `0`: Zero known vulnerabilities in installed Python packages.
   - `1`: Known vulnerability detected matching CVSS/advisory criteria.

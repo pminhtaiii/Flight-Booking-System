@@ -42,7 +42,9 @@ test('writes a versioned clean report through the public scan interface', () => 
     assert.ok(result.report.pnpmAudit);
     assert.ok(result.report.gitleaks);
     assert.equal(result.report.pipAudit.freshness.advisoryDatabaseTimestamp, undefined);
+    assert.equal(result.report.pipAudit.freshness.advisoryQueriedAt, '2026-09-11T00:00:00.000Z');
     assert.equal(result.report.pnpmAudit.freshness.advisoryDatabaseTimestamp, undefined);
+    assert.equal(result.report.pnpmAudit.freshness.advisoryQueriedAt, '2026-09-11T00:00:00.000Z');
     assert.equal(
       evaluateSupplyChain(result.report, { currentDate: '2026-09-11T00:00:00.000Z' }).passed,
       true,
@@ -100,6 +102,37 @@ test('exports the locked agent dependency set before invoking pinned pip-audit',
       '--requirement',
       join(tempDir, 'raw', 'agent-requirements.txt'),
     ]);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('does not reuse an advisory cache when an explicit raw report directory is reused', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'supply-chain-cache-reuse-'));
+  const rawReportDir = join(tempDir, 'raw');
+  const cacheDirs = [];
+  const execFn = (command, args) => {
+    if (command === 'pnpm') return { status: 0, stdout: JSON.stringify({ advisories: {}, metadata: { vulnerabilities: {} } }), stderr: '' };
+    if (command === 'gitleaks') return { status: 0, stdout: '[]', stderr: '' };
+    if (args[0] === 'export') return { status: 0, stdout: '# requirements\n', stderr: '' };
+    const cacheIndex = args.indexOf('--cache-dir');
+    if (cacheIndex >= 0) cacheDirs.push(args[cacheIndex + 1]);
+    return { status: 0, stdout: JSON.stringify({ dependencies: [] }), stderr: '' };
+  };
+  try {
+    for (let index = 0; index < 2; index += 1) {
+      const result = runSupplyChainScan({
+        rootDir: process.cwd(),
+        output: join(tempDir, `report-${index}.json`),
+        strict: false,
+        rawReportDir,
+        execFn,
+        now: () => new Date('2026-09-11T00:00:00.000Z'),
+      });
+      assert.equal(result.exitCode, 0);
+    }
+    assert.equal(cacheDirs.length, 2);
+    assert.notEqual(cacheDirs[0], cacheDirs[1]);
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }

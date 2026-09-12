@@ -1,5 +1,11 @@
 # Progress Tracker
 
+### Feature 023 — Phase 5 CI review follow-up (2026-09-11, verification in progress)
+
+- Investigated GitHub Actions run `34617988651` at `d101e892`: SAST could not import TypeScript; supply-chain scanning lacked uv/pnpm and reported 96 secret findings. All other service chains passed in that run.
+- Review fixes cover scanner provisioning, applicable source routing, weekly full scans, complete Git history, verifiable advisory query freshness, and booking feedback reset on identity changes.
+- Live dependency audit verification remains pending: local automatic approval review blocked sending dependency metadata to the npm registry. Do not infer a green GitHub security gate from offline contract tests.
+
 Update this file after every completed feature. Any AI agent reading this should immediately know what is done, what is in progress, and what is next.
 
 ---

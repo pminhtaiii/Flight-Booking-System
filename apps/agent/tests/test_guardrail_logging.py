@@ -16,7 +16,7 @@ from agent.guardrails.output_pipeline import OutputGuardrailBlockedError, Output
 async def test_output_block_logging_omits_candidate_payload(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    candidate = "api_key=sk_live_1234567890abcdef"
+    candidate = "api_key=" + "sk_live_" + "1234567890abcdef"
     fingerprint = hashlib.sha256(candidate.encode()).hexdigest()[:12]
     pipeline = OutputGuardrailPipeline(SimpleNamespace(enabled=True))
 

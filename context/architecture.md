@@ -1159,6 +1159,8 @@ Feature 023 plan convergence (2026-09-04): admission context is separate from po
 
 ### Phase 5 US3 — Static Application Security Testing (SAST) Architecture
 
+CI review follow-up (2026-09-11): application and shared-package changes route both static security jobs. Weekly scheduled runs bypass PR path detection and run the full security scans. The SAST job installs frozen Node dependencies for its TypeScript parser; the supply-chain job provisions pinned pnpm/uv without installing the Node dependency tree. Gitleaks uses a full-history checkout (`fetch-depth: 0`). Advisory query timestamps are distinct from database publication timestamps; freshness verification must reject missing, stale, or unverifiable evidence.
+
 1. **Rule Panning and Separation (`tests/security/sast/`)**:
    - `guardrails.yml`: Pinned custom rules with severity `ERROR` targeting hard boundaries:
      - `no-llm-in-guardrails`: blocks LLM initialization or invocation inside deterministic guardrails.

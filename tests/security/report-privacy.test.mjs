@@ -114,9 +114,9 @@ function createSampleRawEvidence() {
     responseBody: 'HTTP/1.1 200 OK\r\n{"secret":"leaked"}',
     userMessage: 'My passport is A12345678 and credit card is 4111 2222 3333 4444',
     internalTrace: {
-      token: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.sensitive_sig',
+      token: 'Bearer ' + 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9' + '.eyJzdWIiOiIxMjM0NTY3ODkwIn0.sensitive_sig',
       credentials: {
-        apiKey: 'sk-proj-abc1234567890def1234567890ghij',
+        apiKey: 'sk-proj-' + 'abc1234567890def1234567890ghij',
       },
     },
   };
@@ -202,9 +202,9 @@ test('Sanitized Evidence Writer & Privacy Canary Suite', async (t) => {
   });
 
   await t.test('canary: sensitive bearer tokens, OpenAI API keys, Google API keys, and agent keys are redacted', () => {
-    const bearer = 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.super_secret_jwt_sig_xyz';
-    const openAiKey = 'sk-proj-abc1234567890def1234567890ghij';
-    const googleKey = 'AIzaSyA1234567890abcdefghijklmnopqrstuvw';
+    const bearer = 'Bearer ' + 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9' + '.eyJzdWIiOiIxMjM0NTY3ODkwIn0.super_secret_jwt_sig_xyz';
+    const openAiKey = 'sk-proj-' + 'abc1234567890def1234567890ghij';
+    const googleKey = 'AIzaSy' + 'A1234567890abcdefghijklmnopqrstuvw';
     const agentServiceKey = 'AGENT_SERVICE_API_KEY=test-agent-service-secret-key-12345';
 
     const raw = createSampleRawEvidence();

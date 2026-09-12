@@ -1,0 +1,27 @@
+# Gitleaks configuration pinned in tests/security/toolchain.json
+title = "Flight Booking System Gitleaks Configuration"
+
+[allowlist]
+description = "Allowlist generated graphify metadata and AST hashes"
+paths = [
+  '''^graphify-out/''',
+]
+
+# Synthetic values are allowlisted only where they are intentionally used by
+# security tests or local configuration examples. The default rules remain
+# enabled everywhere else.
+[[allowlists]]
+description = "Synthetic output-security fixture"
+target = "line"
+regexTarget = "line"
+regexes = ['api_key=sk_live_1234567890abcdef']
+paths = ['^apps/agent/tests/security/test_output_stream\\.py$']
+rules = ['stripe-access-token']
+
+[[allowlists]]
+description = "Placeholder local environment example"
+target = "line"
+regexTarget = "line"
+regexes = ['STRIPE_SECRET_KEY=\"rk_test_placeholder\"']
+paths = ['^apps/api/\\.env\\.example$']
+rules = ['stripe-access-token']

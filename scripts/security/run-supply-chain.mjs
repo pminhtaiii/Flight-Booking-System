@@ -22,7 +22,6 @@ const defaultRepoRoot = resolve(__dirname, '..', '..');
 const REPORT_VERSION = '1.0.0';
 const PIP_AUDIT_VERSION = '2.7.3';
 const DEFAULT_OUTPUT = 'artifacts/security/supply-chain.json';
-const DEFAULT_PIP_CACHE = '.pip-audit-cache';
 const PIP_MAX_ADVISORY_AGE_HOURS = 24;
 
 function emptyCounts() {
@@ -75,6 +74,7 @@ function parseJson(raw, label) {
 }
 
 function isoTimestamp(value) {
+  if (value === undefined || value === null || value === '') return null;
   const parsed = value instanceof Date ? value : new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }
@@ -174,6 +174,9 @@ function freshnessRecord({
   checkedAt,
   maxAdvisoryAgeHours,
   advisoryDatabaseTimestamp,
+  advisoryQueriedAt,
+  advisoryTimestampKind,
+  advisoryTimestampEvidence,
   usedOfflineCache,
 }) {
   const freshness = {
@@ -184,6 +187,9 @@ function freshnessRecord({
   };
   if (maxAdvisoryAgeHours !== undefined) freshness.maxAdvisoryAgeHours = maxAdvisoryAgeHours;
   if (advisoryDatabaseTimestamp) freshness.advisoryDatabaseTimestamp = advisoryDatabaseTimestamp;
+  if (advisoryQueriedAt) freshness.advisoryQueriedAt = advisoryQueriedAt;
+  if (advisoryTimestampKind) freshness.advisoryTimestampKind = advisoryTimestampKind;
+  if (advisoryTimestampEvidence) freshness.advisoryTimestampEvidence = advisoryTimestampEvidence;
   return freshness;
 }
 
@@ -257,6 +263,9 @@ function normalisePipAudit(raw, options = {}) {
     checkedAt: options.checkedAt,
     maxAdvisoryAgeHours: PIP_MAX_ADVISORY_AGE_HOURS,
     advisoryDatabaseTimestamp,
+    advisoryQueriedAt: options.advisoryQueriedAt,
+    advisoryTimestampKind: options.advisoryTimestampKind,
+    advisoryTimestampEvidence: options.advisoryTimestampEvidence,
     usedOfflineCache: data?.freshness?.usedOfflineCache,
   });
   return { valid: true, counts: makeCounts(findings), findings, errors: [], freshness };
@@ -368,7 +377,11 @@ function normalisePnpmAudit(raw, options = {}) {
     source: 'npm advisory registry via pnpm audit',
     mode: data?.freshness?.mode || 'live',
     checkedAt: options.checkedAt,
+    maxAdvisoryAgeHours: PIP_MAX_ADVISORY_AGE_HOURS,
     advisoryDatabaseTimestamp,
+    advisoryQueriedAt: options.advisoryQueriedAt,
+    advisoryTimestampKind: options.advisoryTimestampKind,
+    advisoryTimestampEvidence: options.advisoryTimestampEvidence,
     usedOfflineCache: data?.freshness?.usedOfflineCache,
   });
   return { valid: true, counts: makeCounts(findings), findings, errors: [], freshness };
@@ -494,6 +507,7 @@ function runPipAudit(options = {}) {
   mkdirSync(rawReportDir, { recursive: true });
   const requirementsPath = join(rawReportDir, 'agent-requirements.txt');
   const reportPath = join(rawReportDir, 'pip-audit.json');
+  const cacheDir = mkdtempSync(join(rawReportDir, 'pip-audit-cache-'));
   const errors = [];
   let parsed = null;
 
@@ -536,14 +550,22 @@ function runPipAudit(options = {}) {
           '--output',
           reportPath,
           '--cache-dir',
-          resolve(rootDir, DEFAULT_PIP_CACHE),
+          cacheDir,
         ],
         rootDir,
       );
       const raw = readReportFile(reportPath) || auditResult.stdout;
       parsed = normalisePipAudit(raw, {
         checkedAt,
-        advisoryDatabaseTimestamp: options.advisoryDatabaseTimestamp,
+        advisoryDatabaseTimestamp:
+          options.advisoryDatabaseTimestamp ||
+          null,
+        advisoryQueriedAt:
+          raw.trim() && (auditResult.status === 0 || auditResult.status === 1) ? checkedAt : null,
+        advisoryTimestampKind: options.advisoryDatabaseTimestamp ? 'database' : 'queried-at',
+        advisoryTimestampEvidence: options.advisoryDatabaseTimestamp
+          ? 'scanner-provided advisory database timestamp'
+          : 'live registry query observed at checkedAt',
       });
       if (!parsed.valid) errors.push(...parsed.errors);
       if (auditResult.error || (auditResult.status !== 0 && auditResult.status !== 1)) {
@@ -556,6 +578,7 @@ function runPipAudit(options = {}) {
   } catch {
     errors.push('[pip-audit Execution Error] Scanner execution failed');
   } finally {
+    rmSync(cacheDir, { recursive: true, force: true });
     if (ownsReportDir) rmSync(rawReportDir, { recursive: true, force: true });
   }
 
@@ -570,6 +593,9 @@ function runPipAudit(options = {}) {
         checkedAt,
         maxAdvisoryAgeHours: PIP_MAX_ADVISORY_AGE_HOURS,
         advisoryDatabaseTimestamp: null,
+        advisoryQueriedAt: null,
+        advisoryTimestampKind: 'unknown',
+        advisoryTimestampEvidence: 'no successful scanner evidence',
         usedOfflineCache: false,
       }),
     counts: parsed?.counts || emptyCounts(),
@@ -590,7 +616,15 @@ function runPnpmAudit(options = {}) {
   );
   const parsed = normalisePnpmAudit(result.stdout, {
     checkedAt,
-    advisoryDatabaseTimestamp: options.advisoryDatabaseTimestamp,
+    advisoryDatabaseTimestamp:
+      options.advisoryDatabaseTimestamp ||
+      null,
+    advisoryQueriedAt:
+      result.stdout.trim() && (result.status === 0 || result.status === 1) ? checkedAt : null,
+    advisoryTimestampKind: options.advisoryDatabaseTimestamp ? 'database' : 'queried-at',
+    advisoryTimestampEvidence: options.advisoryDatabaseTimestamp
+      ? 'scanner-provided advisory database timestamp'
+      : 'live registry query observed at checkedAt',
   });
   const errors = parsed.errors ? [...parsed.errors] : [];
   if (result.error || (result.status !== 0 && result.status !== 1))
@@ -608,6 +642,9 @@ function runPnpmAudit(options = {}) {
         mode: 'live',
         checkedAt,
         advisoryDatabaseTimestamp: null,
+        advisoryQueriedAt: null,
+        advisoryTimestampKind: 'unknown',
+        advisoryTimestampEvidence: 'no successful scanner evidence',
         usedOfflineCache: false,
       }),
     counts: parsed.counts,
@@ -626,6 +663,8 @@ function runSecretScan(options = {}) {
   mkdirSync(rawReportDir, { recursive: true });
   const errors = [];
   const findings = [];
+  const configFile = join(rootDir, '.gitleaks.toml');
+  const configArgs = existsSync(configFile) ? ['--config', configFile] : [];
   const scanDefinitions = [
     {
       label: 'gitleaks history',
@@ -634,6 +673,7 @@ function runSecretScan(options = {}) {
         'detect',
         '--source',
         rootDir,
+        ...configArgs,
         '--verbose',
         '--report-format',
         'json',
@@ -651,6 +691,7 @@ function runSecretScan(options = {}) {
         'detect',
         '--source',
         rootDir,
+        ...configArgs,
         '--verbose',
         '--report-format',
         'json',
@@ -713,7 +754,7 @@ function deepSanitize(value) {
 }
 
 function staleFreshnessError(scanner, freshness, checkedAt) {
-  const timestamp = freshness?.advisoryDatabaseTimestamp;
+  const timestamp = freshness?.advisoryDatabaseTimestamp || freshness?.advisoryQueriedAt;
   const maxHours = Number(freshness?.maxAdvisoryAgeHours);
   if (!timestamp || !Number.isFinite(maxHours)) return null;
   const advisoryMs = Date.parse(timestamp);
@@ -769,12 +810,19 @@ export function runSupplyChainScan(options = {}) {
   ]) {
     const staleError = staleFreshnessError(name, scanner.freshness, timestamp);
     if (staleError) errors.push(staleError);
-    if (
-      strict &&
-      scanner.freshness?.usedOfflineCache &&
-      !scanner.freshness.advisoryDatabaseTimestamp
-    ) {
-      errors.push(`[${name} Freshness Error] Offline advisory cache has no verifiable timestamp`);
+    if (strict) {
+      const freshness = scanner.freshness || {};
+      const kind = freshness.advisoryTimestampKind;
+      const timestamp = freshness.advisoryDatabaseTimestamp || freshness.advisoryQueriedAt;
+      const evidence = freshness.advisoryTimestampEvidence;
+      const validProvenance =
+        (kind === 'database' && Boolean(freshness.advisoryDatabaseTimestamp) &&
+          evidence === 'scanner-provided advisory database timestamp') ||
+        (kind === 'queried-at' && Boolean(freshness.advisoryQueriedAt) &&
+          evidence === 'live registry query observed at checkedAt');
+      if (!timestamp || !validProvenance) {
+        errors.push(`[${name} Freshness Error] Advisory evidence has no verifiable timestamp/provenance`);
+      }
     }
   }
   if (counts.Critical > 0)

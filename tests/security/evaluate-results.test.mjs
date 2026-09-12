@@ -156,11 +156,18 @@ function writeFixtureDirectory(dir, fixture = createCleanFixtureReports()) {
 
 function createCleanStaticReports() {
   const checkedAt = '2026-09-11T00:00:00.000Z';
-  const freshness = (source, maxAdvisoryAgeHours) => ({
+  const freshness = (source, maxAdvisoryAgeHours, advisoryEvidence = false) => ({
     source,
     mode: 'live',
     checkedAt,
     ...(maxAdvisoryAgeHours === undefined ? {} : { maxAdvisoryAgeHours }),
+    ...(advisoryEvidence
+      ? {
+          advisoryQueriedAt: checkedAt,
+          advisoryTimestampKind: 'queried-at',
+          advisoryTimestampEvidence: 'live registry query observed at checkedAt',
+        }
+      : {}),
     usedOfflineCache: false,
   });
   return {
@@ -177,14 +184,14 @@ function createCleanStaticReports() {
       errors: [],
       pipAudit: {
         timestamp: checkedAt,
-        freshness: freshness('PyPI advisory database via pip-audit', 24),
+        freshness: freshness('PyPI advisory database via pip-audit', 24, true),
         counts: { Critical: 0, High: 0, Medium: 0, Low: 0, Informational: 0 },
         findings: [],
         errors: [],
       },
       pnpmAudit: {
         timestamp: checkedAt,
-        freshness: freshness('npm advisory registry via pnpm audit'),
+        freshness: freshness('npm advisory registry via pnpm audit', undefined, true),
         counts: { Critical: 0, High: 0, Medium: 0, Low: 0, Informational: 0 },
         findings: [],
         errors: [],
@@ -758,6 +765,36 @@ test('evaluateSupplyChain: scanner execution errors fail closed even with clean 
   });
   assert.equal(result.passed, false);
   assert.ok(result.errors.some((error) => error.includes('Scanner reported execution error')));
+});
+
+test('evaluateSupplyChain: missing advisory provenance fails closed for both registry scanners', () => {
+  const report = createCleanStaticReports().supplyChain;
+  delete report.pipAudit.freshness.advisoryQueriedAt;
+  delete report.pipAudit.freshness.advisoryTimestampKind;
+  delete report.pipAudit.freshness.advisoryTimestampEvidence;
+  delete report.pnpmAudit.freshness.advisoryQueriedAt;
+  delete report.pnpmAudit.freshness.advisoryTimestampKind;
+  delete report.pnpmAudit.freshness.advisoryTimestampEvidence;
+  const result = evaluateSupplyChain(report, { currentDate: EVAL_DATE, requireFreshness: true });
+  assert.equal(result.passed, false);
+  assert.ok(result.errors.some((error) => error.includes('pip-audit advisory timestamp')));
+  assert.ok(result.errors.some((error) => error.includes('pnpm audit advisory timestamp')));
+});
+
+test('evaluateSupplyChain: stale and future advisory query timestamps fail the 24-hour gate', () => {
+  const stale = createCleanStaticReports().supplyChain;
+  stale.pipAudit.freshness.advisoryQueriedAt = '2026-09-03T00:00:00.000Z';
+  stale.pnpmAudit.freshness.advisoryQueriedAt = '2026-09-06T00:00:00.000Z';
+  const staleResult = evaluateSupplyChain(stale, { currentDate: EVAL_DATE, requireFreshness: true });
+  assert.equal(staleResult.passed, false);
+  assert.ok(staleResult.errors.filter((error) => error.includes('advisory data is stale')).length >= 1);
+
+  const future = createCleanStaticReports().supplyChain;
+  future.pipAudit.freshness.advisoryQueriedAt = '2026-09-06T00:00:00.000Z';
+  future.pnpmAudit.freshness.advisoryQueriedAt = '2026-09-06T00:00:00.000Z';
+  const futureResult = evaluateSupplyChain(future, { currentDate: EVAL_DATE, requireFreshness: true });
+  assert.equal(futureResult.passed, false);
+  assert.ok(futureResult.errors.filter((error) => error.includes('advisory data is stale')).length >= 1);
 });
 
 test('evaluateDast: active findings cannot be bypassed by bogus counts', () => {
