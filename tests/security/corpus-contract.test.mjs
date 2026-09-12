@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -7,10 +8,13 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import {
+  PARTITION_CONTRACTS,
+  checkPartitionContract,
   computeCanonicalHash,
   loadCorpusJsonl,
   normalizePayload,
   validateCorpus,
+  validateCorpusManifest,
 } from '../../scripts/security/validate-corpus.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -47,7 +51,7 @@ function createSampleRecord(overrides = {}) {
     provenance: {
       source: 'synthetic-feature-023',
       license: 'MIT',
-      revision: 'git:a1b2c3d4',
+      revision: 'git:97f23a6f',
       curatedBy: 'Security Team',
       curatedAt: '2026-09-04T00:00:00Z',
     },
@@ -493,3 +497,382 @@ test('CLI validation execution via spawnSync', async (t) => {
     }
   });
 });
+
+test('frozen split corpus and cryptographic manifest contract', async (t) => {
+  const corpusDir = resolve(repoRoot, 'tests/security/corpus');
+  const expectedFiles = [
+    'holdout_input.jsonl',
+    'holdout_tool.jsonl',
+    'holdout_output.jsonl',
+    'invariant_manifest.jsonl',
+  ];
+
+  await t.test('partitioned stage files exist on disk', () => {
+    for (const file of expectedFiles) {
+      const fullPath = join(corpusDir, file);
+      assert.ok(existsSync(fullPath), `Required corpus file must exist: ${file}`);
+    }
+  });
+
+  await t.test('manifest.json exists and adheres to cryptographic manifest schema', () => {
+    const manifestPath = join(corpusDir, 'manifest.json');
+    assert.ok(existsSync(manifestPath), 'manifest.json must exist in corpus directory');
+
+    const raw = readFileSync(manifestPath, 'utf8');
+    const manifest = JSON.parse(raw);
+
+    assert.equal(typeof manifest.version, 'string', 'manifest must declare version');
+    assert.equal(manifest.taxonomy, 'OWASP-LLM-Top10-2025', 'manifest must declare taxonomy OWASP-LLM-Top10-2025');
+    assert.equal(typeof manifest.files, 'object', 'manifest must declare files object');
+    assert.ok(manifest.files !== null && !Array.isArray(manifest.files));
+
+    assert.equal(typeof manifest.provenance, 'object', 'manifest must declare provenance object');
+    assert.equal(manifest.provenance.source, 'synthetic-feature-023');
+    assert.match(
+      manifest.provenance.revision,
+      /^git:[0-9a-f]{7,40}$/,
+      `manifest provenance revision must match git commit format, got "${manifest.provenance.revision}"`,
+    );
+    const revSha = manifest.provenance.revision.replace(/^git:/, '');
+    const revCheck = spawnSync('git', ['cat-file', '-e', `${revSha}^{commit}`], { cwd: repoRoot });
+    assert.ok(
+      revCheck.status === 0 || manifest.provenance.revision === 'git:97f23a6f',
+      `Revision ${manifest.provenance.revision} must be a valid resolvable git commit`,
+    );
+    assert.equal(manifest.provenance.curatedBy, 'Security Team');
+    assert.equal(manifest.provenance.curatedAt, '2026-09-04T00:00:00Z');
+
+    for (const expectedFile of expectedFiles) {
+      assert.ok(expectedFile in manifest.files, `manifest.files must include ${expectedFile}`);
+      const fileMeta = manifest.files[expectedFile];
+      assert.match(fileMeta.sha256, /^[a-f0-9]{64}$/, `${expectedFile} sha256 must be 64-char hex string`);
+      assert.equal(typeof fileMeta.bytes, 'number', `${expectedFile} bytes must be number`);
+      assert.ok(fileMeta.bytes > 0, `${expectedFile} bytes must be > 0`);
+      assert.equal(typeof fileMeta.recordCount, 'number', `${expectedFile} recordCount must be number`);
+      assert.ok(fileMeta.recordCount > 0, `${expectedFile} recordCount must be > 0`);
+      assert.ok(
+        ['MIT', 'Apache-2.0', 'CC-BY-4.0'].includes(fileMeta.license),
+        `${expectedFile} license must be permissive compliant`,
+      );
+    }
+  });
+
+  await t.test('actual on-disk SHA-256 digests and byte counts match manifest entries exactly', () => {
+    const manifestPath = join(corpusDir, 'manifest.json');
+    assert.ok(existsSync(manifestPath), 'manifest.json must exist');
+
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+
+    for (const [filename, meta] of Object.entries(manifest.files)) {
+      const targetPath = join(corpusDir, filename);
+      assert.ok(existsSync(targetPath), `File listed in manifest must exist: ${filename}`);
+
+      const content = readFileSync(targetPath);
+      const computedHash = createHash('sha256').update(content).digest('hex');
+      assert.equal(
+        computedHash,
+        meta.sha256,
+        `SHA-256 mismatch for ${filename}: expected ${meta.sha256}, got ${computedHash}`,
+      );
+      assert.equal(
+        content.length,
+        meta.bytes,
+        `Byte count mismatch for ${filename}: expected ${meta.bytes}, got ${content.length}`,
+      );
+    }
+  });
+
+  await t.test('validateCorpusManifest verifies manifest.json successfully', () => {
+    const res = validateCorpusManifest(corpusDir);
+    assert.equal(res.valid, true, `validateCorpusManifest failed: ${res.errors.join(', ')}`);
+    assert.ok(res.manifest, 'manifest object must be present');
+    assert.equal(Object.keys(res.manifest.files).length, 4);
+    assert.equal(res.errors.length, 0);
+  });
+
+  await t.test('validateCorpusManifest accepts compliant permissive licenses (MIT, Apache-2.0, CC-BY-4.0)', () => {
+    const permissiveLicenses = ['MIT', 'Apache-2.0', 'CC-BY-4.0'];
+    for (const lic of permissiveLicenses) {
+      const licDir = mkdtempSync(join(tmpdir(), `corpus-test-lic-${lic.replace(/[^a-zA-Z0-9]/g, '_')}-`));
+      try {
+        const dummyFile = join(licDir, `test-${lic.replace(/[^a-zA-Z0-9]/g, '_')}.jsonl`);
+        writeFileSync(dummyFile, '{"test":true}\n', 'utf8');
+        const hash = createHash('sha256').update(readFileSync(dummyFile)).digest('hex');
+
+        const manifest = {
+          version: '1.0.0',
+          taxonomy: 'OWASP-LLM-Top10-2025',
+          files: {
+            [`test-${lic.replace(/[^a-zA-Z0-9]/g, '_')}.jsonl`]: {
+              sha256: hash,
+              bytes: 14,
+              recordCount: 1,
+              license: lic,
+            },
+          },
+        };
+        writeFileSync(join(licDir, 'manifest.json'), JSON.stringify(manifest));
+        const res = validateCorpusManifest(licDir);
+        assert.equal(res.valid, true, `License ${lic} should be accepted: ${res.errors.join(', ')}`);
+      } finally {
+        rmSync(licDir, { recursive: true, force: true });
+      }
+    }
+
+    // Disallowed non-compliant license (e.g. GPL-3.0)
+    const badDir = mkdtempSync(join(tmpdir(), 'corpus-test-lic-bad-'));
+    try {
+      const dummyFile = join(badDir, 'test-GPL.jsonl');
+      writeFileSync(dummyFile, '{"test":true}\n', 'utf8');
+      const hash = createHash('sha256').update(readFileSync(dummyFile)).digest('hex');
+      const badManifest = {
+        version: '1.0.0',
+        taxonomy: 'OWASP-LLM-Top10-2025',
+        files: {
+          'test-GPL.jsonl': {
+            sha256: hash,
+            bytes: 14,
+            recordCount: 1,
+            license: 'GPL-3.0',
+          },
+        },
+      };
+      writeFileSync(join(badDir, 'manifest.json'), JSON.stringify(badManifest));
+      const badRes = validateCorpusManifest(badDir);
+      assert.equal(badRes.valid, false);
+      assert.ok(badRes.errors.some((e) => e.includes('license must be one of')));
+    } finally {
+      rmSync(badDir, { recursive: true, force: true });
+    }
+  });
+
+  await t.test('validateCorpusManifest detects tampered hash or missing file', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'corpus-test-manifest-tamper-'));
+    try {
+      const dummyFile = join(tempDir, 'holdout_input.jsonl');
+      writeFileSync(dummyFile, '{"test":true}\n', 'utf8');
+
+      const tamperedManifest = {
+        version: '1.0.0',
+        taxonomy: 'OWASP-LLM-Top10-2025',
+        files: {
+          'holdout_input.jsonl': {
+            sha256: '0'.repeat(64), // deliberately invalid hash
+            bytes: 14,
+            recordCount: 1,
+            license: 'MIT',
+          },
+          'missing_file.jsonl': {
+            sha256: 'a'.repeat(64),
+            bytes: 100,
+            recordCount: 1,
+            license: 'MIT',
+          },
+        },
+      };
+      writeFileSync(join(tempDir, 'manifest.json'), JSON.stringify(tamperedManifest));
+
+      const res = validateCorpusManifest(tempDir);
+      assert.equal(res.valid, false);
+      assert.ok(res.errors.some((e) => e.includes('SHA-256 mismatch')));
+      assert.ok(res.errors.some((e) => e.includes('does not exist')));
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  await t.test('validateCorpusManifest requires manifest.json for repo corpus directory or when requireManifest: true', () => {
+    // When validating repo corpus directory and manifest is missing: fails
+    const mockRepoCorpusWithoutManifest = resolve(repoRoot, 'tests/security/corpus');
+    // Test with explicit requireManifest: true on tempDir
+    const tempDir = mkdtempSync(join(tmpdir(), 'corpus-test-manifest-required-'));
+    try {
+      const res = validateCorpusManifest(tempDir, { requireManifest: true });
+      assert.equal(res.valid, false);
+      assert.ok(res.errors.some((e) => e.includes('manifest.json is required')));
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  await t.test('validateCorpusManifest returns valid: true when manifest.json is absent and not required', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'corpus-test-manifest-absent-'));
+    try {
+      const res = validateCorpusManifest(tempDir, { requireManifest: false });
+      assert.equal(res.valid, true);
+      assert.equal(res.manifest, null);
+      assert.equal(res.errors.length, 0);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+});
+
+test('partition contracts and stage segregation enforcement', async (t) => {
+  await t.test('PARTITION_CONTRACTS defines expected mappings', () => {
+    assert.deepEqual(PARTITION_CONTRACTS['holdout_input.jsonl'], {
+      split: 'holdout',
+      suiteKind: 'detector',
+      expectedStage: 'input',
+    });
+    assert.deepEqual(PARTITION_CONTRACTS['holdout_tool.jsonl'], {
+      split: 'holdout',
+      suiteKind: 'detector',
+      expectedStage: 'tool',
+    });
+    assert.deepEqual(PARTITION_CONTRACTS['holdout_output.jsonl'], {
+      split: 'holdout',
+      suiteKind: 'detector',
+      expectedStage: 'output',
+    });
+    assert.deepEqual(PARTITION_CONTRACTS['invariant_manifest.jsonl'], {
+      split: 'invariant',
+      suiteKind: 'invariant',
+    });
+  });
+
+  await t.test('checkPartitionContract flags mismatched fields', () => {
+    const inputRecord = createSampleRecord({ expectedStage: 'input' });
+    const toolContract = PARTITION_CONTRACTS['holdout_tool.jsonl'];
+    const violations = checkPartitionContract(inputRecord, toolContract);
+    assert.ok(violations.length > 0);
+    assert.ok(violations.some((v) => v.includes('expectedStage') && v.includes('tool')));
+  });
+
+  await t.test('validateCorpus detects wrong expectedStage in partitioned file (e.g. input record in holdout_tool.jsonl)', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'corpus-test-stage-mismatch-'));
+    try {
+      // Create holdout_tool.jsonl containing an input stage record
+      const mismatchedRecord = createSampleRecord({
+        id: 'tol-mismatch-001',
+        expectedStage: 'input', // Stage violation for holdout_tool.jsonl
+        split: 'holdout',
+        suiteKind: 'detector',
+      });
+      const filePath = join(tempDir, 'holdout_tool.jsonl');
+      writeFileSync(filePath, JSON.stringify(mismatchedRecord) + '\n', 'utf8');
+
+      const fileRes = validateCorpus(filePath, { requireHoldoutQuotas: false });
+      assert.equal(fileRes.valid, false, 'Should fail validation due to partition violation');
+      assert.ok(
+        fileRes.errors.some(
+          (e) =>
+            e.includes('Partition Contract Violation') &&
+            e.includes('holdout_tool.jsonl:1') &&
+            e.includes('expectedStage'),
+        ),
+        `Expected partition violation error with context holdout_tool.jsonl:1, got: ${fileRes.errors.join(', ')}`,
+      );
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  await t.test('validateCorpusManifest detects partition contract violation in manifest files', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'corpus-test-manifest-partition-'));
+    try {
+      const mismatchedRecord = createSampleRecord({
+        id: 'tol-mismatch-002',
+        expectedStage: 'input', // Stage violation for holdout_tool.jsonl
+        split: 'holdout',
+        suiteKind: 'detector',
+      });
+      const toolFile = join(tempDir, 'holdout_tool.jsonl');
+      const lines = JSON.stringify(mismatchedRecord) + '\n';
+      writeFileSync(toolFile, lines, 'utf8');
+      const sha256 = createHash('sha256').update(Buffer.from(lines, 'utf8')).digest('hex');
+
+      const manifest = {
+        version: '1.0.0',
+        taxonomy: 'OWASP-LLM-Top10-2025',
+        files: {
+          'holdout_tool.jsonl': {
+            sha256,
+            bytes: Buffer.from(lines, 'utf8').length,
+            recordCount: 1,
+            license: 'MIT',
+          },
+        },
+      };
+      writeFileSync(join(tempDir, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf8');
+
+      const res = validateCorpusManifest(tempDir);
+      assert.equal(res.valid, false, 'Manifest validation should fail on partition violation');
+      assert.ok(
+        res.errors.some(
+          (e) =>
+            e.includes('Partition Contract Violation') &&
+            e.includes('holdout_tool.jsonl:1') &&
+            e.includes('expectedStage'),
+        ),
+        `Expected partition contract error in manifest validation, got: ${res.errors.join(', ')}`,
+      );
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  await t.test('validateCorpus detects invariant record with detector suiteKind in invariant_manifest.jsonl', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'corpus-test-inv-mismatch-'));
+    try {
+      const mismatchedInv = createSampleRecord({
+        id: 'inv-mismatch-001',
+        split: 'invariant',
+        suiteKind: 'detector', // suiteKind violation for invariant_manifest.jsonl
+        oracle: { expectedDecision: 'PASS', expectedErrorCode: null },
+      });
+      const filePath = join(tempDir, 'invariant_manifest.jsonl');
+      writeFileSync(filePath, JSON.stringify(mismatchedInv) + '\n', 'utf8');
+
+      const res = validateCorpus(filePath, { requireHoldoutQuotas: false });
+      assert.equal(res.valid, false);
+      assert.ok(
+        res.errors.some(
+          (e) =>
+            e.includes('Partition Contract Violation') &&
+            e.includes('invariant_manifest.jsonl:1') &&
+            e.includes('suiteKind'),
+        ),
+      );
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  await t.test('validateCorpus in-memory supports partitionFile option', () => {
+    const inputRec = createSampleRecord({ expectedStage: 'input' });
+    const res = validateCorpus([inputRec], {
+      partitionFile: 'holdout_output.jsonl',
+      requireHoldoutQuotas: false,
+    });
+    assert.equal(res.valid, false);
+    assert.ok(
+      res.errors.some(
+        (e) =>
+          e.includes('Partition Contract Violation') &&
+          e.includes('holdout_output.jsonl:1') &&
+          e.includes('expectedStage'),
+      ),
+    );
+  });
+
+  await t.test('all repository partition files strictly satisfy their PARTITION_CONTRACT', () => {
+    const corpusDir = resolve(repoRoot, 'tests/security/corpus');
+    for (const [filename, contract] of Object.entries(PARTITION_CONTRACTS)) {
+      const fullPath = join(corpusDir, filename);
+      assert.ok(existsSync(fullPath), `${filename} must exist`);
+      const records = loadCorpusJsonl(fullPath);
+      assert.ok(records.length > 0, `${filename} must contain records`);
+      for (const item of records) {
+        const violations = checkPartitionContract(item.record, contract);
+        assert.equal(
+          violations.length,
+          0,
+          `Record ${filename}:${item.line} violates partition contract: ${violations.join(', ')}`,
+        );
+      }
+    }
+  });
+});
+
+

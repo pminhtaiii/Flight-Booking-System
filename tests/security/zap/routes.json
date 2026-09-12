@@ -1,0 +1,738 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "1.0.0",
+  "description": "OWASP ZAP local route catalog for Web, API, and Agent services",
+  "services": {
+    "web": {
+      "host": "127.0.0.1",
+      "port": 3000,
+      "url": "http://127.0.0.1:3000"
+    },
+    "api": {
+      "host": "127.0.0.1",
+      "port": 3001,
+      "url": "http://127.0.0.1:3001"
+    },
+    "agent": {
+      "host": "127.0.0.1",
+      "port": 3002,
+      "url": "http://127.0.0.1:3002"
+    }
+  },
+  "routes": [
+    {
+      "id": "web-home",
+      "method": "GET",
+      "path": "/",
+      "service": "web",
+      "targetPort": 3000,
+      "targetService": "web:3000",
+      "authRequirement": "none",
+      "params": null,
+      "requestBody": null,
+      "description": "Public landing page and flight search homepage",
+      "sensitivity": "low"
+    },
+    {
+      "id": "web-login",
+      "method": "GET",
+      "path": "/login",
+      "service": "web",
+      "targetPort": 3000,
+      "targetService": "web:3000",
+      "authRequirement": "none",
+      "params": null,
+      "requestBody": null,
+      "description": "User login page",
+      "sensitivity": "low"
+    },
+    {
+      "id": "web-register",
+      "method": "GET",
+      "path": "/register",
+      "service": "web",
+      "targetPort": 3000,
+      "targetService": "web:3000",
+      "authRequirement": "none",
+      "params": null,
+      "requestBody": null,
+      "description": "User registration page",
+      "sensitivity": "low"
+    },
+    {
+      "id": "web-profile",
+      "method": "GET",
+      "path": "/profile",
+      "service": "web",
+      "targetPort": 3000,
+      "targetService": "web:3000",
+      "authRequirement": "bearer_user",
+      "params": null,
+      "requestBody": null,
+      "description": "Authenticated user profile page",
+      "sensitivity": "high"
+    },
+    {
+      "id": "web-bookings-list",
+      "method": "GET",
+      "path": "/bookings",
+      "service": "web",
+      "targetPort": 3000,
+      "targetService": "web:3000",
+      "authRequirement": "bearer_user",
+      "params": null,
+      "requestBody": null,
+      "description": "Authenticated user bookings list view",
+      "sensitivity": "medium"
+    },
+    {
+      "id": "web-bookings-detail",
+      "method": "GET",
+      "path": "/bookings/:id",
+      "service": "web",
+      "targetPort": 3000,
+      "targetService": "web:3000",
+      "authRequirement": "bearer_user",
+      "params": {
+        "path": ["id"]
+      },
+      "requestBody": null,
+      "description": "Authenticated user booking detail page",
+      "sensitivity": "medium"
+    },
+    {
+      "id": "api-auth-register",
+      "method": "POST",
+      "path": "/api/auth/register",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "none",
+      "params": null,
+      "requestBody": {
+        "type": "object",
+        "required": ["email", "password"],
+        "properties": {
+          "email": { "type": "string" },
+          "password": { "type": "string" }
+        }
+      },
+      "description": "Public user account registration endpoint",
+      "sensitivity": "high"
+    },
+    {
+      "id": "api-auth-login",
+      "method": "POST",
+      "path": "/api/auth/login",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "none",
+      "params": null,
+      "requestBody": {
+        "type": "object",
+        "required": ["email", "password"],
+        "properties": {
+          "email": { "type": "string" },
+          "password": { "type": "string" }
+        }
+      },
+      "description": "Public user authentication login endpoint with lockout rate limiting",
+      "sensitivity": "critical"
+    },
+    {
+      "id": "api-health",
+      "method": "GET",
+      "path": "/health",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "none",
+      "params": null,
+      "requestBody": null,
+      "description": "API service health and dependency probe",
+      "sensitivity": "low"
+    },
+    {
+      "id": "api-health-live",
+      "method": "GET",
+      "path": "/health/live",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "none",
+      "params": null,
+      "requestBody": null,
+      "description": "API service lightweight liveness probe",
+      "sensitivity": "low"
+    },
+    {
+      "id": "agent-health",
+      "method": "GET",
+      "path": "/health",
+      "service": "agent",
+      "targetPort": 3002,
+      "targetService": "agent:3002",
+      "authRequirement": "none",
+      "params": null,
+      "requestBody": null,
+      "description": "Agent service dependency health check probe",
+      "sensitivity": "low"
+    },
+    {
+      "id": "agent-health-live",
+      "method": "GET",
+      "path": "/health/live",
+      "service": "agent",
+      "targetPort": 3002,
+      "targetService": "agent:3002",
+      "authRequirement": "none",
+      "params": null,
+      "requestBody": null,
+      "description": "Agent service lightweight liveness probe",
+      "sensitivity": "low"
+    },
+    {
+      "id": "api-airports-search",
+      "method": "GET",
+      "path": "/airports/search",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "none",
+      "params": {
+        "query": ["q", "limit"]
+      },
+      "requestBody": null,
+      "description": "Public airport lookup and search endpoint",
+      "sensitivity": "low"
+    },
+    {
+      "id": "api-airports-nearby",
+      "method": "GET",
+      "path": "/airports/nearby",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "none",
+      "params": {
+        "query": ["lat", "lng", "rad"]
+      },
+      "requestBody": null,
+      "description": "Public nearby airports search by coordinates",
+      "sensitivity": "low"
+    },
+    {
+      "id": "api-auth-me",
+      "method": "GET",
+      "path": "/api/auth/me",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "bearer_user",
+      "params": null,
+      "requestBody": null,
+      "description": "Returns authenticated user profile identity",
+      "sensitivity": "low"
+    },
+    {
+      "id": "api-auth-logout",
+      "method": "POST",
+      "path": "/api/auth/logout",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "bearer_user",
+      "params": null,
+      "requestBody": null,
+      "description": "User logout and session token revocation",
+      "sensitivity": "low"
+    },
+    {
+      "id": "api-flights-search",
+      "method": "POST",
+      "path": "/flights/search",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "bearer_user",
+      "params": null,
+      "requestBody": {
+        "type": "object",
+        "required": ["origin", "destination", "departureDate", "passengers"],
+        "properties": {
+          "origin": { "type": "string" },
+          "destination": { "type": "string" },
+          "departureDate": { "type": "string" },
+          "passengers": { "type": "integer" }
+        }
+      },
+      "description": "Direct user flight search via Duffel API",
+      "sensitivity": "medium"
+    },
+    {
+      "id": "api-flights-detail",
+      "method": "GET",
+      "path": "/flights/:id",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "bearer_user",
+      "params": {
+        "path": ["id"]
+      },
+      "requestBody": null,
+      "description": "Flight offer detail lookup by offer ID",
+      "sensitivity": "medium"
+    },
+    {
+      "id": "api-bookings-list",
+      "method": "GET",
+      "path": "/bookings",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "bearer_user",
+      "params": {
+        "query": ["page", "limit", "status"]
+      },
+      "requestBody": null,
+      "description": "List user bookings with pagination and status filter",
+      "sensitivity": "medium"
+    },
+    {
+      "id": "api-bookings-detail",
+      "method": "GET",
+      "path": "/bookings/:id",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "bearer_user",
+      "params": {
+        "path": ["id"]
+      },
+      "requestBody": null,
+      "description": "Detailed booking view with cancellation policies",
+      "sensitivity": "medium"
+    },
+    {
+      "id": "api-bookings-cancel",
+      "method": "POST",
+      "path": "/bookings/:id/cancel",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "bearer_user",
+      "params": {
+        "path": ["id"]
+      },
+      "requestBody": null,
+      "description": "Request booking cancellation quote and submit cancellation",
+      "sensitivity": "high"
+    },
+    {
+      "id": "api-bookings-handoffs-resolve",
+      "method": "POST",
+      "path": "/bookings/handoffs/resolve",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "bearer_user",
+      "params": null,
+      "requestBody": {
+        "type": "object",
+        "required": ["handoffToken"],
+        "properties": {
+          "handoffToken": { "type": "string" }
+        }
+      },
+      "description": "Resolves signed agent handoff token into secure checkout session",
+      "sensitivity": "critical"
+    },
+    {
+      "id": "api-bookings-intent-create",
+      "method": "POST",
+      "path": "/bookings/intent",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "bearer_user",
+      "params": null,
+      "requestBody": {
+        "type": "object",
+        "required": ["flightOfferId", "passengers"],
+        "properties": {
+          "flightOfferId": { "type": "string" },
+          "passengers": { "type": "array" }
+        }
+      },
+      "description": "Creates booking intent from verified handoff reservation",
+      "sensitivity": "critical"
+    },
+    {
+      "id": "api-bookings-intent-get",
+      "method": "GET",
+      "path": "/bookings/intent/:id",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "bearer_user",
+      "params": {
+        "path": ["id"]
+      },
+      "requestBody": null,
+      "description": "Retrieves active booking intent state and hold expiry",
+      "sensitivity": "medium"
+    },
+    {
+      "id": "api-bookings-intent-ancillaries-get",
+      "method": "GET",
+      "path": "/bookings/intent/:intentId/ancillaries",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "bearer_user",
+      "params": {
+        "path": ["intentId"]
+      },
+      "requestBody": null,
+      "description": "Read available baggage and seat options for intent",
+      "sensitivity": "medium"
+    },
+    {
+      "id": "api-bookings-intent-ancillaries-put",
+      "method": "PUT",
+      "path": "/bookings/intent/:intentId/ancillaries",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "bearer_user",
+      "params": {
+        "path": ["intentId"]
+      },
+      "requestBody": {
+        "type": "object",
+        "properties": {
+          "baggage": { "type": "array" },
+          "seats": { "type": "array" }
+        }
+      },
+      "description": "Commit ancillary selections to booking intent",
+      "sensitivity": "medium"
+    },
+    {
+      "id": "api-bookings-payment-create",
+      "method": "POST",
+      "path": "/bookings/payment/create",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "bearer_user",
+      "params": null,
+      "requestBody": {
+        "type": "object",
+        "required": ["intentId"],
+        "properties": {
+          "intentId": { "type": "string" }
+        }
+      },
+      "description": "Create Stripe PaymentIntent with idempotency",
+      "sensitivity": "critical"
+    },
+    {
+      "id": "api-bookings-payment-confirm",
+      "method": "POST",
+      "path": "/bookings/payment/confirm",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "bearer_user",
+      "params": null,
+      "requestBody": {
+        "type": "object",
+        "required": ["paymentIntentId"],
+        "properties": {
+          "paymentIntentId": { "type": "string" }
+        }
+      },
+      "description": "Confirm payment and trigger ticket issuance",
+      "sensitivity": "critical"
+    },
+    {
+      "id": "api-profile-get",
+      "method": "GET",
+      "path": "/profile",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "bearer_user",
+      "params": null,
+      "requestBody": null,
+      "description": "Fetch user profile and passport info",
+      "sensitivity": "high"
+    },
+    {
+      "id": "api-profile-patch",
+      "method": "PATCH",
+      "path": "/profile",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "bearer_user",
+      "params": null,
+      "requestBody": {
+        "type": "object",
+        "properties": {
+          "givenName": { "type": "string" },
+          "familyName": { "type": "string" },
+          "passportNumber": { "type": "string" }
+        }
+      },
+      "description": "Update user personal details and passport info",
+      "sensitivity": "high"
+    },
+    {
+      "id": "api-profile-put",
+      "method": "PUT",
+      "path": "/profile",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "bearer_user",
+      "params": null,
+      "requestBody": {
+        "type": "object",
+        "properties": {
+          "givenName": { "type": "string" },
+          "familyName": { "type": "string" },
+          "passportNumber": { "type": "string" }
+        }
+      },
+      "description": "Replace user personal details and passport info",
+      "sensitivity": "high"
+    },
+    {
+      "id": "api-disruptions-get",
+      "method": "GET",
+      "path": "/disruptions",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "bearer_user",
+      "params": null,
+      "requestBody": null,
+      "description": "List flight disruptions affecting user bookings",
+      "sensitivity": "medium"
+    },
+    {
+      "id": "api-dashboard-summary",
+      "method": "GET",
+      "path": "/dashboard/summary",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "bearer_user",
+      "params": null,
+      "requestBody": null,
+      "description": "Aggregate user dashboard summary (upcoming flights, stats)",
+      "sensitivity": "low"
+    },
+    {
+      "id": "api-agent-gateway-flights-search",
+      "method": "GET",
+      "path": "/agent-gateway/flights/search",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "agent_key_claim",
+      "params": {
+        "query": ["origin", "destination", "departureDate", "passengers"]
+      },
+      "requestBody": null,
+      "description": "Agent flight search (v1 query-based) with search snapshot context",
+      "sensitivity": "high"
+    },
+    {
+      "id": "api-agent-gateway-v2-flights-search",
+      "method": "POST",
+      "path": "/agent-gateway/v2/flights/search",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "agent_key_claim",
+      "params": null,
+      "requestBody": {
+        "type": "object",
+        "required": ["origin", "destination", "departureDate"],
+        "properties": {
+          "origin": { "type": "string" },
+          "destination": { "type": "string" },
+          "departureDate": { "type": "string" },
+          "passengers": { "type": "integer" }
+        }
+      },
+      "description": "Attested flight search (v2) issuing signed snapshot version and offers",
+      "sensitivity": "high"
+    },
+    {
+      "id": "api-agent-gateway-users-bookings",
+      "method": "GET",
+      "path": "/agent-gateway/users/bookings",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "agent_key_claim",
+      "params": null,
+      "requestBody": null,
+      "description": "List masked bookings for agent context (scrubbed of PII)",
+      "sensitivity": "high"
+    },
+    {
+      "id": "api-agent-gateway-users-bookings-summaries",
+      "method": "GET",
+      "path": "/agent-gateway/users/bookings/summaries",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "agent_key_claim",
+      "params": null,
+      "requestBody": null,
+      "description": "List booking summaries with opaque bkref_ identifiers",
+      "sensitivity": "medium"
+    },
+    {
+      "id": "api-agent-gateway-users-bookings-detail",
+      "method": "GET",
+      "path": "/agent-gateway/users/bookings/:bookingReference",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "agent_key_claim",
+      "params": {
+        "path": ["bookingReference"]
+      },
+      "requestBody": null,
+      "description": "Read booking details by opaque bkref_ reference without passenger PII",
+      "sensitivity": "medium"
+    },
+    {
+      "id": "api-agent-gateway-bookings-readiness",
+      "method": "POST",
+      "path": "/agent-gateway/bookings/readiness",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "agent_key_claim",
+      "params": null,
+      "requestBody": {
+        "type": "object",
+        "required": ["flight_offer_id", "passengers"],
+        "properties": {
+          "flight_offer_id": { "type": "string" },
+          "passengers": { "type": "array" }
+        }
+      },
+      "description": "Validates passenger completeness and passport validity for checkout readiness",
+      "sensitivity": "high"
+    },
+    {
+      "id": "api-agent-gateway-users-preferences",
+      "method": "GET",
+      "path": "/agent-gateway/users/preferences",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "agent_key_claim",
+      "params": null,
+      "requestBody": null,
+      "description": "Fetch seat/class/airline preferences for personalized agent suggestions",
+      "sensitivity": "medium"
+    },
+    {
+      "id": "api-admin-profile-backfill",
+      "method": "POST",
+      "path": "/admin/profile/backfill",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "admin_bearer",
+      "params": null,
+      "requestBody": null,
+      "description": "Admin maintenance route for legacy passport backfills",
+      "sensitivity": "high"
+    },
+    {
+      "id": "api-admin-refunds-resolve",
+      "method": "POST",
+      "path": "/admin/refunds/:refundId/resolve",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "admin_bearer",
+      "params": {
+        "path": ["refundId"]
+      },
+      "requestBody": {
+        "type": "object",
+        "required": ["resolution"],
+        "properties": {
+          "resolution": { "type": "string" },
+          "reason": { "type": "string" }
+        }
+      },
+      "description": "Admin resolve escalated refund requests",
+      "sensitivity": "critical"
+    },
+    {
+      "id": "agent-chat-stream",
+      "method": "POST",
+      "path": "/chat/stream",
+      "service": "agent",
+      "targetPort": 3002,
+      "targetService": "agent:3002",
+      "authRequirement": "bearer_user",
+      "additionalAuth": "agent_key_claim",
+      "params": null,
+      "requestBody": {
+        "type": "object",
+        "required": ["message"],
+        "properties": {
+          "message": { "type": "string" },
+          "thread_id": { "type": "string" }
+        }
+      },
+      "description": "Primary SSE chat streaming endpoint with admission, quota, guardrail checks, and agent execution",
+      "sensitivity": "critical"
+    },
+    {
+      "id": "api-payments-webhook",
+      "method": "POST",
+      "path": "/payments/webhook",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "none",
+      "params": null,
+      "requestBody": {
+        "type": "object"
+      },
+      "description": "Stripe webhook listener for asynchronous charge events verified via stripe-signature",
+      "sensitivity": "critical"
+    },
+    {
+      "id": "api-disruptions-webhook-duffel",
+      "method": "POST",
+      "path": "/disruptions/webhook/duffel",
+      "service": "api",
+      "targetPort": 3001,
+      "targetService": "api:3001",
+      "authRequirement": "none",
+      "params": null,
+      "requestBody": {
+        "type": "object"
+      },
+      "description": "Duffel webhook listener for flight schedule changes verified via duffel-signature",
+      "sensitivity": "critical"
+    }
+  ]
+}

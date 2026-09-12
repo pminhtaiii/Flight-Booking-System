@@ -1,4 +1,6 @@
-import { writeFileSync } from 'node:fs';
+import { execSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { computeCanonicalHash, normalizePayload, validateCorpus } from './validate-corpus.mjs';
@@ -6,8 +8,42 @@ import { computeCanonicalHash, normalizePayload, validateCorpus } from './valida
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const repoRoot = resolve(__dirname, '..', '..');
-const holdoutPath = resolve(repoRoot, 'tests/security/corpus/holdout.jsonl');
-const invariantsPath = resolve(repoRoot, 'tests/security/corpus/invariants.jsonl');
+const corpusDir = resolve(repoRoot, 'tests/security/corpus');
+const holdoutInputPath = resolve(corpusDir, 'holdout_input.jsonl');
+const holdoutToolPath = resolve(corpusDir, 'holdout_tool.jsonl');
+const holdoutOutputPath = resolve(corpusDir, 'holdout_output.jsonl');
+const invariantManifestPath = resolve(corpusDir, 'invariant_manifest.jsonl');
+const manifestPath = resolve(corpusDir, 'manifest.json');
+const deprecatedHoldoutPath = resolve(corpusDir, 'holdout.jsonl');
+const deprecatedInvariantsPath = resolve(corpusDir, 'invariants.jsonl');
+
+/**
+ * Resolves current git commit revision or falls back to the frozen T036 commit.
+ * @param {string} [defaultCommit='97f23a6f']
+ * @returns {string}
+ */
+function resolveGitRevision(defaultCommit = '97f23a6f') {
+  if (process.env.CORPUS_REVISION) {
+    return process.env.CORPUS_REVISION.startsWith('git:')
+      ? process.env.CORPUS_REVISION
+      : `git:${process.env.CORPUS_REVISION}`;
+  }
+  try {
+    const stdout = execSync('git rev-parse --short HEAD', {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'ignore'],
+    }).trim();
+    if (/^[0-9a-f]{7,40}$/i.test(stdout)) {
+      return `git:${stdout}`;
+    }
+  } catch {
+    // Fall back to frozen T036 commit when git is unavailable
+  }
+  return `git:${defaultCommit}`;
+}
+
+const DEFAULT_REVISION = resolveGitRevision();
 
 const seenNormalized = new Set();
 const seenIds = new Set();
@@ -29,7 +65,7 @@ function createRecord({
   expectedErrorCode,
   source = 'synthetic-feature-023',
   license = 'MIT',
-  revision = 'git:a1b2c3d4',
+  revision = DEFAULT_REVISION,
   curatedBy = 'Security Team',
   curatedAt = '2026-09-04T00:00:00Z',
 }) {
@@ -85,7 +121,9 @@ function createRecord({
 //    Total:  200 malicious, 500 benign = 700 records
 // ---------------------------------------------------------
 
-const holdoutRecords = [];
+const holdoutInputRecords = [];
+const holdoutToolRecords = [];
+const holdoutOutputRecords = [];
 
 // --- 1.1 Input Stage: 100 Malicious ---
 // 40 injection (LLM01), 25 pii (LLM02), 20 excessive agency (LLM06), 15 prompt leak (LLM07)
@@ -121,7 +159,7 @@ const inputMaliciousPatterns = [
 ];
 
 inputMaliciousPatterns.forEach((item, idx) => {
-  holdoutRecords.push(
+  holdoutInputRecords.push(
     createRecord({
       id: `inp-mal-${String(idx + 1).padStart(4, '0')}`,
       suiteKind: 'detector',
@@ -166,7 +204,7 @@ for (let o = 0; o < origins.length && benignInputCount < 250; o++) {
       const month = benignInputCount % 2 === 0 ? 'October' : 'November';
       const p = `Search ${cabins[c]} flights from ${origins[o]} to ${destinations[d]} on ${month} ${day}, 2026, ${pref} (query #${benignInputCount + 1}).`;
 
-      holdoutRecords.push(
+      holdoutInputRecords.push(
         createRecord({
           id: `inp-ben-${String(benignInputCount + 1).padStart(4, '0')}`,
           suiteKind: 'detector',
@@ -230,7 +268,7 @@ const toolMaliciousPatterns = [
 ];
 
 toolMaliciousPatterns.forEach((item, idx) => {
-  holdoutRecords.push(
+  holdoutToolRecords.push(
     createRecord({
       id: `tol-mal-${String(idx + 1).padStart(4, '0')}`,
       suiteKind: 'detector',
@@ -273,7 +311,7 @@ for (let i = 0; i < 125; i++) {
     ],
   };
 
-  holdoutRecords.push(
+  holdoutToolRecords.push(
     createRecord({
       id: `tol-ben-${String(i + 1).padStart(4, '0')}`,
       suiteKind: 'detector',
@@ -310,7 +348,7 @@ const outputMaliciousPatterns = [
 ];
 
 outputMaliciousPatterns.forEach((item, idx) => {
-  holdoutRecords.push(
+  holdoutOutputRecords.push(
     createRecord({
       id: `out-mal-${String(idx + 1).padStart(4, '0')}`,
       suiteKind: 'detector',
@@ -336,7 +374,7 @@ for (let i = 0; i < 125; i++) {
   const flightNo = `DL${100 + (i % 900)}`;
   const text = `I found a great flight option #${i + 1} departing from ${origin} to ${dest} on flight ${flightNo}. Seat selection is available during check-in 24 hours prior to departure.`;
 
-  holdoutRecords.push(
+  holdoutOutputRecords.push(
     createRecord({
       id: `out-ben-${String(i + 1).padStart(4, '0')}`,
       suiteKind: 'detector',
@@ -353,6 +391,13 @@ for (let i = 0; i < 125; i++) {
     }),
   );
 }
+
+const holdoutRecords = [
+  ...holdoutInputRecords,
+  ...holdoutToolRecords,
+  ...holdoutOutputRecords,
+];
+
 
 // ---------------------------------------------------------
 // 2. INVARIANTS SET (`invariants.jsonl`):
@@ -625,7 +670,16 @@ invariantDefs.forEach((inv, idx) => {
 // 3. WRITE JSONL FILES AND VALIDATE
 // ---------------------------------------------------------
 /* eslint-disable no-console */
-export { createRecord, holdoutRecords, invariantRecords };
+export {
+  DEFAULT_REVISION,
+  createRecord,
+  holdoutInputRecords,
+  holdoutOutputRecords,
+  holdoutRecords,
+  holdoutToolRecords,
+  invariantRecords,
+  resolveGitRevision,
+};
 
 const isMain =
   process.argv[1] &&
@@ -633,16 +687,56 @@ const isMain =
     resolve(process.argv[1]) === resolve(__filename));
 
 if (isMain) {
-  console.log(`Generating ${holdoutRecords.length} holdout records...`);
-  const holdoutLines = holdoutRecords.map((r) => JSON.stringify(r)).join('\n') + '\n';
-  writeFileSync(holdoutPath, holdoutLines, 'utf8');
+  // Delete deprecated monolithic files if present
+  if (existsSync(deprecatedHoldoutPath)) {
+    console.log(`Removing deprecated file: ${deprecatedHoldoutPath}`);
+    rmSync(deprecatedHoldoutPath, { force: true });
+  }
+  if (existsSync(deprecatedInvariantsPath)) {
+    console.log(`Removing deprecated file: ${deprecatedInvariantsPath}`);
+    rmSync(deprecatedInvariantsPath, { force: true });
+  }
 
-  console.log(`Generating ${invariantRecords.length} invariant records...`);
-  const invariantLines = invariantRecords.map((r) => JSON.stringify(r)).join('\n') + '\n';
-  writeFileSync(invariantsPath, invariantLines, 'utf8');
+  const partitions = [
+    { name: 'holdout_input.jsonl', path: holdoutInputPath, records: holdoutInputRecords, label: 'holdout input' },
+    { name: 'holdout_tool.jsonl', path: holdoutToolPath, records: holdoutToolRecords, label: 'holdout tool' },
+    { name: 'holdout_output.jsonl', path: holdoutOutputPath, records: holdoutOutputRecords, label: 'holdout output' },
+    { name: 'invariant_manifest.jsonl', path: invariantManifestPath, records: invariantRecords, label: 'invariant manifest' },
+  ];
 
-  console.log('Validating written corpus files...');
-  const validationResult = validateCorpus(resolve(repoRoot, 'tests/security/corpus'), {
+  const manifestData = {
+    $schema: 'https://json-schema.org/draft/2020-12/schema',
+    version: '1.0.0',
+    taxonomy: 'OWASP-LLM-Top10-2025',
+    provenance: {
+      source: 'synthetic-feature-023',
+      revision: DEFAULT_REVISION,
+      curatedBy: 'Security Team',
+      curatedAt: '2026-09-04T00:00:00Z',
+    },
+    files: {},
+  };
+
+  for (const partition of partitions) {
+    console.log(`Generating ${partition.records.length} ${partition.label} records...`);
+    const lines = partition.records.map((r) => JSON.stringify(r)).join('\n') + '\n';
+    writeFileSync(partition.path, lines, 'utf8');
+
+    const fileBytes = Buffer.from(lines, 'utf8');
+    const sha256 = createHash('sha256').update(fileBytes).digest('hex');
+    manifestData.files[partition.name] = {
+      sha256,
+      bytes: fileBytes.length,
+      recordCount: partition.records.length,
+      license: 'MIT',
+    };
+  }
+
+  console.log('Writing cryptographic manifest.json...');
+  writeFileSync(manifestPath, JSON.stringify(manifestData, null, 2) + '\n', 'utf8');
+
+  console.log('Validating written corpus files and manifest...');
+  const validationResult = validateCorpus(corpusDir, {
     requireHoldoutQuotas: true,
   });
 
@@ -668,4 +762,10 @@ if (isMain) {
     `  Output: ${validationResult.stats.detectors.byStage.output.malicious} malicious / ${validationResult.stats.detectors.byStage.output.benign} benign`,
   );
   console.log(`Invariants: ${validationResult.stats.invariants.total}`);
+  if (validationResult.stats.manifest) {
+    console.log(
+      `Manifest: verified (${validationResult.stats.manifest.filesCount} files, version ${validationResult.stats.manifest.version})`,
+    );
+  }
 }
+

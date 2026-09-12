@@ -1,0 +1,1986 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Booking Systems Route Catalog",
+    "description": "OpenAPI 3.0.3 specification converted from routes.json for OWASP ZAP scanning",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:3000",
+      "description": "Web service (Next.js)"
+    },
+    {
+      "url": "http://127.0.0.1:3001",
+      "description": "API service (NestJS)"
+    },
+    {
+      "url": "http://127.0.0.1:3002",
+      "description": "Agent service (FastAPI)"
+    },
+    {
+      "url": "http://127.0.0.1:3301",
+      "description": "API service (Security Compose)"
+    },
+    {
+      "url": "http://127.0.0.1:3302",
+      "description": "Agent service (Security Compose)"
+    },
+    {
+      "url": "http://127.0.0.1:3400",
+      "description": "Web service (Security Compose)"
+    }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "operationId": "web-home",
+        "summary": "Public landing page and flight search homepage",
+        "description": "Public landing page and flight search homepage",
+        "tags": [
+          "web"
+        ],
+        "parameters": [],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "low",
+        "x-target-port": 3000,
+        "x-route-id": "web-home"
+      }
+    },
+    "/login": {
+      "get": {
+        "operationId": "web-login",
+        "summary": "User login page",
+        "description": "User login page",
+        "tags": [
+          "web"
+        ],
+        "parameters": [],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "low",
+        "x-target-port": 3000,
+        "x-route-id": "web-login"
+      }
+    },
+    "/register": {
+      "get": {
+        "operationId": "web-register",
+        "summary": "User registration page",
+        "description": "User registration page",
+        "tags": [
+          "web"
+        ],
+        "parameters": [],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "low",
+        "x-target-port": 3000,
+        "x-route-id": "web-register"
+      }
+    },
+    "/profile": {
+      "get": {
+        "operationId": "web-profile",
+        "summary": "Authenticated user profile page",
+        "description": "Authenticated user profile page",
+        "tags": [
+          "web"
+        ],
+        "parameters": [],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "high",
+        "x-target-port": 3000,
+        "x-route-id": "web-profile",
+        "x-route-ids": [
+          "web-profile",
+          "api-profile-get"
+        ]
+      },
+      "patch": {
+        "operationId": "api-profile-patch",
+        "summary": "Update user personal details and passport info",
+        "description": "Update user personal details and passport info",
+        "tags": [
+          "api"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "Update user personal details and passport info",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "givenName": {
+                    "type": "string"
+                  },
+                  "familyName": {
+                    "type": "string"
+                  },
+                  "passportNumber": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "givenName": "Jane",
+                "familyName": "Doe",
+                "passportNumber": "A12345678"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "high",
+        "x-target-port": 3001,
+        "x-route-id": "api-profile-patch"
+      },
+      "put": {
+        "operationId": "api-profile-put",
+        "summary": "Replace user personal details and passport info",
+        "description": "Replace user personal details and passport info",
+        "tags": [
+          "api"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "Replace user personal details and passport info",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "givenName": {
+                    "type": "string"
+                  },
+                  "familyName": {
+                    "type": "string"
+                  },
+                  "passportNumber": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "givenName": "Jane",
+                "familyName": "Doe",
+                "passportNumber": "A12345678"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "high",
+        "x-target-port": 3001,
+        "x-route-id": "api-profile-put"
+      }
+    },
+    "/bookings": {
+      "get": {
+        "operationId": "web-bookings-list",
+        "summary": "Authenticated user bookings list view",
+        "description": "Authenticated user bookings list view",
+        "tags": [
+          "web"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Query parameter page"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Query parameter limit"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Query parameter status"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "medium",
+        "x-target-port": 3000,
+        "x-route-id": "web-bookings-list",
+        "x-route-ids": [
+          "web-bookings-list",
+          "api-bookings-list"
+        ]
+      }
+    },
+    "/bookings/{id}": {
+      "get": {
+        "operationId": "web-bookings-detail",
+        "summary": "Authenticated user booking detail page",
+        "description": "Authenticated user booking detail page",
+        "tags": [
+          "web"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Path parameter id"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "medium",
+        "x-target-port": 3000,
+        "x-route-id": "web-bookings-detail",
+        "x-route-ids": [
+          "web-bookings-detail",
+          "api-bookings-detail"
+        ]
+      }
+    },
+    "/api/auth/register": {
+      "post": {
+        "operationId": "api-auth-register",
+        "summary": "Public user account registration endpoint",
+        "description": "Public user account registration endpoint",
+        "tags": [
+          "api"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "Public user account registration endpoint",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email",
+                  "password"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "email": "security-a@example.invalid",
+                "password": "SecurityPass123!"
+              }
+            }
+          }
+        },
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "high",
+        "x-target-port": 3001,
+        "x-route-id": "api-auth-register"
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "operationId": "api-auth-login",
+        "summary": "Public user authentication login endpoint with lockout rate limiting",
+        "description": "Public user authentication login endpoint with lockout rate limiting",
+        "tags": [
+          "api"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "Public user authentication login endpoint with lockout rate limiting",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email",
+                  "password"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "email": "security-a@example.invalid",
+                "password": "SecurityPass123!"
+              }
+            }
+          }
+        },
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "critical",
+        "x-target-port": 3001,
+        "x-route-id": "api-auth-login"
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "api-health",
+        "summary": "API service health and dependency probe",
+        "description": "API service health and dependency probe",
+        "tags": [
+          "api"
+        ],
+        "parameters": [],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "low",
+        "x-target-port": 3001,
+        "x-route-id": "api-health",
+        "x-route-ids": [
+          "api-health",
+          "agent-health"
+        ]
+      }
+    },
+    "/health/live": {
+      "get": {
+        "operationId": "api-health-live",
+        "summary": "API service lightweight liveness probe",
+        "description": "API service lightweight liveness probe",
+        "tags": [
+          "api"
+        ],
+        "parameters": [],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "low",
+        "x-target-port": 3001,
+        "x-route-id": "api-health-live",
+        "x-route-ids": [
+          "api-health-live",
+          "agent-health-live"
+        ]
+      }
+    },
+    "/airports/search": {
+      "get": {
+        "operationId": "api-airports-search",
+        "summary": "Public airport lookup and search endpoint",
+        "description": "Public airport lookup and search endpoint",
+        "tags": [
+          "api"
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Query parameter q"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Query parameter limit"
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "low",
+        "x-target-port": 3001,
+        "x-route-id": "api-airports-search"
+      }
+    },
+    "/airports/nearby": {
+      "get": {
+        "operationId": "api-airports-nearby",
+        "summary": "Public nearby airports search by coordinates",
+        "description": "Public nearby airports search by coordinates",
+        "tags": [
+          "api"
+        ],
+        "parameters": [
+          {
+            "name": "lat",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Query parameter lat"
+          },
+          {
+            "name": "lng",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Query parameter lng"
+          },
+          {
+            "name": "rad",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Query parameter rad"
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "low",
+        "x-target-port": 3001,
+        "x-route-id": "api-airports-nearby"
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "operationId": "api-auth-me",
+        "summary": "Returns authenticated user profile identity",
+        "description": "Returns authenticated user profile identity",
+        "tags": [
+          "api"
+        ],
+        "parameters": [],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "low",
+        "x-target-port": 3001,
+        "x-route-id": "api-auth-me"
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "operationId": "api-auth-logout",
+        "summary": "User logout and session token revocation",
+        "description": "User logout and session token revocation",
+        "tags": [
+          "api"
+        ],
+        "parameters": [],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "low",
+        "x-target-port": 3001,
+        "x-route-id": "api-auth-logout"
+      }
+    },
+    "/flights/search": {
+      "post": {
+        "operationId": "api-flights-search",
+        "summary": "Direct user flight search via Duffel API",
+        "description": "Direct user flight search via Duffel API",
+        "tags": [
+          "api"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "Direct user flight search via Duffel API",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "origin",
+                  "destination",
+                  "departureDate",
+                  "passengers"
+                ],
+                "properties": {
+                  "origin": {
+                    "type": "string"
+                  },
+                  "destination": {
+                    "type": "string"
+                  },
+                  "departureDate": {
+                    "type": "string"
+                  },
+                  "passengers": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "example": {
+                "origin": "SFO",
+                "destination": "JFK",
+                "departureDate": "2026-10-15",
+                "passengers": 1
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "medium",
+        "x-target-port": 3001,
+        "x-route-id": "api-flights-search"
+      }
+    },
+    "/flights/{id}": {
+      "get": {
+        "operationId": "api-flights-detail",
+        "summary": "Flight offer detail lookup by offer ID",
+        "description": "Flight offer detail lookup by offer ID",
+        "tags": [
+          "api"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Path parameter id"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "medium",
+        "x-target-port": 3001,
+        "x-route-id": "api-flights-detail"
+      }
+    },
+    "/bookings/{id}/cancel": {
+      "post": {
+        "operationId": "api-bookings-cancel",
+        "summary": "Request booking cancellation quote and submit cancellation",
+        "description": "Request booking cancellation quote and submit cancellation",
+        "tags": [
+          "api"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Path parameter id"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "high",
+        "x-target-port": 3001,
+        "x-route-id": "api-bookings-cancel"
+      }
+    },
+    "/bookings/handoffs/resolve": {
+      "post": {
+        "operationId": "api-bookings-handoffs-resolve",
+        "summary": "Resolves signed agent handoff token into secure checkout session",
+        "description": "Resolves signed agent handoff token into secure checkout session",
+        "tags": [
+          "api"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "Resolves signed agent handoff token into secure checkout session",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "handoffToken"
+                ],
+                "properties": {
+                  "handoffToken": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "handoffToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.synthetic_handoff_token"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "critical",
+        "x-target-port": 3001,
+        "x-route-id": "api-bookings-handoffs-resolve"
+      }
+    },
+    "/bookings/intent": {
+      "post": {
+        "operationId": "api-bookings-intent-create",
+        "summary": "Creates booking intent from verified handoff reservation",
+        "description": "Creates booking intent from verified handoff reservation",
+        "tags": [
+          "api"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "Creates booking intent from verified handoff reservation",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "flightOfferId",
+                  "passengers"
+                ],
+                "properties": {
+                  "flightOfferId": {
+                    "type": "string"
+                  },
+                  "passengers": {
+                    "type": "array"
+                  }
+                }
+              },
+              "example": {
+                "flightOfferId": "off_mock_123",
+                "passengers": [
+                  {
+                    "id": "pax_1",
+                    "givenName": "Alice",
+                    "familyName": "Smith"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "critical",
+        "x-target-port": 3001,
+        "x-route-id": "api-bookings-intent-create"
+      }
+    },
+    "/bookings/intent/{id}": {
+      "get": {
+        "operationId": "api-bookings-intent-get",
+        "summary": "Retrieves active booking intent state and hold expiry",
+        "description": "Retrieves active booking intent state and hold expiry",
+        "tags": [
+          "api"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Path parameter id"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "medium",
+        "x-target-port": 3001,
+        "x-route-id": "api-bookings-intent-get"
+      }
+    },
+    "/bookings/intent/{intentId}/ancillaries": {
+      "get": {
+        "operationId": "api-bookings-intent-ancillaries-get",
+        "summary": "Read available baggage and seat options for intent",
+        "description": "Read available baggage and seat options for intent",
+        "tags": [
+          "api"
+        ],
+        "parameters": [
+          {
+            "name": "intentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Path parameter intentId"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "medium",
+        "x-target-port": 3001,
+        "x-route-id": "api-bookings-intent-ancillaries-get"
+      },
+      "put": {
+        "operationId": "api-bookings-intent-ancillaries-put",
+        "summary": "Commit ancillary selections to booking intent",
+        "description": "Commit ancillary selections to booking intent",
+        "tags": [
+          "api"
+        ],
+        "parameters": [
+          {
+            "name": "intentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Path parameter intentId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Commit ancillary selections to booking intent",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "baggage": {
+                    "type": "array"
+                  },
+                  "seats": {
+                    "type": "array"
+                  }
+                }
+              },
+              "example": {
+                "baggage": [
+                  {
+                    "type": "checked",
+                    "quantity": 1
+                  }
+                ],
+                "seats": [
+                  {
+                    "seatNumber": "12A"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "medium",
+        "x-target-port": 3001,
+        "x-route-id": "api-bookings-intent-ancillaries-put"
+      }
+    },
+    "/bookings/payment/create": {
+      "post": {
+        "operationId": "api-bookings-payment-create",
+        "summary": "Create Stripe PaymentIntent with idempotency",
+        "description": "Create Stripe PaymentIntent with idempotency",
+        "tags": [
+          "api"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "Create Stripe PaymentIntent with idempotency",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "intentId"
+                ],
+                "properties": {
+                  "intentId": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "intentId": "bi_mock_123"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "critical",
+        "x-target-port": 3001,
+        "x-route-id": "api-bookings-payment-create"
+      }
+    },
+    "/bookings/payment/confirm": {
+      "post": {
+        "operationId": "api-bookings-payment-confirm",
+        "summary": "Confirm payment and trigger ticket issuance",
+        "description": "Confirm payment and trigger ticket issuance",
+        "tags": [
+          "api"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "Confirm payment and trigger ticket issuance",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "paymentIntentId"
+                ],
+                "properties": {
+                  "paymentIntentId": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "paymentIntentId": "pi_mock_123"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "critical",
+        "x-target-port": 3001,
+        "x-route-id": "api-bookings-payment-confirm"
+      }
+    },
+    "/disruptions": {
+      "get": {
+        "operationId": "api-disruptions-get",
+        "summary": "List flight disruptions affecting user bookings",
+        "description": "List flight disruptions affecting user bookings",
+        "tags": [
+          "api"
+        ],
+        "parameters": [],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "medium",
+        "x-target-port": 3001,
+        "x-route-id": "api-disruptions-get"
+      }
+    },
+    "/dashboard/summary": {
+      "get": {
+        "operationId": "api-dashboard-summary",
+        "summary": "Aggregate user dashboard summary (upcoming flights, stats)",
+        "description": "Aggregate user dashboard summary (upcoming flights, stats)",
+        "tags": [
+          "api"
+        ],
+        "parameters": [],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "low",
+        "x-target-port": 3001,
+        "x-route-id": "api-dashboard-summary"
+      }
+    },
+    "/agent-gateway/flights/search": {
+      "get": {
+        "operationId": "api-agent-gateway-flights-search",
+        "summary": "Agent flight search (v1 query-based) with search snapshot context",
+        "description": "Agent flight search (v1 query-based) with search snapshot context",
+        "tags": [
+          "api"
+        ],
+        "parameters": [
+          {
+            "name": "origin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Query parameter origin"
+          },
+          {
+            "name": "destination",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Query parameter destination"
+          },
+          {
+            "name": "departureDate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Query parameter departureDate"
+          },
+          {
+            "name": "passengers",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Query parameter passengers"
+          }
+        ],
+        "security": [
+          {
+            "agentApiKey": [],
+            "claimToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "high",
+        "x-target-port": 3001,
+        "x-route-id": "api-agent-gateway-flights-search"
+      }
+    },
+    "/agent-gateway/v2/flights/search": {
+      "post": {
+        "operationId": "api-agent-gateway-v2-flights-search",
+        "summary": "Attested flight search (v2) issuing signed snapshot version and offers",
+        "description": "Attested flight search (v2) issuing signed snapshot version and offers",
+        "tags": [
+          "api"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "Attested flight search (v2) issuing signed snapshot version and offers",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "origin",
+                  "destination",
+                  "departureDate"
+                ],
+                "properties": {
+                  "origin": {
+                    "type": "string"
+                  },
+                  "destination": {
+                    "type": "string"
+                  },
+                  "departureDate": {
+                    "type": "string"
+                  },
+                  "passengers": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "example": {
+                "origin": "SFO",
+                "destination": "JFK",
+                "departureDate": "2026-10-15",
+                "passengers": 1
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "agentApiKey": [],
+            "claimToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "high",
+        "x-target-port": 3001,
+        "x-route-id": "api-agent-gateway-v2-flights-search"
+      }
+    },
+    "/agent-gateway/users/bookings": {
+      "get": {
+        "operationId": "api-agent-gateway-users-bookings",
+        "summary": "List masked bookings for agent context (scrubbed of PII)",
+        "description": "List masked bookings for agent context (scrubbed of PII)",
+        "tags": [
+          "api"
+        ],
+        "parameters": [],
+        "security": [
+          {
+            "agentApiKey": [],
+            "claimToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "high",
+        "x-target-port": 3001,
+        "x-route-id": "api-agent-gateway-users-bookings"
+      }
+    },
+    "/agent-gateway/users/bookings/summaries": {
+      "get": {
+        "operationId": "api-agent-gateway-users-bookings-summaries",
+        "summary": "List booking summaries with opaque bkref_ identifiers",
+        "description": "List booking summaries with opaque bkref_ identifiers",
+        "tags": [
+          "api"
+        ],
+        "parameters": [],
+        "security": [
+          {
+            "agentApiKey": [],
+            "claimToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "medium",
+        "x-target-port": 3001,
+        "x-route-id": "api-agent-gateway-users-bookings-summaries"
+      }
+    },
+    "/agent-gateway/users/bookings/{bookingReference}": {
+      "get": {
+        "operationId": "api-agent-gateway-users-bookings-detail",
+        "summary": "Read booking details by opaque bkref_ reference without passenger PII",
+        "description": "Read booking details by opaque bkref_ reference without passenger PII",
+        "tags": [
+          "api"
+        ],
+        "parameters": [
+          {
+            "name": "bookingReference",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Path parameter bookingReference"
+          }
+        ],
+        "security": [
+          {
+            "agentApiKey": [],
+            "claimToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "medium",
+        "x-target-port": 3001,
+        "x-route-id": "api-agent-gateway-users-bookings-detail"
+      }
+    },
+    "/agent-gateway/bookings/readiness": {
+      "post": {
+        "operationId": "api-agent-gateway-bookings-readiness",
+        "summary": "Validates passenger completeness and passport validity for checkout readiness",
+        "description": "Validates passenger completeness and passport validity for checkout readiness",
+        "tags": [
+          "api"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "Validates passenger completeness and passport validity for checkout readiness",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "flight_offer_id",
+                  "passengers"
+                ],
+                "properties": {
+                  "flight_offer_id": {
+                    "type": "string"
+                  },
+                  "passengers": {
+                    "type": "array"
+                  }
+                }
+              },
+              "example": {
+                "flight_offer_id": "off_mock_123",
+                "passengers": [
+                  {
+                    "id": "pax_1",
+                    "givenName": "Alice",
+                    "familyName": "Smith"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "agentApiKey": [],
+            "claimToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "high",
+        "x-target-port": 3001,
+        "x-route-id": "api-agent-gateway-bookings-readiness"
+      }
+    },
+    "/agent-gateway/users/preferences": {
+      "get": {
+        "operationId": "api-agent-gateway-users-preferences",
+        "summary": "Fetch seat/class/airline preferences for personalized agent suggestions",
+        "description": "Fetch seat/class/airline preferences for personalized agent suggestions",
+        "tags": [
+          "api"
+        ],
+        "parameters": [],
+        "security": [
+          {
+            "agentApiKey": [],
+            "claimToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "medium",
+        "x-target-port": 3001,
+        "x-route-id": "api-agent-gateway-users-preferences"
+      }
+    },
+    "/admin/profile/backfill": {
+      "post": {
+        "operationId": "api-admin-profile-backfill",
+        "summary": "Admin maintenance route for legacy passport backfills",
+        "description": "Admin maintenance route for legacy passport backfills",
+        "tags": [
+          "api"
+        ],
+        "parameters": [],
+        "security": [
+          {
+            "adminBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "high",
+        "x-target-port": 3001,
+        "x-route-id": "api-admin-profile-backfill"
+      }
+    },
+    "/admin/refunds/{refundId}/resolve": {
+      "post": {
+        "operationId": "api-admin-refunds-resolve",
+        "summary": "Admin resolve escalated refund requests",
+        "description": "Admin resolve escalated refund requests",
+        "tags": [
+          "api"
+        ],
+        "parameters": [
+          {
+            "name": "refundId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Path parameter refundId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Admin resolve escalated refund requests",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "resolution"
+                ],
+                "properties": {
+                  "resolution": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "resolution": "approved",
+                "reason": "Flight cancelled by airline"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "adminBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "critical",
+        "x-target-port": 3001,
+        "x-route-id": "api-admin-refunds-resolve"
+      }
+    },
+    "/chat/stream": {
+      "post": {
+        "operationId": "agent-chat-stream",
+        "summary": "Primary SSE chat streaming endpoint with admission, quota, guardrail checks, and agent execution",
+        "description": "Primary SSE chat streaming endpoint with admission, quota, guardrail checks, and agent execution",
+        "tags": [
+          "agent"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "Primary SSE chat streaming endpoint with admission, quota, guardrail checks, and agent execution",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "message"
+                ],
+                "properties": {
+                  "message": {
+                    "type": "string"
+                  },
+                  "thread_id": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "message": "Find flights from SFO to JFK on October 15",
+                "thread_id": "thread_mock_security"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "agentApiKey": [],
+            "claimToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "critical",
+        "x-target-port": 3002,
+        "x-route-id": "agent-chat-stream"
+      }
+    },
+    "/payments/webhook": {
+      "post": {
+        "operationId": "api-payments-webhook",
+        "summary": "Stripe webhook listener for asynchronous charge events verified via stripe-signature",
+        "description": "Stripe webhook listener for asynchronous charge events verified via stripe-signature",
+        "tags": [
+          "api"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "Stripe webhook listener for asynchronous charge events verified via stripe-signature",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "id": "evt_mock_123",
+                "type": "mock.event",
+                "livemode": false
+              }
+            }
+          }
+        },
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "critical",
+        "x-target-port": 3001,
+        "x-route-id": "api-payments-webhook"
+      }
+    },
+    "/disruptions/webhook/duffel": {
+      "post": {
+        "operationId": "api-disruptions-webhook-duffel",
+        "summary": "Duffel webhook listener for flight schedule changes verified via duffel-signature",
+        "description": "Duffel webhook listener for flight schedule changes verified via duffel-signature",
+        "tags": [
+          "api"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "Duffel webhook listener for flight schedule changes verified via duffel-signature",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "id": "evt_mock_123",
+                "type": "mock.event",
+                "livemode": false
+              }
+            }
+          }
+        },
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Bad request / schema validation failure"
+          },
+          "401": {
+            "description": "Unauthorized / authentication required"
+          },
+          "403": {
+            "description": "Forbidden / insufficient permissions"
+          }
+        },
+        "x-sensitivity": "critical",
+        "x-target-port": 3001,
+        "x-route-id": "api-disruptions-webhook-duffel"
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "User JWT bearer authentication"
+      },
+      "agentApiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "AGENT_SERVICE_API_KEY",
+        "description": "Agent service shared API key header"
+      },
+      "claimToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "CLAIM_TOKEN",
+        "description": "Agent attested user claim token header"
+      },
+      "adminBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Admin bearer authentication"
+      }
+    }
+  }
+}

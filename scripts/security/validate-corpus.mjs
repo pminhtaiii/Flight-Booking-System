@@ -1,12 +1,38 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const repoRoot = resolve(__dirname, '..', '..');
 const defaultSchemaPath = resolve(repoRoot, 'tests/security/corpus/schema.json');
+
+export const PARTITION_CONTRACTS = {
+  'holdout_input.jsonl': { split: 'holdout', suiteKind: 'detector', expectedStage: 'input' },
+  'holdout_tool.jsonl': { split: 'holdout', suiteKind: 'detector', expectedStage: 'tool' },
+  'holdout_output.jsonl': { split: 'holdout', suiteKind: 'detector', expectedStage: 'output' },
+  'invariant_manifest.jsonl': { split: 'invariant', suiteKind: 'invariant' },
+};
+
+/**
+ * Checks a record against a partition contract.
+ * @param {object} record
+ * @param {{ split?: string, suiteKind?: string, expectedStage?: string }} contract
+ * @returns {string[]} List of violation messages
+ */
+export function checkPartitionContract(record, contract) {
+  const violations = [];
+  if (!record || typeof record !== 'object') {
+    return ['Record is not an object'];
+  }
+  for (const [key, expectedVal] of Object.entries(contract)) {
+    if (record[key] !== expectedVal) {
+      violations.push(`expected ${key} "${expectedVal}", got "${record[key]}"`);
+    }
+  }
+  return violations;
+}
 
 /**
  * Normalizes payload using NFKC unicode normalization,
@@ -34,7 +60,7 @@ export function computeCanonicalHash(payload) {
 /**
  * Loads and parses line-delimited JSON (JSONL) file.
  * @param {string} filePath
- * @returns {Array<{ record: any, line: number, sourceFile: string }>}
+ * @returns {Array<{ record: object, line: number, sourceFile: string }>}
  */
 export function loadCorpusJsonl(filePath) {
   if (!existsSync(filePath)) {
@@ -67,8 +93,8 @@ export function loadCorpusJsonl(filePath) {
 
 /**
  * Lightweight JSON schema validation matching tests/security/corpus/schema.json.
- * @param {any} record
- * @param {any} schema
+ * @param {object} record
+ * @param {object} schema
  * @returns {string[]} List of validation error messages, or empty if valid.
  */
 function validatePropertyBySchema(propName, val, propDef, prefix = '') {
@@ -148,8 +174,8 @@ function validateObjectBySchema(objName, obj, objSchema) {
 
 /**
  * Dynamic JSON schema validation matching tests/security/corpus/schema.json.
- * @param {any} record
- * @param {any} schema
+ * @param {object} record
+ * @param {object} schema
  * @returns {string[]} List of validation error messages, or empty if valid.
  */
 export function validateRecordSchema(record, schema) {
@@ -239,18 +265,191 @@ export function validateRecordSchema(record, schema) {
   return errors;
 }
 
+const ALLOWED_LICENSES = new Set(['MIT', 'Apache-2.0', 'CC-BY-4.0']);
+
+/**
+ * Validates corpus manifest if manifest.json exists in corpusDir.
+ * Checks that all listed files exist, SHA-256 hashes match,
+ * bytes and record counts match, and license is compliant ('MIT', 'Apache-2.0', 'CC-BY-4.0').
+ * Also checks that no undeclared .jsonl files exist in corpusDir.
+ *
+ * @param {string} corpusDir
+ * @param {object} [options]
+ * @param {boolean} [options.requireManifest] Whether manifest.json must exist (defaults to true for repo corpus directory)
+ * @returns {{ valid: boolean, errors: string[], manifest: object|null }}
+ */
+export function validateCorpusManifest(corpusDir, options = {}) {
+  const manifestPath = join(corpusDir, 'manifest.json');
+  const isDefaultCorpusDir = resolve(corpusDir) === resolve(repoRoot, 'tests/security/corpus');
+  const requireManifest = options.requireManifest ?? isDefaultCorpusDir;
+
+  if (!existsSync(manifestPath)) {
+    if (requireManifest) {
+      return {
+        valid: false,
+        errors: [`[Manifest Error] manifest.json is required in ${corpusDir} but does not exist`],
+        manifest: null,
+      };
+    }
+    return { valid: true, errors: [], manifest: null };
+  }
+
+  const errors = [];
+  let manifest;
+  try {
+    const raw = readFileSync(manifestPath, 'utf8');
+    manifest = JSON.parse(raw);
+  } catch (err) {
+    return {
+      valid: false,
+      errors: [`[Manifest Error] Failed to parse manifest.json: ${err.message}`],
+      manifest: null,
+    };
+  }
+
+  if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) {
+    return {
+      valid: false,
+      errors: ['[Manifest Error] manifest.json must be a JSON object'],
+      manifest: null,
+    };
+  }
+
+  if (typeof manifest.version !== 'string' || manifest.version.trim().length === 0) {
+    errors.push('[Manifest Error] manifest.json must declare a non-empty version string');
+  }
+
+  if (manifest.taxonomy !== 'OWASP-LLM-Top10-2025') {
+    errors.push(
+      `[Manifest Error] manifest.json taxonomy must be "OWASP-LLM-Top10-2025", got "${manifest.taxonomy}"`,
+    );
+  }
+
+  if (manifest.provenance !== undefined) {
+    if (!manifest.provenance || typeof manifest.provenance !== 'object' || Array.isArray(manifest.provenance)) {
+      errors.push('[Manifest Error] manifest.json provenance must be an object');
+    } else {
+      if (typeof manifest.provenance.source !== 'string' || manifest.provenance.source.trim().length === 0) {
+        errors.push('[Manifest Error] manifest.json provenance must declare a non-empty source');
+      }
+      if (typeof manifest.provenance.revision !== 'string' || manifest.provenance.revision.trim().length === 0) {
+        errors.push('[Manifest Error] manifest.json provenance must declare a non-empty revision');
+      }
+      if (typeof manifest.provenance.curatedBy !== 'string' || manifest.provenance.curatedBy.trim().length === 0) {
+        errors.push('[Manifest Error] manifest.json provenance must declare a non-empty curatedBy');
+      }
+      if (typeof manifest.provenance.curatedAt !== 'string' || manifest.provenance.curatedAt.trim().length === 0) {
+        errors.push('[Manifest Error] manifest.json provenance must declare a non-empty curatedAt');
+      }
+    }
+  }
+
+  if (!manifest.files || typeof manifest.files !== 'object' || Array.isArray(manifest.files)) {
+    errors.push('[Manifest Error] manifest.json must declare a files object');
+    return { valid: false, errors, manifest: null };
+  }
+
+  const declaredFiles = Object.keys(manifest.files);
+  if (declaredFiles.length === 0) {
+    errors.push('[Manifest Error] manifest.json files object must not be empty');
+  }
+
+  for (const [filename, fileMeta] of Object.entries(manifest.files)) {
+    const targetFile = join(corpusDir, filename);
+    if (!existsSync(targetFile)) {
+      errors.push(`[Manifest Error] File listed in manifest does not exist: ${filename}`);
+      continue;
+    }
+
+    if (!fileMeta || typeof fileMeta !== 'object' || Array.isArray(fileMeta)) {
+      errors.push(`[Manifest Error] Entry for ${filename} in manifest.json must be an object`);
+      continue;
+    }
+
+    if (!/^[a-f0-9]{64}$/.test(fileMeta.sha256 || '')) {
+      errors.push(
+        `[Manifest Error] ${filename} sha256 must be a 64-character lowercase hex digest, got "${fileMeta.sha256}"`,
+      );
+    }
+
+    if (typeof fileMeta.bytes !== 'number' || fileMeta.bytes < 0) {
+      errors.push(`[Manifest Error] ${filename} bytes must be a non-negative number`);
+    }
+
+    if (typeof fileMeta.recordCount !== 'number' || fileMeta.recordCount < 0) {
+      errors.push(`[Manifest Error] ${filename} recordCount must be a non-negative number`);
+    }
+
+    if (!ALLOWED_LICENSES.has(fileMeta.license)) {
+      errors.push(
+        `[Manifest Error] ${filename} license must be one of ['MIT', 'Apache-2.0', 'CC-BY-4.0'], got "${fileMeta.license}"`,
+      );
+    }
+
+    const content = readFileSync(targetFile);
+    const computedHash = createHash('sha256').update(content).digest('hex');
+    if (fileMeta.sha256 && computedHash !== fileMeta.sha256) {
+      errors.push(
+        `[Manifest Hash Mismatch] ${filename}: SHA-256 mismatch. Manifest declared "${fileMeta.sha256}", computed "${computedHash}"`,
+      );
+    }
+
+    if (typeof fileMeta.bytes === 'number' && content.length !== fileMeta.bytes) {
+      errors.push(
+        `[Manifest Byte Count Mismatch] ${filename}: Byte count mismatch. Manifest declared ${fileMeta.bytes}, actual ${content.length}`,
+      );
+    }
+
+    try {
+      const records = loadCorpusJsonl(targetFile);
+      if (typeof fileMeta.recordCount === 'number' && records.length !== fileMeta.recordCount) {
+        errors.push(
+          `[Manifest Record Count Mismatch] ${filename}: Record count mismatch. Manifest declared ${fileMeta.recordCount}, actual ${records.length}`,
+        );
+      }
+
+      const contract = PARTITION_CONTRACTS[filename];
+      if (contract) {
+        for (const item of records) {
+          const violations = checkPartitionContract(item.record, contract);
+          for (const v of violations) {
+            errors.push(`[Partition Contract Violation] ${filename}:${item.line}: ${v}`);
+          }
+        }
+      }
+    } catch (e) {
+      errors.push(`[Manifest Error] ${filename} failed to parse as JSONL: ${e.message}`);
+    }
+  }
+
+  // Ensure no undeclared .jsonl files in corpus directory
+  const onDiskFiles = readdirSync(corpusDir).filter((f) => f.endsWith('.jsonl'));
+  for (const f of onDiskFiles) {
+    if (!manifest.files[f]) {
+      errors.push(`[Manifest Error] Undeclared corpus file found in directory: ${f}`);
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    manifest,
+  };
+}
+
 /**
  * Validates corpus records against schema, deduplication, hash matching,
  * variant group split isolation, holdout quotas, and invariant segregation.
  *
- * @param {string|Array<any>} target Path to corpus directory, JSONL file, or array of record objects.
+ * @param {string|Array<object>} target Path to corpus directory, JSONL file, or array of record objects.
  * @param {object} [options]
  * @param {boolean} [options.requireHoldoutQuotas=true]
  * @param {string} [options.schemaPath]
+ * @param {boolean} [options.requireManifest] Whether manifest.json is required
  * @returns {{
  *   valid: boolean,
  *   errors: string[],
- *   records: Array<any>,
+ *   records: Array<object>,
  *   stats: object
  * }}
  */
@@ -271,6 +470,9 @@ export function validateCorpus(target, options = {}) {
     };
   }
 
+  const errors = [];
+  const stats = createEmptyStats();
+
   // Load records
   let itemsToValidate = [];
   if (typeof target === 'string') {
@@ -279,20 +481,32 @@ export function validateCorpus(target, options = {}) {
         valid: false,
         errors: [`Corpus target path does not exist: ${target}`],
         records: [],
-        stats: createEmptyStats(),
+        stats,
       };
     }
     const stat = statSync(target);
     if (stat.isDirectory()) {
+      const manifestResult = validateCorpusManifest(target, options);
+      if (!manifestResult.valid) {
+        errors.push(...manifestResult.errors);
+      }
+      if (manifestResult.manifest) {
+        stats.manifest = {
+          version: manifestResult.manifest.version,
+          taxonomy: manifestResult.manifest.taxonomy,
+          filesCount: Object.keys(manifestResult.manifest.files || {}).length,
+        };
+      }
+
       const files = readdirSync(target)
         .filter((f) => f.endsWith('.jsonl'))
         .sort();
       if (files.length === 0) {
         return {
           valid: false,
-          errors: [`No .jsonl corpus files found in directory: ${target}`],
+          errors: [`No .jsonl corpus files found in directory: ${target}`, ...errors],
           records: [],
-          stats: createEmptyStats(),
+          stats,
         };
       }
       for (const file of files) {
@@ -313,12 +527,9 @@ export function validateCorpus(target, options = {}) {
       valid: false,
       errors: ['Invalid target: must be a directory path, file path, or array of records'],
       records: [],
-      stats: createEmptyStats(),
+      stats,
     };
   }
-
-  const errors = [];
-  const stats = createEmptyStats();
 
   const seenIds = new Map(); // id -> { line, sourceFile }
   const seenNormalizedPayloads = new Map(); // normalizedPayload -> { id, line, sourceFile }
@@ -329,6 +540,20 @@ export function validateCorpus(target, options = {}) {
   for (const item of itemsToValidate) {
     const rec = item.record;
     const context = `${item.sourceFile}:${item.line} (ID: ${rec?.id || 'unknown'})`;
+
+    // Partition contract verification
+    const partitionFile =
+      options.partitionFile || (item.sourceFile && item.sourceFile !== 'in-memory' ? basename(item.sourceFile) : null);
+    const partitionContract = partitionFile ? PARTITION_CONTRACTS[partitionFile] : null;
+    if (partitionContract) {
+      const violations = checkPartitionContract(rec, partitionContract);
+      for (const v of violations) {
+        const errMsg = `[Partition Contract Violation] ${partitionFile}:${item.line}: ${v}`;
+        if (!errors.includes(errMsg)) {
+          errors.push(errMsg);
+        }
+      }
+    }
 
     // 1. Schema validation
     const schemaErrors = validateRecordSchema(rec, schema);
@@ -507,6 +732,7 @@ function createEmptyStats() {
       development: 0,
       invariant: 0,
     },
+    manifest: null,
   };
 }
 
@@ -550,5 +776,11 @@ if (isMain) {
   console.log(
     `  By split: holdout=${result.stats.bySplit.holdout}, dev=${result.stats.bySplit.development}, inv=${result.stats.bySplit.invariant}`,
   );
+  if (result.stats.manifest) {
+    console.log(
+      `  Manifest: verified (${result.stats.manifest.filesCount} files, version ${result.stats.manifest.version}, taxonomy ${result.stats.manifest.taxonomy})`,
+    );
+  }
   process.exit(0);
 }
+
