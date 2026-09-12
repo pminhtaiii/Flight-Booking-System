@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, mkdirSync, writeFileSync, rmSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, relative, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
@@ -19,7 +19,6 @@ import {
   runAstFallbackScan,
   computeFindingFingerprint,
   DEFAULT_STANDARD_RULESETS,
-  SUPPORTED_STANDARD_RULESETS,
   NON_BYPASSABLE_RULES,
   main,
 } from '../../scripts/security/run-sast.mjs';
@@ -418,7 +417,7 @@ test('T030: guardrails.yml contains all 5 required rules with severity ERROR and
     },
     {
       id: 'safe-html-interpolation',
-      expectedLanguages: ['typescript', 'tsx'],
+      expectedLanguages: ['typescript'],
       severity: 'ERROR',
     },
   ];

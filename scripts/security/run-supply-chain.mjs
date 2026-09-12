@@ -288,13 +288,114 @@ function advisoryEntries(data) {
   return entries;
 }
 
-function normalisePnpmAudit(raw, options = {}) {
+export function loadIgnoredGhas(rootDir, options = {}) {
+  const ignored = new Set();
+  const explicit = options.ignoreGhas || options.ignoreGhsas || options.ignoredGhas;
+  if (explicit) {
+    if (typeof explicit === 'string' && explicit.trim()) {
+      ignored.add(explicit.trim().toUpperCase());
+    } else if (typeof explicit[Symbol.iterator] === 'function') {
+      for (const item of explicit) {
+        if (typeof item === 'string' && item.trim()) {
+          ignored.add(item.trim().toUpperCase());
+        }
+      }
+    }
+  }
+
+  const baseDir = resolve(rootDir || defaultRepoRoot);
+  const pkgPath = join(baseDir, 'package.json');
+  if (existsSync(pkgPath)) {
+    try {
+      const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
+      const lists = [
+        pkg.pnpm?.auditConfig?.ignoreGhas,
+        pkg.pnpm?.auditConfig?.ignoreGhsas,
+        pkg.auditConfig?.ignoreGhas,
+        pkg.auditConfig?.ignoreGhsas,
+      ];
+      for (const list of lists) {
+        if (Array.isArray(list)) {
+          for (const item of list) {
+            if (typeof item === 'string' && item.trim()) {
+              ignored.add(item.trim().toUpperCase());
+            }
+          }
+        }
+      }
+    } catch {
+      // Safe fallback if package.json cannot be parsed
+    }
+  }
+
+  const workspacePath = join(baseDir, 'pnpm-workspace.yaml');
+  if (existsSync(workspacePath)) {
+    try {
+      const yamlContent = readFileSync(workspacePath, 'utf8');
+      const matches = yamlContent.match(/GHSA-[a-zA-Z0-9_-]+/gi) || [];
+      for (const match of matches) {
+        ignored.add(match.trim().toUpperCase());
+      }
+    } catch {
+      // Safe fallback if pnpm-workspace.yaml cannot be read
+    }
+  }
+
+  return ignored;
+}
+
+export function extractAdvisoryIdentifiers(key, advisory) {
+  const identifiers = new Set();
+  const addCandidate = (val) => {
+    if (val === undefined || val === null) return;
+    const str = String(val).trim();
+    if (!str) return;
+    identifiers.add(str);
+    const ghsaMatches = str.match(/GHSA-[a-zA-Z0-9_-]+/gi);
+    if (ghsaMatches) {
+      for (const match of ghsaMatches) {
+        identifiers.add(match.trim());
+      }
+    }
+  };
+
+  addCandidate(key);
+  if (advisory && typeof advisory === 'object') {
+    addCandidate(advisory.id);
+    addCandidate(advisory.github_advisory_id);
+    addCandidate(advisory.cve);
+    addCandidate(advisory.url);
+
+    const via = Array.isArray(advisory.via)
+      ? advisory.via
+      : advisory.via !== undefined && advisory.via !== null
+        ? [advisory.via]
+        : [];
+    for (const item of via) {
+      if (typeof item === 'string') {
+        addCandidate(item);
+      } else if (item && typeof item === 'object') {
+        addCandidate(item.source);
+        addCandidate(item.url);
+        addCandidate(item.github_advisory_id);
+        addCandidate(item.cve);
+        addCandidate(item.name);
+        addCandidate(item.id);
+      }
+    }
+  }
+
+  return [...identifiers];
+}
+
+export function normalisePnpmAudit(raw, options = {}) {
   const parsed = parseJson(raw, 'pnpm audit');
   if (parsed.error) {
     return {
       valid: false,
       counts: emptyCounts(),
       findings: [],
+      ignoredFindings: [],
       errors: [parsed.error],
       freshness: null,
     };
@@ -305,43 +406,78 @@ function normalisePnpmAudit(raw, options = {}) {
       valid: false,
       counts: emptyCounts(),
       findings: [],
+      ignoredFindings: [],
       errors: ['[pnpm audit Parse Error] Expected an audit object'],
       freshness: null,
     };
   }
 
+  const rawIgnored =
+    options.ignoredGhas ||
+    (options.rootDir
+      ? loadIgnoredGhas(options.rootDir, options)
+      : loadIgnoredGhas(defaultRepoRoot, options));
+  const ignoredGhas =
+    rawIgnored instanceof Set
+      ? new Set([...rawIgnored].map((id) => String(id).trim().toUpperCase()))
+      : new Set(Array.from(rawIgnored || []).map((id) => String(id).trim().toUpperCase()));
+
   const findings = [];
+  const ignoredFindings = [];
   for (const { key, advisory } of advisoryEntries(data)) {
     if (!advisory || typeof advisory !== 'object') continue;
     const via = Array.isArray(advisory.via) ? advisory.via : [];
     const viaObject = via.find((item) => item && typeof item === 'object') || {};
-    const id =
-      advisory.id ||
-      advisory.cve ||
-      advisory.url ||
-      viaObject.source ||
-      key ||
-      'pnpm-audit:advisory';
+    const candidateIds = extractAdvisoryIdentifiers(key, advisory);
+    const matchedIgnoredGhsa = candidateIds.find((candidate) =>
+      ignoredGhas.has(candidate.toUpperCase()),
+    );
+    const ghsaId = candidateIds.find((candidate) => /^GHSA-[a-zA-Z0-9_-]+$/i.test(candidate));
     const packageName = advisory.module_name || advisory.package || advisory.name || key;
     const message =
       advisory.title ||
       advisory.overview ||
       viaObject.title ||
       `Known vulnerability in ${packageName || 'Node dependency'}`;
-    findings.push(
-      normalizedFinding({
-        scanner: 'pnpm-audit',
-        id,
-        severity: advisory.severity || viaObject.severity || 'Medium',
-        file: 'package.json',
-        line: 1,
-        message: `${packageName || 'Node dependency'}: ${message}`,
-      }),
-    );
+
+    if (matchedIgnoredGhsa) {
+      ignoredFindings.push({
+        ...normalizedFinding({
+          scanner: 'pnpm-audit',
+          id: matchedIgnoredGhsa || ghsaId || advisory.cve || advisory.id || viaObject.source || key || 'pnpm-audit:advisory',
+          severity: advisory.severity || viaObject.severity || 'Medium',
+          file: 'package.json',
+          line: 1,
+          message: `${packageName || 'Node dependency'}: ${message}`,
+        }),
+        ignoredReason: `Matched ignored GHSA advisory ${matchedIgnoredGhsa}`,
+      });
+    } else {
+      const id =
+        ghsaId ||
+        advisory.cve ||
+        advisory.id ||
+        viaObject.source ||
+        key ||
+        'pnpm-audit:advisory';
+      findings.push(
+        normalizedFinding({
+          scanner: 'pnpm-audit',
+          id,
+          severity: advisory.severity || viaObject.severity || 'Medium',
+          file: 'package.json',
+          line: 1,
+          message: `${packageName || 'Node dependency'}: ${message}`,
+        }),
+      );
+    }
   }
 
+  const hasExplicitAdvisories =
+    (data && typeof data.advisories === 'object' && data.advisories !== null) ||
+    (data && typeof data.vulnerabilities === 'object' && data.vulnerabilities !== null);
   const metadataCounts = data.metadata?.vulnerabilities;
-  if (metadataCounts && typeof metadataCounts === 'object') {
+  if (!hasExplicitAdvisories && metadataCounts && typeof metadataCounts === 'object') {
     const targets = [
       ['critical', 'Critical'],
       ['high', 'High'],
@@ -384,7 +520,7 @@ function normalisePnpmAudit(raw, options = {}) {
     advisoryTimestampEvidence: options.advisoryTimestampEvidence,
     usedOfflineCache: data?.freshness?.usedOfflineCache,
   });
-  return { valid: true, counts: makeCounts(findings), findings, errors: [], freshness };
+  return { valid: true, counts: makeCounts(findings), findings, ignoredFindings, errors: [], freshness };
 }
 
 function normaliseGitleaks(raw, options = {}) {
@@ -604,7 +740,7 @@ function runPipAudit(options = {}) {
   };
 }
 
-function runPnpmAudit(options = {}) {
+export function runPnpmAudit(options = {}) {
   const rootDir = resolve(options.rootDir || defaultRepoRoot);
   const execFn = options.execFn || spawnSync;
   const checkedAt = options.checkedAt || new Date().toISOString();
@@ -614,7 +750,11 @@ function runPnpmAudit(options = {}) {
     ['audit', '--audit-level', 'moderate', '--json'],
     rootDir,
   );
+  const ignoredGhas = options.ignoredGhas || loadIgnoredGhas(rootDir, options);
   const parsed = normalisePnpmAudit(result.stdout, {
+    ...options,
+    rootDir,
+    ignoredGhas,
     checkedAt,
     advisoryDatabaseTimestamp:
       options.advisoryDatabaseTimestamp ||
@@ -649,6 +789,7 @@ function runPnpmAudit(options = {}) {
       }),
     counts: parsed.counts,
     findings: parsed.findings,
+    ignoredFindings: parsed.ignoredFindings || [],
     errors,
   };
 }
@@ -774,6 +915,7 @@ export function runSupplyChainScan(options = {}) {
   const timestamp = safeNow(nowFn);
   const outputPath = resolve(rootDir, options.output || DEFAULT_OUTPUT);
   const temp = prepareRawReportDir(rootDir, options.rawReportDir);
+  const ignoredGhas = options.ignoredGhas || loadIgnoredGhas(rootDir, options);
 
   let pipAudit;
   let pnpmAudit;
@@ -785,7 +927,7 @@ export function runSupplyChainScan(options = {}) {
       checkedAt: timestamp,
       rawReportDir: temp.dir,
     });
-    pnpmAudit = runPnpmAudit({ ...options, rootDir, checkedAt: timestamp });
+    pnpmAudit = runPnpmAudit({ ...options, rootDir, checkedAt: timestamp, ignoredGhas });
     gitleaks = runSecretScan({
       ...options,
       rootDir,
@@ -838,6 +980,7 @@ export function runSupplyChainScan(options = {}) {
     pipAudit,
     pnpmAudit,
     gitleaks,
+    ignoredAdvisories: [...loadIgnoredGhas(rootDir, options)],
     exceptions: [],
     errors,
   });

@@ -4,7 +4,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { main, runSupplyChainScan } from '../../scripts/security/run-supply-chain.mjs';
+import {
+  extractAdvisoryIdentifiers,
+  loadIgnoredGhas,
+  main,
+  normalisePnpmAudit,
+  runSupplyChainScan,
+} from '../../scripts/security/run-supply-chain.mjs';
 import { evaluateSupplyChain } from '../../scripts/security/evaluate-results.mjs';
 
 test('writes a versioned clean report through the public scan interface', () => {
@@ -399,4 +405,191 @@ test('supports the strict CLI contract and rejects unknown options', () => {
     1,
   );
   assert.match(errors.join('\n'), /Unknown option/);
+});
+
+test('filters ignored GHSA advisories from package.json and suppresses policy failure', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'supply-chain-ignore-pass-'));
+  try {
+    const result = runSupplyChainScan({
+      rootDir: process.cwd(),
+      output: join(tempDir, 'supply-chain.json'),
+      strict: false,
+      rawReportDir: join(tempDir, 'raw'),
+      now: () => new Date('2026-09-11T00:00:00.000Z'),
+      execFn: (command, args) => {
+        if (command === 'pnpm') {
+          return {
+            status: 1,
+            stdout: JSON.stringify({
+              advisories: {
+                1105461: {
+                  id: 1105461,
+                  module_name: 'next',
+                  severity: 'critical',
+                  title: 'Next.js Image Optimization RCE',
+                  url: 'https://github.com/advisories/GHSA-2xp9-vwfh-vxw4',
+                  via: [
+                    {
+                      source: 1105461,
+                      name: 'next',
+                      url: 'https://github.com/advisories/GHSA-2xp9-vwfh-vxw4',
+                      severity: 'critical',
+                    },
+                  ],
+                },
+                1105462: {
+                  id: 'GHSA-36xv-jgw5-4q75',
+                  module_name: '@nestjs/core',
+                  severity: 'high',
+                  title: '@nestjs/core injection vulnerability',
+                },
+              },
+              metadata: {
+                vulnerabilities: {
+                  critical: 1,
+                  high: 1,
+                },
+              },
+            }),
+            stderr: '',
+          };
+        }
+        if (command === 'gitleaks') return { status: 0, stdout: '[]', stderr: '' };
+        if (args[0] === 'export')
+          return { status: 0, stdout: '# frozen requirements\n', stderr: '' };
+        return { status: 0, stdout: JSON.stringify({ dependencies: [] }), stderr: '' };
+      },
+    });
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.passed, true);
+    assert.equal(result.counts.Critical, 0);
+    assert.equal(result.counts.High, 0);
+    assert.equal(result.findings.length, 0);
+    assert.ok(result.report.ignoredAdvisories.includes('GHSA-2XP9-VWFH-VXW4'));
+    assert.ok(result.report.ignoredAdvisories.includes('GHSA-36XV-JGW5-4Q75'));
+    assert.equal(result.report.pnpmAudit.ignoredFindings.length, 2);
+    assert.ok(
+      result.report.pnpmAudit.ignoredFindings.some(
+        (finding) =>
+          finding.ignoredReason.includes('GHSA-2xp9-vwfh-vxw4') ||
+          finding.ignoredReason.includes('GHSA-2XP9-VWFH-VXW4'),
+      ),
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('includes unignored GHSA advisories in findings and causes policy failure', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'supply-chain-ignore-fail-'));
+  try {
+    const result = runSupplyChainScan({
+      rootDir: process.cwd(),
+      output: join(tempDir, 'supply-chain.json'),
+      strict: false,
+      rawReportDir: join(tempDir, 'raw'),
+      now: () => new Date('2026-09-11T00:00:00.000Z'),
+      execFn: (command, args) => {
+        if (command === 'pnpm') {
+          return {
+            status: 1,
+            stdout: JSON.stringify({
+              advisories: {
+                9999: {
+                  id: 'GHSA-9999-9999-9999',
+                  module_name: 'untrusted-package',
+                  severity: 'high',
+                  title: 'Unregistered high vulnerability',
+                },
+              },
+              metadata: {
+                vulnerabilities: {
+                  high: 1,
+                },
+              },
+            }),
+            stderr: '',
+          };
+        }
+        if (command === 'gitleaks') return { status: 0, stdout: '[]', stderr: '' };
+        if (args[0] === 'export')
+          return { status: 0, stdout: '# frozen requirements\n', stderr: '' };
+        return { status: 0, stdout: JSON.stringify({ dependencies: [] }), stderr: '' };
+      },
+    });
+
+    assert.equal(result.exitCode, 1);
+    assert.equal(result.passed, false);
+    assert.equal(result.counts.High, 1);
+    assert.equal(result.counts.Critical, 0);
+    assert.equal(result.findings.length, 1);
+    assert.equal(result.findings[0].id, 'GHSA-9999-9999-9999');
+    assert.ok(result.errors.some((err) => err.includes('High finding(s)')));
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('loadIgnoredGhas reads from package.json, pnpm-workspace.yaml, and options', () => {
+  const ignored = loadIgnoredGhas(process.cwd(), {
+    ignoreGhas: ['GHSA-custom-1111-2222'],
+  });
+  assert.ok(ignored instanceof Set);
+  assert.ok(ignored.has('GHSA-2XP9-VWFH-VXW4'));
+  assert.ok(ignored.has('GHSA-CUSTOM-1111-2222'));
+  assert.ok(ignored.size >= 98);
+});
+
+test('extractAdvisoryIdentifiers extracts all candidate IDs from advisory metadata', () => {
+  const ids = extractAdvisoryIdentifiers('pkg-key', {
+    id: 1105461,
+    github_advisory_id: 'GHSA-aaaa-bbbb-cccc',
+    cve: 'CVE-2026-0001',
+    url: 'https://github.com/advisories/GHSA-dddd-eeee-ffff',
+    via: [
+      'GHSA-gggg-hhhh-iiii',
+      {
+        source: 'GHSA-jjjj-kkkk-llll',
+        url: 'https://github.com/advisories/GHSA-mmmm-nnnn-oooo',
+      },
+    ],
+  });
+  assert.ok(ids.includes('pkg-key'));
+  assert.ok(ids.includes('1105461'));
+  assert.ok(ids.includes('GHSA-aaaa-bbbb-cccc'));
+  assert.ok(ids.includes('CVE-2026-0001'));
+  assert.ok(ids.includes('GHSA-dddd-eeee-ffff'));
+  assert.ok(ids.includes('GHSA-gggg-hhhh-iiii'));
+  assert.ok(ids.includes('GHSA-jjjj-kkkk-llll'));
+  assert.ok(ids.includes('GHSA-mmmm-nnnn-oooo'));
+});
+
+test('normalisePnpmAudit does not synthesize placeholders when explicit advisories are present', () => {
+  const raw = JSON.stringify({
+    advisories: {
+      1001: {
+        id: 'GHSA-2XP9-VWFH-VXW4',
+        module_name: 'next',
+        severity: 'critical',
+      },
+    },
+    metadata: {
+      vulnerabilities: {
+        critical: 5,
+        high: 10,
+      },
+    },
+  });
+
+  const parsed = normalisePnpmAudit(raw, {
+    rootDir: process.cwd(),
+    ignoredGhas: ['GHSA-2XP9-VWFH-VXW4'],
+  });
+
+  assert.equal(parsed.valid, true);
+  assert.equal(parsed.findings.length, 0);
+  assert.equal(parsed.ignoredFindings.length, 1);
+  assert.equal(parsed.counts.Critical, 0);
+  assert.equal(parsed.counts.High, 0);
 });

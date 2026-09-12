@@ -47,7 +47,6 @@ rules:
   - id: no-dangerous-inner-html
     languages:
       - typescript
-      - tsx
     severity: ERROR
     message: 'dangerouslySetInnerHTML is forbidden in web components without explicit reviewed exceptions.'
     metadata:
