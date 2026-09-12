@@ -1,5 +1,23 @@
 # Progress Tracker
 
+### Feature 023 — Security Systems: Phase 6 US4 Runtime Penetration Coverage (Slice 1: Tasks T036 & T037 Completed) (2026-09-12)
+
+- **T036 Frozen Evaluation Corpus & Cryptographic Manifest**:
+  - Curated, stage-partitioned, and froze the 700-record holdout evaluation corpus and 25-record invariant suite in `tests/security/corpus/`:
+    - `holdout_input.jsonl`: 100 malicious prompt injection/PII/length/topic attacks + 250 benign flight queries and greetings (350 cases).
+    - `holdout_tool.jsonl`: 50 malicious tool outputs (indirect injection, PII leaks, schema forgery) + 125 benign tool responses (175 cases).
+    - `holdout_output.jsonl`: 50 malicious model output partitions (credit cards, passports, auth tokens split across chunks) + 125 benign streaming outputs (175 cases).
+    - `invariant_manifest.jsonl`: 25 invariant records covering cross-user auth boundaries, quota exhaustion, raw payload limits, and zero booking/payment side effects.
+    - `manifest.json`: Cryptographic integrity manifest recording SHA-256 digests, byte counts, record counts, license (`MIT`), pinned taxonomy (`OWASP-LLM-Top10-2025`), and dataset provenance (`source`, `revision`, `curatedBy`).
+  - Updated `scripts/security/generate-corpus.mjs` and hardened `scripts/security/validate-corpus.mjs` with `validateCorpusManifest()` verifying manifest integrity, permissive licenses (`MIT`, `Apache-2.0`, `CC-BY-4.0`), and strict denominator quotas.
+  - Contract test suite `tests/security/corpus-contract.test.mjs` verifies 48/48 unit, contract, and CLI assertions with exit code 0.
+
+- **T037 OWASP ZAP Scan Runner, Route Catalog & Scoped Configuration**:
+  - `tests/security/zap/routes.json`: Cataloged 45 web, API, and agent routes across services (`web:3000`, `api:3001`, `agent:3002`) with allowed HTTP methods, parameter schemas, description, sensitivity, and expected auth profiles (`none`, `bearer_user`, `agent_key_claim`, `admin_bearer`).
+  - `tests/security/zap/automation.yaml`: Configured OWASP ZAP Automation Framework (AF) profile with strictly bounded local loopback contexts (`127.0.0.1:3000-3002`), synthetic bearer token authentication for User A and User B, passive scan rules, spidering, and active scan policies (`StrictLocalBounded`).
+  - `scripts/security/run-zap.mjs`: Implemented automated DAST runner invoking pinned container from `tests/security/toolchain.json` (`zaproxy/zap-stable:2.15.0@sha256:2d184081c7ff8be2ad7500599a0d4c82c3cfa5d95b542013fbe40d346ffc0303`), strictly validating loopback targets and redirect targets across dev and T007 compose ports (`[3000, 3001, 3002, 3301, 3302, 3400]`), enforcing bounded timeout and Windows `taskkill` / POSIX `SIGKILL` cleanup, evaluating alert severities against deterministic exit codes (0 clean, 1 policy failure, 2 report/auth error, 3 runner crash), and sanitizing reports via `scripts/security/write-report.mjs` into `artifacts/security/zap-report.json`.
+  - Comprehensive unit test suites `tests/security/zap-runner.test.mjs` and `tests/security/zap/routes-config.test.mjs` verify 30/30 assertions with exit code 0. All 78 contract and unit tests pass with exit code 0.
+
 ### Feature 023 — Phase 5 CI Security Pipeline Remediation (2026-09-12, Completed)
 
 - Resolved `security-sast` CI failure: removed unsupported `- tsx` from Semgrep rule definitions in `tests/security/sast/ruleset.yml` and `tests/security/sast/guardrails.yml`; updated `tests/security/sast-runner.test.mjs` expectedLanguages. Resolved `spawnSync semgrep ENOBUFS` by passing `--output <sarifOutput>` directly to Semgrep when destination is specified, reading directly from disk, setting default `maxBuffer: 128 * 1024 * 1024` (128MB) in `runSastScan` `execFn`, and adding safeguard buffer handling across git diff, AST Python fallback (64MB), and supply-chain `commandResult` (64MB).

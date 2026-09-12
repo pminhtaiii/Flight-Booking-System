@@ -80,15 +80,15 @@
 │
 ├── tests/
 │   ├── ci/                            → CI workflow contract & network guard tests
-│   ├── security/                      → Security test harnesses, toolchain pins, sast runner, and corpus manifests
-│   │   ├── corpus/                    → schema.json, holdout.jsonl, invariants.jsonl
-│   │   └── sast/                      → guardrails.yml, ruleset.yml, and fixtures/ safe/unsafe control matrix
-
+│   ├── security/                      → Security test harnesses, toolchain pins, sast runner, zap runner, and corpus manifests
+│   │   ├── corpus/                    → schema.json, holdout_input.jsonl, holdout_tool.jsonl, holdout_output.jsonl, invariant_manifest.jsonl, manifest.json
+│   │   ├── sast/                      → guardrails.yml, ruleset.yml, snapshots/, and fixtures/ safe/unsafe control matrix
+│   │   └── zap/                       → routes.json (45 route catalog), automation.yaml (AF config), routes-config.test.mjs
 │   └── smoke/                         → Authoritative whole-stack smoke & sanity test harness
 │
 ├── scripts/
 │   ├── ci/                            → CI status and gate evaluation scripts
-│   └── security/                      → run-supply-chain.mjs, run-sast.mjs, evaluate-results.mjs, validate-corpus.mjs, write-report.mjs
+│   └── security/                      → run-zap.mjs, run-supply-chain.mjs, run-sast.mjs, evaluate-results.mjs, validate-corpus.mjs, write-report.mjs, generate-corpus.mjs
 │
 ├── docs/
 │   ├── adr/                           → Architectural Decision Records
