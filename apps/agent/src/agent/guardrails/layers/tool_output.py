@@ -159,7 +159,35 @@ def _contains_untrusted_directive(value: Any) -> bool:
 
 
 def _project_search_result(raw_value: Any) -> Any:
-    if not isinstance(raw_value, dict) or "flights" not in raw_value:
+    if not isinstance(raw_value, dict):
+        return raw_value
+    if "offers" in raw_value and isinstance(raw_value["offers"], list):
+        projected_flights = []
+        for offer in raw_value["offers"]:
+            if not isinstance(offer, dict):
+                return raw_value
+            price_val = offer.get("price", 0.0)
+            try:
+                price_num = float(price_val)
+            except (ValueError, TypeError):
+                price_num = 0.0
+            projected_flights.append(
+                {
+                    "flight_id": str(
+                        offer.get("offerId") or offer.get("flightNumber") or "FL-UNKNOWN"
+                    ),
+                    "airline": str(offer.get("airline") or "Unknown Airline"),
+                    "price": price_num,
+                    "origin": str(offer.get("origin") or "UNK"),
+                    "destination": str(offer.get("destination") or "UNK"),
+                    "date": str(offer.get("departureTime") or offer.get("date") or ""),
+                    "currency": str(offer.get("currency") or "USD"),
+                    "policy": offer.get("policy"),
+                    "seat_available": offer.get("seat_available"),
+                }
+            )
+        return {"flights": projected_flights}
+    if "flights" not in raw_value:
         return raw_value
     flights = raw_value["flights"]
     if not isinstance(flights, list):

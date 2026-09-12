@@ -12,3 +12,10 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = [
+    "redis_integration: requires a reachable Redis server",
+    "security: security regression and guardrail verification tests",
+]
