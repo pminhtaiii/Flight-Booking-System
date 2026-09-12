@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
@@ -10,6 +18,7 @@ import {
   buildZapDockerArgs,
   evaluateZapReport,
   runZap,
+  validateConfigFileScope,
   validateRedirectScope,
   validateScope,
 } from '../../scripts/security/run-zap.mjs';
@@ -39,6 +48,11 @@ test('validateScope: accepts valid loopback addresses on allowed ports (3000, 30
   assert.equal(validateScope('http://localhost:3301'), true);
   assert.equal(validateScope('http://localhost:3302'), true);
   assert.equal(validateScope('http://localhost:3400'), true);
+
+  // Container loopback resolution host alias
+  assert.equal(validateScope('http://host.docker.internal:3000'), true);
+  assert.equal(validateScope('http://host.docker.internal:3301'), true);
+  assert.equal(validateScope('http://host.docker.internal:3400'), true);
 
   // Array of valid targets
   assert.equal(
@@ -187,6 +201,36 @@ test('buildZapDockerArgs: supports custom zapDir and user options', () => {
   const userIdx = args.indexOf('--user');
   assert.ok(userIdx !== -1, 'args must include --user when specified');
   assert.equal(args[userIdx + 1], '1000:1000');
+});
+
+test('buildZapDockerArgs: defaults network to host and includes add-host for host.docker.internal', () => {
+  const args = buildZapDockerArgs({ toolchainPath });
+  const netIdx = args.indexOf('--network');
+  assert.ok(netIdx !== -1, 'args must include --network');
+  assert.equal(args[netIdx + 1], 'host', '--network must default to host');
+
+  const hostIdx = args.indexOf('--add-host');
+  assert.ok(hostIdx !== -1, 'args must include --add-host');
+  assert.equal(args[hostIdx + 1], 'host.docker.internal:host-gateway');
+});
+
+test('buildZapDockerArgs: allows network override and validates target ports', () => {
+  const customNetArgs = buildZapDockerArgs({ network: 'bridge', toolchainPath });
+  const netIdx = customNetArgs.indexOf('--network');
+  assert.ok(netIdx !== -1);
+  assert.equal(customNetArgs[netIdx + 1], 'bridge');
+
+  // Valid target ports across dev (3000-3002) and compose (3301, 3302, 3400)
+  const validPortsArgs = buildZapDockerArgs({
+    targetPorts: [3000, 3001, 3002, 3301, 3302, 3400],
+    toolchainPath,
+  });
+  assert.ok(Array.isArray(validPortsArgs));
+
+  // Invalid target port throws error
+  assert.throws(() => {
+    buildZapDockerArgs({ targetPorts: [8080], toolchainPath });
+  }, /not an allowed dev or compose port/i);
 });
 
 // -----------------------------------------------------------------------------
@@ -375,6 +419,112 @@ test('evaluateZapReport: returns exitCode 2 when authentication failure occurs d
   assert.match(all401Result.error, /401 or 403/i);
 });
 
+test('evaluateZapReport: returns exitCode 2 when authentication or authorization failure alert is detected', () => {
+  const authAlertReport = {
+    site: [
+      {
+        '@name': 'http://127.0.0.1:3001',
+        alerts: [
+          {
+            pluginid: '99001',
+            alertRef: '99001',
+            alert: '401 Unauthorized - Authentication Failure',
+            riskcode: '2',
+            riskdesc: 'Medium (High)',
+            desc: 'Authentication failure reported across protected routes',
+            uri: 'http://127.0.0.1:3001/api/auth/me',
+          },
+        ],
+      },
+    ],
+  };
+
+  const result = evaluateZapReport(authAlertReport);
+  assert.equal(result.exitCode, 2);
+  assert.match(result.error, /Authentication or authorization failure alert detected/i);
+});
+
+test('evaluateZapReport: returns exitCode 2 when 0 endpoints were scanned', () => {
+  const zeroEndpointsReport = {
+    site: [{ '@name': 'http://127.0.0.1:3000', alerts: [] }],
+    endpoints: [],
+  };
+  const result = evaluateZapReport(zeroEndpointsReport);
+  assert.equal(result.exitCode, 2);
+  assert.match(result.error, /0 scanned endpoints/i);
+});
+
+// -----------------------------------------------------------------------------
+// Suite 3b: validateConfigFileScope(configPath, allowedScope)
+// -----------------------------------------------------------------------------
+test('validateConfigFileScope: accepts automation.yaml within allowed loopback scope', () => {
+  const automationPath = resolve(repoRoot, 'tests/security/zap/automation.yaml');
+  const allowedScope = [
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:3001',
+    'http://127.0.0.1:3002',
+  ];
+
+  const result = validateConfigFileScope(automationPath, allowedScope);
+  assert.equal(result.valid, true, `Scope validation failed: ${result.error}`);
+  assert.ok(Array.isArray(result.urls));
+  assert.ok(result.urls.length >= 3);
+});
+
+test('validateConfigFileScope: rejects configuration declaring external URLs', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'zap-config-evil-'));
+  const evilConfig = join(tempDir, 'evil.yaml');
+  try {
+    writeFileSync(
+      evilConfig,
+      `
+env:
+  contexts:
+    - name: "Evil"
+      urls:
+        - "http://evil.com"
+jobs:
+  - type: "spider"
+    parameters:
+      url: "http://evil.com"
+`,
+      'utf8',
+    );
+    const result = validateConfigFileScope(evilConfig);
+    assert.equal(result.valid, false);
+    assert.match(result.error, /outside allowed loopback scope/i);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('validateConfigFileScope: rejects configuration when declared target is outside allowedScope', () => {
+  const automationPath = resolve(repoRoot, 'tests/security/zap/automation.yaml');
+  // allowedScope only permits port 3000, but automation.yaml targets 3001 as well
+  const narrowScope = ['http://127.0.0.1:3000'];
+
+  const result = validateConfigFileScope(automationPath, narrowScope);
+  assert.equal(result.valid, false);
+  assert.match(result.error, /outside allowed scope/i);
+});
+
+test('validateConfigFileScope: rejects missing or empty configuration file', () => {
+  const missing = validateConfigFileScope(join(tmpdir(), 'missing-config.yaml'));
+  assert.equal(missing.valid, false);
+  assert.match(missing.error, /not found/i);
+
+  const emptyDir = mkdtempSync(join(tmpdir(), 'zap-config-empty-'));
+  const emptyFile = join(emptyDir, 'empty.yaml');
+  try {
+    writeFileSync(emptyFile, '  \n  ', 'utf8');
+    const emptyResult = validateConfigFileScope(emptyFile);
+    assert.equal(emptyResult.valid, false);
+    assert.match(emptyResult.error, /empty/i);
+  } finally {
+    rmSync(emptyDir, { recursive: true, force: true });
+  }
+});
+
 // -----------------------------------------------------------------------------
 // Suite 4: runZap(options, dependencies)
 // -----------------------------------------------------------------------------
@@ -384,6 +534,23 @@ test('runZap: executes injected docker runner, evaluates clean report, and sanit
 
   const rawReportFile = join(testDir, 'zap-raw-report.json');
   const outputReportFile = join(testDir, 'artifacts/security/zap-report.json');
+  const mockConfig = join(testDir, 'automation.yaml');
+  writeFileSync(
+    mockConfig,
+    `
+env:
+  contexts:
+    - name: "BookingSystems-Local"
+      urls:
+        - "http://127.0.0.1:3000"
+        - "http://127.0.0.1:3001"
+jobs:
+  - type: "spider"
+    parameters:
+      url: "http://127.0.0.1:3000"
+`,
+    'utf8',
+  );
 
   const cleanReport = {
     site: [
@@ -403,11 +570,11 @@ test('runZap: executes injected docker runner, evaluates clean report, and sanit
       },
     ],
   };
-  writeFileSync(rawReportFile, JSON.stringify(cleanReport, null, 2), 'utf8');
 
   let runnerCalledWith = null;
   const mockRunner = async (args) => {
     runnerCalledWith = args;
+    writeFileSync(rawReportFile, JSON.stringify(cleanReport, null, 2), 'utf8');
     return { exitCode: 0 };
   };
 
@@ -418,6 +585,7 @@ test('runZap: executes injected docker runner, evaluates clean report, and sanit
         rawReportPath: rawReportFile,
         output: outputReportFile,
         zapDir: testDir,
+        configFile: 'automation.yaml',
         toolchainPath,
       },
       {
@@ -457,6 +625,22 @@ test('runZap: returns exitCode 1 when high/critical findings exist', async () =>
 
   const rawReportFile = join(testDir, 'zap-raw-report.json');
   const outputReportFile = join(testDir, 'artifacts/security/zap-report.json');
+  const mockConfig = join(testDir, 'automation.yaml');
+  writeFileSync(
+    mockConfig,
+    `
+env:
+  contexts:
+    - name: "BookingSystems-Local"
+      urls:
+        - "http://127.0.0.1:3000"
+jobs:
+  - type: "spider"
+    parameters:
+      url: "http://127.0.0.1:3000"
+`,
+    'utf8',
+  );
 
   const highReport = {
     site: [
@@ -476,9 +660,11 @@ test('runZap: returns exitCode 1 when high/critical findings exist', async () =>
       },
     ],
   };
-  writeFileSync(rawReportFile, JSON.stringify(highReport, null, 2), 'utf8');
 
-  const mockRunner = async () => ({ exitCode: 0 });
+  const mockRunner = async () => {
+    writeFileSync(rawReportFile, JSON.stringify(highReport, null, 2), 'utf8');
+    return { exitCode: 0 };
+  };
 
   try {
     const result = await runZap(
@@ -487,6 +673,7 @@ test('runZap: returns exitCode 1 when high/critical findings exist', async () =>
         rawReportPath: rawReportFile,
         output: outputReportFile,
         zapDir: testDir,
+        configFile: 'automation.yaml',
         toolchainPath,
       },
       {
@@ -508,7 +695,7 @@ test('runZap: returns exitCode 3 when runner fails or times out', async () => {
 
   const result = await runZap(
     {
-      scope: ['http://127.0.0.1:3000'],
+      scope: ['http://127.0.0.1:3000', 'http://127.0.0.1:3001', 'http://127.0.0.1:3002'],
       toolchainPath,
     },
     {
@@ -539,7 +726,7 @@ test('runZap: dry-run validates scope and returns dockerArgs without executing c
 
   const result = await runZap(
     {
-      scope: ['http://127.0.0.1:3000'],
+      scope: ['http://127.0.0.1:3000', 'http://127.0.0.1:3001', 'http://127.0.0.1:3002'],
       dryRun: true,
       toolchainPath,
     },
@@ -556,15 +743,35 @@ test('runZap: dry-run validates scope and returns dockerArgs without executing c
 
 test('runZap: passes explicit timeout options cleanly to docker runner', async () => {
   let capturedTimeoutMs = null;
-  const mockRunner = async (_args, opts) => {
-    capturedTimeoutMs = opts.timeoutMs;
-    return { exitCode: 0 };
-  };
-
   const testDir = join(tmpdir(), `run-zap-timeout-${Date.now()}`);
   mkdirSync(testDir, { recursive: true });
   const rawReportFile = join(testDir, 'zap-raw-report.json');
-  writeFileSync(rawReportFile, JSON.stringify({ site: [{ '@name': 'http://127.0.0.1:3000', alerts: [] }] }), 'utf8');
+  const mockConfig = join(testDir, 'automation.yaml');
+  writeFileSync(
+    mockConfig,
+    `
+env:
+  contexts:
+    - name: "BookingSystems-Local"
+      urls:
+        - "http://127.0.0.1:3000"
+jobs:
+  - type: "spider"
+    parameters:
+      url: "http://127.0.0.1:3000"
+`,
+    'utf8',
+  );
+
+  const mockRunner = async (_args, opts) => {
+    capturedTimeoutMs = opts.timeoutMs;
+    writeFileSync(
+      rawReportFile,
+      JSON.stringify({ site: [{ '@name': 'http://127.0.0.1:3000', alerts: [] }] }),
+      'utf8',
+    );
+    return { exitCode: 0 };
+  };
 
   try {
     // 1. Explicit timeout in seconds (--timeout 45 -> 45000ms)
@@ -574,6 +781,8 @@ test('runZap: passes explicit timeout options cleanly to docker runner', async (
         timeout: 45,
         rawReportPath: rawReportFile,
         output: join(testDir, 'report.json'),
+        zapDir: testDir,
+        configFile: 'automation.yaml',
         toolchainPath,
       },
       { dockerRunner: mockRunner },
@@ -587,11 +796,125 @@ test('runZap: passes explicit timeout options cleanly to docker runner', async (
         timeoutMs: 120000,
         rawReportPath: rawReportFile,
         output: join(testDir, 'report.json'),
+        zapDir: testDir,
+        configFile: 'automation.yaml',
         toolchainPath,
       },
       { dockerRunner: mockRunner },
     );
     assert.equal(capturedTimeoutMs, 120000, 'timeoutMs must be passed directly');
+  } finally {
+    rmSync(testDir, { recursive: true, force: true });
+  }
+});
+
+test('runZap: Issue 4: returns exitCode 2 when config targets exceed scope', async () => {
+  // automation.yaml declares 3000, 3001, 3002. Passing scope restricted to only 3000 must fail.
+  const result = await runZap({
+    scope: ['http://127.0.0.1:3000'],
+    toolchainPath,
+  });
+
+  assert.equal(result.exitCode, 2);
+  assert.match(result.error, /outside allowed scope/i);
+});
+
+test('runZap: Issue 5: cleans existing raw reports and rejects missing or stale report files', async () => {
+  const testDir = join(tmpdir(), `run-zap-stale-${Date.now()}`);
+  mkdirSync(testDir, { recursive: true });
+
+  const rawReportFile = join(testDir, 'zap-raw-report.json');
+  const rawSarifFile = join(testDir, 'zap-raw-report.sarif');
+  const mockConfig = join(testDir, 'automation.yaml');
+  writeFileSync(
+    mockConfig,
+    `
+env:
+  contexts:
+    - name: "BookingSystems-Local"
+      urls:
+        - "http://127.0.0.1:3000"
+jobs:
+  - type: "spider"
+    parameters:
+      url: "http://127.0.0.1:3000"
+`,
+    'utf8',
+  );
+
+  // 1. Verify pre-existing raw files are cleaned before runner runs
+  writeFileSync(rawReportFile, '{"site":[]}', 'utf8');
+  writeFileSync(rawSarifFile, '{}', 'utf8');
+
+  let runnerRan = false;
+  const mockRunnerMissing = async () => {
+    runnerRan = true;
+    // Intentionally DO NOT create rawReportFile
+    return { exitCode: 0 };
+  };
+
+  try {
+    const missingResult = await runZap(
+      {
+        scope: ['http://127.0.0.1:3000'],
+        rawReportPath: rawReportFile,
+        output: join(testDir, 'report.json'),
+        zapDir: testDir,
+        configFile: 'automation.yaml',
+        toolchainPath,
+      },
+      { dockerRunner: mockRunnerMissing },
+    );
+
+    assert.equal(runnerRan, true);
+    assert.equal(missingResult.exitCode, 2);
+    assert.match(missingResult.error, /was not generated by ZAP run or is stale/i);
+    assert.equal(existsSync(rawSarifFile), false, 'Pre-existing sarif file must be removed');
+
+    // 2. Verify stale report file (mtime older than run start) fails with exitCode 2
+    const mockRunnerStale = async () => {
+      writeFileSync(
+        rawReportFile,
+        JSON.stringify({ site: [{ '@name': 'http://127.0.0.1:3000', alerts: [] }] }),
+        'utf8',
+      );
+      // Backdate mtime to 10 seconds in the past
+      const past = (Date.now() - 10000) / 1000;
+      utimesSync(rawReportFile, past, past);
+      return { exitCode: 0 };
+    };
+
+    const staleResult = await runZap(
+      {
+        scope: ['http://127.0.0.1:3000'],
+        rawReportPath: rawReportFile,
+        output: join(testDir, 'report.json'),
+        zapDir: testDir,
+        configFile: 'automation.yaml',
+        toolchainPath,
+      },
+      { dockerRunner: mockRunnerStale },
+    );
+
+    assert.equal(staleResult.exitCode, 2);
+    assert.match(staleResult.error, /was not generated by ZAP run or is stale/i);
+
+    // 3. Verify that passing in-memory rawReport bypasses disk existence check
+    const inMemoryResult = await runZap(
+      {
+        scope: ['http://127.0.0.1:3000'],
+        rawReport: {
+          site: [{ '@name': 'http://127.0.0.1:3000', alerts: [] }],
+        },
+        output: join(testDir, 'report.json'),
+        zapDir: testDir,
+        configFile: 'automation.yaml',
+        toolchainPath,
+      },
+      { dockerRunner: async () => ({ exitCode: 0 }) },
+    );
+
+    assert.equal(inMemoryResult.exitCode, 0);
   } finally {
     rmSync(testDir, { recursive: true, force: true });
   }

@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -15,8 +15,16 @@ const defaultConfigFile = 'automation.yaml';
 const defaultOutputPath = resolve(repoRoot, 'artifacts/security/zap-report.json');
 const defaultRawReportPath = resolve(defaultZapDir, 'zap-raw-report.json');
 
-export const ALLOWED_LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
-export const ALLOWED_PORTS = new Set([3000, 3001, 3002, 3301, 3302, 3400]);
+export const ALLOWED_LOOPBACK_HOSTS = new Set([
+  '127.0.0.1',
+  'localhost',
+  '::1',
+  '[::1]',
+  'host.docker.internal',
+]);
+export const DEV_PORTS = Object.freeze([3000, 3001, 3002]);
+export const COMPOSE_PORTS = Object.freeze([3301, 3302, 3400]);
+export const ALLOWED_PORTS = new Set([...DEV_PORTS, ...COMPOSE_PORTS]);
 
 /**
  * Validates target URLs to enforce strict loopback scope boundaries.
@@ -132,8 +140,26 @@ export function buildZapDockerArgs(options = {}) {
     args.push('--user', options.user);
   }
 
-  if (options.network) {
-    args.push('--network', options.network);
+  // Network defaults to 'host' on Linux or if not specified
+  const network = options.network || 'host';
+  if (network) {
+    args.push('--network', network);
+  }
+
+  // Include host.docker.internal mapping so container can resolve host loopback
+  args.push('--add-host', 'host.docker.internal:host-gateway');
+
+  // Validate any explicitly provided target ports against allowed dev & compose ports
+  const targetPorts = options.targetPorts || options.ports;
+  if (Array.isArray(targetPorts)) {
+    for (const port of targetPorts) {
+      const p = Number(port);
+      if (!ALLOWED_PORTS.has(p)) {
+        throw new Error(
+          `Target port ${port} is not an allowed dev or compose port (${Array.from(ALLOWED_PORTS).join(', ')})`,
+        );
+      }
+    }
   }
 
   if (Array.isArray(options.extraDockerArgs)) {
@@ -151,6 +177,164 @@ export function buildZapDockerArgs(options = {}) {
   );
 
   return args;
+}
+
+/**
+ * Extracts declared target URLs from a ZAP automation YAML file.
+ *
+ * @param {string} yamlText
+ * @returns {string[]}
+ */
+export function extractDeclaredUrlsFromYaml(yamlText) {
+  const urls = [];
+  const lines = yamlText.split(/\r?\n/);
+  let inContext = false;
+  let inJob = null;
+  let currentList = null;
+
+  for (let i = 0; i < lines.length; i++) {
+    const rawLine = lines[i];
+    const trimmed = rawLine.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+
+    if (trimmed.startsWith('contexts:')) {
+      inContext = true;
+      inJob = null;
+      currentList = null;
+      continue;
+    }
+    if (trimmed.startsWith('jobs:')) {
+      inContext = false;
+      inJob = null;
+      currentList = null;
+      continue;
+    }
+
+    if (inContext) {
+      if (/^urls\s*:/.test(trimmed)) {
+        currentList = 'urls';
+        continue;
+      }
+      if (/^includePaths\s*:/.test(trimmed)) {
+        currentList = 'includePaths';
+        continue;
+      }
+      if (/^(excludePaths|authentication|sessionManagement|users)\s*:/.test(trimmed)) {
+        currentList = null;
+        continue;
+      }
+      if (currentList === 'urls' || currentList === 'includePaths') {
+        const itemMatch = trimmed.match(/^-\s*["']?([^"'\s]+)["']?/);
+        if (itemMatch) {
+          urls.push(itemMatch[1]);
+          continue;
+        } else if (!trimmed.startsWith('-')) {
+          currentList = null;
+        }
+      }
+    }
+
+    const jobTypeMatch = trimmed.match(/^-\s*type\s*:\s*["']?([^"'\s]+)["']?/);
+    if (jobTypeMatch) {
+      inJob = jobTypeMatch[1];
+      currentList = null;
+      continue;
+    }
+
+    if (inJob === 'spider') {
+      const urlMatch = trimmed.match(/^url\s*:\s*["']?([^"'\s]+)["']?/);
+      if (urlMatch) urls.push(urlMatch[1]);
+    } else if (inJob === 'openapi') {
+      const targetUrlMatch = trimmed.match(/^targetUrl\s*:\s*["']?([^"'\s]+)["']?/);
+      if (targetUrlMatch) urls.push(targetUrlMatch[1]);
+    } else if (inJob === 'requestor') {
+      const urlMatch = trimmed.match(/^(?:-\s*)?url\s*:\s*["']?([^"'\s]+)["']?/);
+      if (urlMatch) urls.push(urlMatch[1]);
+    }
+  }
+
+  return urls;
+}
+
+/**
+ * Validates that all URLs declared in a ZAP automation YAML file are within loopback scope
+ * and, if allowedScope is provided, within that allowed scope.
+ *
+ * @param {string} configPath Path to the YAML configuration file
+ * @param {string|string[]|object} [allowedScope] Optional scope boundary
+ * @returns {{ valid: boolean, error?: string, urls?: string[] }}
+ */
+export function validateConfigFileScope(configPath, allowedScope) {
+  if (!configPath || !existsSync(configPath)) {
+    return { valid: false, error: `Config file not found: ${configPath}` };
+  }
+
+  let raw;
+  try {
+    raw = readFileSync(configPath, 'utf8');
+  } catch (err) {
+    return { valid: false, error: `Failed to read config file: ${err.message}` };
+  }
+
+  if (!raw.trim()) {
+    return { valid: false, error: `Config file is empty: ${configPath}` };
+  }
+
+  const declaredUrls = extractDeclaredUrlsFromYaml(raw);
+  if (declaredUrls.length === 0) {
+    return { valid: false, error: `No target URLs declared in config file: ${configPath}` };
+  }
+
+  let allowedOrigins = null;
+  if (allowedScope) {
+    let allowedList = [];
+    if (typeof allowedScope === 'string') {
+      allowedList = [allowedScope.trim()];
+    } else if (Array.isArray(allowedScope)) {
+      allowedList = allowedScope;
+    } else if (typeof allowedScope === 'object' && Array.isArray(allowedScope.targets)) {
+      allowedList = allowedScope.targets;
+    }
+
+    allowedOrigins = new Set();
+    for (const item of allowedList) {
+      try {
+        const parsed = new URL(item);
+        allowedOrigins.add(parsed.origin.toLowerCase());
+      } catch {
+        // Skip malformed allowed items
+      }
+    }
+  }
+
+  for (const urlStr of declaredUrls) {
+    if (!validateScope(urlStr)) {
+      return {
+        valid: false,
+        error: `Declared target URL "${urlStr}" in ${configPath} is outside allowed loopback scope`,
+      };
+    }
+
+    if (allowedOrigins && allowedOrigins.size > 0) {
+      try {
+        const parsed = new URL(urlStr);
+        const origin = parsed.origin.toLowerCase();
+        if (!allowedOrigins.has(origin)) {
+          return {
+            valid: false,
+            error: `Declared target URL "${urlStr}" in ${configPath} is outside allowed scope: ${Array.from(allowedOrigins).join(', ')}`,
+          };
+        }
+      } catch {
+        return {
+          valid: false,
+          error: `Malformed target URL "${urlStr}" declared in ${configPath}`,
+        };
+      }
+    }
+  }
+
+  return { valid: true, urls: declaredUrls };
 }
 
 /**
@@ -247,6 +431,18 @@ export function evaluateZapReport(rawReportPathOrObject) {
   if (Array.isArray(data.urls) && data.urls.length === 0) {
     return { exitCode: 2, error: 'Scan completed with 0 scanned URLs' };
   }
+  if (Array.isArray(data.endpoints) && data.endpoints.length === 0) {
+    return { exitCode: 2, error: 'Scan completed with 0 scanned endpoints' };
+  }
+  if (data.scannedEndpoints !== undefined && Number(data.scannedEndpoints) === 0) {
+    return { exitCode: 2, error: 'Scan completed with 0 scanned endpoints' };
+  }
+  if (data.totalEndpoints !== undefined && Number(data.totalEndpoints) === 0) {
+    return { exitCode: 2, error: 'Scan completed with 0 scanned endpoints' };
+  }
+  if (data.endpointCount !== undefined && Number(data.endpointCount) === 0) {
+    return { exitCode: 2, error: 'Scan completed with 0 scanned endpoints' };
+  }
   if (Array.isArray(data.site) && data.site.length === 0) {
     return { exitCode: 2, error: 'Scan report contains empty sites array (0 URLs scanned)' };
   }
@@ -289,6 +485,25 @@ export function evaluateZapReport(rawReportPathOrObject) {
     }));
   } else if (Array.isArray(data)) {
     rawAlerts = data;
+  }
+
+  // Check for alerts indicating authentication / authorization failures
+  for (const alert of rawAlerts) {
+    if (!alert || typeof alert !== 'object') continue;
+    const alertName = String(alert.alert || alert.name || alert.title || '');
+    const alertDesc = String(alert.desc || alert.description || '');
+
+    if (
+      /401\s*unauthorized|authentication failure|authentication failed|authorization failure/i.test(
+        alertName,
+      ) ||
+      /authentication failure reported|authorization failure reported/i.test(alertDesc)
+    ) {
+      return {
+        exitCode: 2,
+        error: `Authentication or authorization failure alert detected during scan: ${alertName || alertDesc}`,
+      };
+    }
   }
 
   let criticalCount = 0;
@@ -473,8 +688,24 @@ export async function runZap(options = {}, dependencies = {}) {
     };
   }
 
+  const zapDir = resolve(options.zapDir || options.workDir || defaultZapDir);
+  const configFile = options.configFile || defaultConfigFile;
+  let configPath = resolve(zapDir, configFile);
+  if (!existsSync(configPath) && existsSync(resolve(defaultZapDir, configFile))) {
+    configPath = resolve(defaultZapDir, configFile);
+  }
+
+  const scopeValidator = dependencies.configScopeValidator || validateConfigFileScope;
+  const configScopeResult = scopeValidator(configPath, scope);
+  if (!configScopeResult.valid) {
+    return {
+      exitCode: 2,
+      error: configScopeResult.error || `Config file scope validation failed for ${configPath}`,
+    };
+  }
+
   const toolchainPath = options.toolchainPath || defaultToolchainPath;
-  const dockerArgs = buildZapDockerArgs({ ...options, toolchainPath });
+  const dockerArgs = buildZapDockerArgs({ ...options, toolchainPath, zapDir, configFile });
 
   if (options.dryRun) {
     return {
@@ -501,6 +732,18 @@ export async function runZap(options = {}, dependencies = {}) {
     options.signal.addEventListener('abort', () => controller.abort(), { once: true });
   }
 
+  const rawReportPath = options.rawReportPath || defaultRawReportPath;
+  const rawSarifPath = resolve(dirname(rawReportPath), 'zap-raw-report.sarif');
+
+  if (options.rawReport === undefined) {
+    if (existsSync(rawReportPath)) {
+      rmSync(rawReportPath, { force: true });
+    }
+    if (existsSync(rawSarifPath)) {
+      rmSync(rawSarifPath, { force: true });
+    }
+  }
+
   const startedAt = Date.now();
 
   try {
@@ -517,7 +760,24 @@ export async function runZap(options = {}, dependencies = {}) {
     };
   }
 
-  const rawReportPath = options.rawReportPath || defaultRawReportPath;
+  if (options.rawReport === undefined) {
+    if (!existsSync(rawReportPath)) {
+      return {
+        exitCode: 2,
+        error: 'Raw report file was not generated by ZAP run or is stale',
+        durationMs: Date.now() - startedAt,
+      };
+    }
+    const reportStat = statSync(rawReportPath);
+    if (reportStat.mtimeMs < startedAt - 1000) {
+      return {
+        exitCode: 2,
+        error: 'Raw report file was not generated by ZAP run or is stale',
+        durationMs: Date.now() - startedAt,
+      };
+    }
+  }
+
   const rawReportInput = options.rawReport !== undefined ? options.rawReport : rawReportPath;
   const evaluation = evaluator(rawReportInput);
 

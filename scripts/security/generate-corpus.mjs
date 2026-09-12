@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -15,6 +16,34 @@ const invariantManifestPath = resolve(corpusDir, 'invariant_manifest.jsonl');
 const manifestPath = resolve(corpusDir, 'manifest.json');
 const deprecatedHoldoutPath = resolve(corpusDir, 'holdout.jsonl');
 const deprecatedInvariantsPath = resolve(corpusDir, 'invariants.jsonl');
+
+/**
+ * Resolves current git commit revision or falls back to the frozen T036 commit.
+ * @param {string} [defaultCommit='97f23a6f']
+ * @returns {string}
+ */
+function resolveGitRevision(defaultCommit = '97f23a6f') {
+  if (process.env.CORPUS_REVISION) {
+    return process.env.CORPUS_REVISION.startsWith('git:')
+      ? process.env.CORPUS_REVISION
+      : `git:${process.env.CORPUS_REVISION}`;
+  }
+  try {
+    const stdout = execSync('git rev-parse --short HEAD', {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'ignore'],
+    }).trim();
+    if (/^[0-9a-f]{7,40}$/i.test(stdout)) {
+      return `git:${stdout}`;
+    }
+  } catch {
+    // Fall back to frozen T036 commit when git is unavailable
+  }
+  return `git:${defaultCommit}`;
+}
+
+const DEFAULT_REVISION = resolveGitRevision();
 
 const seenNormalized = new Set();
 const seenIds = new Set();
@@ -36,7 +65,7 @@ function createRecord({
   expectedErrorCode,
   source = 'synthetic-feature-023',
   license = 'MIT',
-  revision = 'git:a1b2c3d4',
+  revision = DEFAULT_REVISION,
   curatedBy = 'Security Team',
   curatedAt = '2026-09-04T00:00:00Z',
 }) {
@@ -642,12 +671,14 @@ invariantDefs.forEach((inv, idx) => {
 // ---------------------------------------------------------
 /* eslint-disable no-console */
 export {
+  DEFAULT_REVISION,
   createRecord,
-  holdoutRecords,
   holdoutInputRecords,
-  holdoutToolRecords,
   holdoutOutputRecords,
+  holdoutRecords,
+  holdoutToolRecords,
   invariantRecords,
+  resolveGitRevision,
 };
 
 const isMain =
@@ -679,7 +710,7 @@ if (isMain) {
     taxonomy: 'OWASP-LLM-Top10-2025',
     provenance: {
       source: 'synthetic-feature-023',
-      revision: 'git:a1b2c3d4',
+      revision: DEFAULT_REVISION,
       curatedBy: 'Security Team',
       curatedAt: '2026-09-04T00:00:00Z',
     },

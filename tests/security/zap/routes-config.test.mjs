@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import test from 'node:test';
@@ -258,4 +259,180 @@ test('T037.1: automation.yaml defines required job pipeline: passiveScan, spider
   assert.match(raw, /zap-raw-report\.json/);
   assert.match(raw, /zap-raw-report\.sarif/);
   assert.match(raw, /\/zap\/wrk/);
+});
+
+test('Issue 2: automation.yaml synthetic tokens are valid HMAC-SHA256 signed JWTs', () => {
+  const raw = readFileSync(automationPath, 'utf8');
+
+  // Extract tokens from automation.yaml
+  const userATokenMatch = raw.match(/name:\s*["']?UserA["']?[\s\S]*?token:\s*["']?([^"'\s]+)["']?/);
+  const userBTokenMatch = raw.match(/name:\s*["']?UserB["']?[\s\S]*?token:\s*["']?([^"'\s]+)["']?/);
+
+  assert.ok(userATokenMatch && userATokenMatch[1], 'Must extract UserA token');
+  assert.ok(userBTokenMatch && userBTokenMatch[1], 'Must extract UserB token');
+
+  const tokenA = userATokenMatch[1];
+  const tokenB = userBTokenMatch[1];
+  const secret = 'security-synthetic-jwt-secret-only';
+
+  function verifyHmacJwt(token) {
+    const parts = token.split('.');
+    assert.equal(parts.length, 3, 'JWT must have 3 parts: header.payload.signature');
+    const [headerB64, payloadB64, signature] = parts;
+
+    const expectedSig = crypto
+      .createHmac('sha256', secret)
+      .update(`${headerB64}.${payloadB64}`)
+      .digest('base64url');
+    assert.equal(signature, expectedSig, 'HMAC-SHA256 signature must be valid');
+
+    const header = JSON.parse(Buffer.from(headerB64, 'base64url').toString('utf8'));
+    assert.equal(header.alg, 'HS256');
+    assert.equal(header.typ, 'JWT');
+
+    const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf8'));
+    return payload;
+  }
+
+  const payloadA = verifyHmacJwt(tokenA);
+  assert.equal(payloadA.id, 'usr_security_a');
+  assert.equal(payloadA.email, 'security-a@example.invalid');
+  assert.equal(payloadA.role, 'USER');
+  assert.equal(payloadA.iss, 'booking-systems-api');
+  assert.equal(payloadA.aud, 'booking-systems-clients');
+  assert.equal(payloadA.jti, 'jti-security-a');
+
+  const payloadB = verifyHmacJwt(tokenB);
+  assert.equal(payloadB.id, 'usr_security_b');
+  assert.equal(payloadB.email, 'security-b@example.invalid');
+  assert.equal(payloadB.role, 'USER');
+  assert.equal(payloadB.iss, 'booking-systems-api');
+  assert.equal(payloadB.aud, 'booking-systems-clients');
+  assert.equal(payloadB.jti, 'jti-security-b');
+});
+
+test('Issue 3: automation.yaml imports openapi.json before activeScan and exercises UserB', () => {
+  const raw = readFileSync(automationPath, 'utf8');
+
+  // Verify openapi job exists
+  assert.match(raw, /type:\s*["']?openapi["']?/);
+  assert.match(raw, /apiFile:\s*["']?\/zap\/wrk\/openapi\.json["']?/);
+  assert.match(raw, /targetUrl:\s*["']?http:\/\/127\.0\.0\.1:3001["']?/);
+
+  // Verify openapi job appears before activeScan job
+  const openapiIdx = raw.indexOf('type: "openapi"');
+  const activeScanIdx = raw.indexOf('type: "activeScan"');
+  assert.ok(openapiIdx !== -1, 'openapi job must be declared');
+  assert.ok(activeScanIdx !== -1, 'activeScan job must be declared');
+  assert.ok(openapiIdx < activeScanIdx, 'openapi job must precede activeScan job');
+
+  // Verify activeScan job for UserB exists as well as UserA
+  const userAMatches = raw.match(/user:\s*["']?UserA["']?/g) || [];
+  const userBMatches = raw.match(/user:\s*["']?UserB["']?/g) || [];
+  assert.ok(userAMatches.length >= 2, 'UserA must be referenced in spider/openapi and activeScan');
+  assert.ok(userBMatches.length >= 1, 'UserB must be referenced in activeScan');
+});
+
+test('Issue 3: openapi.json exists, is valid OpenAPI 3.0.3, and covers all 45 routes', () => {
+  const openapiPath = resolve(repoRoot, 'tests/security/zap/openapi.json');
+  assert.ok(existsSync(openapiPath), `openapi.json must exist at ${openapiPath}`);
+
+  const raw = readFileSync(openapiPath, 'utf8');
+  assert.ok(raw.trim().length > 0, 'openapi.json must not be empty');
+
+  const doc = JSON.parse(raw);
+  assert.equal(doc.openapi, '3.0.3', 'openapi version must be 3.0.3');
+  assert.ok(doc.info?.title, 'info.title must exist');
+  assert.ok(Array.isArray(doc.servers), 'servers must be an array');
+
+  // Verify required server ports: 3000, 3001, 3002, 3301, 3302, 3400
+  const serverUrls = doc.servers.map((s) => s.url);
+  const requiredPorts = [3000, 3001, 3002, 3301, 3302, 3400];
+  for (const port of requiredPorts) {
+    const hasPort = serverUrls.some((u) => u.includes(`:${port}`));
+    assert.ok(hasPort, `Servers must include port ${port}`);
+  }
+
+  // Verify security schemes
+  const schemes = doc.components?.securitySchemes;
+  assert.ok(schemes, 'components.securitySchemes must exist');
+  assert.ok(schemes.bearerAuth, 'bearerAuth scheme must exist');
+  assert.equal(schemes.bearerAuth.type, 'http');
+  assert.equal(schemes.bearerAuth.scheme, 'bearer');
+  assert.equal(schemes.bearerAuth.bearerFormat, 'JWT');
+
+  assert.ok(schemes.agentApiKey, 'agentApiKey scheme must exist');
+  assert.equal(schemes.agentApiKey.type, 'apiKey');
+  assert.equal(schemes.agentApiKey.name, 'AGENT_SERVICE_API_KEY');
+
+  assert.ok(schemes.claimToken, 'claimToken scheme must exist');
+  assert.equal(schemes.claimToken.type, 'apiKey');
+  assert.equal(schemes.claimToken.name, 'CLAIM_TOKEN');
+
+  assert.ok(schemes.adminBearer, 'adminBearer scheme must exist');
+  assert.equal(schemes.adminBearer.type, 'http');
+  assert.equal(schemes.adminBearer.scheme, 'bearer');
+
+  // Verify all 45 routes from routes.json are accounted for
+  const routesData = JSON.parse(readFileSync(routesPath, 'utf8'));
+  const routes = Array.isArray(routesData) ? routesData : routesData.routes;
+  assert.equal(routes.length, 45, 'routes.json must contain all 45 routes');
+
+  for (const r of routes) {
+    const openApiPath = r.path.replace(/:([a-zA-Z0-9_]+)/g, (_, p1) => `{${p1}}`);
+    const method = r.method.toLowerCase();
+
+    assert.ok(
+      doc.paths[openApiPath],
+      `Path ${openApiPath} for route ${r.id} (${r.path}) must exist in openapi.json`,
+    );
+
+    const operation = doc.paths[openApiPath][method];
+    assert.ok(
+      operation,
+      `Operation ${method.toUpperCase()} ${openApiPath} for route ${r.id} must exist in openapi.json`,
+    );
+
+    // Verify path params
+    if (r.params?.path) {
+      for (const paramName of r.params.path) {
+        assert.ok(
+          operation.parameters.some((p) => p.name === paramName && p.in === 'path'),
+          `Path parameter ${paramName} missing for ${r.id}`,
+        );
+      }
+    }
+
+    // Verify query params
+    if (r.params?.query) {
+      for (const paramName of r.params.query) {
+        assert.ok(
+          operation.parameters.some((p) => p.name === paramName && p.in === 'query'),
+          `Query parameter ${paramName} missing for ${r.id}`,
+        );
+      }
+    }
+
+    // Verify requestBody
+    if (r.requestBody) {
+      assert.ok(operation.requestBody, `requestBody missing for ${r.id}`);
+      assert.ok(operation.requestBody.content?.['application/json'], `JSON content missing for ${r.id}`);
+      assert.ok(
+        operation.requestBody.content['application/json'].schema,
+        `schema missing in requestBody for ${r.id}`,
+      );
+    }
+
+    // Verify security
+    if (r.authRequirement === 'bearer_user') {
+      const hasBearer = operation.security.some((s) => 'bearerAuth' in s);
+      assert.ok(hasBearer, `bearerAuth missing in security for ${r.id}`);
+    } else if (r.authRequirement === 'agent_key_claim') {
+      const hasAgentKey = operation.security.some((s) => 'agentApiKey' in s);
+      assert.ok(hasAgentKey, `agentApiKey missing in security for ${r.id}`);
+    } else if (r.authRequirement === 'admin_bearer') {
+      const hasAdmin = operation.security.some((s) => 'adminBearer' in s);
+      assert.ok(hasAdmin, `adminBearer missing in security for ${r.id}`);
+    }
+  }
 });

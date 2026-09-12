@@ -1,12 +1,38 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const repoRoot = resolve(__dirname, '..', '..');
 const defaultSchemaPath = resolve(repoRoot, 'tests/security/corpus/schema.json');
+
+export const PARTITION_CONTRACTS = {
+  'holdout_input.jsonl': { split: 'holdout', suiteKind: 'detector', expectedStage: 'input' },
+  'holdout_tool.jsonl': { split: 'holdout', suiteKind: 'detector', expectedStage: 'tool' },
+  'holdout_output.jsonl': { split: 'holdout', suiteKind: 'detector', expectedStage: 'output' },
+  'invariant_manifest.jsonl': { split: 'invariant', suiteKind: 'invariant' },
+};
+
+/**
+ * Checks a record against a partition contract.
+ * @param {object} record
+ * @param {{ split?: string, suiteKind?: string, expectedStage?: string }} contract
+ * @returns {string[]} List of violation messages
+ */
+export function checkPartitionContract(record, contract) {
+  const violations = [];
+  if (!record || typeof record !== 'object') {
+    return ['Record is not an object'];
+  }
+  for (const [key, expectedVal] of Object.entries(contract)) {
+    if (record[key] !== expectedVal) {
+      violations.push(`expected ${key} "${expectedVal}", got "${record[key]}"`);
+    }
+  }
+  return violations;
+}
 
 /**
  * Normalizes payload using NFKC unicode normalization,
@@ -381,6 +407,16 @@ export function validateCorpusManifest(corpusDir, options = {}) {
           `[Manifest Record Count Mismatch] ${filename}: Record count mismatch. Manifest declared ${fileMeta.recordCount}, actual ${records.length}`,
         );
       }
+
+      const contract = PARTITION_CONTRACTS[filename];
+      if (contract) {
+        for (const item of records) {
+          const violations = checkPartitionContract(item.record, contract);
+          for (const v of violations) {
+            errors.push(`[Partition Contract Violation] ${filename}:${item.line}: ${v}`);
+          }
+        }
+      }
     } catch (e) {
       errors.push(`[Manifest Error] ${filename} failed to parse as JSONL: ${e.message}`);
     }
@@ -504,6 +540,20 @@ export function validateCorpus(target, options = {}) {
   for (const item of itemsToValidate) {
     const rec = item.record;
     const context = `${item.sourceFile}:${item.line} (ID: ${rec?.id || 'unknown'})`;
+
+    // Partition contract verification
+    const partitionFile =
+      options.partitionFile || (item.sourceFile && item.sourceFile !== 'in-memory' ? basename(item.sourceFile) : null);
+    const partitionContract = partitionFile ? PARTITION_CONTRACTS[partitionFile] : null;
+    if (partitionContract) {
+      const violations = checkPartitionContract(rec, partitionContract);
+      for (const v of violations) {
+        const errMsg = `[Partition Contract Violation] ${partitionFile}:${item.line}: ${v}`;
+        if (!errors.includes(errMsg)) {
+          errors.push(errMsg);
+        }
+      }
+    }
 
     // 1. Schema validation
     const schemaErrors = validateRecordSchema(rec, schema);

@@ -31,11 +31,11 @@ env:
         - name: "UserA" # User A
           credentials:
             username: "security-a@example.invalid"
-            token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzZWN1cml0eS11c2VyLWEiLCJlbWFpbCI6InNlY3VyaXR5LWEtZXhhbXBsZS5pbnZhbGlkIiwicm9sZSI6IlVTRVIiLCJpc3MiOiJib29raW5nLXN5c3RlbXMtYXBpIiwiYXVkIjoiYm9va2luZy1zeXN0ZW1zLWNsaWVudHMiLCJqdGkiOiJqdGktc2VjdXJpdHktYSJ9.synthetic_user_a_signature"
+            token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c3Jfc2VjdXJpdHlfYSIsImlkIjoidXNyX3NlY3VyaXR5X2EiLCJlbWFpbCI6InNlY3VyaXR5LWFAZXhhbXBsZS5pbnZhbGlkIiwicm9sZSI6IlVTRVIiLCJpc3MiOiJib29raW5nLXN5c3RlbXMtYXBpIiwiYXVkIjoiYm9va2luZy1zeXN0ZW1zLWNsaWVudHMiLCJqdGkiOiJqdGktc2VjdXJpdHktYSJ9.NuGZj_dqAH6-7ABYdbXGfbPVSN5fDZOkHJcne6ft9ao"
         - name: "UserB" # User B
           credentials:
             username: "security-b@example.invalid"
-            token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzZWN1cml0eS11c2VyLWIiLCJlbWFpbCI6InNlY3VyaXR5LWItZXhhbXBsZS5pbnZhbGlkIiwicm9sZSI6IlVTRVIiLCJpc3MiOiJib29raW5nLXN5c3RlbXMtYXBpIiwiYXVkIjoiYm9va2luZy1zeXN0ZW1zLWNsaWVudHMiLCJqdGkiOiJqdGktc2VjdXJpdHktYiJ9.synthetic_user_b_signature"
+            token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c3Jfc2VjdXJpdHlfYiIsImlkIjoidXNyX3NlY3VyaXR5X2IiLCJlbWFpbCI6InNlY3VyaXR5LWJAZXhhbXBsZS5pbnZhbGlkIiwicm9sZSI6IlVTRVIiLCJpc3MiOiJib29raW5nLXN5c3RlbXMtYXBpIiwiYXVkIjoiYm9va2luZy1zeXN0ZW1zLWNsaWVudHMiLCJqdGkiOiJqdGktc2VjdXJpdHktYiJ9.e9AH3T-4DSEM9BNe5W1V2axbeIQPEvuOTjM7-8Fxrsg"
 jobs:
   - type: "passiveScan-config"
     parameters:
@@ -53,6 +53,13 @@ jobs:
       maxDuration: 5
       maxDepth: 5
 
+  - type: "openapi"
+    parameters:
+      apiFile: "/zap/wrk/openapi.json"
+      targetUrl: "http://127.0.0.1:3001"
+      context: "BookingSystems-Local"
+      user: "UserA"
+
   - type: "passiveScan-wait"
     parameters:
       maxDuration: 5
@@ -61,6 +68,91 @@ jobs:
     parameters:
       context: "BookingSystems-Local"
       user: "UserA"
+      policy: "StrictLocalBounded"
+      maxRuleDurationInMins: 2
+      maxScanDurationInMins: 10
+    policyDefinition:
+      defaultThreshold: "medium"
+      defaultStrength: "medium"
+      rules:
+        # SQL Injection
+        - id: 40018
+          name: "SQL Injection - Hypersonic SQL"
+          threshold: "low"
+          strength: "medium"
+        - id: 40019
+          name: "SQL Injection - MySQL"
+          threshold: "low"
+          strength: "medium"
+        - id: 40020
+          name: "SQL Injection - PostgreSQL"
+          threshold: "low"
+          strength: "medium"
+        - id: 40021
+          name: "SQL Injection - Oracle"
+          threshold: "low"
+          strength: "medium"
+        - id: 40022
+          name: "SQL Injection - SQLite"
+          threshold: "low"
+          strength: "medium"
+        - id: 40024
+          name: "SQL Injection - SQLite (Time Based)"
+          threshold: "low"
+          strength: "medium"
+        - id: 40027
+          name: "SQL Injection - Relational Databases"
+          threshold: "low"
+          strength: "medium"
+        # Cross Site Scripting (Reflected & Stored)
+        - id: 40012
+          name: "Cross Site Scripting (Reflected)"
+          threshold: "low"
+          strength: "medium"
+        - id: 40014
+          name: "Cross Site Scripting (Persistent)"
+          threshold: "low"
+          strength: "medium"
+        - id: 40016
+          name: "Cross Site Scripting (Persistent) - Prime"
+          threshold: "low"
+          strength: "medium"
+        - id: 40017
+          name: "Cross Site Scripting (Persistent) - Spider"
+          threshold: "low"
+          strength: "medium"
+        # CSRF
+        - id: 10202
+          name: "Absence of Anti-CSRF Tokens"
+          threshold: "low"
+          strength: "medium"
+        # Path Traversal
+        - id: 6
+          name: "Path Traversal"
+          threshold: "low"
+          strength: "medium"
+        # Security Header Configuration
+        - id: 10038
+          name: "Content Security Policy (CSP) Header Not Set"
+          threshold: "low"
+          strength: "medium"
+        - id: 10035
+          name: "Strict-Transport-Security Header Not Set"
+          threshold: "low"
+          strength: "medium"
+        - id: 10020
+          name: "Anti-clickjacking Header"
+          threshold: "low"
+          strength: "medium"
+        - id: 10021
+          name: "X-Content-Type-Options Header Missing"
+          threshold: "low"
+          strength: "medium"
+
+  - type: "activeScan"
+    parameters:
+      context: "BookingSystems-Local"
+      user: "UserB"
       policy: "StrictLocalBounded"
       maxRuleDurationInMins: 2
       maxScanDurationInMins: 10

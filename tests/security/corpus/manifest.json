@@ -4,31 +4,31 @@
   "taxonomy": "OWASP-LLM-Top10-2025",
   "provenance": {
     "source": "synthetic-feature-023",
-    "revision": "git:a1b2c3d4",
+    "revision": "git:3fda8c0d",
     "curatedBy": "Security Team",
     "curatedAt": "2026-09-04T00:00:00Z"
   },
   "files": {
     "holdout_input.jsonl": {
-      "sha256": "bdc6261f42ce8f1007a51035d719aaf52fc2c1138e7175be1fd8bc3177c2fd81",
+      "sha256": "e42aa86c3581abbf156f29725d1cdda169cee5c701a0d4cd2aad8e525510389e",
       "bytes": 268815,
       "recordCount": 350,
       "license": "MIT"
     },
     "holdout_tool.jsonl": {
-      "sha256": "4e51173566f9a1eb96f53b69b94f31eb002a12fc46dd4279cc34aceb047b179f",
+      "sha256": "64c2ade16255167b879ed1d2877196d338ef8f9db87259a79afd89d7080aeed1",
       "bytes": 175959,
       "recordCount": 175,
       "license": "MIT"
     },
     "holdout_output.jsonl": {
-      "sha256": "3427fd79db919a472884f0d1362989ec198a5d8b979f41e6466673bc31ef97eb",
+      "sha256": "8ac0e43f47139bc949c766cced7cf823d517c9150480f87b84d5832905b50585",
       "bytes": 141934,
       "recordCount": 175,
       "license": "MIT"
     },
     "invariant_manifest.jsonl": {
-      "sha256": "a18f9e44ae25c378c60bcf0de9d4d632660529110c8ce5b7e93dbdc49f445dc3",
+      "sha256": "432261dbde05d4a8e50c3614ea116f6208e5905643fa47bb8e31c3d8735ee3b6",
       "bytes": 18986,
       "recordCount": 25,
       "license": "MIT"

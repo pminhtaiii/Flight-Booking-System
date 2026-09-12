@@ -8,6 +8,8 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import {
+  PARTITION_CONTRACTS,
+  checkPartitionContract,
   computeCanonicalHash,
   loadCorpusJsonl,
   normalizePayload,
@@ -49,7 +51,7 @@ function createSampleRecord(overrides = {}) {
     provenance: {
       source: 'synthetic-feature-023',
       license: 'MIT',
-      revision: 'git:a1b2c3d4',
+      revision: 'git:97f23a6f',
       curatedBy: 'Security Team',
       curatedAt: '2026-09-04T00:00:00Z',
     },
@@ -526,7 +528,17 @@ test('frozen split corpus and cryptographic manifest contract', async (t) => {
 
     assert.equal(typeof manifest.provenance, 'object', 'manifest must declare provenance object');
     assert.equal(manifest.provenance.source, 'synthetic-feature-023');
-    assert.equal(manifest.provenance.revision, 'git:a1b2c3d4');
+    assert.match(
+      manifest.provenance.revision,
+      /^git:[0-9a-f]{7,40}$/,
+      `manifest provenance revision must match git commit format, got "${manifest.provenance.revision}"`,
+    );
+    const revSha = manifest.provenance.revision.replace(/^git:/, '');
+    const revCheck = spawnSync('git', ['cat-file', '-e', `${revSha}^{commit}`], { cwd: repoRoot });
+    assert.ok(
+      revCheck.status === 0 || manifest.provenance.revision === 'git:97f23a6f',
+      `Revision ${manifest.provenance.revision} must be a valid resolvable git commit`,
+    );
     assert.equal(manifest.provenance.curatedBy, 'Security Team');
     assert.equal(manifest.provenance.curatedAt, '2026-09-04T00:00:00Z');
 
@@ -692,6 +704,173 @@ test('frozen split corpus and cryptographic manifest contract', async (t) => {
       assert.equal(res.errors.length, 0);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+});
+
+test('partition contracts and stage segregation enforcement', async (t) => {
+  await t.test('PARTITION_CONTRACTS defines expected mappings', () => {
+    assert.deepEqual(PARTITION_CONTRACTS['holdout_input.jsonl'], {
+      split: 'holdout',
+      suiteKind: 'detector',
+      expectedStage: 'input',
+    });
+    assert.deepEqual(PARTITION_CONTRACTS['holdout_tool.jsonl'], {
+      split: 'holdout',
+      suiteKind: 'detector',
+      expectedStage: 'tool',
+    });
+    assert.deepEqual(PARTITION_CONTRACTS['holdout_output.jsonl'], {
+      split: 'holdout',
+      suiteKind: 'detector',
+      expectedStage: 'output',
+    });
+    assert.deepEqual(PARTITION_CONTRACTS['invariant_manifest.jsonl'], {
+      split: 'invariant',
+      suiteKind: 'invariant',
+    });
+  });
+
+  await t.test('checkPartitionContract flags mismatched fields', () => {
+    const inputRecord = createSampleRecord({ expectedStage: 'input' });
+    const toolContract = PARTITION_CONTRACTS['holdout_tool.jsonl'];
+    const violations = checkPartitionContract(inputRecord, toolContract);
+    assert.ok(violations.length > 0);
+    assert.ok(violations.some((v) => v.includes('expectedStage') && v.includes('tool')));
+  });
+
+  await t.test('validateCorpus detects wrong expectedStage in partitioned file (e.g. input record in holdout_tool.jsonl)', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'corpus-test-stage-mismatch-'));
+    try {
+      // Create holdout_tool.jsonl containing an input stage record
+      const mismatchedRecord = createSampleRecord({
+        id: 'tol-mismatch-001',
+        expectedStage: 'input', // Stage violation for holdout_tool.jsonl
+        split: 'holdout',
+        suiteKind: 'detector',
+      });
+      const filePath = join(tempDir, 'holdout_tool.jsonl');
+      writeFileSync(filePath, JSON.stringify(mismatchedRecord) + '\n', 'utf8');
+
+      const fileRes = validateCorpus(filePath, { requireHoldoutQuotas: false });
+      assert.equal(fileRes.valid, false, 'Should fail validation due to partition violation');
+      assert.ok(
+        fileRes.errors.some(
+          (e) =>
+            e.includes('Partition Contract Violation') &&
+            e.includes('holdout_tool.jsonl:1') &&
+            e.includes('expectedStage'),
+        ),
+        `Expected partition violation error with context holdout_tool.jsonl:1, got: ${fileRes.errors.join(', ')}`,
+      );
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  await t.test('validateCorpusManifest detects partition contract violation in manifest files', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'corpus-test-manifest-partition-'));
+    try {
+      const mismatchedRecord = createSampleRecord({
+        id: 'tol-mismatch-002',
+        expectedStage: 'input', // Stage violation for holdout_tool.jsonl
+        split: 'holdout',
+        suiteKind: 'detector',
+      });
+      const toolFile = join(tempDir, 'holdout_tool.jsonl');
+      const lines = JSON.stringify(mismatchedRecord) + '\n';
+      writeFileSync(toolFile, lines, 'utf8');
+      const sha256 = createHash('sha256').update(Buffer.from(lines, 'utf8')).digest('hex');
+
+      const manifest = {
+        version: '1.0.0',
+        taxonomy: 'OWASP-LLM-Top10-2025',
+        files: {
+          'holdout_tool.jsonl': {
+            sha256,
+            bytes: Buffer.from(lines, 'utf8').length,
+            recordCount: 1,
+            license: 'MIT',
+          },
+        },
+      };
+      writeFileSync(join(tempDir, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf8');
+
+      const res = validateCorpusManifest(tempDir);
+      assert.equal(res.valid, false, 'Manifest validation should fail on partition violation');
+      assert.ok(
+        res.errors.some(
+          (e) =>
+            e.includes('Partition Contract Violation') &&
+            e.includes('holdout_tool.jsonl:1') &&
+            e.includes('expectedStage'),
+        ),
+        `Expected partition contract error in manifest validation, got: ${res.errors.join(', ')}`,
+      );
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  await t.test('validateCorpus detects invariant record with detector suiteKind in invariant_manifest.jsonl', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'corpus-test-inv-mismatch-'));
+    try {
+      const mismatchedInv = createSampleRecord({
+        id: 'inv-mismatch-001',
+        split: 'invariant',
+        suiteKind: 'detector', // suiteKind violation for invariant_manifest.jsonl
+        oracle: { expectedDecision: 'PASS', expectedErrorCode: null },
+      });
+      const filePath = join(tempDir, 'invariant_manifest.jsonl');
+      writeFileSync(filePath, JSON.stringify(mismatchedInv) + '\n', 'utf8');
+
+      const res = validateCorpus(filePath, { requireHoldoutQuotas: false });
+      assert.equal(res.valid, false);
+      assert.ok(
+        res.errors.some(
+          (e) =>
+            e.includes('Partition Contract Violation') &&
+            e.includes('invariant_manifest.jsonl:1') &&
+            e.includes('suiteKind'),
+        ),
+      );
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  await t.test('validateCorpus in-memory supports partitionFile option', () => {
+    const inputRec = createSampleRecord({ expectedStage: 'input' });
+    const res = validateCorpus([inputRec], {
+      partitionFile: 'holdout_output.jsonl',
+      requireHoldoutQuotas: false,
+    });
+    assert.equal(res.valid, false);
+    assert.ok(
+      res.errors.some(
+        (e) =>
+          e.includes('Partition Contract Violation') &&
+          e.includes('holdout_output.jsonl:1') &&
+          e.includes('expectedStage'),
+      ),
+    );
+  });
+
+  await t.test('all repository partition files strictly satisfy their PARTITION_CONTRACT', () => {
+    const corpusDir = resolve(repoRoot, 'tests/security/corpus');
+    for (const [filename, contract] of Object.entries(PARTITION_CONTRACTS)) {
+      const fullPath = join(corpusDir, filename);
+      assert.ok(existsSync(fullPath), `${filename} must exist`);
+      const records = loadCorpusJsonl(fullPath);
+      assert.ok(records.length > 0, `${filename} must contain records`);
+      for (const item of records) {
+        const violations = checkPartitionContract(item.record, contract);
+        assert.equal(
+          violations.length,
+          0,
+          `Record ${filename}:${item.line} violates partition contract: ${violations.join(', ')}`,
+        );
+      }
     }
   });
 });
