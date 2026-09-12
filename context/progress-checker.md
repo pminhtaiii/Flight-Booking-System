@@ -1,5 +1,14 @@
 # Progress Tracker
 
+### Feature 023 — Phase 5 CI Security Pipeline Remediation (2026-09-12, Completed)
+
+- Resolved `security-sast` CI failure: removed unsupported `- tsx` from Semgrep rule definitions in `tests/security/sast/ruleset.yml` and `tests/security/sast/guardrails.yml`; updated `tests/security/sast-runner.test.mjs` expectedLanguages. Resolved `spawnSync semgrep ENOBUFS` by passing `--output <sarifOutput>` directly to Semgrep when destination is specified, reading directly from disk, setting default `maxBuffer: 128 * 1024 * 1024` (128MB) in `runSastScan` `execFn`, and adding safeguard buffer handling across git diff, AST Python fallback (64MB), and supply-chain `commandResult` (64MB).
+- Addressed code review on **Mutable Semgrep Rulesets**: removed version-stripping logic in `scripts/security/run-sast.mjs` so caller-specified versions/tags are preserved. Added local locked JSON snapshot files for standard registry rulesets in `tests/security/sast/snapshots/` (`p-default.json`, `p-owasp-top-ten.json`, `p-security-audit.json`, `p-secrets.json`), ensuring reproducible audits and immunity to upstream breaking changes.
+- Remediated 4 codebase SAST findings: enforced `{ authTagLength: 16 }` in `apps/api/src/common/encryption.service.ts` for AES-GCM deciphers; replaced unverified JWT decode in `apps/agent/src/agent/tools/nestjs_client.py` with verified decode across candidate secret ring; eliminated `unsafe-formatstring` in `apps/web/lib/airport-service.ts` by passing structured objects; removed unused scratch file `apps/agent/test_tool_node.py`; and baselined pre-existing benign warnings in `tests/security/sast/baseline.json`. Added unit tests in `tests/security/sast-runner.test.mjs` (41/41 passing).
+- Resolved `security-supply-chain` CI failure & code review findings: added `loadDependencyAdvisoryRegister` and `loadIgnoredGhas` in `scripts/security/run-supply-chain.mjs` enforcing narrow, expiring exceptions against `docs/security/dependency-advisories.md` with a 30-day review window (`Policy-Expires-At: 2026-10-12T00:00:00.000Z`). Verified all 98 cataloged GHSAs in `package.json` (`pnpm.auditConfig.ignoreGhas`) and `pnpm-workspace.yaml` (`auditConfig.ignoreGhas`). Any uncataloged or expired GHSA fails closed. Structured exceptions with rationale and compensating controls are populated in `report.exceptions` for independent validation.
+- Added comprehensive unit tests in `tests/security/supply-chain.test.mjs` verifying filtering of ignored GHSAs, blocking of unignored vulnerabilities, expiring policy fail-closed checks, and uncataloged ignore rejection (17/17 tests passing).
+- Verified full static contract and security suites: `ci-workflow.contract.test.mjs` (23/23 passing), `evaluate-results.test.mjs` (38/38 passing), `sast-runner.test.mjs` (41/41 passing), `supply-chain.test.mjs` (17/17 passing), full suite 119/119 passing, local full SAST scan passed (0 findings, exit code 0), `@shared/types` (110/110 passing), API/Web typechecks (0 errors), and ESLint (0 errors, 0 warnings).
+
 Update this file after every completed feature. Any AI agent reading this should immediately know what is done, what is in progress, and what is next.
 
 ---
@@ -75,12 +84,25 @@ Update this file after every completed feature. Any AI agent reading this should
     - Git diff resolution fails closed on non-zero exit status or execution error instead of treating failure as an empty scan.
   - Expanded test suite in `tests/security/sast-runner.test.mjs` to 38/38 passing tests (exit code 0).
 
+- **T033 Supply Chain & Secret Scanner Driver (`scripts/security/run-supply-chain.mjs`)**:
+  - Implemented pinned Python SCA (`pip-audit 2.7.3` via `uv export --package agent --locked --no-dev`), Node SCA (`pnpm audit --audit-level moderate --json`), and dual-scope secret scanning with Gitleaks v8.18.4 (git history `--log-opts=--all` and working tree `--no-git`).
+  - Output report conforms to schema v1.0.0, includes honest tool freshness metadata without fabricating timestamps, redacts secrets/PII, and fails closed on scanner errors or Critical/High findings.
+  - Test suite in `tests/security/supply-chain.test.mjs` (8/8 tests passing).
+
+- **T034/T035 CI Security Gate & Workflow Integration (`.github/workflows/ci.yml`, `scripts/ci/evaluate-ci-status.mjs`)**:
+  - Integrated `security` path detection filter into `detect-changes` in `.github/workflows/ci.yml`.
+  - Added parallel least-privilege CI jobs: `security-sast` (Semgrep v1.88.0 with `setuptools<80` pin, raw SARIF v2.1.0 output) and `security-supply-chain` (Gitleaks v8.18.4 with sha256 checksum verification, pip-audit, and pnpm audit).
+  - Wired `ci-status` aggregate evaluator to download security artifacts (`if: always()`, `continue-on-error: true`) and evaluate static security results via `evaluateSecurityResults({ scope: 'static' })` failing closed on missing/invalid/stale/vulnerable reports.
+  - Fixed booking disruption conflict error clearing bug on 409 in `apps/web/components/bookings/BookingDetail.tsx`.
+  - Fixed Semgrep rule parsing error in `tests/security/sast/ruleset.yml` and diagnostic masking in `scripts/security/run-sast.mjs`.
+  - Verified 30/30 tests in `tests/ci/evaluate-ci-status.test.mjs` and `tests/ci/ci-workflow.contract.test.mjs` passing.
+
 ### Current Status
 
-**Feature:** Security Systems (Feature 023) — Phase 5 US3 Static Security Checks
-**Last completed:** T032 SAST Baseline & Temporary Exception Schema hardening in `scripts/security/run-sast.mjs` with fallback syntax validation for JS/TS/TSX/MJS (38/38 passing in `tests/security/sast-runner.test.mjs`).
-**In progress:** Phase 5 Slice 1 complete (T029, T030, T031, T032 hardened).
-**Next:** T033 — Implement separate SCA and secret drivers in `scripts/security/run-supply-chain.mjs`.
+**Feature:** Security Systems (Feature 023) — Phase 5 US3 Static Security Checks Complete
+**Last completed:** T033–T035 supply-chain & secret scanning, CI security jobs/evaluator, and workflow contract verification.
+**In progress:** Phase 5 complete.
+**Next:** Phase 6 US4 — Execute Runtime Penetration Coverage (T036–T041).
 
 ### Feature 023 — CI regression remediation checkpoint (2026-09-09)
 

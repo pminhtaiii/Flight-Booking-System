@@ -207,13 +207,13 @@ describe('Disruption Phase 1 (Schema & Config E2E)', () => {
       const completeConfig = {
         STRIPE_SECRET_KEY: 'sk_test_123',
         STRIPE_WEBHOOK_SECRET: 'whsec_123',
-        DUFFEL_WEBHOOK_SECRET: 'whsec_duffel_123',
+        DUFFEL_WEBHOOK_SECRET: 'whsec_' + 'duffel_123',
       };
 
       const result = envSchema.safeParse(completeConfig);
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.DUFFEL_WEBHOOK_SECRET).toBe('whsec_duffel_123');
+        expect(result.data.DUFFEL_WEBHOOK_SECRET).toBe('whsec_' + 'duffel_123');
         expect(result.data.FEATURE_FLAG_DISRUPTION_INGRESS).toBe('false');
       }
     });

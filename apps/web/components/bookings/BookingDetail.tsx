@@ -35,9 +35,12 @@ export function BookingDetail({ booking: initialBooking }: BookingDetailProps) {
 
   useEffect(() => {
     setBooking(initialBooking);
+  }, [initialBooking]);
+
+  useEffect(() => {
     setConflictError(null);
     setActionSuccess(null);
-  }, [initialBooking]);
+  }, [initialBooking?.id]);
 
   const [cancellationStatus, setCancellationStatus] = useState<CancellationStatusView | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);

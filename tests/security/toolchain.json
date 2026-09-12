@@ -10,10 +10,10 @@
       "license": "LGPL-2.1",
       "outputFormat": "sarif",
       "rulesets": [
-        "p/default@v1.88.0",
-        "p/owasp-top-ten@v1.88.0",
-        "p/security-audit@v1.88.0",
-        "p/secrets@v1.88.0"
+        "p/default",
+        "p/owasp-top-ten",
+        "p/security-audit",
+        "p/secrets"
       ],
       "failSeverity": "ERROR",
       "includePaths": [

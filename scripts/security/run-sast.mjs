@@ -31,10 +31,10 @@ export const DEFAULT_IGNORED_DIRS = new Set([
 ]);
 
 export const DEFAULT_STANDARD_RULESETS = [
-  'p/default@v1.88.0',
-  'p/owasp-top-ten@v1.88.0',
-  'p/security-audit@v1.88.0',
-  'p/secrets@v1.88.0',
+  'p/default',
+  'p/owasp-top-ten',
+  'p/security-audit',
+  'p/secrets',
 ];
 
 export const SUPPORTED_STANDARD_RULESETS = new Set([
@@ -43,6 +43,8 @@ export const SUPPORTED_STANDARD_RULESETS = new Set([
   'p/security-audit',
   'p/secrets',
 ]);
+
+export const DEFAULT_SNAPSHOT_DIR = resolve(defaultRepoRoot, 'tests/security/sast/snapshots');
 
 export const NON_BYPASSABLE_RULES = new Set([
   'no-llm-in-guardrails',
@@ -86,7 +88,7 @@ export function calculateFileCensus(options = {}) {
 
     let count = 0;
 
-    function walk(currentDir) {
+    const walk = (currentDir) => {
       let entries;
       try {
         entries = readdirSync(currentDir, { withFileTypes: true });
@@ -164,6 +166,7 @@ export function resolveTargetFiles(options = {}) {
         res = execFn('git', ['diff', '--name-only', '--diff-filter=ACMRTUXB', base], {
           cwd: rootDir,
           encoding: 'utf8',
+          maxBuffer: 16 * 1024 * 1024,
         });
         if (res && res.status === 0 && !res.error) {
           gitSuccess = true;
@@ -178,6 +181,7 @@ export function resolveTargetFiles(options = {}) {
           res = execFn('git', ['diff', '--name-only', '--diff-filter=ACMRTUXB', 'HEAD'], {
             cwd: rootDir,
             encoding: 'utf8',
+            maxBuffer: 16 * 1024 * 1024,
           });
           if (res && res.status === 0 && !res.error) {
             gitSuccess = true;
@@ -425,6 +429,7 @@ export function validateBaselineFinding(finding, index = 0) {
  * Validates the structure and entries of a baseline findings document.
  */
 export function validateBaselineSchema(baselineData, options = {}) {
+  void options;
   const errors = [];
   let data = baselineData;
 
@@ -689,7 +694,10 @@ export function evaluateFindings(findings = [], options = {}) {
       const bFile = (b.file || b.path || '').replaceAll('\\', '/');
       const fileMatches =
         bFile === findingFile || (bFile.length > 0 && findingFile.endsWith('/' + bFile));
-      const ruleMatches = b.ruleId === finding.ruleId;
+      const ruleMatches =
+        b.ruleId === finding.ruleId ||
+        finding.ruleId.endsWith('.' + b.ruleId) ||
+        b.ruleId.endsWith('.' + finding.ruleId);
       const lineMatches = b.line === undefined || b.line === null || b.line === finding.startLine;
       return ruleMatches && fileMatches && lineMatches;
     });
@@ -716,7 +724,11 @@ export function evaluateFindings(findings = [], options = {}) {
         return false;
       }
 
-      if (ex.ruleId !== finding.ruleId) return false;
+      const ruleMatches =
+        ex.ruleId === finding.ruleId ||
+        finding.ruleId.endsWith('.' + ex.ruleId) ||
+        ex.ruleId.endsWith('.' + finding.ruleId);
+      if (!ruleMatches) return false;
 
       const exFile = (ex.file || ex.path || '').replaceAll('\\', '/');
       const fileMatches =
@@ -812,13 +824,23 @@ export function runAstFallbackScan(targetFiles, rootDir, options = {}) {
       } else {
         errors.push(`[SAST Fallback Error] Unsupported standard ruleset: ${cfg}`);
       }
+    } else {
+      for (const standard of SUPPORTED_STANDARD_RULESETS) {
+        const sanitized = standard.replace(/\//g, '-');
+        if (
+          cfg.endsWith(`${sanitized}.json`) ||
+          cfg.endsWith(`${sanitized}.yml`) ||
+          cfg.endsWith(`${sanitized}.yaml`)
+        ) {
+          enabledStandardPacks.add(standard);
+          break;
+        }
+      }
     }
   }
 
   const hasSecrets = enabledStandardPacks.has('p/secrets');
   const hasOwasp = enabledStandardPacks.has('p/owasp-top-ten');
-  const hasSecurityAudit = enabledStandardPacks.has('p/security-audit');
-  const hasDefault = enabledStandardPacks.has('p/default');
   const hasCustomRules =
     !options.configs ||
     configs.some(
@@ -1111,6 +1133,7 @@ print(json.dumps({'findings': findings, 'errors': errors}))
       const res = spawnSync('python', ['-c', pythonScript], {
         input: inputPayload,
         encoding: 'utf8',
+        maxBuffer: 64 * 1024 * 1024,
       });
       if (res.error) {
         errors.push(`[AST Fallback Error] Python process failed to spawn: ${res.error.message}`);
@@ -1539,22 +1562,47 @@ export function runSastScan(options = {}) {
 
   // Step 4: Build Semgrep CLI execution arguments
   const semgrepArgs = ['--sarif'];
-  for (const cfg of configs) {
-    const isRegistry = cfg.startsWith('p/') || cfg.startsWith('r/');
-    if (!isRegistry && !existsSync(cfg)) {
-      errors.push(`[SAST Config Error] Required config file does not exist: ${cfg}`);
-      return {
-        passed: false,
-        exitCode: 1,
-        census,
-        targetResolution,
-        findings: [],
-        unbaselinedFindings: [],
-        errors,
-      };
-    }
-    semgrepArgs.push('--config', cfg);
+  if (sarifOutput) {
+    mkdirSync(dirname(sarifOutput), { recursive: true });
+    semgrepArgs.push('--output', sarifOutput);
   }
+  const SNAPSHOT_DIR = resolve(rootDir, 'tests/security/sast/snapshots');
+  for (const cfg of configs) {
+    const isRegistry = typeof cfg === 'string' && (cfg.startsWith('p/') || cfg.startsWith('r/'));
+    let resolvedConfig = cfg;
+    if (isRegistry) {
+      const hasExplicitVersion = cfg.includes('@');
+      if (!hasExplicitVersion) {
+        const sanitized = cfg.replace(/\//g, '-');
+        const jsonSnapshot = resolve(SNAPSHOT_DIR, `${sanitized}.json`);
+        const ymlSnapshot = resolve(SNAPSHOT_DIR, `${sanitized}.yml`);
+        const yamlSnapshot = resolve(SNAPSHOT_DIR, `${sanitized}.yaml`);
+        if (existsSync(jsonSnapshot)) {
+          resolvedConfig = jsonSnapshot;
+        } else if (existsSync(ymlSnapshot)) {
+          resolvedConfig = ymlSnapshot;
+        } else if (existsSync(yamlSnapshot)) {
+          resolvedConfig = yamlSnapshot;
+        }
+      }
+    } else {
+      if (!existsSync(resolvedConfig)) {
+        errors.push(`[SAST Config Error] Required config file does not exist: ${resolvedConfig}`);
+        return {
+          passed: false,
+          exitCode: 1,
+          census,
+          targetResolution,
+          findings: [],
+          unbaselinedFindings: [],
+          errors,
+        };
+      }
+    }
+    semgrepArgs.push('--config', resolvedConfig);
+  }
+
+  semgrepArgs.push('--metrics=off');
 
   semgrepArgs.push('--exclude', 'node_modules');
   semgrepArgs.push('--exclude', 'dist');
@@ -1583,6 +1631,7 @@ export function runSastScan(options = {}) {
       cwd: rootDir,
       encoding: 'utf8',
       shell: process.platform === 'win32',
+      maxBuffer: options.maxBuffer || 128 * 1024 * 1024,
     });
   } catch (err) {
     if (canUseFallback) {
@@ -1659,9 +1708,11 @@ export function runSastScan(options = {}) {
   }
 
   if (scanRes.status !== 0 && scanRes.status !== 1) {
-    errors.push(
-      `[SAST Crash] Semgrep crashed with exit status ${scanRes.status}:\n${scanRes.stderr || scanRes.stdout}`,
-    );
+    const diag = [
+      scanRes.stderr ? `STDERR:\n${scanRes.stderr}` : '',
+      scanRes.stdout ? `STDOUT:\n${scanRes.stdout}` : '',
+    ].filter(Boolean).join('\n');
+    errors.push(`[SAST Crash] Semgrep crashed with exit status ${scanRes.status}:\n${diag || 'No output captured'}`);
     return {
       passed: false,
       exitCode: 1,
@@ -1673,7 +1724,17 @@ export function runSastScan(options = {}) {
     };
   }
 
-  const sarifRaw = scanRes.stdout || '';
+  let sarifRaw = '';
+  if (sarifOutput && existsSync(sarifOutput)) {
+    try {
+      sarifRaw = readFileSync(sarifOutput, 'utf8');
+    } catch {
+      sarifRaw = '';
+    }
+  }
+  if (!sarifRaw.trim() && scanRes?.stdout) {
+    sarifRaw = scanRes.stdout;
+  }
 
   if (scanRes.status === 1 && sarifRaw.trim().length === 0) {
     errors.push(
@@ -1694,7 +1755,9 @@ export function runSastScan(options = {}) {
     try {
       const sarifDir = dirname(sarifOutput);
       mkdirSync(sarifDir, { recursive: true });
-      writeFileSync(sarifOutput, sarifRaw, 'utf8');
+      if (!existsSync(sarifOutput) || !readFileSync(sarifOutput, 'utf8').trim()) {
+        writeFileSync(sarifOutput, sarifRaw, 'utf8');
+      }
     } catch (err) {
       errors.push(
         `[SAST Output Error] Failed to write SARIF output to ${sarifOutput}: ${err.message}`,
@@ -1750,8 +1813,10 @@ export function runSastScan(options = {}) {
 export function main(argv = process.argv.slice(2), dependencies = {}) {
   const rootDir = dependencies.rootDir || defaultRepoRoot;
   const exitFn = dependencies.exitFn || process.exit;
+  /* eslint-disable no-console */
   const logFn = dependencies.logFn || console.log;
   const errFn = dependencies.errFn || console.error;
+  /* eslint-enable no-console */
   const execFn = dependencies.execFn;
 
   let mode = 'full';

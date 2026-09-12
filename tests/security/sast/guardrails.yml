@@ -87,7 +87,6 @@ rules:
   - id: safe-html-interpolation
     languages:
       - typescript
-      - tsx
     severity: ERROR
     message: 'Raw HTML interpolation via dangerouslySetInnerHTML introduces XSS vulnerabilities; use sanitized React text elements.'
     metadata:

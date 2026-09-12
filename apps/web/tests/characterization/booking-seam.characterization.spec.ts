@@ -153,6 +153,12 @@ test.describe('Booking Seam Characterization - User Flows', () => {
     await ackButton.click();
 
     expect(ackCalled).toBe(true);
+    await expect(page.getByText('Successfully acknowledged the changes.')).toBeVisible();
+    await page.waitForTimeout(1000);
+    await expect(page.getByText('Successfully acknowledged the changes.')).toBeVisible();
+
+    await page.goto('/bookings/11111111-1111-4111-8111-111111111111');
+    await expect(page.getByText('Successfully acknowledged the changes.')).toHaveCount(0);
   });
 
   test('renders disruption alert and handles accept action', async ({ page, context }) => {
@@ -230,6 +236,12 @@ test.describe('Booking Seam Characterization - User Flows', () => {
     await ackButton.click();
 
     await expect(page.getByText('A newer change exists and must be reviewed.')).toBeVisible();
+    // Allow the router.refresh() RSC update to reconcile the same client component instance.
+    await page.waitForTimeout(1000);
+    await expect(page.getByText('A newer change exists and must be reviewed.')).toBeVisible();
+
+    await page.goto('/bookings/11111111-1111-4111-8111-111111111111');
+    await expect(page.getByText('A newer change exists and must be reviewed.')).toHaveCount(0);
   });
 
   test('renders cancellation review modal and completes cancellation flow', async ({

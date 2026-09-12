@@ -446,6 +446,36 @@ export function evaluateSupplyChain(supplyChainData, options = {}) {
     };
   }
 
+  if (supplyChainData.errors !== undefined) {
+    if (!Array.isArray(supplyChainData.errors)) {
+      errors.push('[Supply Chain Error] Scanner errors must be an array');
+    } else if (supplyChainData.errors.length > 0) {
+      errors.push(
+        `[Supply Chain Error] Scanner reported execution error(s): ${JSON.stringify(supplyChainData.errors)}`,
+      );
+    }
+  }
+  for (const [key, label] of [
+    ['pipAudit', 'pip-audit'],
+    ['pnpmAudit', 'pnpm audit'],
+    ['gitleaks', 'gitleaks'],
+  ]) {
+    const scanner = supplyChainData[key];
+    if (!scanner || typeof scanner !== 'object' || Array.isArray(scanner)) continue;
+    if (scanner.errors !== undefined) {
+      if (!Array.isArray(scanner.errors)) {
+        errors.push(`[Supply Chain Error] ${label} errors must be an array`);
+      } else if (scanner.errors.length > 0) {
+        errors.push(
+          `[Supply Chain Error] ${label} reported execution error(s): ${JSON.stringify(scanner.errors)}`,
+        );
+      }
+    }
+  }
+  if (options.requireFreshness) {
+    errors.push(...validateStaticSupplyChainFreshness(supplyChainData, options));
+  }
+
   // Require scanner execution evidence
   const hasEvidence =
     Array.isArray(supplyChainData.findings) ||
@@ -996,6 +1026,206 @@ export function validateReportSchemas(reports) {
   return { valid: errors.length === 0, errors };
 }
 
+function isValidTimestamp(value) {
+  if (typeof value !== 'string' || value.trim() === '') return false;
+  return Number.isFinite(Date.parse(value));
+}
+
+function staticReportVersion(report, expectedVersion, label, errors) {
+  if (!report || typeof report !== 'object' || Array.isArray(report)) {
+    errors.push(`[Static Schema Error] ${label} report must be an object`);
+    return;
+  }
+  if (report.version !== expectedVersion) {
+    errors.push(
+      `[Static Schema Error] ${label} report version must be ${expectedVersion}; received ${String(report.version)}`,
+    );
+  }
+}
+
+function validateStaticSupplyChainFreshness(supplyChainData, options = {}) {
+  const errors = [];
+  const currentDate = options.currentDate || new Date().toISOString();
+  const maxAdvisoryAgeHours = Number(options.maxAdvisoryAgeHours ?? 24);
+  const currentDateMs = Date.parse(currentDate);
+
+  if (!isValidTimestamp(supplyChainData?.timestamp)) {
+    errors.push('[Static Freshness Error] Supply-chain report timestamp is missing or invalid');
+  } else if (Number.isFinite(currentDateMs) && Date.parse(supplyChainData.timestamp) > currentDateMs) {
+    errors.push('[Static Freshness Error] Supply-chain report timestamp is from the future');
+  }
+
+  const scanners = [
+    ['pipAudit', 'pip-audit'],
+    ['pnpmAudit', 'pnpm audit'],
+    ['gitleaks', 'gitleaks'],
+  ];
+
+  for (const [key, label] of scanners) {
+    const scanner = supplyChainData?.[key];
+    if (!scanner || typeof scanner !== 'object' || Array.isArray(scanner)) {
+      errors.push(`[Static Schema Error] Missing ${label} scanner evidence`);
+      continue;
+    }
+    if (!isValidTimestamp(scanner.timestamp)) {
+      errors.push(`[Static Freshness Error] ${label} timestamp is missing or invalid`);
+    }
+    if (!Array.isArray(scanner.errors)) {
+      errors.push(`[Static Schema Error] ${label} errors must be an array`);
+    }
+    const freshness = scanner.freshness;
+    if (!freshness || typeof freshness !== 'object' || Array.isArray(freshness)) {
+      errors.push(`[Static Freshness Error] ${label} freshness metadata is missing`);
+      continue;
+    }
+    if (typeof freshness.source !== 'string' || freshness.source.trim() === '') {
+      errors.push(`[Static Freshness Error] ${label} freshness source is missing`);
+    }
+    if (typeof freshness.mode !== 'string' || freshness.mode.trim() === '') {
+      errors.push(`[Static Freshness Error] ${label} freshness mode is missing`);
+    }
+    if (!isValidTimestamp(freshness.checkedAt)) {
+      errors.push(`[Static Freshness Error] ${label} freshness checkedAt is missing or invalid`);
+    }
+    if (typeof freshness.usedOfflineCache !== 'boolean') {
+      errors.push(`[Static Freshness Error] ${label} freshness usedOfflineCache must be boolean`);
+    } else if (freshness.usedOfflineCache) {
+      errors.push(`[Static Freshness Error] ${label} used an offline advisory cache`);
+    }
+
+    const advisoryTimestamp =
+      freshness.advisoryDatabaseTimestamp ??
+      freshness.advisoryQueriedAt ??
+      scanner.advisoryDatabaseTimestamp;
+    const requiresAdvisoryFreshness = key === 'pipAudit' || key === 'pnpmAudit';
+    if (requiresAdvisoryFreshness && (advisoryTimestamp === undefined || advisoryTimestamp === null)) {
+      errors.push(`[Static Freshness Error] ${label} advisory timestamp is missing`);
+    } else if (
+      requiresAdvisoryFreshness &&
+      ((freshness.advisoryTimestampKind !== 'database' &&
+        freshness.advisoryTimestampKind !== 'queried-at') ||
+        (freshness.advisoryTimestampKind === 'database' &&
+          (typeof freshness.advisoryDatabaseTimestamp !== 'string' ||
+            freshness.advisoryTimestampEvidence !== 'scanner-provided advisory database timestamp')) ||
+        (freshness.advisoryTimestampKind === 'queried-at' &&
+          (typeof freshness.advisoryQueriedAt !== 'string' ||
+            freshness.advisoryTimestampEvidence !== 'live registry query observed at checkedAt')))
+    ) {
+      errors.push(`[Static Freshness Error] ${label} advisory timestamp provenance is missing`);
+    } else if (advisoryTimestamp !== undefined && advisoryTimestamp !== null) {
+      if (!isValidTimestamp(advisoryTimestamp)) {
+        errors.push(`[Static Freshness Error] ${label} advisory timestamp is invalid`);
+      } else if (Number.isFinite(currentDateMs)) {
+        const advisoryDateMs = Date.parse(advisoryTimestamp);
+        if (advisoryDateMs > currentDateMs || currentDateMs - advisoryDateMs > maxAdvisoryAgeHours * 60 * 60 * 1000) {
+          errors.push(`[Static Freshness Error] ${label} advisory data is stale or from the future`);
+        }
+      }
+    }
+  }
+
+  return errors;
+}
+
+function readStaticJsonReport(directory, fileName, errors) {
+  const path = join(directory, fileName);
+  if (!existsSync(path)) {
+    errors.push(`[Fail-Closed] Missing required report: ${fileName}`);
+    return null;
+  }
+  try {
+    return JSON.parse(readFileSync(path, 'utf8'));
+  } catch (error) {
+    errors.push(`[Fail-Closed] Failed to parse ${fileName}: ${error.message}`);
+    return null;
+  }
+}
+
+function evaluateStaticSecurityResults({ directory, currentDate, maxAdvisoryAgeHours }) {
+  const resolvedDir = resolve(directory);
+  const errors = [];
+  const reports = {};
+  if (!existsSync(resolvedDir)) {
+    return {
+      passed: false,
+      exitCode: 1,
+      errors: [`[Fail-Closed] Security reports directory does not exist: ${resolvedDir}`],
+      summary: {},
+      reports,
+    };
+  }
+
+  reports.sast = readStaticJsonReport(resolvedDir, 'sast.json', errors);
+  reports.supplyChain = readStaticJsonReport(resolvedDir, 'supply-chain.json', errors);
+  if (errors.length > 0) {
+    return { passed: false, exitCode: 1, errors, summary: {}, reports };
+  }
+
+  staticReportVersion(reports.sast, '2.1.0', 'SAST', errors);
+  staticReportVersion(reports.supplyChain, '1.0.0', 'Supply-chain', errors);
+  if (!Array.isArray(reports.sast.runs)) {
+    errors.push('[Static Schema Error] SAST SARIF report must contain a runs array');
+  }
+  if (!Array.isArray(reports.supplyChain.errors)) {
+    errors.push('[Static Schema Error] Supply-chain report errors must be an array');
+  }
+  if (Array.isArray(reports.supplyChain.errors) && reports.supplyChain.errors.length > 0) {
+    errors.push(`[Supply Chain Error] Scanner reported execution error(s): ${JSON.stringify(reports.supplyChain.errors)}`);
+  }
+  for (const [key, label] of [
+    ['pipAudit', 'pip-audit'],
+    ['pnpmAudit', 'pnpm audit'],
+    ['gitleaks', 'gitleaks'],
+  ]) {
+    const scanner = reports.supplyChain[key];
+    if (scanner && Array.isArray(scanner.errors) && scanner.errors.length > 0) {
+      errors.push(`[Supply Chain Error] ${label} reported execution error(s): ${JSON.stringify(scanner.errors)}`);
+    }
+  }
+  errors.push(...validateStaticSupplyChainFreshness(reports.supplyChain, {
+    currentDate,
+    maxAdvisoryAgeHours,
+  }));
+
+  if (reports.supplyChain.counts === undefined) {
+    errors.push('[Static Schema Error] Supply-chain report must include explicit counts');
+  } else {
+    errors.push(...validateExplicitCounts(reports.supplyChain.counts, 'Supply Chain'));
+  }
+  if (Array.isArray(reports.supplyChain.exceptions)) {
+    const currentDateMs = Date.parse(currentDate);
+    for (const exception of reports.supplyChain.exceptions) {
+      const id = exception?.id || exception?.fingerprint || 'unknown-exception';
+      const expiry = exception?.expiry ?? exception?.expiresAt;
+      if (!isValidTimestamp(expiry)) {
+        errors.push(`[Supply Chain Exception Error] Exception "${id}" missing or invalid expiry date`);
+      } else if (Number.isFinite(currentDateMs) && Date.parse(expiry) < currentDateMs) {
+        errors.push(`[Expired Security Exception] Exception "${id}" expired on ${expiry}`);
+      }
+    }
+  } else {
+    errors.push('[Static Schema Error] Supply-chain exceptions must be an array');
+  }
+
+  const sastEval = evaluateSast(reports.sast);
+  if (!sastEval.passed) errors.push(...sastEval.errors);
+  const supplyChainEval = evaluateSupplyChain(reports.supplyChain, {
+    currentDate,
+    maxAdvisoryAgeHours,
+    requireFreshness: true,
+  });
+  if (!supplyChainEval.passed) errors.push(...supplyChainEval.errors);
+
+  const passed = errors.length === 0;
+  return {
+    passed,
+    exitCode: passed ? 0 : 1,
+    errors,
+    summary: { sast: sastEval.counts, supplyChain: supplyChainEval.counts },
+    reports,
+  };
+}
+
 /**
  * Top-level evaluation function aggregating and evaluating reports from directory.
  * Returns verdict and exit code (0 for pass, 1 for fail).
@@ -1005,8 +1235,10 @@ export function validateReportSchemas(reports) {
  */
 export function evaluateSecurityResults(optionsOrDir) {
   let targetDir = 'artifacts/security';
+  let scope = 'full';
   let manifestPath = null;
   let currentDate = new Date().toISOString();
+  let maxAdvisoryAgeHours = 24;
   let coveragePolicyPath;
   let coveragePolicyOverride;
   let hasCoveragePolicyOverride = false;
@@ -1015,15 +1247,23 @@ export function evaluateSecurityResults(optionsOrDir) {
     targetDir = optionsOrDir;
   } else if (optionsOrDir && typeof optionsOrDir === 'object') {
     if (optionsOrDir.directory) targetDir = optionsOrDir.directory;
+    if (optionsOrDir.scope) scope = optionsOrDir.scope;
     if (optionsOrDir.manifest) manifestPath = optionsOrDir.manifest;
     else if (optionsOrDir.manifestPath) manifestPath = optionsOrDir.manifestPath;
     if (optionsOrDir.currentDate) currentDate = optionsOrDir.currentDate;
+    if (optionsOrDir.maxAdvisoryAgeHours !== undefined) {
+      maxAdvisoryAgeHours = optionsOrDir.maxAdvisoryAgeHours;
+    }
     if (Object.prototype.hasOwnProperty.call(optionsOrDir, 'coveragePolicy')) {
       coveragePolicyOverride = optionsOrDir.coveragePolicy;
       hasCoveragePolicyOverride = true;
     } else if (optionsOrDir.coveragePolicyPath) {
       coveragePolicyPath = optionsOrDir.coveragePolicyPath;
     }
+  }
+
+  if (scope === 'static') {
+    return evaluateStaticSecurityResults({ directory: targetDir, currentDate, maxAdvisoryAgeHours });
   }
 
   const resolvedDir = resolve(targetDir);

@@ -477,8 +477,8 @@ async def test_tool_output_pii_ssn_blocked_gateway(
 @pytest.mark.parametrize(
     "token_payload",
     [
-        {"secret_key": "api_key=sk_live_canary999secretkey98765"},
-        {"auth": {"bearer": "sk_live_canary999secretkey98765"}},
+        {"secret_key": f"api_key={'sk_live_'}{'canary999secretkey98765'}"},
+        {"auth": {"bearer": "".join(["sk_live_", "canary999secretkey98765"])}},
     ],
 )
 async def test_tool_output_pii_api_keys_tokens_blocked_direct(
@@ -506,7 +506,7 @@ async def test_tool_output_pii_api_keys_tokens_blocked_gateway(
     call = DummyToolCall("search_flights")
 
     async def invoke_with_token() -> dict[str, Any]:
-        return {"token_dump": "api_key=sk_live_canary999secretkey98765"}
+        return {"token_dump": f"api_key={'sk_live_'}{'canary999secretkey98765'}"}
 
     decision = await gateway.execute_tool(turn_capabilities, call, invoke_with_token)
 

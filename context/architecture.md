@@ -88,7 +88,7 @@
 │
 ├── scripts/
 │   ├── ci/                            → CI status and gate evaluation scripts
-│   └── security/                      → evaluate-results.mjs, validate-corpus.mjs, write-report.mjs, and security harness tooling
+│   └── security/                      → run-supply-chain.mjs, run-sast.mjs, evaluate-results.mjs, validate-corpus.mjs, write-report.mjs
 │
 ├── docs/
 │   ├── adr/                           → Architectural Decision Records
@@ -1158,6 +1158,8 @@ Phase 2 Foundation status (2026-09-05): Tasks T005–T011 implemented. `scripts/
 Feature 023 plan convergence (2026-09-04): admission context is separate from post-router/gate sealed tool authority. The design now specifies bounded PII spans, stage-local DAST oracles and quota profiles, validated generated summaries and payload-free model callbacks. Two independent review cycles closed six planning findings; see `specs/023-security-systems/review-convergence.md`. Runtime implementation remains pending.
 
 ### Phase 5 US3 — Static Application Security Testing (SAST) Architecture
+
+CI review follow-up (2026-09-11): application and shared-package changes route both static security jobs. Weekly scheduled runs bypass PR path detection and run the full security scans. The SAST job installs frozen Node dependencies for its TypeScript parser; the supply-chain job provisions pinned pnpm/uv without installing the Node dependency tree. Gitleaks uses a full-history checkout (`fetch-depth: 0`). Advisory query timestamps are distinct from database publication timestamps; freshness verification must reject missing, stale, or unverifiable evidence.
 
 1. **Rule Panning and Separation (`tests/security/sast/`)**:
    - `guardrails.yml`: Pinned custom rules with severity `ERROR` targeting hard boundaries:

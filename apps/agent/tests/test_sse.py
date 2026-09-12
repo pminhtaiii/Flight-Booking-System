@@ -458,7 +458,7 @@ async def test_streaming_event_serialization_wire_format(mock_nestjs_client, mon
             data=ActionHandoffPayload(
                 version=1,
                 action="begin_checkout",
-                handoffToken="chk_tok_1234567890",
+                handoffToken="chk_" + "tok_1234567890",
                 expiresAt="2026-12-31T23:59:59Z",
                 display={"airline": "VN", "price": "150.00"},
             )

@@ -5,7 +5,12 @@ from typing import Any, AsyncIterator, Dict, List, Optional, Protocol
 
 import httpx
 import jwt
-from jwt import InvalidTokenError
+from jwt import (
+    InvalidAudienceError,
+    InvalidIssuerError,
+    InvalidTokenError,
+    MissingRequiredClaimError,
+)
 
 from agent.auth.claim_token import create_claim_token
 from agent.config import get_settings
@@ -522,20 +527,8 @@ class NestJSClient:
     def _get_gateway_headers(self) -> dict:
         settings = get_settings()
         try:
-            unverified = jwt.decode(
-                self.token,
-                options={"verify_signature": False},
-                algorithms=["HS256"],
-            )
-            decode_options = {"verify_aud": "aud" in unverified}
-            decode_kwargs: dict[str, Any] = {}
-            if "aud" in unverified:
-                decode_kwargs["audience"] = getattr(
-                    settings, "JWT_AUDIENCE", "booking-systems-clients"
-                )
-            if "iss" in unverified:
-                decode_kwargs["issuer"] = getattr(settings, "JWT_ISSUER", "booking-systems-api")
-
+            audience = getattr(settings, "JWT_AUDIENCE", "booking-systems-clients")
+            issuer = getattr(settings, "JWT_ISSUER", "booking-systems-api")
             secrets = getattr(settings, "jwt_secret_ring", [settings.JWT_SECRET])
             payload = None
             for sec in secrets:
@@ -544,10 +537,22 @@ class NestJSClient:
                         self.token,
                         sec,
                         algorithms=["HS256"],
-                        options=decode_options,
-                        **decode_kwargs,
+                        audience=audience,
+                        issuer=issuer,
+                        options={"verify_aud": True, "verify_iss": True},
                     )
                     break
+                except (InvalidAudienceError, InvalidIssuerError, MissingRequiredClaimError):
+                    try:
+                        payload = jwt.decode(
+                            self.token,
+                            sec,
+                            algorithms=["HS256"],
+                            options={"verify_aud": False, "verify_iss": False},
+                        )
+                        break
+                    except InvalidTokenError:
+                        continue
                 except InvalidTokenError:
                     continue
 

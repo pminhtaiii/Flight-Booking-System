@@ -154,6 +154,84 @@ function writeFixtureDirectory(dir, fixture = createCleanFixtureReports()) {
   writeFileSync(join(dir, 'invariant-corpus.json'), JSON.stringify(fixture.invariantCorpus, null, 2), 'utf8');
 }
 
+function createCleanStaticReports() {
+  const checkedAt = '2026-09-11T00:00:00.000Z';
+  const freshness = (source, maxAdvisoryAgeHours, advisoryEvidence = false) => ({
+    source,
+    mode: 'live',
+    checkedAt,
+    ...(maxAdvisoryAgeHours === undefined ? {} : { maxAdvisoryAgeHours }),
+    ...(advisoryEvidence
+      ? {
+          advisoryQueriedAt: checkedAt,
+          advisoryTimestampKind: 'queried-at',
+          advisoryTimestampEvidence: 'live registry query observed at checkedAt',
+        }
+      : {}),
+    usedOfflineCache: false,
+  });
+  return {
+    sast: {
+      version: '2.1.0',
+      runs: [{ tool: { driver: { name: 'Semgrep', semanticVersion: '1.88.0' } }, results: [] }],
+    },
+    supplyChain: {
+      version: '1.0.0',
+      timestamp: checkedAt,
+      counts: { Critical: 0, High: 0, Medium: 0, Low: 0, Informational: 0 },
+      findings: [],
+      exceptions: [],
+      errors: [],
+      pipAudit: {
+        timestamp: checkedAt,
+        freshness: freshness('PyPI advisory database via pip-audit', 24, true),
+        counts: { Critical: 0, High: 0, Medium: 0, Low: 0, Informational: 0 },
+        findings: [],
+        errors: [],
+      },
+      pnpmAudit: {
+        timestamp: checkedAt,
+        freshness: freshness('npm advisory registry via pnpm audit', undefined, true),
+        counts: { Critical: 0, High: 0, Medium: 0, Low: 0, Informational: 0 },
+        findings: [],
+        errors: [],
+      },
+      gitleaks: {
+        timestamp: checkedAt,
+        freshness: freshness('Gitleaks static detection rules'),
+        counts: { Critical: 0, High: 0, Medium: 0, Low: 0, Informational: 0 },
+        findings: [],
+        errors: [],
+      },
+    },
+  };
+}
+
+function writeStaticFixtureDirectory(dir, fixture = createCleanStaticReports()) {
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'sast.json'), JSON.stringify(fixture.sast, null, 2), 'utf8');
+  writeFileSync(join(dir, 'supply-chain.json'), JSON.stringify(fixture.supplyChain, null, 2), 'utf8');
+}
+
+test('evaluateSecurityResults: static scope evaluates only raw SARIF and supply-chain reports', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'sec-eval-static-clean-'));
+  try {
+    writeStaticFixtureDirectory(tempDir);
+    const result = evaluateSecurityResults({
+      directory: tempDir,
+      scope: 'static',
+      currentDate: '2026-09-11T00:00:00.000Z',
+      maxAdvisoryAgeHours: 24,
+    });
+    assert.equal(result.passed, true);
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.errors.length, 0);
+    assert.deepEqual(Object.keys(result.reports).sort(), ['sast', 'supplyChain']);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test('evaluateSecurityResults: clean synthetic reports fixture passes with exit code 0', () => {
   const tempDir = mkdtempSync(join(tmpdir(), 'sec-eval-clean-'));
   try {
@@ -676,6 +754,47 @@ test('evaluateSupplyChain: active findings cannot be bypassed by bogus counts', 
   assert.equal(res.passed, false);
   assert.equal(res.counts.Critical, 1);
   assert.ok(res.errors.some((e) => e.includes('Critical')));
+});
+
+test('evaluateSupplyChain: scanner execution errors fail closed even with clean findings', () => {
+  const report = createCleanStaticReports().supplyChain;
+  report.errors = ['[pnpm audit Execution Error] registry unavailable'];
+  const result = evaluateSupplyChain(report, {
+    currentDate: '2026-09-11T00:00:00.000Z',
+    requireFreshness: true,
+  });
+  assert.equal(result.passed, false);
+  assert.ok(result.errors.some((error) => error.includes('Scanner reported execution error')));
+});
+
+test('evaluateSupplyChain: missing advisory provenance fails closed for both registry scanners', () => {
+  const report = createCleanStaticReports().supplyChain;
+  delete report.pipAudit.freshness.advisoryQueriedAt;
+  delete report.pipAudit.freshness.advisoryTimestampKind;
+  delete report.pipAudit.freshness.advisoryTimestampEvidence;
+  delete report.pnpmAudit.freshness.advisoryQueriedAt;
+  delete report.pnpmAudit.freshness.advisoryTimestampKind;
+  delete report.pnpmAudit.freshness.advisoryTimestampEvidence;
+  const result = evaluateSupplyChain(report, { currentDate: EVAL_DATE, requireFreshness: true });
+  assert.equal(result.passed, false);
+  assert.ok(result.errors.some((error) => error.includes('pip-audit advisory timestamp')));
+  assert.ok(result.errors.some((error) => error.includes('pnpm audit advisory timestamp')));
+});
+
+test('evaluateSupplyChain: stale and future advisory query timestamps fail the 24-hour gate', () => {
+  const stale = createCleanStaticReports().supplyChain;
+  stale.pipAudit.freshness.advisoryQueriedAt = '2026-09-03T00:00:00.000Z';
+  stale.pnpmAudit.freshness.advisoryQueriedAt = '2026-09-06T00:00:00.000Z';
+  const staleResult = evaluateSupplyChain(stale, { currentDate: EVAL_DATE, requireFreshness: true });
+  assert.equal(staleResult.passed, false);
+  assert.ok(staleResult.errors.filter((error) => error.includes('advisory data is stale')).length >= 1);
+
+  const future = createCleanStaticReports().supplyChain;
+  future.pipAudit.freshness.advisoryQueriedAt = '2026-09-06T00:00:00.000Z';
+  future.pnpmAudit.freshness.advisoryQueriedAt = '2026-09-06T00:00:00.000Z';
+  const futureResult = evaluateSupplyChain(future, { currentDate: EVAL_DATE, requireFreshness: true });
+  assert.equal(futureResult.passed, false);
+  assert.ok(futureResult.errors.filter((error) => error.includes('advisory data is stale')).length >= 1);
 });
 
 test('evaluateDast: active findings cannot be bypassed by bogus counts', () => {
