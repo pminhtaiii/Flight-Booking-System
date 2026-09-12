@@ -1,0 +1,158 @@
+# OWASP ZAP Automation Framework Configuration Profile
+# Feature 023: Security Systems - DAST Automation Profile
+# Scope: Strictly locked to local loopback services (3000, 3001, 3002)
+
+env:
+  contexts:
+    - name: "BookingSystems-Local"
+      urls:
+        - "http://127.0.0.1:3000"
+        - "http://127.0.0.1:3001"
+        - "http://127.0.0.1:3002"
+      includePaths:
+        - "http://127.0.0.1:3000/.*"
+        - "http://127.0.0.1:3001/.*"
+        - "http://127.0.0.1:3002/.*"
+      excludePaths:
+        - "^(?!http://127\\.0\\.0\\.1:(3000|3001|3002)).*"
+      authentication:
+        method: "manual"
+        parameters: {}
+        verification:
+          method: "response"
+          pollFrequency: 60
+          loggedInRegex: "\\Q200 OK\\E"
+          loggedOutRegex: "\\Q401 Unauthorized\\E"
+      sessionManagement:
+        method: "headers"
+        parameters: {}
+      users:
+        - name: "User A"
+          credentials:
+            username: "security-a@example.invalid"
+            token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzZWN1cml0eS11c2VyLWEiLCJlbWFpbCI6InNlY3VyaXR5LWEtZXhhbXBsZS5pbnZhbGlkIiwicm9sZSI6IlVTRVIiLCJpc3MiOiJib29raW5nLXN5c3RlbXMtYXBpIiwiYXVkIjoiYm9va2luZy1zeXN0ZW1zLWNsaWVudHMiLCJqdGkiOiJqdGktc2VjdXJpdHktYSJ9.synthetic_user_a_signature"
+        - name: "User B"
+          credentials:
+            username: "security-b@example.invalid"
+            token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzZWN1cml0eS11c2VyLWIiLCJlbWFpbCI6InNlY3VyaXR5LWItZXhhbXBsZS5pbnZhbGlkIiwicm9sZSI6IlVTRVIiLCJpc3MiOiJib29raW5nLXN5c3RlbXMtYXBpIiwiYXVkIjoiYm9va2luZy1zeXN0ZW1zLWNsaWVudHMiLCJqdGkiOiJqdGktc2VjdXJpdHktYiJ9.synthetic_user_b_signature"
+jobs:
+  - type: "passiveScan-config"
+    parameters:
+      maxAlertsPerRule: 10
+      scanOnlyInScope: true
+      maxBodySizeInBytesToScan: 1048576
+      enableRules: true
+      alertThreshold: "LOW"
+
+  - type: "spider"
+    parameters:
+      context: "BookingSystems-Local"
+      url: "http://127.0.0.1:3000"
+      maxDuration: 5
+      maxDepth: 5
+
+  - type: "passiveScan-wait"
+    parameters:
+      maxDuration: 5
+
+  - type: "activeScan"
+    parameters:
+      context: "BookingSystems-Local"
+      policy: "StrictLocalBounded"
+      maxRuleDurationInMins: 2
+      maxScanDurationInMins: 10
+    policyDefinition:
+      defaultThreshold: "medium"
+      defaultStrength: "medium"
+      rules:
+        # SQL Injection
+        - id: 40018
+          name: "SQL Injection - Hypersonic SQL"
+          threshold: "low"
+          strength: "medium"
+        - id: 40019
+          name: "SQL Injection - MySQL"
+          threshold: "low"
+          strength: "medium"
+        - id: 40020
+          name: "SQL Injection - PostgreSQL"
+          threshold: "low"
+          strength: "medium"
+        - id: 40021
+          name: "SQL Injection - Oracle"
+          threshold: "low"
+          strength: "medium"
+        - id: 40022
+          name: "SQL Injection - SQLite"
+          threshold: "low"
+          strength: "medium"
+        - id: 40024
+          name: "SQL Injection - SQLite (Time Based)"
+          threshold: "low"
+          strength: "medium"
+        - id: 40027
+          name: "SQL Injection - Relational Databases"
+          threshold: "low"
+          strength: "medium"
+        # Cross Site Scripting (Reflected & Stored)
+        - id: 40012
+          name: "Cross Site Scripting (Reflected)"
+          threshold: "low"
+          strength: "medium"
+        - id: 40014
+          name: "Cross Site Scripting (Persistent)"
+          threshold: "low"
+          strength: "medium"
+        - id: 40016
+          name: "Cross Site Scripting (Persistent) - Prime"
+          threshold: "low"
+          strength: "medium"
+        - id: 40017
+          name: "Cross Site Scripting (Persistent) - Spider"
+          threshold: "low"
+          strength: "medium"
+        # CSRF
+        - id: 10202
+          name: "Absence of Anti-CSRF Tokens"
+          threshold: "low"
+          strength: "medium"
+        # Path Traversal
+        - id: 6
+          name: "Path Traversal"
+          threshold: "low"
+          strength: "medium"
+        # Security Header Configuration
+        - id: 10038
+          name: "Content Security Policy (CSP) Header Not Set"
+          threshold: "low"
+          strength: "medium"
+        - id: 10035
+          name: "Strict-Transport-Security Header Not Set"
+          threshold: "low"
+          strength: "medium"
+        - id: 10020
+          name: "Anti-clickjacking Header"
+          threshold: "low"
+          strength: "medium"
+        - id: 10021
+          name: "X-Content-Type-Options Header Missing"
+          threshold: "low"
+          strength: "medium"
+
+  - type: "report"
+    parameters:
+      template: "traditional-json"
+      reportDir: "/zap/wrk"
+      reportFile: "zap-raw-report.json"
+      reportTitle: "Booking Systems OWASP ZAP Raw JSON Report"
+      reportDescription: "OWASP ZAP DAST scan results in JSON format"
+      displayReport: false
+
+  - type: "report"
+    parameters:
+      template: "sarif-json"
+      reportDir: "/zap/wrk"
+      reportFile: "zap-raw-report.sarif"
+      reportTitle: "Booking Systems OWASP ZAP Raw SARIF Report"
+      reportDescription: "OWASP ZAP DAST scan results in SARIF format"
+      displayReport: false
