@@ -726,6 +726,7 @@ function commandResult(execFn, command, args, rootDir) {
       cwd: rootDir,
       encoding: 'utf8',
       shell: process.platform === 'win32',
+      maxBuffer: 64 * 1024 * 1024,
     });
     if (!result || typeof result !== 'object') {
       return { status: null, stdout: '', stderr: '', error: new Error('invalid scanner result') };

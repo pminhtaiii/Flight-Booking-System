@@ -164,6 +164,7 @@ export function resolveTargetFiles(options = {}) {
         res = execFn('git', ['diff', '--name-only', '--diff-filter=ACMRTUXB', base], {
           cwd: rootDir,
           encoding: 'utf8',
+          maxBuffer: 16 * 1024 * 1024,
         });
         if (res && res.status === 0 && !res.error) {
           gitSuccess = true;
@@ -178,6 +179,7 @@ export function resolveTargetFiles(options = {}) {
           res = execFn('git', ['diff', '--name-only', '--diff-filter=ACMRTUXB', 'HEAD'], {
             cwd: rootDir,
             encoding: 'utf8',
+            maxBuffer: 16 * 1024 * 1024,
           });
           if (res && res.status === 0 && !res.error) {
             gitSuccess = true;
@@ -1110,6 +1112,7 @@ print(json.dumps({'findings': findings, 'errors': errors}))
       const res = spawnSync('python', ['-c', pythonScript], {
         input: inputPayload,
         encoding: 'utf8',
+        maxBuffer: 64 * 1024 * 1024,
       });
       if (res.error) {
         errors.push(`[AST Fallback Error] Python process failed to spawn: ${res.error.message}`);
@@ -1538,6 +1541,10 @@ export function runSastScan(options = {}) {
 
   // Step 4: Build Semgrep CLI execution arguments
   const semgrepArgs = ['--sarif'];
+  if (sarifOutput) {
+    mkdirSync(dirname(sarifOutput), { recursive: true });
+    semgrepArgs.push('--output', sarifOutput);
+  }
   for (const cfg of configs) {
     const isRegistry = cfg.startsWith('p/') || cfg.startsWith('r/');
     if (!isRegistry && !existsSync(cfg)) {
@@ -1585,6 +1592,7 @@ export function runSastScan(options = {}) {
       cwd: rootDir,
       encoding: 'utf8',
       shell: process.platform === 'win32',
+      maxBuffer: options.maxBuffer || 128 * 1024 * 1024,
     });
   } catch (err) {
     if (canUseFallback) {
@@ -1677,7 +1685,17 @@ export function runSastScan(options = {}) {
     };
   }
 
-  const sarifRaw = scanRes.stdout || '';
+  let sarifRaw = '';
+  if (sarifOutput && existsSync(sarifOutput)) {
+    try {
+      sarifRaw = readFileSync(sarifOutput, 'utf8');
+    } catch {
+      sarifRaw = '';
+    }
+  }
+  if (!sarifRaw.trim() && scanRes?.stdout) {
+    sarifRaw = scanRes.stdout;
+  }
 
   if (scanRes.status === 1 && sarifRaw.trim().length === 0) {
     errors.push(
@@ -1698,7 +1716,9 @@ export function runSastScan(options = {}) {
     try {
       const sarifDir = dirname(sarifOutput);
       mkdirSync(sarifDir, { recursive: true });
-      writeFileSync(sarifOutput, sarifRaw, 'utf8');
+      if (!existsSync(sarifOutput) || !readFileSync(sarifOutput, 'utf8').trim()) {
+        writeFileSync(sarifOutput, sarifRaw, 'utf8');
+      }
     } catch (err) {
       errors.push(
         `[SAST Output Error] Failed to write SARIF output to ${sarifOutput}: ${err.message}`,

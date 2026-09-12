@@ -2473,3 +2473,109 @@ test('Issue 1: runAstFallbackScan detects syntax errors in JS/TS/TSX/MJS files a
     }
   }
 });
+
+test('runSastScan safeguards maxBuffer and handles sarifOutput file routing', () => {
+  const mockCleanSarif = {
+    version: '2.1.0',
+    runs: [{ tool: { driver: { name: 'semgrep' } }, results: [] }],
+  };
+
+  // 1. Verify runSastScan passes default maxBuffer: 128 * 1024 * 1024 to execFn
+  let capturedOptions = null;
+  let capturedArgs = null;
+  runSastScan({
+    rootDir: repoRoot,
+    execFn: (cmd, args, opts) => {
+      capturedArgs = args;
+      capturedOptions = opts;
+      return { status: 0, stdout: JSON.stringify(mockCleanSarif), stderr: '' };
+    },
+  });
+  assert.ok(capturedOptions, 'execFn must be called with options');
+  assert.equal(capturedOptions.maxBuffer, 128 * 1024 * 1024, 'default maxBuffer must be 128MB');
+
+  // Verify custom maxBuffer is respected
+  capturedOptions = null;
+  runSastScan({
+    rootDir: repoRoot,
+    maxBuffer: 32 * 1024 * 1024,
+    execFn: (cmd, args, opts) => {
+      capturedOptions = opts;
+      return { status: 0, stdout: JSON.stringify(mockCleanSarif), stderr: '' };
+    },
+  });
+  assert.equal(capturedOptions.maxBuffer, 32 * 1024 * 1024, 'custom maxBuffer must be passed to execFn');
+
+  // 2. When sarifOutput is provided, semgrepArgs includes --output and resolved sarifOutput
+  const tempDir = mkdtempSync(join(tmpdir(), 'sast-buf-test-'));
+  const targetSarif = join(tempDir, 'sub', 'report.sarif');
+  try {
+    capturedArgs = null;
+    runSastScan({
+      rootDir: repoRoot,
+      sarifOutput: targetSarif,
+      execFn: (cmd, args) => {
+        capturedArgs = args;
+        return { status: 0, stdout: JSON.stringify(mockCleanSarif), stderr: '' };
+      },
+    });
+    const outputIdx = capturedArgs.indexOf('--output');
+    assert.ok(outputIdx !== -1, 'semgrepArgs must include --output flag');
+    assert.equal(
+      capturedArgs[outputIdx + 1],
+      resolve(repoRoot, targetSarif),
+      'resolved sarifOutput must follow --output flag',
+    );
+
+    // 3. When sarifOutput already has SARIF written (or mock writes to file), runSastScan reads and evaluates findings from sarifOutput
+    const mockFindingSarif = {
+      version: '2.1.0',
+      runs: [
+        {
+          tool: { driver: { name: 'semgrep' } },
+          results: [
+            {
+              ruleId: 'no-raw-payload-logging',
+              level: 'error',
+              message: { text: 'Unredacted log detected' },
+              locations: [
+                {
+                  physicalLocation: {
+                    artifactLocation: { uri: 'apps/agent/src/agent/bad.py' },
+                    region: { startLine: 1 },
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    writeFileSync(targetSarif, JSON.stringify(mockFindingSarif), 'utf8');
+
+    // execFn returns empty stdout to verify findings are read from targetSarif file
+    const fileScanResult = runSastScan({
+      rootDir: repoRoot,
+      sarifOutput: targetSarif,
+      execFn: () => ({ status: 1, stdout: '', stderr: '' }),
+    });
+    assert.equal(
+      fileScanResult.passed,
+      false,
+      'Scan must fail closed due to findings read from sarifOutput file',
+    );
+    assert.equal(
+      fileScanResult.unbaselinedFindings.length,
+      1,
+      'Should evaluate unbaselined finding read from sarifOutput',
+    );
+    assert.equal(
+      fileScanResult.findings[0].ruleId,
+      'no-raw-payload-logging',
+      'Finding ruleId must match sarifOutput content',
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
