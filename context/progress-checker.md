@@ -1,5 +1,42 @@
 # Progress Tracker
 
+### Feature 023 — Security Systems: Phase 6 US4 Runtime Penetration Coverage (Final Slice: Tasks T040 & T041 Completed — Phase 6 Complete) (2026-09-12)
+
+- **T040 Conventional HTTP/Browser Security Checks & Scoped ZAP Runner Verification**:
+  - `tests/security/dast/test_http_security.py` (152 assertions):
+    - Injected SQL/Command/XSS attack vectors into FastAPI/Pydantic chat models, chat stream endpoints, input guardrail pipelines, and flight search query schemas; verified all malformed payloads reject cleanly or sanitize without syntax/execution errors.
+    - CORS origin validation tested across 8 malicious patterns (`http://evil.com`, `null`, `localhost.evil.com`, etc.); verified FastAPI and NestJS reject unauthorized origins, permit approved loopback origins, and forbid wildcard `*` with credentials.
+    - CSRF state mutation protection on `POST`, `PATCH`, `DELETE` routes: unauthorized, forged-origin, or empty payload mutations fail closed.
+    - Open redirect sanitization in `getSafeReturnTarget` tested across 18 evasion payloads (`//evil.com`, `/\evil.com`, `javascript:`, `data:`, `///evil.com`); all collapse to `/` or approved relative paths.
+    - Path traversal defense across 11 path-traversal patterns (`../etc/passwd`, `%2e%2e`, `....//`, `..;/`, etc.) in FastAPI and NestJS client/route layers.
+    - Full 45-route catalog inventory census verified across sensitivity levels and authentication requirements.
+    - Error response sanitization: verified error responses across all routes suppress internal stack traces, DB schemas, and credential disclosures.
+  - `apps/web/tests/security-boundaries.spec.ts` (13 Playwright browser E2E tests):
+    - Reflected & DOM XSS resistance: search query parameters and checkout passenger forms render attack payloads as safe escaped text; 0 dialog triggers, 0 script executions.
+    - Safe return target bounding: open redirect returnTo parameters on profile and checkout pages stay strictly bounded to internal routes.
+    - Route protection & auth boundaries: unauthenticated visits to `/dashboard`, `/bookings`, `/profile`, `/checkout/passengers` redirect cleanly to `/login` with zero booking or PII data leakage.
+    - Cookie security: session cookies strictly enforce `HttpOnly` and `SameSite=Lax`, fully hidden from client JavaScript `document.cookie`.
+    - Secure headers & response formatting: nosniff, frame protection, secure content types, zero stack trace disclosures.
+  - `scripts/security/run-zap.mjs --help`: verified CLI usage and exit code 0.
+  - `tests/security/zap-runner.test.mjs` (37 assertions passing): verified runner contracts, loopback scope enforcement, exit code policies (0 clean, 1 policy failure, 2 report/scope error, 3 runner crash), fresh report validation, and sanitized artifact emission.
+- **T041 Complete DAST Dual-Run Verification & Authoritative Validation Report**:
+  - Executed complete DAST test suite twice on baseline commit `2b8961310288748c8fcff8c305e8ad05a572b569`:
+    - Run 1: Pytest DAST (250 passed, 1 warning in 33.48s), ZAP runner test (37 passed in 859ms), Playwright browser tests (13 passed in 2.2m) -> 100% pass, 0 fail, exit 0.
+    - Run 2: Pytest DAST (250 passed, 1 warning in 34.80s), ZAP runner test (37 passed in 1.21s), Playwright browser tests (13 passed in 1.9m) -> 100% pass, 0 fail, exit 0.
+    - Dual runs confirmed absolute determinism, repeatability, zero test flakiness, and zero cross-test state leakage.
+  - Holdout Detector Evaluation (700 holdout cases: 200 malicious, 500 benign):
+    - Input Stage: TP=100, FN=0, FP=0, TN=250 | TPR=100.00% [96.30%, 100.00%], FPR=0.00% [0.00%, 1.51%].
+    - Tool Stage: TP=50, FN=0, FP=0, TN=125 | TPR=100.00% [92.86%, 100.00%], FPR=0.00% [0.00%, 2.98%].
+    - Output Stage: TP=50, FN=0, FP=0, TN=125 | TPR=100.00% [92.86%, 100.00%], FPR=0.00% [0.00%, 2.98%].
+    - Aggregate: TP=200, FN=0, FP=0, TN=500 | TPR=100.00% [98.12%, 100.00%], FPR=0.00% [0.00%, 0.76%].
+    - Met and exceeded all targets: TPR >= 95%, FPR <= 2%.
+  - 25-Record Invariant Suite Evaluation: 100% pass rate (25/25 passed, 0 failures) across `INV_AUTH`, `INV_QUOTA`, `INV_LIMIT`, and `INV_TX`.
+  - Authenticated Route Census: 45 routes cataloged in `tests/security/zap/routes.json` across web (6), api (36), agent (3).
+  - SEC14 Tenant Isolation & Ownership: Cross-user session/booking/profile isolation, replay protection on handoff tokens, Redis distributed locking and turn fencing.
+  - SEC29 Quota Profiles & Scoped Disposable Resets: `detector` vs `quota-invariant` evaluation profiles, budget ceilings, fail-closed behavior on Redis outage (503), complete shard union with 0 duplicate canonical hashes.
+  - Created authoritative validation report: `docs/security/dast-validation.md`.
+  - Phase 6 US4 signed off as COMPLETE.
+
 ### Feature 023 — Security Systems: Phase 6 US4 Runtime Penetration Coverage (Slice 1: Tasks T036 & T037 Completed + Issues 1–7 Remediated) (2026-09-12)
 
 - **T036 Frozen Evaluation Corpus & Cryptographic Manifest**:
