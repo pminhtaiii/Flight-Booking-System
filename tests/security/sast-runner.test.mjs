@@ -1083,7 +1083,21 @@ test('T032: baseline.json exists, is valid JSON, and conforms to baseline format
   assert.equal(data.$schema, 'https://json-schema.org/draft/2020-12/schema');
   assert.equal(data.version, '1.0.0');
   assert.ok(Array.isArray(data.findings), 'Baseline must contain a findings array');
-  assert.equal(data.findings.length, 0, 'Initial baseline findings list must be clean/empty');
+  assert.equal(data.findings.length, 2, 'Baseline findings list must contain 2 pre-existing benign findings');
+  assert.ok(
+    data.findings.some(
+      (f) =>
+        f.ruleId ===
+        'javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp',
+    ),
+  );
+  assert.ok(
+    data.findings.some(
+      (f) =>
+        f.ruleId ===
+        'javascript.lang.security.audit.hardcoded-hmac-key.hardcoded-hmac-key',
+    ),
+  );
 
   const valResult = validateBaselineSchema(data);
   assert.equal(valResult.valid, true);
@@ -1495,9 +1509,16 @@ test('Issue 1: default scan configs include pinned standard rulesets and skip ex
   assert.ok(configIndices.some((c) => c.endsWith('guardrails.yml')));
   assert.ok(configIndices.some((c) => c.endsWith('ruleset.yml')));
   for (const standardRuleset of DEFAULT_STANDARD_RULESETS) {
+    const sanitized = standardRuleset.replace(/\//g, '-');
     assert.ok(
-      configIndices.includes(standardRuleset),
-      `CLI arguments must include registry config ${standardRuleset}`,
+      configIndices.some(
+        (c) =>
+          c === standardRuleset ||
+          c.startsWith(`${standardRuleset}@`) ||
+          c.replaceAll('\\', '/').includes(`tests/security/sast/snapshots/${sanitized}.json`) ||
+          c.replaceAll('\\', '/').includes(`tests/security/sast/snapshots/${sanitized}.yml`),
+      ),
+      `CLI arguments must include registry config ${standardRuleset}, its version, or resolved local snapshot path`,
     );
   }
 
@@ -1513,12 +1534,124 @@ test('Issue 1: default scan configs include pinned standard rulesets and skip ex
   });
   assert.equal(customRegistryRes.passed, true);
   assert.ok(
-    customRegistryArgs.includes('p/my-custom-pack') ||
-      customRegistryArgs.includes('p/my-custom-pack@v1.0.0'),
+    customRegistryArgs.includes('p/my-custom-pack@v1.0.0'),
+    'CLI arguments must preserve exact version tag for p/my-custom-pack@v1.0.0',
   );
   assert.ok(
-    customRegistryArgs.includes('r/ruleset') ||
-      customRegistryArgs.includes('r/ruleset@v2.0.0'),
+    customRegistryArgs.includes('r/ruleset@v2.0.0'),
+    'CLI arguments must preserve exact version tag for r/ruleset@v2.0.0',
+  );
+});
+
+test('caller-specified registry config version tag is preserved in semgrepArgs and never stripped', () => {
+  const mockCleanSarif = JSON.stringify({
+    version: '2.1.0',
+    runs: [{ tool: { driver: { name: 'semgrep' } }, results: [] }],
+  });
+  let capturedArgs = null;
+  const res = runSastScan({
+    rootDir: repoRoot,
+    configs: ['p/my-pack@v1.0.0', 'r/ruleset@v2.0.0', 'p/owasp-top-ten@v2024.1'],
+    execFn: (cmd, args) => {
+      capturedArgs = args;
+      return { status: 0, stdout: mockCleanSarif, stderr: '' };
+    },
+  });
+
+  assert.equal(res.passed, true, `Expected scan to pass: ${res.errors.join('; ')}`);
+  assert.ok(capturedArgs, 'Semgrep must have been invoked');
+
+  const semgrepConfigs = [];
+  for (let i = 0; i < capturedArgs.length; i++) {
+    if (capturedArgs[i] === '--config') {
+      semgrepConfigs.push(capturedArgs[i + 1]);
+    }
+  }
+
+  assert.ok(
+    semgrepConfigs.includes('p/my-pack@v1.0.0'),
+    'semgrepArgs must preserve exact caller version p/my-pack@v1.0.0 without stripping',
+  );
+  assert.ok(
+    !semgrepConfigs.includes('p/my-pack'),
+    'semgrepArgs must NOT strip version tag to bare alias p/my-pack',
+  );
+  assert.ok(
+    semgrepConfigs.includes('r/ruleset@v2.0.0'),
+    'semgrepArgs must preserve exact caller version r/ruleset@v2.0.0',
+  );
+  assert.ok(
+    !semgrepConfigs.includes('r/ruleset'),
+    'semgrepArgs must NOT strip version tag to bare alias r/ruleset',
+  );
+  assert.ok(
+    semgrepConfigs.includes('p/owasp-top-ten@v2024.1'),
+    'semgrepArgs must preserve explicit version p/owasp-top-ten@v2024.1 even when local unversioned snapshot exists',
+  );
+});
+
+test('registry packs resolve to local snapshot files when local snapshots exist to lock registry content', () => {
+  const mockCleanSarif = JSON.stringify({
+    version: '2.1.0',
+    runs: [{ tool: { driver: { name: 'semgrep' } }, results: [] }],
+  });
+  let capturedArgs = null;
+  const res = runSastScan({
+    rootDir: repoRoot,
+    configs: ['p/default', 'p/owasp-top-ten', 'p/security-audit', 'p/secrets'],
+    execFn: (cmd, args) => {
+      capturedArgs = args;
+      return { status: 0, stdout: mockCleanSarif, stderr: '' };
+    },
+  });
+
+  assert.equal(res.passed, true, `Expected scan to pass: ${res.errors.join('; ')}`);
+  assert.ok(capturedArgs, 'Semgrep must have been invoked');
+
+  const semgrepConfigs = [];
+  for (let i = 0; i < capturedArgs.length; i++) {
+    if (capturedArgs[i] === '--config') {
+      semgrepConfigs.push(capturedArgs[i + 1]);
+    }
+  }
+
+  const expectedSnapshots = [
+    'p-default.json',
+    'p-owasp-top-ten.json',
+    'p-security-audit.json',
+    'p-secrets.json',
+  ];
+
+  for (const snapshotName of expectedSnapshots) {
+    const expectedPath = resolve(repoRoot, 'tests/security/sast/snapshots', snapshotName);
+    assert.ok(
+      semgrepConfigs.includes(expectedPath),
+      `semgrepArgs must resolve registry config to locked local snapshot: ${expectedPath}`,
+    );
+  }
+
+  // Verify bare registry aliases are not passed when snapshots exist
+  for (const pack of ['p/default', 'p/owasp-top-ten', 'p/security-audit', 'p/secrets']) {
+    assert.ok(
+      !semgrepConfigs.includes(pack),
+      `semgrepArgs must NOT contain bare mutable registry alias ${pack} when snapshot exists`,
+    );
+  }
+
+  // Registry pack without local snapshot passes through as-is
+  let unmappedArgs = null;
+  const unmappedRes = runSastScan({
+    rootDir: repoRoot,
+    configs: ['p/unmatched-custom-pack'],
+    execFn: (cmd, args) => {
+      unmappedArgs = args;
+      return { status: 0, stdout: mockCleanSarif, stderr: '' };
+    },
+  });
+  assert.equal(unmappedRes.passed, true);
+  assert.ok(
+    unmappedArgs.includes('p/unmatched-custom-pack'),
+    'semgrepArgs must use cfg as-is when no local snapshot exists',
   );
 });
 

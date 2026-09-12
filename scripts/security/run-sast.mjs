@@ -44,6 +44,8 @@ export const SUPPORTED_STANDARD_RULESETS = new Set([
   'p/secrets',
 ]);
 
+export const DEFAULT_SNAPSHOT_DIR = resolve(defaultRepoRoot, 'tests/security/sast/snapshots');
+
 export const NON_BYPASSABLE_RULES = new Set([
   'no-llm-in-guardrails',
   'no-unshielded-tool-execution',
@@ -815,6 +817,18 @@ export function runAstFallbackScan(targetFiles, rootDir, options = {}) {
       } else {
         errors.push(`[SAST Fallback Error] Unsupported standard ruleset: ${cfg}`);
       }
+    } else {
+      for (const standard of SUPPORTED_STANDARD_RULESETS) {
+        const sanitized = standard.replace(/\//g, '-');
+        if (
+          cfg.endsWith(`${sanitized}.json`) ||
+          cfg.endsWith(`${sanitized}.yml`) ||
+          cfg.endsWith(`${sanitized}.yaml`)
+        ) {
+          enabledStandardPacks.add(standard);
+          break;
+        }
+      }
     }
   }
 
@@ -1545,21 +1559,39 @@ export function runSastScan(options = {}) {
     mkdirSync(dirname(sarifOutput), { recursive: true });
     semgrepArgs.push('--output', sarifOutput);
   }
+  const SNAPSHOT_DIR = resolve(rootDir, 'tests/security/sast/snapshots');
   for (const cfg of configs) {
-    const isRegistry = cfg.startsWith('p/') || cfg.startsWith('r/');
-    if (!isRegistry && !existsSync(cfg)) {
-      errors.push(`[SAST Config Error] Required config file does not exist: ${cfg}`);
-      return {
-        passed: false,
-        exitCode: 1,
-        census,
-        targetResolution,
-        findings: [],
-        unbaselinedFindings: [],
-        errors,
-      };
+    const isRegistry = typeof cfg === 'string' && (cfg.startsWith('p/') || cfg.startsWith('r/'));
+    let resolvedConfig = cfg;
+    if (isRegistry) {
+      const hasExplicitVersion = cfg.includes('@');
+      if (!hasExplicitVersion) {
+        const sanitized = cfg.replace(/\//g, '-');
+        const jsonSnapshot = resolve(SNAPSHOT_DIR, `${sanitized}.json`);
+        const ymlSnapshot = resolve(SNAPSHOT_DIR, `${sanitized}.yml`);
+        const yamlSnapshot = resolve(SNAPSHOT_DIR, `${sanitized}.yaml`);
+        if (existsSync(jsonSnapshot)) {
+          resolvedConfig = jsonSnapshot;
+        } else if (existsSync(ymlSnapshot)) {
+          resolvedConfig = ymlSnapshot;
+        } else if (existsSync(yamlSnapshot)) {
+          resolvedConfig = yamlSnapshot;
+        }
+      }
+    } else {
+      if (!existsSync(resolvedConfig)) {
+        errors.push(`[SAST Config Error] Required config file does not exist: ${resolvedConfig}`);
+        return {
+          passed: false,
+          exitCode: 1,
+          census,
+          targetResolution,
+          findings: [],
+          unbaselinedFindings: [],
+          errors,
+        };
+      }
     }
-    const resolvedConfig = isRegistry ? cfg.replace(/@.*$/, '') : cfg;
     semgrepArgs.push('--config', resolvedConfig);
   }
 

@@ -1,5 +1,19 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "version": "1.0.0",
-  "findings": []
+  "findings": [
+    {
+      "ruleId": "javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp",
+      "file": "apps/api/src/cache/cache.service.ts",
+      "line": 336,
+      "severity": "WARNING",
+      "rationale": "Escaped Redis glob pattern conversion to RegExp for in-memory cache fallback"
+    },
+    {
+      "ruleId": "javascript.lang.security.audit.hardcoded-hmac-key.hardcoded-hmac-key",
+      "file": "apps/api/src/chat-handoff/chat-handoff-token.service.spec.ts",
+      "severity": "WARNING",
+      "rationale": "Unit test mock HMAC secrets for token service specification"
+    }
+  ]
 }

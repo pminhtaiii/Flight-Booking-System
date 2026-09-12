@@ -57,7 +57,7 @@ export async function getAirportByIataCode(iataCode: string): Promise<Airport | 
     return data;
   } catch (error) {
     // eslint-disable-next-line no-console
-    console.error(`[airport-service/getAirportByIataCode] iataCode=${iataCode}`, error);
+    console.error('[airport-service/getAirportByIataCode]', { iataCode, error });
     return null;
   }
 }
@@ -84,7 +84,7 @@ export async function getNearbyAirports(
     return data;
   } catch (error) {
     // eslint-disable-next-line no-console
-    console.error(`[airport-service/getNearbyAirports] lat=${lat}, lng=${lng}`, error);
+    console.error('[airport-service/getNearbyAirports]', { lat, lng, error });
     return null;
   }
 }
