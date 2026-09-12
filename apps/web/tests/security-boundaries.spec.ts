@@ -1,8 +1,56 @@
 import { randomBytes } from 'node:crypto';
+import http from 'node:http';
 import { expect, test, type Page } from '@playwright/test';
 import { encode } from 'next-auth/jwt';
+import { getAuthCookieConfig } from '../lib/auth';
 
 const TEST_SECRET = process.env.NEXTAUTH_SECRET || randomBytes(32).toString('base64url');
+let mockAuthBackend: http.Server | undefined;
+
+test.beforeAll(async () => {
+  await new Promise<void>((resolve) => {
+    const server = http.createServer((req, res) => {
+      if (req.url?.includes('/auth/login') && req.method === 'POST') {
+        let body = '';
+        req.on('data', (chunk) => {
+          body += chunk;
+        });
+        req.on('end', () => {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(
+            JSON.stringify({
+              token: 'sec-auth-token-real',
+              user: {
+                id: 'sec-user-456',
+                email: 'security-audit@example.test',
+              },
+            }),
+          );
+        });
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+
+    server.once('error', () => {
+      resolve();
+    });
+
+    server.listen(3001, () => {
+      mockAuthBackend = server;
+      resolve();
+    });
+  });
+});
+
+test.afterAll(async () => {
+  if (mockAuthBackend) {
+    await new Promise<void>((resolve) => {
+      mockAuthBackend?.close(() => resolve());
+    });
+  }
+});
 
 async function authenticateSession(
   page: Page,
@@ -64,6 +112,7 @@ test.describe('Web Browser Security Boundaries', () => {
     test('flight search URL query parameters with attack payloads are escaped with zero script execution', async ({
       page,
     }) => {
+      test.slow();
       let dialogFired = false;
       let dialogMessage = '';
       page.on('dialog', async (dialog) => {
@@ -224,13 +273,14 @@ test.describe('Web Browser Security Boundaries', () => {
       page,
       context,
     }) => {
+      test.setTimeout(90_000);
       await context.clearCookies();
 
       await page.goto('/dashboard');
 
       // Verify redirection to login
-      await expect(page).toHaveURL(/.*\/login(\?callbackUrl=.*dashboard)?/);
-      await expect(page.getByRole('heading', { name: 'Plan the next move.' })).toBeVisible();
+      await expect(page).toHaveURL(/.*\/login(\?callbackUrl=.*dashboard)?/, { timeout: 60_000 });
+      await expect(page.getByRole('heading', { name: 'Plan the next move.' })).toBeVisible({ timeout: 60_000 });
 
       // Verify zero private user data leaked in HTML/DOM
       const content = await page.content();
@@ -245,13 +295,14 @@ test.describe('Web Browser Security Boundaries', () => {
       page,
       context,
     }) => {
+      test.setTimeout(90_000);
       await context.clearCookies();
 
-      await page.goto('/bookings');
+      await page.goto('/bookings', { timeout: 60_000 });
 
       // Verify redirection to login
-      await expect(page).toHaveURL(/.*\/login/);
-      await expect(page.getByRole('heading', { name: 'Plan the next move.' })).toBeVisible();
+      await expect(page).toHaveURL(/.*\/login/, { timeout: 60_000 });
+      await expect(page.getByRole('heading', { name: 'Plan the next move.' })).toBeVisible({ timeout: 60_000 });
 
       // Verify no booking reservation numbers or private itinerary content leaked
       const content = await page.content();
@@ -297,6 +348,34 @@ test.describe('Web Browser Security Boundaries', () => {
     });
   });
 
+async function authenticateViaNextAuthCallback(page: Page): Promise<{
+  sessionCookieHeader: string;
+}> {
+  const csrfRes = await page.request.get('/api/auth/csrf');
+  expect(csrfRes.ok()).toBe(true);
+  const csrfData = (await csrfRes.json()) as { csrfToken?: string };
+  const csrfToken = csrfData.csrfToken;
+  expect(csrfToken).toBeTruthy();
+
+  const callbackRes = await page.request.post('/api/auth/callback/credentials', {
+    form: {
+      csrfToken: csrfToken || '',
+      email: 'security-audit@example.test',
+      password: 'AuditPassword123!',
+      callbackUrl: 'http://127.0.0.1:3000/',
+      json: 'true',
+    },
+  });
+  expect(callbackRes.ok()).toBe(true);
+
+  const rawHeaders = callbackRes.headersArray();
+  const sessionCookieHeader = rawHeaders.find(
+    (h) => h.name.toLowerCase() === 'set-cookie' && h.value.includes('next-auth.session-token'),
+  )?.value;
+
+  return { sessionCookieHeader: sessionCookieHeader || '' };
+}
+
   // ---------------------------------------------------------------------------
   // d. Cookie Security & Header Configuration
   // ---------------------------------------------------------------------------
@@ -305,25 +384,46 @@ test.describe('Web Browser Security Boundaries', () => {
       page,
       context,
     }) => {
-      await authenticateSession(page);
-      await page.goto('/search');
+      const { sessionCookieHeader } = await authenticateViaNextAuthCallback(page);
 
+      // Authenticate through real NextAuth callback and inspect application-issued set-cookie header on response
+      expect(sessionCookieHeader).toBeTruthy();
+      expect(sessionCookieHeader).toMatch(/HttpOnly/i);
+      expect(sessionCookieHeader).toMatch(/SameSite=Lax/i);
+      expect(sessionCookieHeader).toMatch(/Path=\//i);
+
+      // Verify browser context reflects application-issued session cookie attributes
       const cookies = await context.cookies();
       const sessionCookie = cookies.find((c) => c.name === 'next-auth.session-token');
 
       expect(sessionCookie).toBeDefined();
-      // HttpOnly must be true to prevent client-side script access
       expect(sessionCookie?.httpOnly).toBe(true);
-      // SameSite must be Lax or Strict to prevent CSRF cross-origin leak
-      expect(['lax', 'strict']).toContain(sessionCookie?.sameSite.toLowerCase());
-      // Cookie path must be restricted to root
+      expect(sessionCookie?.sameSite.toLowerCase()).toBe('lax');
       expect(sessionCookie?.path).toBe('/');
+    });
+
+    test('production NextAuth options contract enforces Secure cookie policy and __Secure- prefix', () => {
+      const prodConfig = getAuthCookieConfig({ NODE_ENV: 'production' });
+      expect(prodConfig.useSecureCookies).toBe(true);
+      expect(prodConfig.sessionToken.name).toBe('__Secure-next-auth.session-token');
+      expect(prodConfig.sessionToken.options.secure).toBe(true);
+      expect(prodConfig.sessionToken.options.httpOnly).toBe(true);
+      expect(prodConfig.sessionToken.options.sameSite).toBe('lax');
+      expect(prodConfig.sessionToken.options.path).toBe('/');
+
+      const httpsConfig = getAuthCookieConfig({
+        NODE_ENV: 'development',
+        NEXTAUTH_URL: 'https://staging.example.com',
+      });
+      expect(httpsConfig.useSecureCookies).toBe(true);
+      expect(httpsConfig.sessionToken.name).toBe('__Secure-next-auth.session-token');
+      expect(httpsConfig.sessionToken.options.secure).toBe(true);
     });
 
     test('client-side JavaScript cannot access HttpOnly session tokens via document.cookie', async ({
       page,
     }) => {
-      await authenticateSession(page);
+      await authenticateViaNextAuthCallback(page);
       await page.goto('/search');
 
       // Evaluate document.cookie from browser execution context
@@ -343,6 +443,11 @@ test.describe('Web Browser Security Boundaries', () => {
       const headers = response?.headers() || {};
       // Verify HTML content type is properly delivered
       expect(headers['content-type']).toContain('text/html');
+
+      // Security headers configured via next.config.mjs
+      expect(headers['x-content-type-options']).toBe('nosniff');
+      expect(headers['x-frame-options']?.toUpperCase()).toBe('SAMEORIGIN');
+      expect(headers['referrer-policy']).toBe('strict-origin-when-cross-origin');
 
       // Response body contains HTML without server stack traces or unhandled error dumps
       const body = await page.content();

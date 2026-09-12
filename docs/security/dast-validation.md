@@ -39,10 +39,10 @@ Each command was executed sequentially twice to verify determinism and absence o
 |---|---|---|---|:---:|:---:|
 | **DAST Pytest Suite** (SEC14, SEC18, SEC19, SEC28, SEC29) | `uv run --package agent pytest tests/security/dast/test_ownership.py tests/security/dast/test_adversarial.py tests/security/dast/test_http_security.py tests/security/dast/test_quota_profiles.py -v` | **254 passed**, 1 warning (`33.48s`) | **254 passed**, 1 warning (`34.80s`) | `0` | **MATCH** |
 | **ZAP Runner Suite** (Runner contracts, scope bounding, policy evaluation) | `node --test tests/security/zap-runner.test.mjs` | **37 passed**, 0 fail (`859ms`) | **37 passed**, 0 fail (`1.21s`) | `0` | **MATCH** |
-| **Browser Security Boundaries** (Reflected/DOM XSS, open redirects, route guards, cookie flags) | `& '.\apps\web\node_modules\.bin\playwright.CMD' test 'apps/web/tests/security-boundaries.spec.ts' --config='apps/web/tests/playwright.config.ts'` | **12 passed** (`1.9m`) | **12 passed** (`1.9m`) | `0` | **MATCH** |
+| **Browser Security Boundaries** (Reflected/DOM XSS, open redirects, route guards, cookie flags) | `& '.\apps\web\node_modules\.bin\playwright.CMD' test 'apps/web/tests/security-boundaries.spec.ts' --config='apps/web/tests/playwright.config.ts'` | **13 passed** (`3.2m`) | **13 passed** (`1.9m`) | `0` | **MATCH** |
 | **ZAP Runner CLI Help Interface** | `node scripts/security/run-zap.mjs --help` | Usage displayed (`162ms`) | Usage displayed (`158ms`) | `0` | **MATCH** |
 
-> **Verification Sign-Off**: Total test executions per run = **303 tests** (254 Pytest + 37 Node Test + 12 Playwright). Run 1 and Run 2 produced identical pass counts (100% pass rate) with 0 regressions, 0 test flakiness, and zero infrastructure crashes.
+> **Verification Sign-Off**: Total test executions per run = **304 tests** (254 Pytest + 37 Node Test + 13 Playwright). Run 1 and Run 2 produced identical pass counts (100% pass rate) with 0 regressions, 0 test flakiness, and zero infrastructure crashes.
 
 ---
 
@@ -252,7 +252,7 @@ Verified in `tests/security/dast/test_ownership.py` (18 tests passed):
 
 ## 7. SEC18 HTTP & Browser Security Boundaries
 
-Verified in `tests/security/dast/test_http_security.py` (169 tests passed) and `apps/web/tests/security-boundaries.spec.ts` (12 tests passed):
+Verified in `tests/security/dast/test_http_security.py` (169 tests passed) and `apps/web/tests/security-boundaries.spec.ts` (13 tests passed):
 
 1. **Reflected & DOM XSS Resistance**:
    - Search query parameters (`origin`, `destination`, `offerId`, `returnUrl`) injected with attack payloads (`<script>alert(1)</script>`, `"><img src=x onerror=alert(1)>`, `<svg/onload=alert(1)>`, `javascript:alert(1)`) are strictly sanitized/escaped by Next.js React DOM rendering.
@@ -270,9 +270,10 @@ Verified in `tests/security/dast/test_http_security.py` (169 tests passed) and `
    - 11 path traversal vectors (`../etc/passwd`, `../../../../../../etc/shadow`, `..\..\windows\win.ini`, `%2e%2e%2f...`, `..;/...`) tested against FastAPI and NestJS route parameters.
    - Traversal sequences are rejected or stripped; internal filesystem files remain inaccessible.
 6. **Cookie Security & Secure Headers**:
-   - Session cookies enforce `HttpOnly` and `SameSite=Lax`.
+   - Authenticated through real NextAuth callback flow (`/api/auth/csrf` -> `/api/auth/callback/credentials`) and directly inspected application-issued `set-cookie` response header: verified `HttpOnly`, `SameSite=Lax`, and `Path=/`.
+   - Contract test verified production NextAuth options enforce `useSecureCookies: true`, `__Secure-next-auth.session-token` name prefix, and `secure: true`.
    - Client-side script execution (`page.evaluate(() => document.cookie)`) verified that sensitive auth session tokens are completely invisible to JavaScript.
-   - HTTP responses deliver secure headers (`X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`) and suppress internal framework stack traces.
+   - HTTP responses deliver secure headers (`X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy: strict-origin-when-cross-origin`) configured in `apps/web/next.config.mjs` and suppress internal framework stack traces.
 
 ---
 

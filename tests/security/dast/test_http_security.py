@@ -768,14 +768,14 @@ async def test_route_inventory_all_45_routes_http_or_contract(
     routes = load_route_catalog()
     assert len(routes) == 45, f"Expected 45 routes, got {len(routes)}"
 
-    api_url = _TEST_ENV["NESTJS_API_URL"]
-    web_url = os.environ.get("TEST_WEB_URL", "http://127.0.0.1:3000")
+    api_url = _TEST_ENV["NESTJS_API_URL"].rstrip("/")
+    web_url = os.environ.get("TEST_WEB_URL", "http://127.0.0.1:3000").rstrip("/")
 
     # Check live reachability
     is_live_api = False
     try:
         async with httpx.AsyncClient(timeout=0.3) as client:
-            res = await client.get(f"{api_url.rstrip('/')}/health")
+            res = await client.get(f"{api_url}/health")
             is_live_api = res.status_code < 500
     except Exception:
         is_live_api = False
@@ -788,55 +788,282 @@ async def test_route_inventory_all_45_routes_http_or_contract(
     except Exception:
         is_live_web = False
 
+    user_token = make_jwt_token(role="USER")
+    forged_token = make_jwt_token(secret="attacker-unauthorized-secret-key-12345")
+    admin_token = make_jwt_token(role="ADMIN")
+
+    client_for_headers = NestJSClient(
+        base_url=_TEST_ENV["NESTJS_API_URL"],
+        token=user_token,
+    )
+    gateway_headers = client_for_headers._get_gateway_headers()
+
     for route in routes:
         svc = route["service"]
         method = route["method"]
         path = route["path"]
         auth_req = route["authRequirement"]
 
-        clean_path = path.replace(":id", "syn_test_001").replace(
-            ":reference", "bkref_00000000-0000-0000-0000-000000000000"
+        # Universal contract & inventory specifications (applies to all 45 routes)
+        assert auth_req in ("none", "bearer_user", "admin_bearer", "agent_key_claim")
+        assert route["sensitivity"] in ("low", "medium", "high", "critical")
+        assert route["targetPort"] in (3000, 3001, 3002)
+        assert route["id"].startswith(f"{svc}-")
+        assert route["targetService"] == f"{svc}:{route['targetPort']}"
+
+        clean_path = (
+            path.replace(":bookingReference", "bkref_00000000-0000-0000-0000-000000000000")
+            .replace(":reference", "bkref_00000000-0000-0000-0000-000000000000")
+            .replace(":intentId", "syn_intent_001")
+            .replace(":refundId", "syn_refund_001")
+            .replace(":id", "syn_test_001")
+        )
+
+        sample_body = (
+            {"message": "census", "action": "APPROVE"}
+            if method in ("POST", "PUT", "PATCH")
+            else None
         )
 
         if svc == "agent":
             req_fn = getattr(fast_api_client, method.lower())
-            if method in ("POST", "PUT", "PATCH"):
-                resp = req_fn(clean_path, json={"message": "census"})
-            else:
-                resp = req_fn(clean_path)
             if auth_req == "none":
+                resp = req_fn(clean_path)
                 assert resp.status_code < 500, (
                     f"Agent public route {path} failed with {resp.status_code}"
                 )
-            else:
-                assert resp.status_code in (401, 403), (
-                    f"Agent protected route {path} returned {resp.status_code}"
+            elif auth_req == "bearer_user":
+                # Unauthenticated request returns 401
+                resp_unauth = req_fn(clean_path, json=sample_body)
+                assert resp_unauth.status_code == 401, (
+                    f"Agent protected route {path} allowed unauthenticated request"
                 )
+                # Forged token returns 401
+                resp_forged = req_fn(
+                    clean_path,
+                    json=sample_body,
+                    headers={"Authorization": f"Bearer {forged_token}"},
+                )
+                assert resp_forged.status_code == 401, (
+                    f"Agent protected route {path} allowed forged token"
+                )
+                # Valid user token succeeds (<400 or 404)
+                with (
+                    patch("agent.streaming.sse.NestJSClient") as MockClient,
+                    patch(
+                        "agent.repositories.chat_budget_repository.ChatBudgetRepository.admit_request",
+                        new_callable=AsyncMock,
+                        return_value=True,
+                    ),
+                    patch("agent.streaming.sse.graph.astream_events") as mock_graph,
+                    patch("agent.streaming.sse._persist_response"),
+                ):
+                    mock_nestjs = AsyncMock()
+                    mock_nestjs.set_fencing_token = MagicMock()
+                    mock_nestjs.check_user_access.return_value = {"allowed": True}
+                    mock_nestjs.get_memory.return_value = {"messages": []}
+                    MockClient.return_value = mock_nestjs
+
+                    async def fake_stream(*args: Any, **kwargs: Any) -> Any:
+                        if False:
+                            yield None
+
+                    mock_graph.return_value = fake_stream()
+
+                    resp_valid = req_fn(
+                        clean_path,
+                        json=sample_body,
+                        headers={
+                            "Authorization": f"Bearer {user_token}",
+                            "Origin": "http://localhost:3000",
+                        },
+                    )
+                assert resp_valid.status_code < 400 or resp_valid.status_code == 404, (
+                    f"Agent protected route {path} failed with valid token: "
+                    f"{resp_valid.status_code}"
+                )
+            elif auth_req == "admin_bearer":
+                resp_unauth = req_fn(clean_path, json=sample_body)
+                assert resp_unauth.status_code == 401
+                resp_user = req_fn(
+                    clean_path,
+                    json=sample_body,
+                    headers={"Authorization": f"Bearer {user_token}"},
+                )
+                assert resp_user.status_code == 403
+                resp_admin = req_fn(
+                    clean_path,
+                    json=sample_body,
+                    headers={"Authorization": f"Bearer {admin_token}"},
+                )
+                assert resp_admin.status_code != 403
+            elif auth_req == "agent_key_claim":
+                resp_unauth = req_fn(clean_path, json=sample_body)
+                assert resp_unauth.status_code in (401, 403)
+                resp_valid = req_fn(clean_path, json=sample_body, headers=gateway_headers)
+                assert resp_valid.status_code < 400 or resp_valid.status_code == 404
+
         elif svc == "api" and is_live_api:
-            async with httpx.AsyncClient(timeout=1.0) as client:
-                resp = await client.request(
-                    method,
-                    f"{api_url.rstrip('/')}{clean_path}",
-                    headers={"Origin": "http://localhost:3000"},
-                    json={"test": "census"} if method in ("POST", "PUT", "PATCH") else None,
+            if clean_path.startswith("/api/"):
+                target_url = (
+                    f"{api_url[:-4] if api_url.endswith('/api') else api_url}{clean_path}"
                 )
+            elif clean_path == "/health" or clean_path.startswith("/health/"):
+                base_origin = api_url[:-4] if api_url.endswith("/api") else api_url
+                target_url = f"{base_origin}{clean_path}"
+            else:
+                target_url = (
+                    f"{api_url if api_url.endswith('/api') else f'{api_url}/api'}{clean_path}"
+                )
+
+            async with httpx.AsyncClient(timeout=2.0) as client:
                 if auth_req == "none":
-                    assert resp.status_code < 500
-                else:
-                    assert resp.status_code in (401, 403)
+                    resp = await client.request(
+                        method,
+                        target_url,
+                        headers={"Origin": "http://localhost:3000"},
+                        json=sample_body,
+                    )
+                    assert resp.status_code < 500, (
+                        f"Public API route {path} failed with {resp.status_code}"
+                    )
+                elif auth_req == "bearer_user":
+                    resp_unauth = await client.request(
+                        method,
+                        target_url,
+                        headers={"Origin": "http://localhost:3000"},
+                        json=sample_body,
+                    )
+                    assert resp_unauth.status_code in (401, 403), (
+                        f"Protected API route {path} allowed unauthenticated access"
+                    )
+                    resp_forged = await client.request(
+                        method,
+                        target_url,
+                        headers={
+                            "Origin": "http://localhost:3000",
+                            "Authorization": f"Bearer {forged_token}",
+                        },
+                        json=sample_body,
+                    )
+                    assert resp_forged.status_code == 401, (
+                        f"Protected API route {path} accepted forged token"
+                    )
+                    resp_valid = await client.request(
+                        method,
+                        target_url,
+                        headers={
+                            "Origin": "http://localhost:3000",
+                            "Authorization": f"Bearer {user_token}",
+                        },
+                        json=sample_body,
+                    )
+                    assert resp_valid.status_code < 400 or resp_valid.status_code == 404, (
+                        f"Protected API route {path} failed with valid token: "
+                        f"{resp_valid.status_code}"
+                    )
+                elif auth_req == "admin_bearer":
+                    resp_unauth = await client.request(
+                        method,
+                        target_url,
+                        headers={"Origin": "http://localhost:3000"},
+                        json=sample_body,
+                    )
+                    assert resp_unauth.status_code == 401, (
+                        f"Admin API route {path} allowed unauthenticated access"
+                    )
+                    resp_user = await client.request(
+                        method,
+                        target_url,
+                        headers={
+                            "Origin": "http://localhost:3000",
+                            "Authorization": f"Bearer {user_token}",
+                        },
+                        json=sample_body,
+                    )
+                    assert resp_user.status_code == 403, (
+                        f"Admin API route {path} allowed standard USER token"
+                    )
+                    resp_admin = await client.request(
+                        method,
+                        target_url,
+                        headers={
+                            "Origin": "http://localhost:3000",
+                            "Authorization": f"Bearer {admin_token}",
+                        },
+                        json=sample_body,
+                    )
+                    assert resp_admin.status_code != 403 and resp_admin.status_code != 401, (
+                        f"Admin API route {path} rejected ADMIN token with {resp_admin.status_code}"
+                    )
+                elif auth_req == "agent_key_claim":
+                    resp_missing = await client.request(
+                        method,
+                        target_url,
+                        headers={"Origin": "http://localhost:3000"},
+                        json=sample_body,
+                    )
+                    assert resp_missing.status_code in (401, 403), (
+                        f"Gateway API route {path} allowed missing credentials"
+                    )
+                    resp_valid = await client.request(
+                        method,
+                        target_url,
+                        headers={"Origin": "http://localhost:3000", **gateway_headers},
+                        json=sample_body,
+                    )
+                    assert resp_valid.status_code < 400 or resp_valid.status_code == 404, (
+                        f"Gateway API route {path} failed with valid credentials: "
+                        f"{resp_valid.status_code}"
+                    )
+
         elif svc == "web" and is_live_web:
-            async with httpx.AsyncClient(timeout=1.0, follow_redirects=False) as client:
-                resp = await client.request(method, f"{web_url.rstrip('/')}{clean_path}")
+            target_url = f"{web_url}{clean_path}"
+            async with httpx.AsyncClient(timeout=2.0, follow_redirects=False) as client:
                 if auth_req == "none":
-                    assert resp.status_code < 500
-                else:
-                    loc = resp.headers.get("location", "")
-                    assert resp.status_code in (302, 307, 401, 403) or "/login" in loc
-            # Offline contract fallback: verify route inventory specifications
-            assert auth_req in ("none", "bearer_user", "admin_bearer", "agent_key_claim")
-            assert route["sensitivity"] in ("low", "medium", "high", "critical")
-            assert route["targetPort"] in (3000, 3001, 3002)
-            assert route["id"].startswith(f"{svc}-")
+                    resp = await client.request(method, target_url)
+                    assert resp.status_code < 500, (
+                        f"Public Web route {path} failed with {resp.status_code}"
+                    )
+                elif auth_req == "bearer_user":
+                    resp_unauth = await client.request(method, target_url)
+                    loc = resp_unauth.headers.get("location", "")
+                    assert resp_unauth.status_code in (302, 307, 401, 403) or "/login" in loc, (
+                        f"Protected Web route {path} allowed unauthenticated access"
+                    )
+
+        else:
+            # Explicit offline contract boundary (when live API or Web service is offline):
+            # Validate each route's security specification and contract without silent skip.
+            if auth_req == "none":
+                assert route["sensitivity"] in ("low", "high", "critical"), (
+                    f"Public route {path} has invalid sensitivity: {route['sensitivity']}"
+                )
+            elif auth_req == "bearer_user":
+                assert route["sensitivity"] in ("low", "medium", "high", "critical"), (
+                    f"Protected user route {path} has invalid sensitivity: {route['sensitivity']}"
+                )
+                assert not path.startswith("/admin"), (
+                    f"User bearer route {path} cannot be in admin space"
+                )
+                assert not path.startswith("/agent-gateway"), (
+                    f"User bearer route {path} cannot be in agent gateway space"
+                )
+            elif auth_req == "admin_bearer":
+                assert route["sensitivity"] in ("high", "critical"), (
+                    f"Admin route {path} must be high or critical sensitivity"
+                )
+                assert "/admin" in path, f"Admin route {path} must be in admin path namespace"
+                assert svc == "api", f"Admin routes only defined on api service, got {svc}"
+            elif auth_req == "agent_key_claim":
+                assert route["sensitivity"] in ("medium", "high", "critical"), (
+                    f"Agent gateway route {path} must be medium, high, or critical sensitivity"
+                )
+                assert path.startswith("/agent-gateway"), (
+                    f"Agent gateway route {path} must start with /agent-gateway"
+                )
+                assert svc == "api", f"Agent gateway routes only defined on api service, got {svc}"
+                assert "X-Agent-API-Key" in gateway_headers and "X-User-Claim" in gateway_headers
 
 
 def test_route_inventory_public_routes_reachability(fast_api_client: TestClient) -> None:
@@ -884,8 +1111,9 @@ def test_route_inventory_protected_routes_reject_forged_token(fast_api_client: T
         assert resp.status_code == 401, f"Route {r['path']} must return 401 on forged signature"
 
 
-def test_route_inventory_admin_routes_reject_standard_user() -> None:
-    """Verify that admin_bearer routes reject standard user roles."""
+@pytest.mark.asyncio
+async def test_route_inventory_admin_routes_reject_standard_user() -> None:
+    """Verify that admin_bearer routes reject standard user roles and allow admin roles."""
     routes = load_route_catalog()
     admin_routes = [r for r in routes if r["authRequirement"] == "admin_bearer"]
     assert len(admin_routes) == 2
@@ -893,14 +1121,114 @@ def test_route_inventory_admin_routes_reject_standard_user() -> None:
     assert admin_ids == {"api-admin-profile-backfill", "api-admin-refunds-resolve"}
 
     user_token = make_jwt_token(role="USER")
-    decoded = jwt.decode(
-        user_token,
-        _TEST_ENV["JWT_SECRET"],
-        algorithms=["HS256"],
-        audience=_TEST_ENV["JWT_AUDIENCE"],
-    )
-    assert decoded.get("role") != "ADMIN"
-    assert "ADMIN" not in decoded.get("roles", [])
+    admin_token = make_jwt_token(role="ADMIN")
+
+    api_url = _TEST_ENV["NESTJS_API_URL"].rstrip("/")
+    is_live_api = False
+    try:
+        async with httpx.AsyncClient(timeout=0.3) as client:
+            res = await client.get(f"{api_url}/health")
+            is_live_api = res.status_code < 500
+    except Exception:
+        is_live_api = False
+
+    if is_live_api:
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            for route in admin_routes:
+                path = route["path"].replace(":refundId", "syn_refund_001")
+                if path.startswith("/api/"):
+                    req_url = f"{api_url[:-4] if api_url.endswith('/api') else api_url}{path}"
+                else:
+                    req_url = (
+                        f"{api_url if api_url.endswith('/api') else f'{api_url}/api'}{path}"
+                    )
+
+                # 1. Unauthenticated request returns 401
+                resp_unauth = await client.post(
+                    req_url,
+                    headers={"Origin": "http://localhost:3000"},
+                    json={"action": "APPROVE", "reason": "census"},
+                )
+                assert resp_unauth.status_code == 401, (
+                    f"Admin endpoint {req_url} did not return 401 when unauthenticated"
+                )
+
+                # 2. Standard USER token returns 403 Forbidden!
+                resp_user = await client.post(
+                    req_url,
+                    headers={
+                        "Origin": "http://localhost:3000",
+                        "Authorization": f"Bearer {user_token}",
+                    },
+                    json={"action": "APPROVE", "reason": "census"},
+                )
+                assert resp_user.status_code == 403, (
+                    f"Admin endpoint {req_url} did not return 403 Forbidden for USER token"
+                )
+
+                # 3. ADMIN token is NOT rejected with 403
+                resp_admin = await client.post(
+                    req_url,
+                    headers={
+                        "Origin": "http://localhost:3000",
+                        "Authorization": f"Bearer {admin_token}",
+                    },
+                    json={"action": "APPROVE", "reason": "census"},
+                )
+                assert resp_admin.status_code != 403, (
+                    f"Admin endpoint {req_url} unexpectedly returned 403 for ADMIN token"
+                )
+                assert resp_admin.status_code != 401, (
+                    f"Admin endpoint {req_url} unexpectedly returned 401 for ADMIN token"
+                )
+    else:
+        # Explicit, non-silent contract boundary for offline execution:
+        # Verify admin controllers, RolesGuard authorization, and token payload claims
+        backfill_ctrl = (
+            REPO_ROOT
+            / "apps"
+            / "api"
+            / "src"
+            / "profile"
+            / "passport-expiry-backfill.controller.ts"
+        )
+        admin_controllers = [
+            backfill_ctrl,
+            REPO_ROOT / "apps" / "api" / "src" / "payment" / "admin-refund.controller.ts",
+        ]
+        for ctrl_path in admin_controllers:
+            assert ctrl_path.exists(), f"Admin controller missing: {ctrl_path}"
+            ctrl_text = ctrl_path.read_text(encoding="utf-8")
+            assert "@Roles('ADMIN')" in ctrl_text, f"{ctrl_path.name} missing @Roles('ADMIN')"
+            assert "RolesGuard" in ctrl_text, f"{ctrl_path.name} missing RolesGuard"
+            assert "JwtAuthGuard" in ctrl_text, f"{ctrl_path.name} missing JwtAuthGuard"
+
+        # Verify RolesGuard logic enforces 403 Forbidden when user is not ADMIN
+        roles_guard_path = REPO_ROOT / "apps" / "api" / "src" / "auth" / "guards" / "roles.guard.ts"
+        assert roles_guard_path.exists(), f"RolesGuard missing: {roles_guard_path}"
+        guard_text = roles_guard_path.read_text(encoding="utf-8")
+        assert "ForbiddenException('Insufficient permissions')" in guard_text
+        assert "!requiredRoles.includes(user.role)" in guard_text
+
+        # Validate standard USER token role and assert it fails the ADMIN role requirement
+        decoded_user = jwt.decode(
+            user_token,
+            _TEST_ENV["JWT_SECRET"],
+            algorithms=["HS256"],
+            audience=_TEST_ENV["JWT_AUDIENCE"],
+        )
+        assert decoded_user.get("role") == "USER"
+        assert "ADMIN" not in decoded_user.get("roles", [])
+
+        # Validate ADMIN token role and assert it satisfies the ADMIN role requirement
+        decoded_admin = jwt.decode(
+            admin_token,
+            _TEST_ENV["JWT_SECRET"],
+            algorithms=["HS256"],
+            audience=_TEST_ENV["JWT_AUDIENCE"],
+        )
+        assert decoded_admin.get("role") == "ADMIN"
+        assert "ADMIN" in decoded_admin.get("roles", [])
 
 
 def test_route_inventory_agent_gateway_routes_require_service_key_and_claim() -> None:
