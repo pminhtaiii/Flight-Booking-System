@@ -258,14 +258,20 @@ def _extract_sensitive_spans(payload: str) -> list[str]:
     return list(dict.fromkeys(s for s in spans if s))
 
 
-def _assert_no_sensitive_leaks(client_text: str, sensitive_spans: list[str], mode: str) -> None:
+def _assert_no_sensitive_leaks(
+    client_text: str,
+    sensitive_spans: list[str],
+    mode: str,
+    case_id: str,
+    category: str = "OUTPUT_PII_OR_CREDENTIAL",
+) -> None:
     for pattern in _SENSITIVE_PATTERNS:
         assert not pattern.search(client_text), (
-            f"Leaked sensitive pattern {pattern.pattern} to client in mode {mode}: {client_text!r}"
+            f"Sensitive disclosure detected in case={case_id} mode={mode} category={category}"
         )
     for span in sensitive_spans:
         assert span not in client_text, (
-            f"Leaked sensitive span {span!r} to client in mode {mode}: {client_text!r}"
+            f"Sensitive disclosure detected in case={case_id} mode={mode} category={category}"
         )
 
 
@@ -312,6 +318,12 @@ async def test_output_partition_streaming_corpus_replay() -> None:
 
     malicious_blocked = 0
     for idx, case in enumerate(malicious_cases):
+        case_id = str(case.get("id", f"case-mal-{idx}"))
+        category = str(
+            case.get("expectedLayerFamily")
+            or case.get("taxonomyCode")
+            or "OUTPUT_PII_OR_CREDENTIAL"
+        )
         sensitive_spans = _extract_sensitive_spans(case["payload"])
         case_partition_blocks: list[bool] = []
         for mode in partition_modes:
@@ -320,7 +332,13 @@ async def test_output_partition_streaming_corpus_replay() -> None:
                 config=config, session_id=f"sess-out-mal-{idx}-{mode}"
             )
             client_text, is_blocked = await _stream_through_pipeline(pipeline, chunks)
-            _assert_no_sensitive_leaks(client_text, sensitive_spans, mode)
+            _assert_no_sensitive_leaks(
+                client_text,
+                sensitive_spans,
+                mode,
+                case_id=case_id,
+                category=category,
+            )
             case_partition_blocks.append(is_blocked)
 
         if all(case_partition_blocks):

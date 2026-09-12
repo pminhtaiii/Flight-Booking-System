@@ -48,6 +48,7 @@
   - Issue 8 (Bounded Credential Policy & Contracts): Bounded horizontal whitespace to `[ \t]{0,4}` / `[ \t]{1,4}` in `output_pipeline.py`; updated `specs/023-security-systems/contracts/guardrail-boundaries.md`, `tests/security/pii-policy.json`, and `apps/agent/tests/security/test_output_stream.py`.
   - Issue 9 (Dynamic Test Configuration): Removed hardcoded secret literals and URLs from module import level in `test_ownership.py`; resolved dynamically via `_resolve_test_env()` using `secrets.token_hex(32)` or environment variables in `conftest.py` / `test_ownership.py`.
   - Issue 10 (Comment Quality & Rationale): Purged redundant narration comments throughout both test modules; preserved only security rationale, threat model, and invariant explanations.
+  - Sanitized failure diagnostics in `tests/security/dast/test_adversarial.py` leak assertions to report only `case_id`, `mode`, and `category`, preventing sensitive fixture strings or raw text disclosure in test outputs.
   - Verified full test suite: 24/24 DAST tests passing in ~13s, 483/483 agent security tests passing in ~32s, and `ruff check` / `ruff format` 100% clean.
 
 ### Feature 023 — Phase 5 CI Security Pipeline Remediation (2026-09-12, Completed)
