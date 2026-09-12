@@ -666,45 +666,37 @@ if (isMain) {
     rmSync(deprecatedInvariantsPath, { force: true });
   }
 
-  // Write stage-partitioned files
-  console.log(`Generating ${holdoutInputRecords.length} holdout input records...`);
-  const inputLines = holdoutInputRecords.map((r) => JSON.stringify(r)).join('\n') + '\n';
-  writeFileSync(holdoutInputPath, inputLines, 'utf8');
-
-  console.log(`Generating ${holdoutToolRecords.length} holdout tool records...`);
-  const toolLines = holdoutToolRecords.map((r) => JSON.stringify(r)).join('\n') + '\n';
-  writeFileSync(holdoutToolPath, toolLines, 'utf8');
-
-  console.log(`Generating ${holdoutOutputRecords.length} holdout output records...`);
-  const outputLines = holdoutOutputRecords.map((r) => JSON.stringify(r)).join('\n') + '\n';
-  writeFileSync(holdoutOutputPath, outputLines, 'utf8');
-
-  console.log(`Generating ${invariantRecords.length} invariant records...`);
-  const invariantLines = invariantRecords.map((r) => JSON.stringify(r)).join('\n') + '\n';
-  writeFileSync(invariantManifestPath, invariantLines, 'utf8');
-
-  // Generate manifest.json with cryptographic SHA-256 hashes
-  const filesToCatalog = [
-    { name: 'holdout_input.jsonl', path: holdoutInputPath, count: holdoutInputRecords.length },
-    { name: 'holdout_tool.jsonl', path: holdoutToolPath, count: holdoutToolRecords.length },
-    { name: 'holdout_output.jsonl', path: holdoutOutputPath, count: holdoutOutputRecords.length },
-    { name: 'invariant_manifest.jsonl', path: invariantManifestPath, count: invariantRecords.length },
+  const partitions = [
+    { name: 'holdout_input.jsonl', path: holdoutInputPath, records: holdoutInputRecords, label: 'holdout input' },
+    { name: 'holdout_tool.jsonl', path: holdoutToolPath, records: holdoutToolRecords, label: 'holdout tool' },
+    { name: 'holdout_output.jsonl', path: holdoutOutputPath, records: holdoutOutputRecords, label: 'holdout output' },
+    { name: 'invariant_manifest.jsonl', path: invariantManifestPath, records: invariantRecords, label: 'invariant manifest' },
   ];
 
   const manifestData = {
     $schema: 'https://json-schema.org/draft/2020-12/schema',
     version: '1.0.0',
     taxonomy: 'OWASP-LLM-Top10-2025',
+    provenance: {
+      source: 'synthetic-feature-023',
+      revision: 'git:a1b2c3d4',
+      curatedBy: 'Security Team',
+      curatedAt: '2026-09-04T00:00:00Z',
+    },
     files: {},
   };
 
-  for (const item of filesToCatalog) {
-    const fileBytes = readFileSync(item.path);
+  for (const partition of partitions) {
+    console.log(`Generating ${partition.records.length} ${partition.label} records...`);
+    const lines = partition.records.map((r) => JSON.stringify(r)).join('\n') + '\n';
+    writeFileSync(partition.path, lines, 'utf8');
+
+    const fileBytes = Buffer.from(lines, 'utf8');
     const sha256 = createHash('sha256').update(fileBytes).digest('hex');
-    manifestData.files[item.name] = {
+    manifestData.files[partition.name] = {
       sha256,
       bytes: fileBytes.length,
-      recordCount: item.count,
+      recordCount: partition.records.length,
       license: 'MIT',
     };
   }

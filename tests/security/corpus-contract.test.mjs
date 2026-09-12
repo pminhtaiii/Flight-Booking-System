@@ -524,6 +524,12 @@ test('frozen split corpus and cryptographic manifest contract', async (t) => {
     assert.equal(typeof manifest.files, 'object', 'manifest must declare files object');
     assert.ok(manifest.files !== null && !Array.isArray(manifest.files));
 
+    assert.equal(typeof manifest.provenance, 'object', 'manifest must declare provenance object');
+    assert.equal(manifest.provenance.source, 'synthetic-feature-023');
+    assert.equal(manifest.provenance.revision, 'git:a1b2c3d4');
+    assert.equal(manifest.provenance.curatedBy, 'Security Team');
+    assert.equal(manifest.provenance.curatedAt, '2026-09-04T00:00:00Z');
+
     for (const expectedFile of expectedFiles) {
       assert.ok(expectedFile in manifest.files, `manifest.files must include ${expectedFile}`);
       const fileMeta = manifest.files[expectedFile];
@@ -532,7 +538,10 @@ test('frozen split corpus and cryptographic manifest contract', async (t) => {
       assert.ok(fileMeta.bytes > 0, `${expectedFile} bytes must be > 0`);
       assert.equal(typeof fileMeta.recordCount, 'number', `${expectedFile} recordCount must be number`);
       assert.ok(fileMeta.recordCount > 0, `${expectedFile} recordCount must be > 0`);
-      assert.equal(fileMeta.license, 'MIT', `${expectedFile} license must be MIT`);
+      assert.ok(
+        ['MIT', 'Apache-2.0', 'CC-BY-4.0'].includes(fileMeta.license),
+        `${expectedFile} license must be permissive compliant`,
+      );
     }
   });
 
@@ -567,6 +576,62 @@ test('frozen split corpus and cryptographic manifest contract', async (t) => {
     assert.ok(res.manifest, 'manifest object must be present');
     assert.equal(Object.keys(res.manifest.files).length, 4);
     assert.equal(res.errors.length, 0);
+  });
+
+  await t.test('validateCorpusManifest accepts compliant permissive licenses (MIT, Apache-2.0, CC-BY-4.0)', () => {
+    const permissiveLicenses = ['MIT', 'Apache-2.0', 'CC-BY-4.0'];
+    for (const lic of permissiveLicenses) {
+      const licDir = mkdtempSync(join(tmpdir(), `corpus-test-lic-${lic.replace(/[^a-zA-Z0-9]/g, '_')}-`));
+      try {
+        const dummyFile = join(licDir, `test-${lic.replace(/[^a-zA-Z0-9]/g, '_')}.jsonl`);
+        writeFileSync(dummyFile, '{"test":true}\n', 'utf8');
+        const hash = createHash('sha256').update(readFileSync(dummyFile)).digest('hex');
+
+        const manifest = {
+          version: '1.0.0',
+          taxonomy: 'OWASP-LLM-Top10-2025',
+          files: {
+            [`test-${lic.replace(/[^a-zA-Z0-9]/g, '_')}.jsonl`]: {
+              sha256: hash,
+              bytes: 14,
+              recordCount: 1,
+              license: lic,
+            },
+          },
+        };
+        writeFileSync(join(licDir, 'manifest.json'), JSON.stringify(manifest));
+        const res = validateCorpusManifest(licDir);
+        assert.equal(res.valid, true, `License ${lic} should be accepted: ${res.errors.join(', ')}`);
+      } finally {
+        rmSync(licDir, { recursive: true, force: true });
+      }
+    }
+
+    // Disallowed non-compliant license (e.g. GPL-3.0)
+    const badDir = mkdtempSync(join(tmpdir(), 'corpus-test-lic-bad-'));
+    try {
+      const dummyFile = join(badDir, 'test-GPL.jsonl');
+      writeFileSync(dummyFile, '{"test":true}\n', 'utf8');
+      const hash = createHash('sha256').update(readFileSync(dummyFile)).digest('hex');
+      const badManifest = {
+        version: '1.0.0',
+        taxonomy: 'OWASP-LLM-Top10-2025',
+        files: {
+          'test-GPL.jsonl': {
+            sha256: hash,
+            bytes: 14,
+            recordCount: 1,
+            license: 'GPL-3.0',
+          },
+        },
+      };
+      writeFileSync(join(badDir, 'manifest.json'), JSON.stringify(badManifest));
+      const badRes = validateCorpusManifest(badDir);
+      assert.equal(badRes.valid, false);
+      assert.ok(badRes.errors.some((e) => e.includes('license must be one of')));
+    } finally {
+      rmSync(badDir, { recursive: true, force: true });
+    }
   });
 
   await t.test('validateCorpusManifest detects tampered hash or missing file', () => {
@@ -604,10 +669,24 @@ test('frozen split corpus and cryptographic manifest contract', async (t) => {
     }
   });
 
-  await t.test('validateCorpusManifest returns valid: true when manifest.json is absent', () => {
+  await t.test('validateCorpusManifest requires manifest.json for repo corpus directory or when requireManifest: true', () => {
+    // When validating repo corpus directory and manifest is missing: fails
+    const mockRepoCorpusWithoutManifest = resolve(repoRoot, 'tests/security/corpus');
+    // Test with explicit requireManifest: true on tempDir
+    const tempDir = mkdtempSync(join(tmpdir(), 'corpus-test-manifest-required-'));
+    try {
+      const res = validateCorpusManifest(tempDir, { requireManifest: true });
+      assert.equal(res.valid, false);
+      assert.ok(res.errors.some((e) => e.includes('manifest.json is required')));
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  await t.test('validateCorpusManifest returns valid: true when manifest.json is absent and not required', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'corpus-test-manifest-absent-'));
     try {
-      const res = validateCorpusManifest(tempDir);
+      const res = validateCorpusManifest(tempDir, { requireManifest: false });
       assert.equal(res.valid, true);
       assert.equal(res.manifest, null);
       assert.equal(res.errors.length, 0);

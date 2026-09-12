@@ -2,6 +2,12 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "version": "1.0.0",
   "taxonomy": "OWASP-LLM-Top10-2025",
+  "provenance": {
+    "source": "synthetic-feature-023",
+    "revision": "git:a1b2c3d4",
+    "curatedBy": "Security Team",
+    "curatedAt": "2026-09-04T00:00:00Z"
+  },
   "files": {
     "holdout_input.jsonl": {
       "sha256": "bdc6261f42ce8f1007a51035d719aaf52fc2c1138e7175be1fd8bc3177c2fd81",

@@ -34,7 +34,7 @@ export function computeCanonicalHash(payload) {
 /**
  * Loads and parses line-delimited JSON (JSONL) file.
  * @param {string} filePath
- * @returns {Array<{ record: any, line: number, sourceFile: string }>}
+ * @returns {Array<{ record: object, line: number, sourceFile: string }>}
  */
 export function loadCorpusJsonl(filePath) {
   if (!existsSync(filePath)) {
@@ -67,8 +67,8 @@ export function loadCorpusJsonl(filePath) {
 
 /**
  * Lightweight JSON schema validation matching tests/security/corpus/schema.json.
- * @param {any} record
- * @param {any} schema
+ * @param {object} record
+ * @param {object} schema
  * @returns {string[]} List of validation error messages, or empty if valid.
  */
 function validatePropertyBySchema(propName, val, propDef, prefix = '') {
@@ -148,8 +148,8 @@ function validateObjectBySchema(objName, obj, objSchema) {
 
 /**
  * Dynamic JSON schema validation matching tests/security/corpus/schema.json.
- * @param {any} record
- * @param {any} schema
+ * @param {object} record
+ * @param {object} schema
  * @returns {string[]} List of validation error messages, or empty if valid.
  */
 export function validateRecordSchema(record, schema) {
@@ -239,18 +239,32 @@ export function validateRecordSchema(record, schema) {
   return errors;
 }
 
+const ALLOWED_LICENSES = new Set(['MIT', 'Apache-2.0', 'CC-BY-4.0']);
+
 /**
  * Validates corpus manifest if manifest.json exists in corpusDir.
  * Checks that all listed files exist, SHA-256 hashes match,
- * bytes and record counts match, and license is 'MIT'.
+ * bytes and record counts match, and license is compliant ('MIT', 'Apache-2.0', 'CC-BY-4.0').
  * Also checks that no undeclared .jsonl files exist in corpusDir.
  *
  * @param {string} corpusDir
- * @returns {{ valid: boolean, errors: string[], manifest: any }}
+ * @param {object} [options]
+ * @param {boolean} [options.requireManifest] Whether manifest.json must exist (defaults to true for repo corpus directory)
+ * @returns {{ valid: boolean, errors: string[], manifest: object|null }}
  */
-export function validateCorpusManifest(corpusDir) {
+export function validateCorpusManifest(corpusDir, options = {}) {
   const manifestPath = join(corpusDir, 'manifest.json');
+  const isDefaultCorpusDir = resolve(corpusDir) === resolve(repoRoot, 'tests/security/corpus');
+  const requireManifest = options.requireManifest ?? isDefaultCorpusDir;
+
   if (!existsSync(manifestPath)) {
+    if (requireManifest) {
+      return {
+        valid: false,
+        errors: [`[Manifest Error] manifest.json is required in ${corpusDir} but does not exist`],
+        manifest: null,
+      };
+    }
     return { valid: true, errors: [], manifest: null };
   }
 
@@ -283,6 +297,25 @@ export function validateCorpusManifest(corpusDir) {
     errors.push(
       `[Manifest Error] manifest.json taxonomy must be "OWASP-LLM-Top10-2025", got "${manifest.taxonomy}"`,
     );
+  }
+
+  if (manifest.provenance !== undefined) {
+    if (!manifest.provenance || typeof manifest.provenance !== 'object' || Array.isArray(manifest.provenance)) {
+      errors.push('[Manifest Error] manifest.json provenance must be an object');
+    } else {
+      if (typeof manifest.provenance.source !== 'string' || manifest.provenance.source.trim().length === 0) {
+        errors.push('[Manifest Error] manifest.json provenance must declare a non-empty source');
+      }
+      if (typeof manifest.provenance.revision !== 'string' || manifest.provenance.revision.trim().length === 0) {
+        errors.push('[Manifest Error] manifest.json provenance must declare a non-empty revision');
+      }
+      if (typeof manifest.provenance.curatedBy !== 'string' || manifest.provenance.curatedBy.trim().length === 0) {
+        errors.push('[Manifest Error] manifest.json provenance must declare a non-empty curatedBy');
+      }
+      if (typeof manifest.provenance.curatedAt !== 'string' || manifest.provenance.curatedAt.trim().length === 0) {
+        errors.push('[Manifest Error] manifest.json provenance must declare a non-empty curatedAt');
+      }
+    }
   }
 
   if (!manifest.files || typeof manifest.files !== 'object' || Array.isArray(manifest.files)) {
@@ -321,8 +354,10 @@ export function validateCorpusManifest(corpusDir) {
       errors.push(`[Manifest Error] ${filename} recordCount must be a non-negative number`);
     }
 
-    if (fileMeta.license !== 'MIT') {
-      errors.push(`[Manifest Error] ${filename} license must be "MIT", got "${fileMeta.license}"`);
+    if (!ALLOWED_LICENSES.has(fileMeta.license)) {
+      errors.push(
+        `[Manifest Error] ${filename} license must be one of ['MIT', 'Apache-2.0', 'CC-BY-4.0'], got "${fileMeta.license}"`,
+      );
     }
 
     const content = readFileSync(targetFile);
@@ -370,14 +405,15 @@ export function validateCorpusManifest(corpusDir) {
  * Validates corpus records against schema, deduplication, hash matching,
  * variant group split isolation, holdout quotas, and invariant segregation.
  *
- * @param {string|Array<any>} target Path to corpus directory, JSONL file, or array of record objects.
+ * @param {string|Array<object>} target Path to corpus directory, JSONL file, or array of record objects.
  * @param {object} [options]
  * @param {boolean} [options.requireHoldoutQuotas=true]
  * @param {string} [options.schemaPath]
+ * @param {boolean} [options.requireManifest] Whether manifest.json is required
  * @returns {{
  *   valid: boolean,
  *   errors: string[],
- *   records: Array<any>,
+ *   records: Array<object>,
  *   stats: object
  * }}
  */
@@ -414,7 +450,7 @@ export function validateCorpus(target, options = {}) {
     }
     const stat = statSync(target);
     if (stat.isDirectory()) {
-      const manifestResult = validateCorpusManifest(target);
+      const manifestResult = validateCorpusManifest(target, options);
       if (!manifestResult.valid) {
         errors.push(...manifestResult.errors);
       }

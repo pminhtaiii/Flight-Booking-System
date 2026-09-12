@@ -219,6 +219,10 @@ test('T037.1: automation.yaml declares strict local loopback contexts and synthe
   assert.match(raw, /security-b@example\.invalid/);
   assert.match(raw, /User A/);
   assert.match(raw, /User B/);
+
+  // Verify header-based session management with bearer token injection
+  assert.match(raw, /method:\s*["']?headers["']?/);
+  assert.match(raw, /Authorization:\s*["']?Bearer\s+.*token.*["']?/);
 });
 
 test('T037.1: automation.yaml defines required job pipeline: passiveScan, spider, activeScan, report', () => {
@@ -228,15 +232,17 @@ test('T037.1: automation.yaml defines required job pipeline: passiveScan, spider
   assert.match(raw, /type:\s*["']?passiveScan-config["']?/);
   assert.match(raw, /alertThreshold:\s*["']?LOW["']?/);
 
-  // 2. spider on web service
+  // 2. spider on web service with authenticated UserA
   assert.match(raw, /type:\s*["']?spider["']?/);
+  assert.match(raw, /user:\s*["']?UserA["']?/);
   assert.match(raw, /maxDuration:\s*5/);
 
   // 3. passiveScan-wait
   assert.match(raw, /type:\s*["']?passiveScan-wait["']?/);
 
-  // 4. activeScan with StrictLocalBounded policy and rules
+  // 4. activeScan with StrictLocalBounded policy, authenticated UserA, and rules
   assert.match(raw, /type:\s*["']?activeScan["']?/);
+  assert.match(raw, /user:\s*["']?UserA["']?/);
   assert.match(raw, /policy:\s*["']?StrictLocalBounded["']?/);
   assert.match(raw, /maxRuleDurationInMins:\s*2/);
   assert.match(raw, /maxScanDurationInMins:\s*10/);

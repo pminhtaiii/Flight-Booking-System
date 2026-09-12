@@ -15,12 +15,12 @@ const defaultConfigFile = 'automation.yaml';
 const defaultOutputPath = resolve(repoRoot, 'artifacts/security/zap-report.json');
 const defaultRawReportPath = resolve(defaultZapDir, 'zap-raw-report.json');
 
-const ALLOWED_LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
-const ALLOWED_PORTS = new Set([3000, 3001, 3002]);
+export const ALLOWED_LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
+export const ALLOWED_PORTS = new Set([3000, 3001, 3002, 3301, 3302, 3400]);
 
 /**
  * Validates target URLs to enforce strict loopback scope boundaries.
- * Targets must be on 127.0.0.1 or localhost and on ports 3000, 3001, or 3002.
+ * Targets must be on 127.0.0.1 or localhost and on allowed ports: 3000, 3001, 3002, 3301, 3302, 3400.
  *
  * @param {string|string[]|object} targets
  * @returns {boolean} true if all targets are in scope, false otherwise
@@ -67,6 +67,32 @@ export function validateScope(targets) {
   }
 
   return true;
+}
+
+/**
+ * Validates a redirect target URL to ensure it satisfies loopback scope boundaries.
+ * Relative redirect paths are resolved against baseUrl (defaulting to loopback).
+ * Absolute redirect targets must be on an allowed loopback host and port.
+ *
+ * @param {string} redirectTarget URL or path from redirect Location header
+ * @param {string} [baseUrl] Base URL to resolve relative redirects against
+ * @returns {boolean} true if redirect destination is in scope, false otherwise
+ */
+export function validateRedirectScope(redirectTarget, baseUrl) {
+  if (!redirectTarget || typeof redirectTarget !== 'string') return false;
+  const trimmed = redirectTarget.trim();
+  if (!trimmed) return false;
+
+  try {
+    const base = baseUrl ? new URL(baseUrl) : new URL('http://127.0.0.1:3000');
+    if (baseUrl && !validateScope(baseUrl)) {
+      return false;
+    }
+    const resolved = new URL(trimmed, base);
+    return validateScope(resolved.href);
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -171,6 +197,70 @@ export function evaluateZapReport(rawReportPathOrObject) {
 
   if (!data || typeof data !== 'object') {
     return { exitCode: 2, error: 'Invalid report data structure' };
+  }
+
+  if (
+    data.authFailed === true ||
+    data.authFailure === true ||
+    data.authenticationFailed === true ||
+    data.authenticationStatus === 'failed'
+  ) {
+    return { exitCode: 2, error: 'Authentication failure reported during scan' };
+  }
+
+  if (Array.isArray(data.authErrors) && data.authErrors.length > 0) {
+    return { exitCode: 2, error: `Authentication errors during scan: ${data.authErrors.join(', ')}` };
+  }
+
+  if (Array.isArray(data.authenticatedEndpoints) && data.authenticatedEndpoints.length > 0) {
+    const allAuthFailed = data.authenticatedEndpoints.every((ep) => {
+      const status = Number(ep.status || ep.statusCode || ep.responseCode);
+      return status === 401 || status === 403;
+    });
+    if (allAuthFailed) {
+      return { exitCode: 2, error: 'All authenticated endpoints returned 401 or 403 status codes' };
+    }
+  }
+
+  if (Array.isArray(data.messages) && data.messages.length > 0) {
+    const authMessages = data.messages.filter((m) => m.authenticated === true || m.auth === true);
+    if (authMessages.length > 0) {
+      const allAuthFailed = authMessages.every((m) => {
+        const status = Number(m.status || m.statusCode || m.responseCode);
+        return status === 401 || status === 403;
+      });
+      if (allAuthFailed) {
+        return { exitCode: 2, error: 'All authenticated endpoints returned 401 or 403 status codes' };
+      }
+    }
+  }
+
+  if (data.scannedUrls !== undefined && Number(data.scannedUrls) === 0) {
+    return { exitCode: 2, error: 'Scan completed with 0 scanned URLs' };
+  }
+  if (data.totalScannedUrls !== undefined && Number(data.totalScannedUrls) === 0) {
+    return { exitCode: 2, error: 'Scan completed with 0 scanned URLs' };
+  }
+  if (data.urlCount !== undefined && Number(data.urlCount) === 0) {
+    return { exitCode: 2, error: 'Scan completed with 0 scanned URLs' };
+  }
+  if (Array.isArray(data.urls) && data.urls.length === 0) {
+    return { exitCode: 2, error: 'Scan completed with 0 scanned URLs' };
+  }
+  if (Array.isArray(data.site) && data.site.length === 0) {
+    return { exitCode: 2, error: 'Scan report contains empty sites array (0 URLs scanned)' };
+  }
+
+  const hasSite = Boolean(data.site);
+  const hasAlerts = Array.isArray(data.alerts) && data.alerts.length > 0;
+  const hasFindings = Array.isArray(data.findings) && data.findings.length > 0;
+  const hasRuns = Array.isArray(data.runs) && data.runs.length > 0;
+  const hasSummary = Boolean(data.scannerSummary && Array.isArray(data.scannerSummary.findings) && data.scannerSummary.findings.length > 0);
+  const hasArrayRoot = Array.isArray(data) && data.length > 0;
+  const hasUrls = Array.isArray(data.urls) && data.urls.length > 0;
+
+  if (!hasSite && !hasAlerts && !hasFindings && !hasRuns && !hasSummary && !hasArrayRoot && !hasUrls) {
+    return { exitCode: 2, error: 'Empty scan report with no scanned sites, URLs, or findings' };
   }
 
   let rawAlerts = [];
@@ -376,18 +466,16 @@ export async function runZap(options = {}, dependencies = {}) {
       'http://127.0.0.1:3002',
     ];
 
-  // 1. Validate Scope
   if (!validateScope(scope)) {
     return {
       exitCode: 2,
-      error: `Invalid scope: targets must be local loopback addresses (127.0.0.1 or localhost on ports 3000, 3001, 3002). Got: ${JSON.stringify(scope)}`,
+      error: `Invalid scope: targets must be local loopback addresses (127.0.0.1 or localhost on ports 3000, 3001, 3002, 3301, 3302, 3400). Got: ${JSON.stringify(scope)}`,
     };
   }
 
   const toolchainPath = options.toolchainPath || defaultToolchainPath;
   const dockerArgs = buildZapDockerArgs({ ...options, toolchainPath });
 
-  // 2. Handle dry run
   if (options.dryRun) {
     return {
       exitCode: 0,
@@ -402,11 +490,10 @@ export async function runZap(options = {}, dependencies = {}) {
   const reportWriter = dependencies.reportWriter || writeSanitizedReport;
 
   let timeoutMs = 600000;
-  if (options.timeoutMs) {
+  if (options.timeoutMs !== undefined && options.timeoutMs !== null) {
     timeoutMs = Number(options.timeoutMs);
-  } else if (options.timeout) {
-    const t = Number(options.timeout);
-    timeoutMs = t > 1000 ? t : t * 1000;
+  } else if (options.timeout !== undefined && options.timeout !== null) {
+    timeoutMs = Number(options.timeout) * 1000;
   }
 
   const controller = new AbortController();
@@ -416,7 +503,6 @@ export async function runZap(options = {}, dependencies = {}) {
 
   const startedAt = Date.now();
 
-  // 3. Execute Docker runner
   try {
     await runner(dockerArgs, {
       timeoutMs,
@@ -431,7 +517,6 @@ export async function runZap(options = {}, dependencies = {}) {
     };
   }
 
-  // 4. Evaluate Raw Report
   const rawReportPath = options.rawReportPath || defaultRawReportPath;
   const rawReportInput = options.rawReport !== undefined ? options.rawReport : rawReportPath;
   const evaluation = evaluator(rawReportInput);
@@ -444,7 +529,6 @@ export async function runZap(options = {}, dependencies = {}) {
     };
   }
 
-  // 5. Sanitize and Write Report
   const outputPath = options.output || defaultOutputPath;
   const durationMs = Date.now() - startedAt;
 
@@ -551,7 +635,7 @@ OWASP ZAP DAST scan runner for local loopback verification.
 Options:
   --help, -h          Show help and usage information
   --dry-run           Validate configuration and arguments without running container
-  --scope <urls>      Comma-separated loopback URLs (must be 127.0.0.1 or localhost on ports 3000-3002)
+  --scope <urls>      Comma-separated loopback URLs (must be 127.0.0.1 or localhost on allowed ports: 3000-3002, 3301, 3302, 3400)
   --config, -c <path> Path to automation.yaml config file
   --output, -o <path> Output path for sanitized report (default: artifacts/security/zap-report.json)
   --raw-report <path> Path where raw ZAP JSON report is written

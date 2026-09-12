@@ -10,6 +10,7 @@ import {
   buildZapDockerArgs,
   evaluateZapReport,
   runZap,
+  validateRedirectScope,
   validateScope,
 } from '../../scripts/security/run-zap.mjs';
 
@@ -22,7 +23,8 @@ const runZapCli = resolve(repoRoot, 'scripts/security/run-zap.mjs');
 // -----------------------------------------------------------------------------
 // Suite 1: validateScope(targets)
 // -----------------------------------------------------------------------------
-test('validateScope: accepts valid loopback addresses on allowed ports (3000, 3001, 3002)', () => {
+test('validateScope: accepts valid loopback addresses on allowed ports (3000, 3001, 3002, 3301, 3302, 3400)', () => {
+  // Local dev server ports
   assert.equal(validateScope('http://127.0.0.1:3000'), true);
   assert.equal(validateScope('http://127.0.0.1:3001'), true);
   assert.equal(validateScope('http://127.0.0.1:3002'), true);
@@ -30,16 +32,27 @@ test('validateScope: accepts valid loopback addresses on allowed ports (3000, 30
   assert.equal(validateScope('http://localhost:3001'), true);
   assert.equal(validateScope('http://localhost:3002'), true);
 
+  // T007 security compose stack ports (3301 api, 3302 agent, 3400 web)
+  assert.equal(validateScope('http://127.0.0.1:3301'), true);
+  assert.equal(validateScope('http://127.0.0.1:3302'), true);
+  assert.equal(validateScope('http://127.0.0.1:3400'), true);
+  assert.equal(validateScope('http://localhost:3301'), true);
+  assert.equal(validateScope('http://localhost:3302'), true);
+  assert.equal(validateScope('http://localhost:3400'), true);
+
   // Array of valid targets
   assert.equal(
     validateScope([
       'http://127.0.0.1:3000',
       'http://127.0.0.1:3001',
       'http://127.0.0.1:3002',
+      'http://127.0.0.1:3301',
+      'http://127.0.0.1:3302',
+      'http://127.0.0.1:3400',
     ]),
     true,
   );
-  assert.equal(validateScope(['http://localhost:3000', 'http://127.0.0.1:3001']), true);
+  assert.equal(validateScope(['http://localhost:3400', 'http://127.0.0.1:3301']), true);
 });
 
 test('validateScope: rejects external addresses', () => {
@@ -76,6 +89,46 @@ test('validateScope: rejects malformed, non-string, or empty targets', () => {
   assert.equal(validateScope(123), false);
   assert.equal(validateScope('not-a-valid-url'), false);
   assert.equal(validateScope([]), false);
+});
+
+// -----------------------------------------------------------------------------
+// Suite 1b: validateRedirectScope(redirectTarget, baseUrl)
+// -----------------------------------------------------------------------------
+test('validateRedirectScope: accepts valid redirect destinations within allowed loopback scope', () => {
+  // Absolute URLs on allowed ports
+  assert.equal(validateRedirectScope('http://127.0.0.1:3000/dashboard'), true);
+  assert.equal(validateRedirectScope('http://127.0.0.1:3301/api/health'), true);
+  assert.equal(validateRedirectScope('http://127.0.0.1:3400/login'), true);
+  assert.equal(validateRedirectScope('http://localhost:3002/chat'), true);
+
+  // Relative paths resolved against valid base URL
+  assert.equal(validateRedirectScope('/api/auth/me', 'http://127.0.0.1:3001'), true);
+  assert.equal(validateRedirectScope('/flights/search', 'http://127.0.0.1:3400'), true);
+  assert.equal(validateRedirectScope('relative/path', 'http://127.0.0.1:3000'), true);
+
+  // Relative path defaulting to loopback port 3000
+  assert.equal(validateRedirectScope('/dashboard'), true);
+});
+
+test('validateRedirectScope: rejects out-of-scope or external redirect destinations', () => {
+  // External destinations
+  assert.equal(validateRedirectScope('http://evil.com/phish'), false);
+  assert.equal(validateRedirectScope('https://google.com'), false);
+  assert.equal(validateRedirectScope('//attacker.com/steal'), false);
+
+  // Unallowed loopback ports
+  assert.equal(validateRedirectScope('http://127.0.0.1:8080/admin'), false);
+  assert.equal(validateRedirectScope('http://localhost:9000'), false);
+
+  // Out-of-scope base URL with relative path
+  assert.equal(validateRedirectScope('/profile', 'http://evil.com'), false);
+  assert.equal(validateRedirectScope('/profile', 'http://127.0.0.1:8080'), false);
+
+  // Invalid protocols or inputs
+  assert.equal(validateRedirectScope('javascript:alert(1)'), false);
+  assert.equal(validateRedirectScope(''), false);
+  assert.equal(validateRedirectScope(null), false);
+  assert.equal(validateRedirectScope(undefined), false);
 });
 
 // -----------------------------------------------------------------------------
@@ -271,6 +324,57 @@ test('evaluateZapReport: returns exitCode 2 when report is missing, empty, or un
   assert.equal(evaluateZapReport('').exitCode, 2);
 });
 
+test('evaluateZapReport: returns exitCode 2 when scan produced 0 URLs or is empty', () => {
+  // Empty object with no scanned sites, findings or urls
+  const emptyObjResult = evaluateZapReport({});
+  assert.equal(emptyObjResult.exitCode, 2);
+  assert.match(emptyObjResult.error, /empty/i);
+
+  // Empty site array
+  const emptySitesResult = evaluateZapReport({ site: [] });
+  assert.equal(emptySitesResult.exitCode, 2);
+  assert.match(emptySitesResult.error, /0 URLs scanned|empty/i);
+
+  // Explicit scannedUrls: 0
+  const zeroUrlsResult = evaluateZapReport({ scannedUrls: 0 });
+  assert.equal(zeroUrlsResult.exitCode, 2);
+  assert.match(zeroUrlsResult.error, /0 scanned URLs/i);
+
+  // Empty urls array
+  const emptyUrlsResult = evaluateZapReport({ urls: [] });
+  assert.equal(emptyUrlsResult.exitCode, 2);
+  assert.match(emptyUrlsResult.error, /0 scanned URLs/i);
+});
+
+test('evaluateZapReport: returns exitCode 2 when authentication failure occurs during scan', () => {
+  // authFailed flag
+  const authFailedResult = evaluateZapReport({
+    site: [{ '@name': 'http://127.0.0.1:3000', alerts: [] }],
+    authFailed: true,
+  });
+  assert.equal(authFailedResult.exitCode, 2);
+  assert.match(authFailedResult.error, /Authentication failure/i);
+
+  // authErrors array
+  const authErrorsResult = evaluateZapReport({
+    site: [{ '@name': 'http://127.0.0.1:3000', alerts: [] }],
+    authErrors: ['Token expired during login turn'],
+  });
+  assert.equal(authErrorsResult.exitCode, 2);
+  assert.match(authErrorsResult.error, /Authentication error/i);
+
+  // All authenticated endpoints returned 401/403
+  const all401Result = evaluateZapReport({
+    site: [{ '@name': 'http://127.0.0.1:3000', alerts: [] }],
+    authenticatedEndpoints: [
+      { path: '/api/auth/me', status: 401 },
+      { path: '/profile', status: 403 },
+    ],
+  });
+  assert.equal(all401Result.exitCode, 2);
+  assert.match(all401Result.error, /401 or 403/i);
+});
+
 // -----------------------------------------------------------------------------
 // Suite 4: runZap(options, dependencies)
 // -----------------------------------------------------------------------------
@@ -448,6 +552,49 @@ test('runZap: dry-run validates scope and returns dockerArgs without executing c
   assert.equal(result.dryRun, true);
   assert.equal(runnerCalled, false, 'Runner should NOT be called on dry-run');
   assert.ok(Array.isArray(result.dockerArgs));
+});
+
+test('runZap: passes explicit timeout options cleanly to docker runner', async () => {
+  let capturedTimeoutMs = null;
+  const mockRunner = async (_args, opts) => {
+    capturedTimeoutMs = opts.timeoutMs;
+    return { exitCode: 0 };
+  };
+
+  const testDir = join(tmpdir(), `run-zap-timeout-${Date.now()}`);
+  mkdirSync(testDir, { recursive: true });
+  const rawReportFile = join(testDir, 'zap-raw-report.json');
+  writeFileSync(rawReportFile, JSON.stringify({ site: [{ '@name': 'http://127.0.0.1:3000', alerts: [] }] }), 'utf8');
+
+  try {
+    // 1. Explicit timeout in seconds (--timeout 45 -> 45000ms)
+    await runZap(
+      {
+        scope: ['http://127.0.0.1:3000'],
+        timeout: 45,
+        rawReportPath: rawReportFile,
+        output: join(testDir, 'report.json'),
+        toolchainPath,
+      },
+      { dockerRunner: mockRunner },
+    );
+    assert.equal(capturedTimeoutMs, 45000, 'timeout in seconds must convert directly to milliseconds');
+
+    // 2. Explicit timeoutMs (timeoutMs: 120000 -> 120000ms)
+    await runZap(
+      {
+        scope: ['http://127.0.0.1:3000'],
+        timeoutMs: 120000,
+        rawReportPath: rawReportFile,
+        output: join(testDir, 'report.json'),
+        toolchainPath,
+      },
+      { dockerRunner: mockRunner },
+    );
+    assert.equal(capturedTimeoutMs, 120000, 'timeoutMs must be passed directly');
+  } finally {
+    rmSync(testDir, { recursive: true, force: true });
+  }
 });
 
 // -----------------------------------------------------------------------------

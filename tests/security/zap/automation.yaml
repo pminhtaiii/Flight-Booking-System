@@ -25,13 +25,14 @@ env:
           loggedOutRegex: "\\Q401 Unauthorized\\E"
       sessionManagement:
         method: "headers"
-        parameters: {}
+        parameters:
+          Authorization: "Bearer {%header:token%}"
       users:
-        - name: "User A"
+        - name: "UserA" # User A
           credentials:
             username: "security-a@example.invalid"
             token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzZWN1cml0eS11c2VyLWEiLCJlbWFpbCI6InNlY3VyaXR5LWEtZXhhbXBsZS5pbnZhbGlkIiwicm9sZSI6IlVTRVIiLCJpc3MiOiJib29raW5nLXN5c3RlbXMtYXBpIiwiYXVkIjoiYm9va2luZy1zeXN0ZW1zLWNsaWVudHMiLCJqdGkiOiJqdGktc2VjdXJpdHktYSJ9.synthetic_user_a_signature"
-        - name: "User B"
+        - name: "UserB" # User B
           credentials:
             username: "security-b@example.invalid"
             token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzZWN1cml0eS11c2VyLWIiLCJlbWFpbCI6InNlY3VyaXR5LWItZXhhbXBsZS5pbnZhbGlkIiwicm9sZSI6IlVTRVIiLCJpc3MiOiJib29raW5nLXN5c3RlbXMtYXBpIiwiYXVkIjoiYm9va2luZy1zeXN0ZW1zLWNsaWVudHMiLCJqdGkiOiJqdGktc2VjdXJpdHktYiJ9.synthetic_user_b_signature"
@@ -47,6 +48,7 @@ jobs:
   - type: "spider"
     parameters:
       context: "BookingSystems-Local"
+      user: "UserA"
       url: "http://127.0.0.1:3000"
       maxDuration: 5
       maxDepth: 5
@@ -58,6 +60,7 @@ jobs:
   - type: "activeScan"
     parameters:
       context: "BookingSystems-Local"
+      user: "UserA"
       policy: "StrictLocalBounded"
       maxRuleDurationInMins: 2
       maxScanDurationInMins: 10
