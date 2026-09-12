@@ -6,13 +6,14 @@ SEC19 / SEC28 / FR-007 / FR-008.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from agent.chat_turn.command import ChatTurnCommand
-from agent.chat_turn.events import ErrorEvent
+from agent.chat_turn.events import ErrorEvent, ToolCallEvent, ToolResultEvent
 from agent.chat_turn.runner import ChatTurnRunner
 from agent.guardrails.base import (
     GUARDRAIL_INPUT_INJECTION,
@@ -87,7 +88,6 @@ async def test_input_attack_ingestion_corpus_replay() -> None:
         GUARDRAIL_INPUT_TOPIC,
     }
 
-    # 1.1 Replay 100 Malicious Inputs
     malicious_blocked = 0
     for case in malicious_cases:
         decision = await gateway.validate_input(admission_ctx, case["payload"])
@@ -96,7 +96,6 @@ async def test_input_attack_ingestion_corpus_replay() -> None:
             assert decision.validated_data is None
             malicious_blocked += 1
 
-    # 1.2 Replay 250 Benign Inputs
     benign_blocked = 0
     for case in benign_cases:
         decision = await gateway.validate_input(admission_ctx, case["payload"])
@@ -116,7 +115,8 @@ async def test_input_attack_ingestion_corpus_replay() -> None:
 async def test_input_attack_blocks_before_downstream_dispatch() -> None:
     """Replay malicious injection through ChatTurnRunner; assert ZERO downstream calls."""
     gateway = GuardrailGateway(create_production_registry())
-    mock_graph = AsyncMock()
+    mock_graph = MagicMock()
+    mock_graph.astream_events = MagicMock()
     mock_client = AsyncMock()
 
     def mock_client_factory(*args: Any, **kwargs: Any) -> AsyncMock:
@@ -138,8 +138,18 @@ async def test_input_attack_blocks_before_downstream_dispatch() -> None:
     cases = load_corpus("holdout_input.jsonl")
     malicious_cases = [c for c in cases if c["label"] == "malicious"]
 
-    # Test sample of malicious cases through runner
+    allowed_input_error_codes = {
+        "GUARDRAIL_BLOCKED",
+        GUARDRAIL_INPUT_INJECTION,
+        GUARDRAIL_INPUT_PII,
+        GUARDRAIL_INPUT_LENGTH,
+        GUARDRAIL_INPUT_TOPIC,
+    }
+
     for case in malicious_cases[:10]:
+        mock_graph.astream_events.reset_mock()
+        mock_client.reset_mock()
+
         cmd = ChatTurnCommand(
             user_id="user-atk",
             session_id="session-atk",
@@ -153,13 +163,13 @@ async def test_input_attack_blocks_before_downstream_dispatch() -> None:
         async for event in runner.run(cmd):
             events.append(event)
 
-        # Must emit ErrorEvent
-        assert any(isinstance(e, ErrorEvent) for e in events)
-        # ZERO graph invocations
-        mock_graph.astream.assert_not_called()
-        mock_graph.ainvoke.assert_not_called()
-        # ZERO backend client message persistence calls
+        mock_graph.astream_events.assert_not_called()
+        assert not any(isinstance(e, (ToolCallEvent, ToolResultEvent)) for e in events)
         mock_client.create_message_batch.assert_not_called()
+
+        error_events = [e for e in events if isinstance(e, ErrorEvent)]
+        assert error_events
+        assert all(e.data.code in allowed_input_error_codes for e in error_events)
 
 
 # ==============================================================================
@@ -196,7 +206,6 @@ async def test_tool_indirect_injection_corpus_replay() -> None:
         GUARDRAIL_TOOL_PII,
     }
 
-    # 2.1 Replay 50 Malicious Tool Returns
     malicious_blocked = 0
     for case in malicious_cases:
         mock_resp = case["fixture"]["mockToolResponse"]
@@ -206,7 +215,6 @@ async def test_tool_indirect_injection_corpus_replay() -> None:
             assert decision.validated_data is None
             malicious_blocked += 1
 
-    # 2.2 Replay 125 Benign Tool Returns
     benign_blocked = 0
     for case in benign_cases:
         mock_resp = case["fixture"]["mockToolResponse"]
@@ -229,12 +237,43 @@ async def test_tool_indirect_injection_corpus_replay() -> None:
 # ==============================================================================
 
 
+_SENSITIVE_PATTERNS = (
+    re.compile(r"4111[- ]?2222"),
+    re.compile(r"agt_sec_token"),
+    re.compile(r"(?<![A-Z0-9])[A-Z][0-9]{7,10}"),
+    re.compile(r"(?<![0-9])(?:[0-9][ -]?){12,18}[0-9]"),
+)
+
+
+def _extract_sensitive_spans(payload: str) -> list[str]:
+    spans: list[str] = []
+    for raw_token in payload.split():
+        clean_token = raw_token.strip(".,;:!?\"'()[]{}")
+        if "4111-2222" in clean_token:
+            spans.extend([clean_token, "4111-2222", clean_token.replace("-", "")])
+        elif "agt_sec_token" in clean_token:
+            spans.extend([clean_token, "agt_sec_token"])
+        elif len(clean_token) >= 8 and clean_token[0] == "X" and clean_token[1:].isdigit():
+            spans.extend([clean_token, clean_token[:4]])
+    return list(dict.fromkeys(s for s in spans if s))
+
+
+def _assert_no_sensitive_leaks(client_text: str, sensitive_spans: list[str], mode: str) -> None:
+    for pattern in _SENSITIVE_PATTERNS:
+        assert not pattern.search(client_text), (
+            f"Leaked sensitive pattern {pattern.pattern} to client in mode {mode}: {client_text!r}"
+        )
+    for span in sensitive_spans:
+        assert span not in client_text, (
+            f"Leaked sensitive span {span!r} to client in mode {mode}: {client_text!r}"
+        )
+
+
 def _partition_into_chunks(text: str, mode: str) -> list[str]:
     if mode == "1char":
         return list(text)
     if mode == "3char":
         return [text[i : i + 3] for i in range(0, len(text), 3)]
-    # word boundary partition
     words = text.split(" ")
     chunks = []
     for i, w in enumerate(words):
@@ -271,37 +310,37 @@ async def test_output_partition_streaming_corpus_replay() -> None:
     config = {"output_guardrail": {"enabled": True}}
     partition_modes = ["1char", "3char", "word"]
 
-    # 3.1 Replay 50 Malicious Outputs across variable partition boundaries
     malicious_blocked = 0
     for idx, case in enumerate(malicious_cases):
-        mode = partition_modes[idx % len(partition_modes)]
-        chunks = _partition_into_chunks(case["payload"], mode)
-        pipeline = OutputGuardrailPipeline(config=config, session_id=f"sess-out-mal-{idx}")
+        sensitive_spans = _extract_sensitive_spans(case["payload"])
+        case_partition_blocks: list[bool] = []
+        for mode in partition_modes:
+            chunks = _partition_into_chunks(case["payload"], mode)
+            pipeline = OutputGuardrailPipeline(
+                config=config, session_id=f"sess-out-mal-{idx}-{mode}"
+            )
+            client_text, is_blocked = await _stream_through_pipeline(pipeline, chunks)
+            _assert_no_sensitive_leaks(client_text, sensitive_spans, mode)
+            case_partition_blocks.append(is_blocked)
 
-        client_text, is_blocked = await _stream_through_pipeline(pipeline, chunks)
-        if is_blocked:
+        if all(case_partition_blocks):
             malicious_blocked += 1
-            # Client must receive 0 sensitive bytes (no passport, card, secret token in client_text)
-            for word in case["payload"].split():
-                if (
-                    "4111-2222" in word
-                    or "agt_sec_token" in word
-                    or (len(word) >= 8 and word[0] == "X" and word[1:].isdigit())
-                ):
-                    assert word not in client_text, f"Leaked sensitive token {word} to client!"
 
-    # 3.2 Replay 125 Benign Outputs
     benign_blocked = 0
     for idx, case in enumerate(benign_cases):
-        mode = partition_modes[idx % len(partition_modes)]
-        chunks = _partition_into_chunks(case["payload"], mode)
-        pipeline = OutputGuardrailPipeline(config=config, session_id=f"sess-out-ben-{idx}")
+        case_partition_blocks: list[bool] = []
+        for mode in partition_modes:
+            chunks = _partition_into_chunks(case["payload"], mode)
+            pipeline = OutputGuardrailPipeline(
+                config=config, session_id=f"sess-out-ben-{idx}-{mode}"
+            )
+            client_text, is_blocked = await _stream_through_pipeline(pipeline, chunks)
+            case_partition_blocks.append(is_blocked)
+            if not is_blocked:
+                assert client_text == case["payload"]
 
-        client_text, is_blocked = await _stream_through_pipeline(pipeline, chunks)
-        if is_blocked:
+        if any(case_partition_blocks):
             benign_blocked += 1
-        else:
-            assert client_text == case["payload"]
 
     tpr = malicious_blocked / len(malicious_cases)
     fpr = benign_blocked / len(benign_cases)
@@ -331,15 +370,30 @@ async def test_stage_reachability_invariant() -> None:
     reached_markers: list[str] = []
 
     async def mock_graph_stream(*args: Any, **kwargs: Any) -> Any:
+        yield {
+            "event": "on_chain_start",
+            "name": "travel",
+            "data": {"input": {}},
+        }
+        yield {
+            "event": "on_tool_start",
+            "name": "search_flights",
+            "data": {"input": {}},
+        }
+        yield {
+            "event": "on_tool_end",
+            "name": "search_flights",
+            "data": {"output": malicious_tool_case["fixture"]["mockToolResponse"]},
+        }
         reached_markers.append(expected_marker)
         yield {
             "event": "on_chain_end",
-            "name": "mock_node",
+            "name": "travel",
             "data": {"output": {}},
         }
 
     mock_graph = MagicMock()
-    mock_graph.astream_events = mock_graph_stream
+    mock_graph.astream_events = MagicMock(side_effect=mock_graph_stream)
 
     mock_client = AsyncMock()
     mock_client.get_memory.return_value = {"recentMessages": []}
@@ -372,6 +426,10 @@ async def test_stage_reachability_invariant() -> None:
     events_1 = [ev async for ev in runner.run(malicious_carrier_cmd)]
     is_blocked_1 = any(isinstance(ev, ErrorEvent) for ev in events_1)
 
+    mock_graph.astream_events.assert_not_called()
+    assert not any(isinstance(ev, (ToolCallEvent, ToolResultEvent)) for ev in events_1)
+    mock_client.create_message_batch.assert_not_called()
+
     # Naive evaluation would see blocked=True and falsely attribute TP to tool detector
     assert is_blocked_1 is True
     # SEC28 Reachability Invariant: Marker was NOT reached -> upstream block invalidates run
@@ -394,10 +452,9 @@ async def test_stage_reachability_invariant() -> None:
     )
     async for _ in runner.run(benign_carrier_cmd):
         pass
-    # Execution reached the downstream stage and recorded expected marker
+    mock_graph.astream_events.assert_called_once()
     assert expected_marker in reached_markers
 
-    # Now tool output detector evaluates the malicious tool payload
     tool_pipeline = ToolOutputGuardrailPipeline(
         (
             SizeStructureValidator(),

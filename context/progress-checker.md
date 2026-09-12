@@ -37,6 +37,18 @@
     4. Stage Reachability Invariant (SEC28): Captured payload-free `reachedStageMarker` values tied to turn IDs and asserted that unexpected upstream blocks do NOT count as downstream detector true positives. Verified all 700 holdout records carry valid reached stage markers.
   - Hardened input injection signatures with linear, non-catastrophic ReDoS-safe AST patterns and SSN pattern detection in `apps/agent/src/agent/guardrails/layers/injection.py` and `input.py`.
   - All 6 tests in `tests/security/dast/test_adversarial.py` pass cleanly in ~8.6s, all 77 input layer tests pass, and full agent test suite passes. Formatting and lint checks pass cleanly with `ruff`.
+- **Phase 6 Slice 2 Follow-Up: Remediated Issues 1–10**:
+  - Issue 1 (Reachable Redis Fixture): Created `tests/security/dast/conftest.py` with reachable async `redis_client` fixture connecting to `$env:REDIS_URL` (`redis://127.0.0.1:6379/0`), pinging, and closing. Running full suite without excluding `redis_integration` passes all 24 tests.
+  - Issue 2 (Public Interface Enforcement & Verification): Re-labeled mocked checks as explicit `[Error-Handling Unit]` tests; added public interface tests (`test_nestjs_client_public_interface_ownership_invariants`, `test_fastapi_jwt_auth_middleware_public_interface`); added `verify_claim_token` implementing real HMAC candidate secret ring verification and TTL/status checking; added `test_live_backend_or_contract_fallback_ownership`.
+  - Issue 3 (Actual Stage Delivery Markers & Forbidden Sinks): Simulated delivery to actual tool stage (`on_tool_end` of `search_flights`) for stage reachability invariant; asserted forbidden sinks (`astream_events.assert_not_called()`, zero tool events, zero message batch writes) before scoring.
+  - Issue 4 (Unconditional Leak Checks): Added `_assert_no_sensitive_leaks` verifying sensitive card, passport, and auth token patterns/spans unconditionally for ALL cases (blocked or not).
+  - Issue 5 (Correct Graph Invocation Assertions): Asserted `mock_graph.astream_events.assert_not_called()`, verified specific error code matches `allowed_input_error_codes`.
+  - Issue 6 (Partition Mode Coverage): Evaluated every output case across all three partition modes (`1char`, `3char`, `word`) with a fresh pipeline, separating corpus metrics from partition runs and asserting zero leaks on every mode.
+  - Issue 7 (Strict Flight Search Normalization): Validated required source fields (`offer_id`, `airline`, `origin`, `destination`, `price > 0`) before normalization in `tool_output.py`; malformed records are not converted to fake fares/placeholders, allowing `SchemaValidator` to fail them. Added `price: float = Field(gt=0)` in `schemas/tools.py`.
+  - Issue 8 (Bounded Credential Policy & Contracts): Bounded horizontal whitespace to `[ \t]{0,4}` / `[ \t]{1,4}` in `output_pipeline.py`; updated `specs/023-security-systems/contracts/guardrail-boundaries.md`, `tests/security/pii-policy.json`, and `apps/agent/tests/security/test_output_stream.py`.
+  - Issue 9 (Dynamic Test Configuration): Removed hardcoded secret literals and URLs from module import level in `test_ownership.py`; resolved dynamically via `_resolve_test_env()` using `secrets.token_hex(32)` or environment variables in `conftest.py` / `test_ownership.py`.
+  - Issue 10 (Comment Quality & Rationale): Purged redundant narration comments throughout both test modules; preserved only security rationale, threat model, and invariant explanations.
+  - Verified full test suite: 24/24 DAST tests passing in ~13s, 483/483 agent security tests passing in ~32s, and `ruff check` / `ruff format` 100% clean.
 
 ### Feature 023 — Phase 5 CI Security Pipeline Remediation (2026-09-12, Completed)
 

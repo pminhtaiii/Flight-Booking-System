@@ -43,7 +43,16 @@
       "maximumMatchScalars": 512,
       "leftLookaroundScalars": 0,
       "rightLookaroundScalars": 0,
-      "prefixes": ["api_key=", "access_token=", "secret=", "bearer "],
+      "prefixes": [
+        "api_key=",
+        "api_key:",
+        "access_token=",
+        "access_token:",
+        "secret=",
+        "secret:",
+        "bearer "
+      ],
+      "maximumWhitespaceScalars": 4,
       "overlongCandidate": "fail_closed"
     }
   }

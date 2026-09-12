@@ -34,7 +34,7 @@ class SearchFlightsToolInput(_ToolSchema):
 class FlightSearchResult(_ToolSchema):
     flight_id: str
     airline: str
-    price: float
+    price: float = Field(gt=0)
     origin: str
     destination: str
     date: str | None = None

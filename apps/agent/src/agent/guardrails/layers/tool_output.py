@@ -166,26 +166,53 @@ def _project_search_result(raw_value: Any) -> Any:
         for offer in raw_value["offers"]:
             if not isinstance(offer, dict):
                 return raw_value
-            price_val = offer.get("price", 0.0)
+            offer_id = (
+                offer.get("offerId")
+                or offer.get("flightNumber")
+                or offer.get("flight_id")
+                or offer.get("id")
+            )
+            airline = offer.get("airline")
+            origin = offer.get("origin") or offer.get("departureAirport")
+            destination = offer.get("destination") or offer.get("arrivalAirport")
+            price_val = offer.get("price")
             try:
-                price_num = float(price_val)
+                price_num = float(price_val) if price_val is not None else None
             except (ValueError, TypeError):
-                price_num = 0.0
+                price_num = None
+
+            if (
+                not offer_id
+                or not str(offer_id).strip()
+                or not origin
+                or not str(origin).strip()
+                or not destination
+                or not str(destination).strip()
+                or not airline
+                or not str(airline).strip()
+                or price_num is None
+                or price_num <= 0
+            ):
+                return raw_value
+
+            date_val = offer.get("departureTime") or offer.get("date")
+            currency_val = offer.get("currency")
+
             projected_flights.append(
                 {
-                    "flight_id": str(
-                        offer.get("offerId") or offer.get("flightNumber") or "FL-UNKNOWN"
-                    ),
-                    "airline": str(offer.get("airline") or "Unknown Airline"),
+                    "flight_id": str(offer_id).strip(),
+                    "airline": str(airline).strip(),
                     "price": price_num,
-                    "origin": str(offer.get("origin") or "UNK"),
-                    "destination": str(offer.get("destination") or "UNK"),
-                    "date": str(offer.get("departureTime") or offer.get("date") or ""),
-                    "currency": str(offer.get("currency") or "USD"),
+                    "origin": str(origin).strip(),
+                    "destination": str(destination).strip(),
+                    "date": str(date_val).strip() if date_val else None,
+                    "currency": str(currency_val).strip() if currency_val else None,
                     "policy": offer.get("policy"),
                     "seat_available": offer.get("seat_available"),
                 }
             )
+        if not projected_flights:
+            return raw_value
         return {"flights": projected_flights}
     if "flights" not in raw_value:
         return raw_value
