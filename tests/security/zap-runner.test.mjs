@@ -18,6 +18,7 @@ import {
   buildZapDockerArgs,
   evaluateZapReport,
   runZap,
+  SUPPORTED_ZAP_JOB_TYPES,
   validateConfigFileScope,
   validateRedirectScope,
   validateScope,
@@ -522,6 +523,196 @@ test('validateConfigFileScope: rejects missing or empty configuration file', () 
     assert.match(emptyResult.error, /empty/i);
   } finally {
     rmSync(emptyDir, { recursive: true, force: true });
+  }
+});
+
+test('SUPPORTED_ZAP_JOB_TYPES exports expected job types Set', () => {
+  assert.ok(SUPPORTED_ZAP_JOB_TYPES instanceof Set);
+  const expectedJobs = [
+    'passiveScan-config',
+    'passiveScan-wait',
+    'spider',
+    'openapi',
+    'activeScan',
+    'report',
+    'requestor',
+  ];
+  assert.equal(SUPPORTED_ZAP_JOB_TYPES.size, expectedJobs.length);
+  for (const job of expectedJobs) {
+    assert.ok(SUPPORTED_ZAP_JOB_TYPES.has(job), `Missing job type: ${job}`);
+  }
+});
+
+test('validateConfigFileScope: rejects configuration with YAML anchor or alias', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'zap-config-anchor-'));
+  const anchorConfig = join(tempDir, 'anchor.yaml');
+  const aliasConfig = join(tempDir, 'alias.yaml');
+  try {
+    // YAML anchor definition
+    writeFileSync(
+      anchorConfig,
+      `
+env:
+  contexts:
+    - name: "AnchorContext"
+      urls:
+        - &ref http://example.com
+jobs:
+  - type: "spider"
+    parameters:
+      url: *ref
+`,
+      'utf8',
+    );
+    const resultAnchor = validateConfigFileScope(anchorConfig);
+    assert.equal(resultAnchor.valid, false);
+    assert.match(resultAnchor.error, /unsupported YAML anchor or alias construct/i);
+    assert.match(resultAnchor.error, /&ref/);
+
+    // YAML alias reference
+    writeFileSync(
+      aliasConfig,
+      `
+env:
+  contexts:
+    - name: "AliasContext"
+      urls:
+        - *ref
+jobs:
+  - type: "spider"
+    parameters:
+      url: "http://127.0.0.1:3000"
+`,
+      'utf8',
+    );
+    const resultAlias = validateConfigFileScope(aliasConfig);
+    assert.equal(resultAlias.valid, false);
+    assert.match(resultAlias.error, /unsupported YAML anchor or alias construct/i);
+    assert.match(resultAlias.error, /\*ref/);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('validateConfigFileScope: rejects configuration with unsupported job type', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'zap-config-jobtype-'));
+  const ajaxConfig = join(tempDir, 'spider-ajax.yaml');
+  const graphqlConfig = join(tempDir, 'graphql.yaml');
+  try {
+    // Unsupported spiderAjax job
+    writeFileSync(
+      ajaxConfig,
+      `
+env:
+  contexts:
+    - name: "TestContext"
+      urls:
+        - "http://127.0.0.1:3000"
+jobs:
+  - type: "spiderAjax"
+    parameters:
+      url: "http://127.0.0.1:3000"
+`,
+      'utf8',
+    );
+    const resultAjax = validateConfigFileScope(ajaxConfig);
+    assert.equal(resultAjax.valid, false);
+    assert.match(resultAjax.error, /unsupported ZAP job type.*spiderAjax/i);
+
+    // Unsupported graphql job
+    writeFileSync(
+      graphqlConfig,
+      `
+env:
+  contexts:
+    - name: "TestContext"
+      urls:
+        - "http://127.0.0.1:3000"
+jobs:
+  - type: "graphql"
+    parameters:
+      endpoint: "http://127.0.0.1:3000"
+`,
+      'utf8',
+    );
+    const resultGraphql = validateConfigFileScope(graphqlConfig);
+    assert.equal(resultGraphql.valid, false);
+    assert.match(resultGraphql.error, /unsupported ZAP job type.*graphql/i);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('validateConfigFileScope: rejects configuration with external target hidden in arbitrary job parameters', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'zap-config-hidden-'));
+  const hiddenConfig = join(tempDir, 'hidden-target.yaml');
+  try {
+    writeFileSync(
+      hiddenConfig,
+      `
+env:
+  contexts:
+    - name: "ValidContext"
+      urls:
+        - "http://127.0.0.1:3000"
+jobs:
+  - type: "spider"
+    parameters:
+      url: "http://127.0.0.1:3000"
+      customCallback: "http://evil.com/leak"
+`,
+      'utf8',
+    );
+    const result = validateConfigFileScope(hiddenConfig);
+    assert.equal(result.valid, false);
+    assert.match(result.error, /outside allowed loopback scope/i);
+    assert.match(result.error, /evil\.com/);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('validateConfigFileScope: accepts valid configuration with supported jobs and loopback targets', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'zap-config-valid-'));
+  const validConfig = join(tempDir, 'valid.yaml');
+  try {
+    writeFileSync(
+      validConfig,
+      `
+env:
+  contexts:
+    - name: "LocalValid"
+      urls:
+        - "http://127.0.0.1:3000"
+        - "http://127.0.0.1:3001"
+      includePaths:
+        - "http://127.0.0.1:3000/.*"
+      excludePaths:
+        - "^(?!http://127\\\\.0\\\\.0\\\\.1:(3000|3001)).*"
+jobs:
+  - type: "passiveScan-config"
+  - type: "spider"
+    parameters:
+      url: "http://127.0.0.1:3000"
+  - type: "openapi"
+    parameters:
+      targetUrl: "http://127.0.0.1:3001"
+  - type: "passiveScan-wait"
+  - type: "activeScan"
+  - type: "report"
+  - type: "requestor"
+    parameters:
+      url: "http://127.0.0.1:3000"
+`,
+      'utf8',
+    );
+    const result = validateConfigFileScope(validConfig, ['http://127.0.0.1:3000', 'http://127.0.0.1:3001']);
+    assert.equal(result.valid, true, `Expected valid: true, got error: ${result.error}`);
+    assert.ok(Array.isArray(result.urls));
+    assert.ok(result.urls.includes('http://127.0.0.1:3000'));
+    assert.ok(result.urls.includes('http://127.0.0.1:3001'));
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
   }
 });
 

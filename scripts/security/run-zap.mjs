@@ -25,6 +25,15 @@ export const ALLOWED_LOOPBACK_HOSTS = new Set([
 export const DEV_PORTS = Object.freeze([3000, 3001, 3002]);
 export const COMPOSE_PORTS = Object.freeze([3301, 3302, 3400]);
 export const ALLOWED_PORTS = new Set([...DEV_PORTS, ...COMPOSE_PORTS]);
+export const SUPPORTED_ZAP_JOB_TYPES = new Set([
+  'passiveScan-config',
+  'passiveScan-wait',
+  'spider',
+  'openapi',
+  'activeScan',
+  'report',
+  'requestor',
+]);
 
 /**
  * Validates target URLs to enforce strict loopback scope boundaries.
@@ -189,7 +198,6 @@ export function extractDeclaredUrlsFromYaml(yamlText) {
   const urls = [];
   const lines = yamlText.split(/\r?\n/);
   let inContext = false;
-  let inJob = null;
   let currentList = null;
 
   for (let i = 0; i < lines.length; i++) {
@@ -199,13 +207,11 @@ export function extractDeclaredUrlsFromYaml(yamlText) {
 
     if (trimmed.startsWith('contexts:')) {
       inContext = true;
-      inJob = null;
       currentList = null;
       continue;
     }
     if (trimmed.startsWith('jobs:')) {
       inContext = false;
-      inJob = null;
       currentList = null;
       continue;
     }
@@ -220,40 +226,38 @@ export function extractDeclaredUrlsFromYaml(yamlText) {
         continue;
       }
       if (/^(excludePaths|authentication|sessionManagement|users)\s*:/.test(trimmed)) {
-        currentList = null;
+        currentList = trimmed.startsWith('excludePaths') ? 'excludePaths' : null;
         continue;
       }
       if (currentList === 'urls' || currentList === 'includePaths') {
         const itemMatch = trimmed.match(/^-\s*["']?([^"'\s]+)["']?/);
         if (itemMatch) {
           urls.push(itemMatch[1]);
-          continue;
         } else if (!trimmed.startsWith('-')) {
+          currentList = null;
+        }
+      } else if (currentList === 'excludePaths') {
+        if (!trimmed.startsWith('-')) {
           currentList = null;
         }
       }
     }
 
-    const jobTypeMatch = trimmed.match(/^-\s*type\s*:\s*["']?([^"'\s]+)["']?/);
-    if (jobTypeMatch) {
-      inJob = jobTypeMatch[1];
-      currentList = null;
-      continue;
-    }
-
-    if (inJob === 'spider') {
-      const urlMatch = trimmed.match(/^url\s*:\s*["']?([^"'\s]+)["']?/);
-      if (urlMatch) urls.push(urlMatch[1]);
-    } else if (inJob === 'openapi') {
-      const targetUrlMatch = trimmed.match(/^targetUrl\s*:\s*["']?([^"'\s]+)["']?/);
-      if (targetUrlMatch) urls.push(targetUrlMatch[1]);
-    } else if (inJob === 'requestor') {
-      const urlMatch = trimmed.match(/^(?:-\s*)?url\s*:\s*["']?([^"'\s]+)["']?/);
-      if (urlMatch) urls.push(urlMatch[1]);
+    // Comprehensive URL extraction from any line not in excludePaths
+    if (currentList !== 'excludePaths') {
+      const matches = trimmed.match(/https?:\/\/[^\s"'`<>]+/g);
+      if (matches) {
+        for (const m of matches) {
+          const cleaned = m.replace(/[,;)]+$/, '');
+          if (cleaned) {
+            urls.push(cleaned);
+          }
+        }
+      }
     }
   }
 
-  return urls;
+  return Array.from(new Set(urls));
 }
 
 /**
@@ -280,6 +284,61 @@ export function validateConfigFileScope(configPath, allowedScope) {
     return { valid: false, error: `Config file is empty: ${configPath}` };
   }
 
+  // 1. Check for unsupported YAML constructs (anchors and aliases)
+  const anchorMatch = raw.match(/(?:^|\s)([&*][A-Za-z0-9_-]+)/);
+  if (anchorMatch) {
+    const construct = anchorMatch[1].trim();
+    return {
+      valid: false,
+      error: `Config file contains unsupported YAML anchor or alias construct: ${construct}`,
+    };
+  }
+
+  // 2. Parse all job types under `jobs:` and verify against SUPPORTED_ZAP_JOB_TYPES
+  const lines = raw.split(/\r?\n/);
+  let inJobs = false;
+  let inNestedJobConfig = false;
+  const jobTypes = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+
+    if (/^[a-zA-Z0-9_-]+\s*:/.test(line)) {
+      inJobs = line.startsWith('jobs:');
+      inNestedJobConfig = false;
+      continue;
+    }
+
+    if (inJobs) {
+      const indent = line.search(/\S/);
+      if (indent <= 4 && trimmed.startsWith('-')) {
+        inNestedJobConfig = false;
+      }
+      if (/^(parameters|policyDefinition|rules)\s*:/.test(trimmed)) {
+        inNestedJobConfig = true;
+        continue;
+      }
+      if (!inNestedJobConfig) {
+        const jobMatch = trimmed.match(/^(?:-\s*)?type\s*:\s*["']?([^"'\s#]+)["']?/);
+        if (jobMatch) {
+          jobTypes.push(jobMatch[1]);
+        }
+      }
+    }
+  }
+
+  for (const jobType of jobTypes) {
+    if (!SUPPORTED_ZAP_JOB_TYPES.has(jobType)) {
+      return {
+        valid: false,
+        error: `Unsupported ZAP job type: ${jobType}`,
+      };
+    }
+  }
+
+  // 3. Comprehensive URL discovery
   const declaredUrls = extractDeclaredUrlsFromYaml(raw);
   if (declaredUrls.length === 0) {
     return { valid: false, error: `No target URLs declared in config file: ${configPath}` };
