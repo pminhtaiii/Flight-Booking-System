@@ -1,0 +1,55 @@
+# Semgrep Ruleset Definition for Flight Booking System
+# Conforms to Semgrep Ruleset Specification v1.88.0
+
+# ruleset: flight-booking-security-ruleset
+# version: '1.88.0'
+#
+# metadata:
+#   name: 'flight-booking-security-ruleset'
+#   pinned_toolchain_version: '1.88.0'
+#   ruleset_version: '1.0.0'
+#   license: 'LGPL-2.1'
+#   description: 'Pinned static application security testing ruleset combining custom guardrail boundary rules and reviewed generic rules.'
+#   standard_rulesets:
+#     - 'p/default'
+#     - 'p/owasp-top-ten'
+#     - 'p/security-audit'
+#     - 'p/secrets'
+#   interprocedural_properties:
+#     behavioral_tests_required:
+#       - property: 'Cross-module guardrail lifecycle enforcement'
+#         rationale: 'Semgrep AST matching cannot track interprocedural state transitions across distributed async workflows.'
+#         verification_suite: 'apps/agent/tests/security/'
+#       - property: 'Capability table sealing post-checkout'
+#         rationale: 'Static pattern scans cannot prove dynamic session state or token revocation at runtime.'
+#         verification_suite: 'apps/agent/tests/security/test_tool_authority.py'
+#       - property: 'PII scrubbing across streaming SSE transport'
+#         rationale: 'Downstream chunk assembly and backpressure cannot be proven by single-node pattern scans.'
+#         verification_suite: 'tests/security/dast/test_adversarial.py'
+#
+# includes:
+#   - guardrails.yml
+
+rules:
+  - id: no-generic-eval-exec
+    languages:
+      - python
+    severity: ERROR
+    message: 'Dangerous code execution via eval or exec is forbidden across the codebase.'
+    metadata:
+      category: security
+      subcategory: code-injection
+      cwe: "CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code ('Eval Injection')"
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: exec(...)
+
+  - id: no-dangerous-inner-html
+    languages:
+      - typescript
+    severity: ERROR
+    message: 'dangerouslySetInnerHTML is forbidden in web components without explicit reviewed exceptions.'
+    metadata:
+      category: security
+      subcategory: xss
+    pattern: 'dangerouslySetInnerHTML={{ __html: ... }}'

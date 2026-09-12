@@ -171,10 +171,14 @@ export class ChatMessageCryptoService {
       throw new UnsupportedKeyVersionError(message.contentKeyVersion);
     }
     if (
-      message.contentCiphertext &&
-      message.contentNonce &&
-      message.contentAuthTag &&
-      message.contentKeyVersion
+      message.contentCiphertext !== undefined &&
+      message.contentCiphertext !== null &&
+      message.contentNonce !== undefined &&
+      message.contentNonce !== null &&
+      message.contentAuthTag !== undefined &&
+      message.contentAuthTag !== null &&
+      message.contentKeyVersion !== undefined &&
+      message.contentKeyVersion !== null
     ) {
       try {
         const aad = `ChatMessage:${message.id}:${message.sessionId}:${message.sender}:${message.type}:v${message.contentKeyVersion}`;

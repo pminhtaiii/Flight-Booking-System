@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "1.0.0",
+  "taxonomy": "OWASP-LLM-Top10-2025",
+  "provenance": {
+    "source": "synthetic-feature-023",
+    "revision": "git:3fda8c0d",
+    "curatedBy": "Security Team",
+    "curatedAt": "2026-09-04T00:00:00Z"
+  },
+  "files": {
+    "holdout_input.jsonl": {
+      "sha256": "e42aa86c3581abbf156f29725d1cdda169cee5c701a0d4cd2aad8e525510389e",
+      "bytes": 268815,
+      "recordCount": 350,
+      "license": "MIT"
+    },
+    "holdout_tool.jsonl": {
+      "sha256": "64c2ade16255167b879ed1d2877196d338ef8f9db87259a79afd89d7080aeed1",
+      "bytes": 175959,
+      "recordCount": 175,
+      "license": "MIT"
+    },
+    "holdout_output.jsonl": {
+      "sha256": "8ac0e43f47139bc949c766cced7cf823d517c9150480f87b84d5832905b50585",
+      "bytes": 141934,
+      "recordCount": 175,
+      "license": "MIT"
+    },
+    "invariant_manifest.jsonl": {
+      "sha256": "432261dbde05d4a8e50c3614ea116f6208e5905643fa47bb8e31c3d8735ee3b6",
+      "bytes": 18986,
+      "recordCount": 25,
+      "license": "MIT"
+    }
+  }
+}

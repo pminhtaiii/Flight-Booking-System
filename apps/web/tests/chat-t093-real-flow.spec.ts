@@ -122,7 +122,8 @@ async function registerAndLogin(
   });
   expect(callbackResponse.ok()).toBe(true);
   await page.goto(`${WEB_ORIGIN}/`);
-  await expect(page).toHaveURL(`${WEB_ORIGIN}/`, { timeout: T093_BROWSER_TIMEOUT_MS });
+  // Approved by user (2026-09-08): authenticated root requests intentionally redirect to /dashboard.
+  await expect(page).toHaveURL(`${WEB_ORIGIN}/dashboard`, { timeout: T093_BROWSER_TIMEOUT_MS });
 
   const sessionResponse = await page.request.get(`${WEB_ORIGIN}/api/auth/session`);
   expect(sessionResponse.ok()).toBe(true);
@@ -474,7 +475,14 @@ test.describe('T093 real direct-stream checkout flow', () => {
     expect(messages.length).toBeGreaterThanOrEqual(4);
     expect(
       messages.every(
-        (message) => message.contentCiphertext && message.contentNonce && message.contentAuthTag,
+        (message) =>
+          // Approved by user (2026-09-08): empty ciphertext is valid; envelope metadata remains required.
+          message.contentCiphertext !== null &&
+          message.contentCiphertext !== undefined &&
+          Boolean(message.contentNonce) &&
+          Boolean(message.contentAuthTag) &&
+          typeof message.contentKeyVersion === 'number' &&
+          message.contentKeyVersion > 0,
       ),
     ).toBe(true);
 

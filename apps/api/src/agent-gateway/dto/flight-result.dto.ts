@@ -1,3 +1,10 @@
+import type {
+  AttestedFlightSearchMetaDto,
+  AgentFlightMatchResultDto,
+} from './attested-flight-search.dto';
+
+export type { AttestedFlightSearchMetaDto, AgentFlightMatchResultDto };
+
 export class FlightResultDto {
   airline!: string;
   flightNumber!: string;
@@ -11,8 +18,11 @@ export class FlightResultDto {
   currency!: string; // ISO 4217 code
   fareClass?: string | null;
   baggageAllowance?: string | null;
+  matchResult?: AgentFlightMatchResultDto | null;
 }
 
 export class FlightSearchResponseDto {
+  mode?: 'MATCHED' | 'RANKED';
   results!: FlightResultDto[];
+  meta?: AttestedFlightSearchMetaDto;
 }

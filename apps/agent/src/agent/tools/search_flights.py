@@ -6,8 +6,15 @@ from typing import Any
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 
+from agent.guardrails.schemas.tools import (
+    SearchFlightsToolInput,
+    SearchFlightsToolResult,
+    SearchFlightsUpstreamProjection,
+    project_upstream,
+)
 from agent.infrastructure.redis import get_redis_client
 from agent.tools.base import get_nestjs_client
+from agent.tools.flight_match_projection import project_flight_search_for_narration
 from agent.trusted_search_snapshot import (
     AttestedSearchEnvelope,
     SnapshotOwner,
@@ -18,12 +25,9 @@ from agent.trusted_search_snapshot import (
 
 logger = logging.getLogger(__name__)
 
-AIRLINE_MAP = {
-    "VN": "Vietnam Airlines",
-    "NH": "ANA",
-    "JL": "Japan Airlines",
-    "SQ": "Singapore Airlines",
-}
+
+def _narration(value: str) -> str:
+    return SearchFlightsToolResult(narration=value).narration
 
 
 def _get_snapshot_lifecycle() -> TrustedSearchSnapshotLifecycle:
@@ -45,7 +49,7 @@ def _to_utc_datetime(val: Any) -> datetime:
     return dt.astimezone(timezone.utc)
 
 
-@tool("search_flights")
+@tool("search_flights", args_schema=SearchFlightsToolInput)
 async def search_flights(
     origin: str, destination: str, date: str, passengers: int = 1, config: RunnableConfig = None
 ) -> str:
@@ -53,7 +57,9 @@ async def search_flights(
     try:
         client = get_nestjs_client(config)
     except Exception:
-        return "I couldn't search for flights right now. The flight search service is temporarily unavailable. Please try again in a moment."
+        return _narration(
+            "I couldn't search for flights right now. The flight search service is temporarily unavailable. Please try again in a moment."
+        )
 
     configurable = (
         config.get("configurable", {})
@@ -66,31 +72,50 @@ async def search_flights(
     user_id = configurable.get("user_id") or "default_user"
 
     owner = SnapshotOwner(user_id=user_id, chat_session_id=thread_id)
+    snapshot_staging = configurable.get("_snapshot_staging")
+    snapshot_stage_key = configurable.get("_snapshot_stage_key")
+    defer_snapshot_persistence = isinstance(snapshot_staging, dict) and isinstance(
+        snapshot_stage_key, str
+    )
     try:
         lifecycle = _get_snapshot_lifecycle()
     except Exception as e:
         logger.error("Could not initialize snapshot lifecycle: %s", str(e))
-        return "I couldn't search for flights right now. The flight search service is temporarily unavailable. Please try again in a moment."
+        return _narration(
+            "I couldn't search for flights right now. The flight search service is temporarily unavailable. Please try again in a moment."
+        )
 
     proposed_version = 1
-    try:
-        res = lifecycle.next_version(owner)
-        allocated = await res if inspect.isawaitable(res) else res
-        if isinstance(allocated, int) and not isinstance(allocated, bool) and allocated > 0:
-            proposed_version = allocated
-    except Exception as e:
-        logger.warning("Could not allocate snapshot version: %s", str(e))
-        proposed_version = 1
+    if defer_snapshot_persistence:
+        existing_snapshot = configurable.get("trusted_snapshot")
+        if isinstance(existing_snapshot, dict):
+            existing_version = existing_snapshot.get("snapshotVersion") or existing_snapshot.get(
+                "version"
+            )
+            if (
+                isinstance(existing_version, int)
+                and not isinstance(existing_version, bool)
+                and existing_version > 0
+            ):
+                proposed_version = existing_version + 1
+    else:
+        try:
+            res = lifecycle.next_version(owner)
+            allocated = await res if inspect.isawaitable(res) else res
+            if isinstance(allocated, int) and not isinstance(allocated, bool) and allocated > 0:
+                proposed_version = allocated
+        except Exception as e:
+            logger.warning("Could not allocate snapshot version: %s", str(e))
+            proposed_version = 1
 
     try:
         search_call = getattr(client, "post_gateway_flights_search_v2", None) or getattr(
             client, "search_flights_v2", None
         )
         if not search_call:
-            search_call = getattr(client, "get_gateway_flights_search", None)
-
-        if not search_call:
-            return "I couldn't search for flights right now. The flight search service is temporarily unavailable. Please try again in a moment."
+            return _narration(
+                "I couldn't search for flights right now. The flight search service is temporarily unavailable. Please try again in a moment."
+            )
 
         call_res = search_call(
             chat_session_id=thread_id,
@@ -103,17 +128,38 @@ async def search_flights(
         data = await call_res if inspect.isawaitable(call_res) else call_res
     except Exception as e:
         logger.warning("Error calling flight search v2: %s", str(e))
-        return "I couldn't search for flights right now. The flight search service is temporarily unavailable. Please try again in a moment."
+        return _narration(
+            "I couldn't search for flights right now. The flight search service is temporarily unavailable. Please try again in a moment."
+        )
 
     if not isinstance(data, dict):
-        return "I couldn't search for flights right now. The flight search service is temporarily unavailable. Please try again in a moment."
+        return _narration(
+            "I couldn't search for flights right now. The flight search service is temporarily unavailable. Please try again in a moment."
+        )
 
     if "error" in data:
-        return str(data["error"])
+        error = data["error"]
+        if isinstance(error, str) and error == (
+            "I can currently only search economy class for adult passengers. For other cabin classes "
+            "or passenger types, please use the search page."
+        ):
+            return _narration(error)
+        return _narration(
+            "I couldn't search for flights right now. The flight search service is temporarily unavailable. Please try again in a moment."
+        )
+
+    raw_results = data.get("results", [])
+    if not raw_results or not isinstance(raw_results, list):
+        return _narration(f"Found 0 flights from {origin} to {destination} on {date}.")
+
+    try:
+        data = project_upstream(SearchFlightsUpstreamProjection, data).model_dump(exclude_none=True)
+    except Exception:
+        return _narration(
+            "I couldn't search for flights right now. The flight search service is temporarily unavailable. Please try again in a moment."
+        )
 
     results = data.get("results", [])
-    if not results or not isinstance(results, list):
-        return f"Found 0 flights from {origin} to {destination} on {date}."
 
     try:
         snapshot_results = []
@@ -122,13 +168,17 @@ async def search_flights(
             duffel_offer_id = flight.get("duffelOfferId") or flight_offer_id
             if not flight_offer_id or not duffel_offer_id:
                 logger.error("Flight result missing required offer ID")
-                return "I encountered an error preparing your search results. Please try again."
+                return _narration(
+                    "I encountered an error preparing your search results. Please try again."
+                )
 
             dep_time_val = flight.get("departureTime") or flight.get("departureAt")
             arr_time_val = flight.get("arrivalTime") or flight.get("arrivalAt")
             if not dep_time_val or not arr_time_val:
                 logger.error("Flight result missing departure or arrival time")
-                return "I encountered an error preparing your search results. Please try again."
+                return _narration(
+                    "I encountered an error preparing your search results. Please try again."
+                )
 
             snapshot_results.append(
                 TrustedSearchResult(
@@ -151,14 +201,16 @@ async def search_flights(
         expires_at_raw = data.get("snapshotExpiresAt") or data.get("expiresAt")
         if not expires_at_raw:
             logger.error("Gateway flight search response missing snapshot expiry")
-            return "I encountered an error preparing your search results. Please try again."
+            return _narration(
+                "I encountered an error preparing your search results. Please try again."
+            )
 
         exp_dt = _to_utc_datetime(expires_at_raw)
         if exp_dt <= now_dt:
             logger.error(
                 "Gateway flight search response has expired snapshot: %s <= %s", exp_dt, now_dt
             )
-            return "The flight search results have expired. Please search again."
+            return _narration("The flight search results have expired. Please search again.")
 
         selection_attestation = data.get("selectionAttestation") or data.get("attestation")
         if (
@@ -167,7 +219,9 @@ async def search_flights(
             or not selection_attestation.strip()
         ):
             logger.error("Gateway flight search response missing selectionAttestation")
-            return "I encountered an error preparing your search results. Please try again."
+            return _narration(
+                "I encountered an error preparing your search results. Please try again."
+            )
 
         fingerprint = data.get("fingerprint")
         if not fingerprint or not isinstance(fingerprint, str) or not fingerprint.strip():
@@ -182,7 +236,9 @@ async def search_flights(
             logger.error(
                 "Gateway flight search response invalid snapshotVersion: %s", snapshot_version
             )
-            return "I encountered an error preparing your search results. Please try again."
+            return _narration(
+                "I encountered an error preparing your search results. Please try again."
+            )
 
         envelope = AttestedSearchEnvelope(
             schemaVersion=1,
@@ -193,32 +249,18 @@ async def search_flights(
             results=snapshot_results,
         )
 
-        create_res = lifecycle.create_or_replace(owner, envelope)
-        snapshot = await create_res if inspect.isawaitable(create_res) else create_res
+        if defer_snapshot_persistence:
+            snapshot_staging[snapshot_stage_key] = {
+                "lifecycle": lifecycle,
+                "owner": owner,
+                "envelope": envelope,
+            }
+        else:
+            create_res = lifecycle.create_or_replace(owner, envelope)
+            if inspect.isawaitable(create_res):
+                await create_res
     except Exception as e:
         logger.error("Failed to save trusted snapshot: %s", str(e), exc_info=True)
-        return "I encountered an error preparing your search results. Please try again."
+        return _narration("I encountered an error preparing your search results. Please try again.")
 
-    safe_results = lifecycle.project_for_llm(snapshot)
-
-    flight_blocks = []
-    for flight in safe_results:
-        airline_name = AIRLINE_MAP.get(flight.airline, flight.airline)
-        dep_time_str = flight.departure_at.strftime("%H:%M")
-        arr_time_str = flight.arrival_at.strftime("%H:%M")
-
-        try:
-            price = float(flight.price)
-        except (ValueError, TypeError):
-            price = 0.0
-        price_formatted = f"${price:,.2f}"
-
-        block = (
-            f"{flight.index}. {airline_name}\n"
-            f"   Departs: {dep_time_str} {flight.origin} \u2192 Arrives: {arr_time_str} {flight.destination}\n"
-            f"   Price: {price_formatted} {flight.currency}"
-        )
-        flight_blocks.append(block)
-
-    header = f"Found {len(safe_results)} flights from {origin} to {destination} on {date}:"
-    return f"{header}\n\n" + "\n\n".join(flight_blocks)
+    return _narration(project_flight_search_for_narration(data))

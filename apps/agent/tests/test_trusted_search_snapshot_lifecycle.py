@@ -1,18 +1,24 @@
 import asyncio
+import inspect
 import json
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from uuid import uuid4
 
 import pytest
+import redis.asyncio as redis
 from pydantic import ValidationError
 
 from agent.trusted_search_snapshot import (
     AttestedSearchEnvelope,
     ResolvedOfferSelection,
     SnapshotOwner,
+    TrustedSearchResult,
     TrustedSearchSnapshot,
     TrustedSearchSnapshotLifecycle,
     TrustedSnapshotRepository,
+    models,
 )
 
 
@@ -664,6 +670,61 @@ async def test_create_or_replace_persists_an_owner_scoped_snapshot() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.redis_integration
+async def test_save_next_snapshot_uses_atomic_owner_fence_on_local_redis() -> None:
+    """The allocate-and-save primitive preserves Redis state on a stale batch."""
+
+    redis_url = os.environ.get("AGENT_TEST_REDIS_URL", "redis://127.0.0.1:6379/15")
+    client = redis.from_url(redis_url, decode_responses=True)
+    owner = SnapshotOwner(
+        user_id=f"atomic-test-{uuid4().hex}",
+        chat_session_id=f"session-{uuid4().hex}",
+    )
+    repository = TrustedSnapshotRepository(client)
+    snapshot_key = repository._get_key(owner.user_id, owner.chat_session_id)
+    version_key = repository._version_key(owner.user_id, owner.chat_session_id)
+    accepted_key = repository._accepted_key(owner.user_id, owner.chat_session_id)
+
+    try:
+        try:
+            await client.ping()
+        except Exception:
+            pytest.skip("local Redis is unavailable")
+
+        first = TrustedSearchSnapshot.model_validate(_snapshot_payload(owner, version=1))
+        assert await repository.save_next_snapshot(first) is True
+        assert await repository.get_snapshot(owner.user_id, owner.chat_session_id) == first
+
+        stale = TrustedSearchSnapshot.model_validate(
+            _snapshot_payload(
+                owner,
+                version=1,
+                results=[{**_results()[0], "flightOfferId": "stale-flight"}],
+            )
+        )
+        assert await repository.save_next_snapshot(stale) is False
+        assert await repository.get_snapshot(owner.user_id, owner.chat_session_id) == first
+        assert await client.get(version_key) == "1"
+        assert await client.get(accepted_key) == "1"
+
+        second = TrustedSearchSnapshot.model_validate(
+            _snapshot_payload(
+                owner,
+                version=2,
+                results=[{**_results()[0], "flightOfferId": "second-flight"}],
+            )
+        )
+        assert await repository.save_next_snapshot(second) is True
+        assert await repository.get_snapshot(owner.user_id, owner.chat_session_id) == second
+        assert await client.get(snapshot_key)
+        assert await client.get(version_key) == "2"
+        assert await client.get(accepted_key) == "2"
+    finally:
+        await client.delete(snapshot_key, version_key, accepted_key)
+        await client.aclose()
+
+
+@pytest.mark.asyncio
 async def test_select_resolves_a_valid_one_based_offer_and_rejects_bounds() -> None:
     snapshot = TrustedSearchSnapshot.model_validate(_snapshot_payload(_owner()))
     lifecycle = _lifecycle()
@@ -920,3 +981,66 @@ async def test_legacy_session_direct_save_without_prior_next_version() -> None:
     stored = await repository.get_snapshot(owner.user_id, owner.chat_session_id)
     assert stored is not None
     assert stored.snapshotVersion == 2
+
+
+FORBIDDEN_SCORING_FIELDS = [
+    "score",
+    "match_level",
+    "matchLevel",
+    "weights",
+    "breakdown",
+    "scoring_version",
+    "scoringVersion",
+]
+
+
+@pytest.mark.parametrize("field", FORBIDDEN_SCORING_FIELDS)
+def test_models_reject_scoring_fields_validation_error(field: str) -> None:
+    owner = _owner()
+    raw_result = _results()[0]
+
+    with pytest.raises(ValidationError):
+        TrustedSearchResult.model_validate({**raw_result, field: 100})
+
+    envelope_data = _envelope_payload()
+    with pytest.raises(ValidationError):
+        AttestedSearchEnvelope.model_validate({**envelope_data, field: 100})
+
+    snapshot_data = _snapshot_payload(owner)
+    with pytest.raises(ValidationError):
+        TrustedSearchSnapshot.model_validate({**snapshot_data, field: 100})
+
+
+def test_trusted_search_snapshot_explicitly_enforces_extra_forbid() -> None:
+    for model_cls in (
+        models.TrustedSearchResult,
+        models.AttestedSearchEnvelope,
+        models.TrustedSearchSnapshot,
+    ):
+        src = inspect.getsource(model_cls)
+        assert 'extra="forbid"' in src or "extra='forbid'" in src
+
+
+@pytest.mark.asyncio
+async def test_lifecycle_persisted_redis_payload_is_strictly_score_free() -> None:
+    owner = _owner()
+    redis = FakeAsyncRedis()
+    lifecycle = _lifecycle(redis)
+
+    created = await lifecycle.create_or_replace(owner, _envelope(version=1))
+    assert created.snapshotVersion == 1
+
+    snapshot_key = f"chat:snapshot:{owner.user_id}:{owner.chat_session_id}"
+    raw_payload = await redis.get(snapshot_key)
+    assert raw_payload is not None
+
+    # Strict check: none of forbidden score keys/strings exist in raw json
+    for field in FORBIDDEN_SCORING_FIELDS:
+        assert f'"{field}"' not in raw_payload
+
+    # Strict check: parsed JSON contains zero scoring keys at top level or nested results
+    parsed = json.loads(raw_payload)
+    for field in FORBIDDEN_SCORING_FIELDS:
+        assert field not in parsed
+        for result in parsed.get("results", []):
+            assert field not in result

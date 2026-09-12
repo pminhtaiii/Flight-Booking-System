@@ -15,6 +15,7 @@ function flatResults({ api, web, agent, smoke }) {
     api,
     web,
     agent,
+    security: 'false',
     'detect-changes': 'success',
     'api-gate': api === 'true' ? 'success' : 'skipped',
     'api-unit-tests': api === 'true' ? 'success' : 'skipped',
@@ -23,13 +24,15 @@ function flatResults({ api, web, agent, smoke }) {
     'web-build': web === 'true' ? 'success' : 'skipped',
     'agent-gate': agent === 'true' ? 'success' : 'skipped',
     'agent-tests': agent === 'true' ? 'success' : 'skipped',
+    'security-sast': 'skipped',
+    'security-supply-chain': 'skipped',
     [SMOKE_JOB]: smoke,
   };
 }
 
 function nestedResults(flat) {
-  const { api, web, agent, ...jobs } = flat;
-  return { outputs: { api, web, agent }, jobs };
+  const { api, web, agent, security, ...jobs } = flat;
+  return { outputs: { api, web, agent, security }, jobs };
 }
 
 // These expectations are hand-derived from the aggregate contract: only the
@@ -132,6 +135,7 @@ function cliEnvironment(smoke) {
     API_CHANGED: 'false',
     WEB_CHANGED: 'false',
     AGENT_CHANGED: 'false',
+    SECURITY_CHANGED: 'false',
     API_GATE_RESULT: 'skipped',
     API_UNIT_TESTS_RESULT: 'skipped',
     API_E2E_TESTS_RESULT: 'skipped',
@@ -139,6 +143,8 @@ function cliEnvironment(smoke) {
     WEB_BUILD_RESULT: 'skipped',
     AGENT_GATE_RESULT: 'skipped',
     AGENT_TESTS_RESULT: 'skipped',
+    SECURITY_SAST_RESULT: 'skipped',
+    SECURITY_SUPPLY_CHAIN_RESULT: 'skipped',
     ...(smoke === undefined ? {} : { SMOKE_AND_SANITY_RESULT: smoke }),
   };
   if (smoke === undefined) {
@@ -162,4 +168,43 @@ test('CLI adapter includes SMOKE_AND_SANITY_RESULT and fails closed when it is a
     assert.equal(result.status, 1, `CLI ${SMOKE_JOB}=${String(smoke)} must fail closed`);
     assert.equal(JSON.parse(result.stdout).passed, false);
   }
+});
+
+test('security changes require both security jobs and a passing static report evaluation', () => {
+  const securityOnly = {
+    ...flatResults({ api: 'false', web: 'false', agent: 'false', smoke: 'skipped' }),
+    security: 'true',
+    'security-sast': 'success',
+    'security-supply-chain': 'success',
+  };
+
+  // Security-only active, evaluateSecurityResults passes
+  assert.equal(evaluateCiStatus(securityOnly, { evaluateSecurityResults: () => ({ passed: true }) }).passed, true);
+
+  // Security report evaluation fails
+  const result = evaluateCiStatus(securityOnly, {
+    evaluateSecurityResults: () => ({
+      passed: false,
+      errors: ['[Fail-Closed] missing static report'],
+    }),
+  });
+  assert.equal(result.passed, false);
+  assert.match(result.reason, /security/i);
+
+  // Security jobs failed/skipped
+  assert.equal(evaluateCiStatus({ ...securityOnly, 'security-sast': 'failure' }, { evaluateSecurityResults: () => ({ passed: true }) }).passed, false);
+  assert.equal(evaluateCiStatus({ ...securityOnly, 'security-supply-chain': 'skipped' }, { evaluateSecurityResults: () => ({ passed: true }) }).passed, false);
+
+  // Security jobs success when security === 'false'
+  const securityFalse = { ...securityOnly, security: 'false' };
+  assert.equal(evaluateCiStatus(securityFalse).passed, false);
+
+  // Mixed security + API/Web/Agent activates smoke-and-sanity
+  const mixed = {
+    ...flatResults({ api: 'true', web: 'false', agent: 'false', smoke: 'success' }),
+    security: 'true',
+    'security-sast': 'success',
+    'security-supply-chain': 'success',
+  };
+  assert.equal(evaluateCiStatus(mixed, { evaluateSecurityResults: () => ({ passed: true }) }).passed, true);
 });

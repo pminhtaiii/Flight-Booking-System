@@ -279,6 +279,39 @@ describe('Agent Gateway (E2E)', () => {
     await prisma.airport.deleteMany({});
     await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
+
+    // User-requested CI repair: canonical search validates the airport reference table.
+    await prisma.airport.createMany({
+      data: [
+        {
+          iataCode: 'HAN',
+          name: 'Noi Bai',
+          city: 'Hanoi',
+          country: 'VN',
+          latitude: 21.2212,
+          longitude: 105.807,
+          type: 'LARGE_AIRPORT',
+        },
+        {
+          iataCode: 'SGN',
+          name: 'Tan Son Nhat',
+          city: 'Ho Chi Minh City',
+          country: 'VN',
+          latitude: 10.8184,
+          longitude: 106.6633,
+          type: 'LARGE_AIRPORT',
+        },
+        {
+          iataCode: 'NRT',
+          name: 'Narita',
+          city: 'Tokyo',
+          country: 'JP',
+          latitude: 35.7647,
+          longitude: 140.3864,
+          type: 'LARGE_AIRPORT',
+        },
+      ],
+    });
   });
 
   describe('Authentication and Security (Layer 1 & 2)', () => {
@@ -640,7 +673,13 @@ describe('Agent Gateway (E2E)', () => {
         .expect(200);
 
       expect(res.body.results.length).toBe(5);
-      const firstResult = res.body.results[0];
+      // Phase 022 ranks cold-start offers by stops, then price; supplier order is obsolete.
+      expect(
+        res.body.results.map((result: { flightNumber: string }) => result.flightNumber),
+      ).toEqual(['VJ932', 'NH858', 'VN310', 'JL752', 'SQ176']);
+      const firstResult = res.body.results.find(
+        (result: { flightNumber: string }) => result.flightNumber === 'VN310',
+      );
 
       expect(firstResult.airline).toBe('Vietnam Airlines');
       expect(firstResult.flightNumber).toBe('VN310');
@@ -683,7 +722,7 @@ describe('Agent Gateway (E2E)', () => {
         .expect(200);
 
       const logs = await prisma.auditLog.findMany({
-        where: { userId: user.id },
+        where: { userId: user.id, action: 'AGENT_TOOL_CALL' },
       });
 
       expect(logs.length).toBe(1);
@@ -852,7 +891,10 @@ describe('Agent Gateway (E2E)', () => {
         .expect(200);
 
       expect(res.body.results.length).toBe(5);
-      expect(res.body.results[0].price).toBe(452.0 * 3);
+      const vietnamAirlines = res.body.results.find(
+        (result: { flightNumber: string }) => result.flightNumber === 'VN310',
+      );
+      expect(vietnamAirlines.price).toBe(452.0 * 3);
     });
   });
 
@@ -1180,7 +1222,9 @@ describe('Agent Gateway (E2E)', () => {
       const results = res.body.results;
       expect(results.length).toBeGreaterThan(0);
 
-      const firstResult = results[0];
+      const firstResult = results.find(
+        (result: { flightNumber: string }) => result.flightNumber === 'VN310',
+      );
       expect(firstResult.flightOfferId).toBeDefined();
       expect(firstResult.duffelOfferId).toBeDefined();
       expect(firstResult.offerExpiresAt).toBeDefined();
@@ -1197,12 +1241,20 @@ describe('Agent Gateway (E2E)', () => {
       expect(firstResult.fareClass).toBe('Economy');
       expect(firstResult.baggageAllowance).toBe('23kg checked');
 
-      // Verify FlightOffer rows were created in DB
-      const persistedOffer = await prisma.flightOffer.findUnique({
-        where: { id: firstResult.flightOfferId },
+      // Every signed selection must be immediately usable by handoff, without polling.
+      const persistedOffers = await prisma.flightOffer.findMany({
+        where: {
+          id: { in: results.map((result: { flightOfferId: string }) => result.flightOfferId) },
+        },
       });
-      expect(persistedOffer).toBeDefined();
-      expect(persistedOffer?.duffelOfferId).toBe(firstResult.duffelOfferId);
+      expect(persistedOffers).toHaveLength(results.length);
+      for (const result of results) {
+        expect(persistedOffers.find((offer) => offer.id === result.flightOfferId)).toMatchObject({
+          id: result.flightOfferId,
+          duffelOfferId: result.duffelOfferId,
+          rawOffer: { id: result.duffelOfferId },
+        });
+      }
     });
 
     it('should support aliases proposedVersion, departureDate, and passengers', async () => {
@@ -1234,7 +1286,10 @@ describe('Agent Gateway (E2E)', () => {
       expect(res.body.results.length).toBeGreaterThan(0);
       expect(res.body.results[0].flightOfferId).toBeDefined();
       expect(res.body.results[0].duffelOfferId).toBeDefined();
-      expect(res.body.results[0].price).toBe(452.0 * 2);
+      const vietnamAirlines = res.body.results.find(
+        (result: { flightNumber: string }) => result.flightNumber === 'VN310',
+      );
+      expect(vietnamAirlines.price).toBe(452.0 * 2);
     });
 
     it('legacy GET /flights/search should remain completely unenriched', async () => {
@@ -1254,11 +1309,14 @@ describe('Agent Gateway (E2E)', () => {
       expect(results[0].duffelOfferId).toBeUndefined();
       expect(results[0].offerExpiresAt).toBeUndefined();
 
-      expect(results[0].airline).toBe('Vietnam Airlines');
-      expect(results[0].flightNumber).toBe('VN310');
-      expect(results[0].departureAirport).toBe('HAN');
-      expect(results[0].arrivalAirport).toBe('NRT');
-      expect(results[0].price).toBe(452.0);
+      const vietnamAirlines = results.find(
+        (result: { flightNumber: string }) => result.flightNumber === 'VN310',
+      );
+      expect(vietnamAirlines.airline).toBe('Vietnam Airlines');
+      expect(vietnamAirlines.flightNumber).toBe('VN310');
+      expect(vietnamAirlines.departureAirport).toBe('HAN');
+      expect(vietnamAirlines.arrivalAirport).toBe('NRT');
+      expect(vietnamAirlines.price).toBe(452.0);
     });
   });
 

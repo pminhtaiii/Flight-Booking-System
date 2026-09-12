@@ -1,4 +1,11 @@
-import { Injectable, BadRequestException, Logger, HttpException, HttpStatus } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  Logger,
+  HttpException,
+  HttpStatus,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CacheService } from '@/cache/cache.service';
 import { DuffelService } from '@/duffel/duffel.service';
@@ -16,6 +23,11 @@ import { DuffelOffer, DuffelSegment } from '@/duffel/duffel.types';
 import { Prisma } from '@prisma/client';
 
 export type CabinClass = 'economy' | 'premium_economy' | 'business' | 'first';
+
+type FlightSearchOptions = {
+  persistence?: 'deferred' | 'required';
+  caller?: 'user' | 'agent';
+};
 
 function parseISO8601Duration(durationStr: string | null | undefined): number {
   if (!durationStr) return 0;
@@ -143,7 +155,9 @@ function mapOffer(offer: DuffelOffer, id: string, requestedCabinClass: CabinClas
   let baggageAllowance: string | null = null;
   if (segmentBaggage && segmentBaggage.length > 0) {
     const bag = segmentBaggage[0];
-    baggageAllowance = `${bag.quantity || 0} ${bag.type} bag(s)`;
+    baggageAllowance = bag.quantity === undefined && bag.weight !== undefined
+      ? `${bag.weight}${(bag.weight_unit || 'kg').toLowerCase()} ${bag.type}`
+      : `${bag.quantity || 0} ${bag.type} bag(s)`;
   }
 
   const cabinClass = firstSegment?.passengers?.[0]?.cabin_class || null;
@@ -201,6 +215,7 @@ export class FlightsService {
     query: FlightSearchRequestDto,
     traceId?: string,
     correlationId?: string,
+    options: FlightSearchOptions = {},
   ): Promise<FlightSearchResponseDto> {
     const startTime = Date.now();
     const origin = query.origin.trim().toUpperCase();
@@ -246,7 +261,7 @@ export class FlightsService {
       ...passengersInfo,
     };
 
-    const searchResult = await this.duffelService.searchFlights(forSearch, 'user');
+    const searchResult = await this.duffelService.searchFlights(forSearch, options.caller ?? 'user');
     const rawResult = searchResult.offerRequest;
     const cached = searchResult.cached;
     const sha256 = searchResult.searchHash;
@@ -277,8 +292,7 @@ export class FlightsService {
       };
     });
 
-    // Write async write-behind persistence
-    setImmediate(async () => {
+    const persistSearch = async (): Promise<void> => {
       try {
         const prices = results.map((r) => r.price);
         const minPrice = prices.length > 0 ? Math.min(...prices) : null;
@@ -337,8 +351,20 @@ export class FlightsService {
         });
       } catch (error) {
         this.logger.error('Failed to save search history and offers atomically', error);
+        if (options.persistence === 'required') {
+          throw new ServiceUnavailableException('Flight search results could not be saved');
+        }
       }
-    });
+    };
+
+    // Attestations must reference committed rows; ordinary searches retain write-behind.
+    if (options.persistence === 'required') {
+      await persistSearch();
+    } else {
+      setImmediate(() => {
+        void persistSearch();
+      });
+    }
 
     const responseTime = Date.now() - startTime;
 

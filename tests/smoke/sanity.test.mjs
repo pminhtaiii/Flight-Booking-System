@@ -400,7 +400,7 @@ describe('whole-stack sanity suite: flight search & cache', { timeout: SUITE_TIM
               break;
             }
           } catch (err) {
-            if (err?.status === 404) {
+            if (err?.status === 404 || err?.status === 410) {
               lastError = err;
               await new Promise((resolve) => setTimeout(resolve, 100));
               continue;

@@ -12,6 +12,7 @@ from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
 from pydantic import Field
 
+from agent.config import get_settings
 from agent.main import app
 from agent.models.requests import RouteDecision
 from agent.tools.nestjs_client import NestJSClient
@@ -129,6 +130,14 @@ def mock_guardrails(monkeypatch):
     mock_gr.validate_message = AsyncMock(return_value=(True, ""))
     monkeypatch.setattr(app.state, "guardrails", mock_gr, raising=False)
     return mock_gr
+
+
+@pytest.fixture
+def multi_agent_enabled():
+    """Isolate checkout tests from the independent single-agent rollback default."""
+    settings = get_settings().model_copy(update={"FEATURE_FLAG_CHAT_MULTI_AGENT": True})
+    with patch("agent.graph.graph.agent_config.get_settings", return_value=settings):
+        yield
 
 
 @pytest.mark.asyncio
@@ -537,14 +546,24 @@ async def test_sse_complete_profile_handoff_stops_without_persistence(mock_nestj
     assert not [event for event in events if event["event"] == "token"]
     assert mock_nestjs_client.create_message_batch.call_count == 1
     assert mock_nestjs_client.create_message_batch.mock_calls[0].args[1][0]["sender"] == "USER"
-    assert len(llm.responses) == 1
+    # Publication now waits for the validated tools-node projection. LangGraph
+    # may already schedule the following model turn, but its content must never
+    # be emitted or persisted after ACTION_REQUIRED closes the stream.
+    assert "This response must never be generated." not in json.dumps(events)
+    assert "This response must never be generated." not in str(
+        mock_nestjs_client.create_message_batch.mock_calls
+    )
 
 
 @pytest.mark.asyncio
-async def test_sse_action_handoff_ordering_and_schema(mock_nestjs_client):
+async def test_sse_action_handoff_ordering_and_schema(mock_nestjs_client, multi_agent_enabled):
     headers = get_auth_headers()
 
     trusted_snapshot = {
+        # User-approved CI fixture correction (2026-09-09): trusted snapshots
+        # must identify the authenticated owner and session for handoff validation.
+        "userId": "12345",
+        "sessionId": "session-handoff",
         "version": 1,
         "attestation": "test_attestation",
         "fingerprint": "test_fingerprint",
@@ -593,7 +612,12 @@ async def test_sse_action_handoff_ordering_and_schema(mock_nestjs_client):
         patch("agent.agents.chat_agent.ChatOpenAI", return_value=llm),
         patch(
             "agent.graph.graph.invoke_router",
-            return_value=RouteDecision(intent="CHECKOUT", confidence=1.0, isCommitment=True),
+            return_value=RouteDecision(
+                intent="CHECKOUT",
+                confidence=1.0,
+                isCommitment=True,
+                selectionIndex=1,
+            ),
         ),
         patch("agent.graph.nodes.get_settings") as mock_settings,
     ):
@@ -670,7 +694,9 @@ async def test_sse_action_handoff_ordering_and_schema(mock_nestjs_client):
 
 
 @pytest.mark.asyncio
-async def test_sse_action_handoff_validation_failure_emits_error(mock_nestjs_client):
+async def test_sse_action_handoff_validation_failure_emits_error(
+    mock_nestjs_client, multi_agent_enabled
+):
     headers = get_auth_headers()
 
     # Snapshot expired failure triggers validate_handoff error event
@@ -716,7 +742,19 @@ async def test_sse_action_handoff_validation_failure_emits_error(mock_nestjs_cli
         patch("agent.agents.chat_agent.ChatOpenAI", return_value=llm),
         patch(
             "agent.graph.graph.invoke_router",
-            return_value=RouteDecision(intent="CHECKOUT", confidence=1.0, isCommitment=True),
+            return_value=RouteDecision(
+                intent="CHECKOUT",
+                confidence=1.0,
+                isCommitment=True,
+                selectionIndex=1,
+            ),
+        ),
+        # User-authorized CI fixture correction (2026-09-08): isolate the
+        # downstream validation defense; the normal router gate already
+        # rejects an expired snapshot before checkout execution.
+        patch(
+            "agent.graph.graph.evaluate_checkout_gate",
+            return_value={"route": "checkout", "disambiguation": "none"},
         ),
         patch("agent.graph.nodes.get_settings") as mock_settings,
     ):
@@ -756,7 +794,9 @@ async def test_sse_action_handoff_validation_failure_emits_error(mock_nestjs_cli
 
 
 @pytest.mark.asyncio
-async def test_sse_action_handoff_index_out_of_bounds_no_token(mock_nestjs_client):
+async def test_sse_action_handoff_index_out_of_bounds_no_token(
+    mock_nestjs_client, multi_agent_enabled
+):
     headers = get_auth_headers()
 
     trusted_snapshot = {
@@ -801,7 +841,12 @@ async def test_sse_action_handoff_index_out_of_bounds_no_token(mock_nestjs_clien
         patch("agent.agents.chat_agent.ChatOpenAI", return_value=llm),
         patch(
             "agent.graph.graph.invoke_router",
-            return_value=RouteDecision(intent="CHECKOUT", confidence=1.0, isCommitment=True),
+            return_value=RouteDecision(
+                intent="CHECKOUT",
+                confidence=1.0,
+                isCommitment=True,
+                selectionIndex=1,
+            ),
         ),
         patch("agent.graph.nodes.get_settings") as mock_settings,
     ):
@@ -837,7 +882,7 @@ async def test_sse_action_handoff_index_out_of_bounds_no_token(mock_nestjs_clien
 
 
 @pytest.mark.asyncio
-async def test_sse_action_handoff_disabled_flag(mock_nestjs_client):
+async def test_sse_action_handoff_disabled_flag(mock_nestjs_client, multi_agent_enabled):
     headers = get_auth_headers()
 
     trusted_snapshot = {
@@ -881,7 +926,12 @@ async def test_sse_action_handoff_disabled_flag(mock_nestjs_client):
         patch("agent.agents.chat_agent.ChatOpenAI", return_value=llm),
         patch(
             "agent.graph.graph.invoke_router",
-            return_value=RouteDecision(intent="CHECKOUT", confidence=1.0, isCommitment=True),
+            return_value=RouteDecision(
+                intent="CHECKOUT",
+                confidence=1.0,
+                isCommitment=True,
+                selectionIndex=1,
+            ),
         ),
         patch("agent.graph.nodes.get_settings") as mock_settings,
     ):
@@ -921,7 +971,7 @@ async def test_sse_action_handoff_disabled_flag(mock_nestjs_client):
 
 
 @pytest.mark.asyncio
-async def test_sse_action_handoff_disconnect_retry(mock_nestjs_client):
+async def test_sse_action_handoff_disconnect_retry(mock_nestjs_client, multi_agent_enabled):
     headers = get_auth_headers()
 
     trusted_snapshot = {
@@ -965,7 +1015,12 @@ async def test_sse_action_handoff_disconnect_retry(mock_nestjs_client):
         patch("agent.agents.chat_agent.ChatOpenAI", return_value=llm),
         patch(
             "agent.graph.graph.invoke_router",
-            return_value=RouteDecision(intent="CHECKOUT", confidence=1.0, isCommitment=True),
+            return_value=RouteDecision(
+                intent="CHECKOUT",
+                confidence=1.0,
+                isCommitment=True,
+                selectionIndex=1,
+            ),
         ),
     ):
         mock_snapshot_obj = MagicMock()

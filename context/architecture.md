@@ -57,7 +57,10 @@
 │   │   └── test/                      → API E2E & characterization spec tests
 │   ├── agent/                         → Python/FastAPI agent service
 │   │   ├── src/agent/                 → FastAPI source code
-│   │   │   ├── chat_turn/             → ChatTurnRunner (causal cleanup) & event models
+│   │   │   ├── chat_turn/             → ChatController (thin delegator), ChatTurnRunner (causal cleanup) & event models
+│   │   │   ├── guardrails/            → GuardrailGateway, deterministic input/output pipelines, closed registry, bounded PII scanning, pipeline decisions
+│   │   │   ├── middleware/            → BodyLimitMiddleware (raw ASGI 64 KiB ceiling), auth & rate limit middlewares
+│   │   │   ├── memory/                → MemoryManager (sliding window, lower-trust envelope, summary gateway validation)
 │   │   │   ├── trusted_search_snapshot/ → 3-key Redis protocol & safe projections
 │   │   │   ├── graph/                 → LangGraph state machine & deterministic nodes
 │   │   │   └── streaming/             → Thin SSE transport adapter & pre-stream admission
@@ -77,7 +80,16 @@
 │
 ├── tests/
 │   ├── ci/                            → CI workflow contract & network guard tests
+│   ├── security/                      → Security test harnesses, toolchain pins, sast runner, zap runner, and corpus manifests
+│   │   ├── corpus/                    → schema.json, holdout_input.jsonl, holdout_tool.jsonl, holdout_output.jsonl, invariant_manifest.jsonl, manifest.json
+│   │   ├── sast/                      → guardrails.yml, ruleset.yml, snapshots/, and fixtures/ safe/unsafe control matrix
+│   │   ├── zap/                       → routes.json (45 route catalog), automation.yaml (AF config), routes-config.test.mjs
+│   │   └── dast/                      → test_ownership.py (two-user isolation, JWT/claim validation, replay protection, Redis fencing) & test_adversarial.py (700-case holdout corpus replay, stage reachability)
 │   └── smoke/                         → Authoritative whole-stack smoke & sanity test harness
+│
+├── scripts/
+│   ├── ci/                            → CI status and gate evaluation scripts
+│   └── security/                      → run-zap.mjs, run-supply-chain.mjs, run-sast.mjs, evaluate-results.mjs, validate-corpus.mjs, write-report.mjs, generate-corpus.mjs
 │
 ├── docs/
 │   ├── adr/                           → Architectural Decision Records
@@ -108,6 +120,118 @@
 ## Build and Runtime Output
 
 The root TypeScript configuration is type-check-only and sets `noEmit: true`. Package build configurations override that setting where runtime JavaScript is required: the API emits `apps/api/dist/main.js` for NestJS startup, and the shared package emits `packages/shared/dist` for the API's workspace imports. The API development command builds shared types first and then runs `nest start --watch`; inheriting the root `noEmit` setting prevents the API entrypoint from being created and causes a `dist/main` module-resolution failure.
+
+## Deterministic Security Guardrails & Chat Protection (Feature 023, Phase 3 US1)
+
+Feature 023 establishes a deterministic, multi-layered security architecture that replaces monolithic LLM-judge guardrails with bounded regex, AST analysis, normalization, and strict capability boundaries, guaranteeing zero secondary model latency and reliable fail-closed behavior across every chat turn.
+
+1. **Thin Controller Delegation (`apps/agent/src/agent/chat_turn/controller.py`)**:
+   - `ChatController` serves as the single entry orchestrator between transport adapters (SSE) and execution engines (`ChatTurnRunner`).
+   - Validates mandatory `GuardrailGateway` presence immediately. If the gateway is unconfigured or absent, it yields `ErrorEvent(code="GUARDRAIL_CONFIGURATION_ERROR")` with 0 downstream runner or model invocations.
+   - Enforces pre-execution input admission validation via `gateway.validate_input(context, message)` using an immutable `AdmissionContext`. If rejected, it immediately yields `ErrorEvent(code=decision.response_key)` without touching session state or LLMs.
+
+2. **Mandatory Security Gateway (`apps/agent/src/agent/guardrails/gateway.py`)**:
+   - `validate_input(context, message)`:
+     - Strict type checking: enforces `AdmissionContext` (zero tool authority).
+     - Layer ordering: queries `registry.ordered_layers("input")` and fails closed (`GUARDRAIL_INPUT_INJECTION`) if the registry contains no input layers or throws an exception.
+     - Short-circuits on the first `BLOCK` decision, completely discarding unvalidated payload data.
+     - Catches unhandled classifier exceptions and fails closed with generic response keys, preventing exception leaks or canary disclosure.
+   - `execute_tool(context, call, invoke)`:
+     - Enforces `TurnCapabilities` validation; verifies the requested tool call is present in `context.sealed_tools`.
+     - Denies unauthorized tools with `GUARDRAIL_TOOL_SCHEMA` before invocation.
+     - Fails closed on execution crashes without leaking internal traceback details.
+   - `stream_output(context, tokens)`:
+     - Yields `ApprovedChunk` instances for safe emitted tokens and terminates safely upon boundary violations.
+   - Tool-result validation is a fixed fail-closed chain: size/iterative structure bounds (max 64 KiB, depth <= 5, nodes <= 500), strict minimized result-schema projection, PII scanning, then untrusted-content injection detection. The live graph seals per-turn capabilities, authorizes an entire proposed batch before invocation, and validates each result before publishing a `ToolMessage`; raw tool callbacks are never exposed on SSE.
+   - The six tool-facing NestJS client operations stream decompressed response bytes through a 64 KiB bound before JSON loading; missing or false `Content-Length` values cannot bypass the cumulative check, and pre-parse JSON delimiter scanning rejects structures above the endpoint depth allowance or 5,000 nodes.
+   - Upstream responses remain bounded to 64 KiB and 5,000 structural nodes so an unpaginated 50-booking history remains valid. The default depth limit is 5; attested V2 flight search alone permits depth 7 for safe structured match explanations (`{ key, params }`).
+
+3. **Closed Registry with Topological Dependency Sorting (`apps/agent/src/agent/guardrails/registry.py`)**:
+   - Closed keyset enforcement: strictly forbids unverified or arbitrary layer registration.
+   - DAG ordering: implements Kahn's in-degree reduction topological sort with cycle detection, ensuring prerequisites (e.g. `input.length`) execute before dependent layers (e.g. `input.pii`, `input.injection`, `input.topic`).
+   - Anti-patterns prohibited: zero dynamic imports (`__import__`, `importlib.import_module`, `eval`, `exec`).
+   - Compulsory production registry (`create_production_registry`):
+     - `COMPULSORY_PRODUCTION_LAYERS`: immutable set containing `input.length`, `input.pii`, `input.injection`, `input.topic`, and `output.pii`.
+     - Disallowing or disabling any compulsory layer raises `RegistryContractError`.
+     - Production layers execute deterministic checks:
+       - `InputLengthLayer`: validates max characters (4096) and max UTF-8 bytes (16384) with static `GUARDRAIL_INPUT_LENGTH`.
+       - `InputPIILayer`: evaluates passport numbers, credit card numbers (Luhn checked), emails, and phone numbers via `detect_pii` with `GUARDRAIL_INPUT_PII`.
+       - `InputInjectionLayer`: evaluates raw text and multi-step normalized variants (`bounded_normalize`, `detect_base64_payloads`) against compiled injection signatures with `GUARDRAIL_INPUT_INJECTION`.
+       - `InputTopicLayer`: filters out-of-domain requests (code generation, creative writing, medical/legal advice) while permitting greetings and travel inquiries with `GUARDRAIL_INPUT_TOPIC`.
+       - `OutputPIILayer`: checks emitted chunk text for confidential PII via `detect_pii` with `GUARDRAIL_OUTPUT_PII`.
+
+4. **Normalization & ReDoS Safe Execution (`apps/agent/src/agent/guardrails/normalization.py`)**:
+   - `bounded_normalize`: composites Unicode NFKC normalization, zero-width character stripping, recursive nested URL decoding (bounded rounds), and homoglyph translation.
+   - `safe_regex_match` & `is_catastrophic_regex`: inspects regex AST for nested quantifiers and repetition alternations, restricting input scanning to sub-millisecond execution (< 5ms) on adversarial inputs.
+
+5. **Immutable Security Contracts (`apps/agent/src/agent/guardrails/base.py`)**:
+   - `AdmissionContext`: immutable turn context before routing with zero tool authority.
+   - `TurnCapabilities`: post-routing sealed capability bound to effective route intent and sealed tool list.
+   - `PipelineDecision[T]`: frozen decision container automatically stripping payload data when `status == "BLOCK"`.
+
+---
+
+## Deterministic Tool Boundary and Handoff Validation (Feature 023, Phase 4 US2)
+
+The Phase 4 tool boundary is implemented across the graph, runner, gateway, and
+trusted snapshot lifecycle. Router and checkout-gate code seal output-only
+`TurnCapabilities`; graph dispatch reads the seal from state and rejects configuration
+capability fallbacks. A proposed tool batch is authorized before any member runs, and
+each result passes the size/structure, strict schema, PII, and untrusted-instruction
+layers before it can become a `ToolMessage`, graph update, callback projection,
+checkpoint, model input, or public event. A production registry with no tool layers is
+fail-closed. Runner events and `ACTION_HANDOFF` use only validated output, while
+owner/session snapshot binding and single-lease cleanup remain enforced on block,
+error, cancellation, and disconnect.
+
+For graph search, `search_flights` stages its attested envelope in a private
+graph-scoped map. It does not allocate a snapshot version, write storage, or update
+trusted configuration until the complete tool batch passes validation; a blocked batch
+clears staging and publishes no message. The post-pass node validates all stages,
+coalesces same-owner entries to the last envelope, and commits through one atomic
+`commit_next` lifecycle operation. Direct `search_flights.ainvoke()` calls retain
+their existing persistence behavior for compatibility. A failed or multi-owner batch
+cannot leave an earlier snapshot committed on a blocked turn.
+
+The follow-up graph-state correction passes the latest `state["trusted_snapshot"]`
+into the next tool configuration and writes the validated `TrustedSearchSnapshot`
+returned by `commit_next` back into graph state. Commit failures clear staged work
+and fail closed. The router benchmark latency was resolved via regex ReDoS AST classification
+caching, candidate deduplication in `InjectionSignatureEngine`, and `known_safe=True` bypass for vetted
+signatures, with fail-closed rejection for catastrophic patterns on all input lengths.
+
+Owner-bound handoff snapshot read failures emit only the static
+`validate_handoff_snapshot_read_failed` warning and the generic safe error; exception
+text, identifiers, and payloads stay out of logs. Snapshot commit failures emit only
+the static `trusted_search_snapshot_batch_commit_failed` warning with the same
+payload-free logging boundary.
+
+The API chat persistence boundary accepts an empty plaintext message only as a complete
+AES-256-GCM envelope: an empty ciphertext is valid when nonce, authentication tag, and
+positive key version are present; undefined content is still encrypted before storage,
+and incomplete envelopes fail closed. The validated command counts and scope-limited
+handoff/payment evidence are recorded in
+[`docs/security/tool-boundary-validation.md`](../docs/security/tool-boundary-validation.md).
+The atomic final-fix commands have green observed checkpoints (`349` agent tests with
+one skip and `49` literal GOAL tests), local Redis verifies the new commit primitive,
+and the post-atomic T093 flow passed `1/1` with exit `0`. Phase 4 US2 T026–T028 task
+closure and workflow signoff are complete for this slice.
+
+### Runtime Penetration & DAST Boundaries (Feature 023, Phase 6 Slice 2: T038 & T039)
+
+1. **Two-User Ownership & Attestation Replay Suite (`tests/security/dast/test_ownership.py` / T038)**:
+   - Provisions two synthetic authenticated users (`user_a` and `user_b`) against the isolated local stack.
+   - **Cross-User Session & Booking Isolation**: Verifies that `user_a` cannot access, query, or stream `user_b`'s chat sessions, traveler profiles, booking records, or search snapshots. Requests fail with strict HTTP 403/404 or `CHAT_SESSION_NOT_FOUND`, with zero model/graph inference, zero database mutations, and zero PII or metadata leakage.
+   - **Claim & Service Key Validation**: Expired JWT tokens reject with 401 Unauthorized; forged HMAC `X-User-Claim` tokens (tampered `userId`, invalid signatures, expired `iat`, or inactive status) reject with 401/403; missing or invalid `AGENT_SERVICE_API_KEY` rejects with 401.
+   - **Stale Snapshot & Handoff Replay Protection**: Replaying consumed (HTTP 409) or expired (HTTP 410) handoff tokens fails closed without booking or payment side effects; tampering with flight price, currency, or passenger fields on a signed search snapshot breaks cryptographic HMAC validation and fails closed.
+   - **Redis Fencing Concurrency**: Concurrent turns for the same session fail closed via `SessionLockRepository` and `MessageQueueManager`; out-of-order execution with stale fence tokens is rejected from persistence; queue depth exceeding limit raises HTTP 429.
+
+2. **Adversarial Holdout Corpus Replay Engine (`tests/security/dast/test_adversarial.py` / T039)**:
+   - Executes the automated in-memory replay engine against all 700 frozen holdout corpus cases (`tests/security/corpus/`):
+     - **Input Attack Ingestion (350 cases)**: 100 malicious prompt injections, jailbreaks, PII inputs + 250 benign travel queries and greetings replayed through `GuardrailGateway` and `ChatTurnRunner`. Enforces static safe rejection events (`GUARDRAIL_BLOCKED`, `GUARDRAIL_INPUT_INJECTION`, `GUARDRAIL_INPUT_PII`) with zero downstream model/tool calls. Achieves TPR 100% (100/100 $\ge 95\%$) and FPR 0% (0/250 $\le 2\%$).
+     - **Tool Indirect Injection Replay (175 cases)**: 50 malicious tool outputs carrying indirect injection directives, JSON bombs, and PII leaks + 125 benign tool responses. Enforces `ToolOutputGuardrailPipeline` (`SizeStructureValidator`, `SchemaValidator`, `PIIScanner`, `UntrustedContentInjectionDetector`) blocking payloads before LangGraph state publication. Achieves TPR 100% (50/50 $\ge 95\%$) and FPR 0% (0/125 $\le 2\%$).
+     - **Output Token Partition Streaming Replay (175 cases)**: 50 malicious model outputs with PII/credentials + 125 benign outputs streamed across variable chunk boundaries (1-char, 3-char, word boundaries). Enforces candidate holdback via `OutputGuardrailPipeline` and `ChunkBuffer`, emitting `OUTPUT_GUARDRAIL_BLOCKED` with 0 sensitive bytes received by the client. Achieves TPR 100% (50/50 $\ge 95\%$) and FPR 0% (0/125 $\le 2\%$).
+     - **Stage Reachability Invariant (SEC28)**: Captures payload-free `reachedStageMarker` values tied to turn IDs and validates that unexpected upstream blocks do NOT count as downstream detector true positives.
 
 ---
 
@@ -383,7 +507,7 @@ The web layer (`apps/web`) establishes a strict server boundary protecting backe
 The Agent Gateway decomposes the legacy monolithic service into isolated capability modules with negative-privacy telemetry and decoupled chat persistence:
 
 1. **Four Isolated Capability Submodules (`apps/api/src/agent-gateway/`)**:
-   - `AttestedFlightSearchModule`: Owns legacy search and versioned attested search (`POST /api/agent-gateway/v2/flights/search`) with HMAC-SHA256 selection attestation generation.
+   - `AttestedFlightSearchModule`: Owns legacy search (`GET /api/agent-gateway/flights/search`) and versioned attested search (`POST /api/agent-gateway/v2/flights/search`) delegating to canonical `FlightsService`, slicing top 5 in exact server-ranked order, with HMAC-SHA256 selection attestation generation and zero direct supplier calls.
    - `AgentBookingReadinessModule`: Owns advisory readiness projection (`POST /api/agent-gateway/bookings/readiness`), internal profile resolution, safe ordinal mapping, and telemetry.
    - `SafeBookingReadModule`: Owns Tier-1 summaries (`GET /api/agent-gateway/users/bookings/summaries`) and Tier-2 details (`GET /api/agent-gateway/users/bookings/:bookingReference`) strictly projected from `BookingAgentProjection` with regex reference validation (`^bkref_...`), 404 tenant isolation, and temporarily retained legacy `/users/bookings`.
    - `TravelerPreferencesModule`: Owns allowlisted preference projection (`GET /api/agent-gateway/users/preferences`) querying Prisma `travelerProfile` without exposing passport PII.
@@ -768,17 +892,17 @@ Next.js UI → POST apps/agent:3002/chat/stream (Direct SSE streaming with corre
         ↓
 FastAPI JWTAuthMiddleware validates JWT token (shared JWT_SECRET)
         ↓
-FastAPI NemoGuardrailService runs safety checks (length, regex heuristics, Mimo safety classification)
-        ├── Safety check FAILS/BLOCKED → Log security event, return error event and close stream
-        └── Safety check PASSES ↓
+FastAPI ChatController requires the deterministic GuardrailGateway and validates input before runner/model execution
+        ├── Gateway FAILS/BLOCKS → Emit a static guardrail event and close without model/tool execution
+        └── Gateway PASSES ↓
             Agent checks conversation memory (loads history/summary from NestJS Chat API using X-Service-Auth)
                 ↓
             Orchestrates LangGraph StateGraph agent (Router → Travel Assistant or Checkout Orchestrator)
                 ↓
-            Tokens fed into OutputGuardrailPipeline (accumulates tokens to sentences → concurrent lookahead regex scan & NeMo safety check)
-                ├── Safety check FAILS/BLOCKED → Log security event, emit OUTPUT_GUARDRAIL_BLOCKED error, persist partial response, and close stream
-                └── Safety check PASSES ↓
-                    Safe chunks streamed back to frontend via SSE in real time (structured JSON latency & verdict logged per check)
+            Raw model tokens remain private inside OutputGuardrailPipeline until deterministic bounded PII inspection approves a raw prefix
+                ├── PII/credential/overflow detected → discard undecided text, close upstream, emit OUTPUT_GUARDRAIL_BLOCKED, persist only approved prefix
+                └── Prefix approved ↓
+                    Approved raw chunks stream through SSE; payload-free callbacks expose no prompts, tokens, messages, or raw exceptions
                 ↓
             If Checkout Intent:
                 Checkout Orchestrator validates Trusted Search Snapshot, calls deterministic NestJS handoff service.
@@ -788,6 +912,17 @@ FastAPI NemoGuardrailService runs safety checks (length, regex heuristics, Mimo 
             Upon completion, full conversation Turn persisted via NestJS Chat API (protected by X-Fencing-Token and AES-256-GCM encryption)
 ```
 
+- **Agent Security Architecture & Deterministic Guardrails (Feature 023 / US1)**:
+  - **ASGI Ingress Protection**: Raw ASGI `BodyLimitMiddleware` enforces a strict 64 KiB ceiling before JSON decoding, inspecting both `Content-Length` headers and streaming chunked bodies to prevent memory exhaustion and buffer saturation attacks. `BodyLimitMiddleware` is registered inside `CORSMiddleware` (which is outermost), and incorporates defense-in-depth inspection of the incoming `Origin` header to ensure 413 responses always carry `Access-Control-Allow-Origin` and `Vary: Origin`.
+  - **Admission Control**: `ChatController` serves as a thin delegator performing a single-pass input validation via `GuardrailGateway` before delegating to `ChatTurnRunner`. When validation succeeds, `validated_input` is passed directly to `ChatTurnRunner.run(command, validated_input=decision.validated_data)`, eliminating redundant validation passes.
+  - **Input Guardrail Pipeline**: Closed, dependency-ordered pipeline enforcing fail-closed protection:
+    1. `LengthValidator` (`input.length`): Enforces 4,000 Unicode codepoints and 16,384 UTF-8 byte caps.
+    2. `PIIDetector` (`input.pii`): Redacts or blocks payment cards (Luhn-checked), passport numbers, email addresses, and phone numbers, while permitting reviewed travel domain exceptions (e.g. flight numbers, IATA airport codes, dates).
+    3. `InjectionDetector` (`input.injection`): Employs `InjectionSignatureEngine` with 60+ compiled regexes spanning direct overrides, roleplay/delimiter hijacking, jailbreaks, and obfuscation. Operates with bounded multi-round normalization, 16 KiB scanning ceiling, and AST inspection ensuring ReDoS-safe linear matching.
+    4. `TopicBoundary` (`input.topic`): Restricts agent interactions strictly to travel, flight bookings, baggage, and airline operations, blocking off-topic requests (code generation, medical, financial, legal advice).
+  - **Memory Security Boundary**: Conversation history loaded from persistence is kept strictly isolated from the trusted `SystemMessage(content=SYSTEM_PROMPT)`. Prior turns and summaries are framed within a lower-trust `HumanMessage` data envelope. Loaded history is validated against guardrails (rejecting turns containing historical injection or PII), and newly generated conversation summaries are validated via `GuardrailGateway` prior to database persistence and discarded if blocked.
+  - **Deterministic Output Boundary**: `OutputGuardrailPipeline` and `ChunkBuffer` keep detector-relevant normalized suffixes and their raw-source mapping private until a finite policy decision is possible. The versioned policy limits passport matches to 11 ASCII scalars, Luhn-validated cards to 37 scalars, phones to 40, ASCII emails to 254 with a 64-scalar local part, and credentials to 512; pending raw UTF-8 text is capped at 8 KiB. Unsupported/overlong candidates fail closed. Output blocking closes the upstream iterator, discards undecided text, emits the static `OUTPUT_GUARDRAIL_BLOCKED` event, and persists only the already-approved prefix.
+  - **Payload-Free Model Dispatch**: Main, travel, checkout, router, final-answer, graph-stream and summarizer invocations replace caller callbacks with a payload-free configuration while retaining trusted turn-local dependencies. Non-streamed `AIMessage` and generated summary content is deterministically validated before graph export, reuse, or persistence. Runtime startup and SSE no longer initialize or call the legacy NeMo/MiMo security classifier; primary advisory models remain unchanged.
 - **Browser Transport & Correlation (Direct-Only Lockdown)**: Chat clients stream directly to the public FastAPI agent endpoint (`apps/agent:3002/chat/stream`) via permanent direct-only SSE transport (`POST ${NEXT_PUBLIC_AGENT_URL}/chat/stream`). The legacy Next.js proxy route has been permanently decommissioned and removed (Phase 8D / T101). Both the Python Agent configuration and Next.js web client enforce fail-closed runtime validation against any decommissioned proxy flag (e.g. `FEATURE_FLAG_CHAT_DIRECT_STREAM='false'` or `NEXT_PUBLIC_FEATURE_FLAG_CHAT_DIRECT_STREAM='false'`), throwing a startup/request initialization error. Independently sanitized opaque trace and correlation IDs propagate across browser, agent, and backend; the Python sanitizer is shared by SSE and the NestJS client, and a real loopback integration test verifies identical IDs in NestJS telemetry and audit persistence. Agent and API telemetry enforce per-field closed type/value schemas, fail open on emission failure, and use fixed event names; audit metadata never stores request/session/user/offer/message/token/passenger/payment/passport values.
 - **Independent Handoff Gates**: The LLM remains read-only and never creates bookings. When users commit to a flight, the Checkout Orchestrator signals a deterministic NestJS handoff service to issue a token.
 - **Secure Handoff Lifecycle**: The `ACTION_HANDOFF` SSE event delivers a hash-only token without URL or offer identifier. A native same-origin form adds the in-memory credential only while constructing the POST body; the bootstrap route validates a renderable safe checkout context, sets a short-lived root-scoped `HttpOnly; Secure; SameSite=Strict` cookie, and redirects to `/checkout/passengers`. The passenger page resolves server-side, and same-origin readiness/intent routes accept only allowlisted passenger inputs, inject the credential from the HttpOnly cookie, use bounded upstream calls, and clear the cookie at the same root scope only after successful intent creation. Tokens are strictly absent from URLs, DOM fields, readable storage, and telemetry.
@@ -807,7 +942,7 @@ FastAPI NemoGuardrailService runs safety checks (length, regex heuristics, Mimo 
 - **Privacy-Safe Agent Tool Audit Service (`AgentToolAuditService`)**: Emits structured, privacy-safe execution telemetry (`toolName`, `outcome: 'SUCCESS' | 'FAILURE'`, `durationMs`, `responseSizeBytes`, `traceId`, `correlationId`, `actorId`, `occurredAt`, `errorCode`) to `AuditLog`. Strictly enforces negative privacy protection: projects only allowlisted performance metrics while unconditionally discarding raw parameters, customer messages, passenger details, passport numbers, card numbers, or Duffel IDs. Provides graceful fallback UUID generation and fail-safe error isolation to prevent audit logging failures from interrupting agent tool operations.
 - **Capability-Local Agent Gateway Submodules & Clean Composition (`apps/api/src/agent-gateway/`)**:
   - `AgentGatewayModule`: Serves as an umbrella composition module importing and re-exporting the 4 capability submodules, `AgentAuthModule`, `AgentToolAuditModule`, and transitional cross-module providers (`SelectionAttestationService`, `BookingAgentProjectionService`). Broad monolithic `AgentGatewayService` and `AgentGatewayController` are completely decommissioned and deleted with zero remaining references.
-  - `AttestedFlightSearchModule`: Owns legacy search (`GET /api/agent-gateway/flights/search`) with Redis caching and V2 attested search (`POST /api/agent-gateway/v2/flights/search`) with HMAC-SHA256 selection attestation generation.
+  - `AttestedFlightSearchModule`: Owns legacy search (`GET /api/agent-gateway/flights/search`) and V2 attested search (`POST /api/agent-gateway/v2/flights/search`) delegating canonical search, scoring, and ranking to `FlightsService`, slicing top 5 in exact server order, with HMAC-SHA256 selection attestation generation and zero direct supplier calls.
   - `AgentBookingReadinessModule`: Owns advisory readiness projection (`POST /api/agent-gateway/bookings/readiness`), internal profile resolution, safe ordinal mapping, and telemetry.
   - `SafeBookingReadModule`: Owns Tier-1 summaries (`GET /api/agent-gateway/users/bookings/summaries`) and Tier-2 details (`GET /api/agent-gateway/users/bookings/:bookingReference`) strictly projected from `BookingAgentProjection` with regex reference validation (`^bkref_...`), 404 tenant isolation, and temporarily retained legacy `/users/bookings`.
   - `TravelerPreferencesModule`: Owns allowlisted preference projection (`GET /api/agent-gateway/users/preferences`) querying Prisma `travelerProfile` without exposing passport PII.
@@ -856,6 +991,7 @@ The repository uses a single GitHub Actions pull request CI workflow at `.github
 - **Loopback-Only Network Guards**: `node-network-guard.cjs` and `python/sitecustomize.py` restrict outgoing socket connections during CI test/build stages exclusively to loopback addresses (`127.0.0.1`, `::1`, `localhost`) to prevent unauthorized live provider access.
 - **Change Detection & Routing**: `detect-changes` executes contract validation and actionlint, emitting string booleans for `api`, `web`, and `agent` via `dorny/paths-filter`.
 - **Deterministic Test Commands**: API unit CI calls the explicit `test:ci` script rather than forwarding Jest flags through pnpm. Agent Redis coverage enforcement is applied only to the dedicated Redis-marked selection, so the non-Redis and Redis groups validate independently.
+- **Post-fix verification status (2026-09-09)**: Adjacent snapshot/search integration tests passed `74/74`, graph tests passed `6/6`, and the live Redis snapshot check passed `1`, with `39` deselected; Ruff check/format also passed. The router stream-entry benchmark (`test_t098_router_entry_benchmark`) bottleneck was resolved via AST classification caching, short-circuit length bounds, and candidate deduplication (p95 at `14.836 ms` vs `100.0 ms` limit). The complete non-Redis agent suite passed serially with `971 passed, 4 skipped, 12 deselected`, exit code `0`.
 - **Correctness vs. Performance**: Blocking API E2E runs exclude `[.-]performance.e2e-spec.ts` wall-clock benchmarks, which remain available through the opt-in `test:e2e:performance` command for controlled benchmark environments.
 - **Status Evaluation**: The terminal `ci-status` job runs `evaluate-ci-status.mjs` with `always()`, verifying that all relevant service jobs succeeded, irrelevant jobs were safely skipped, and detection ran cleanly. Branch protection requires only `ci-status`.
 
@@ -1007,6 +1143,8 @@ Feature 019 restructures high-leverage boundaries without changing public produc
    - `FlightsModule`: `imports: [..., FlightMatchModule, ProfileModule]` $\rightarrow$ `exports: [FlightsService, FlightSearchOrchestratorService]`.
    - Zero circular dependencies across `FlightsModule`, `FlightMatchModule`, and `ProfileModule`.
 
+   **Agent search persistence and budget boundary (Phase 6 follow-up):** Both gateway search versions delegate to `FlightsService.search()` with `caller: 'agent'`, preserving the agent supplier budget. V2 additionally requests `persistence: 'required'`: the search-history, flight-offer, and recovery transaction must commit before the gateway signs its ordered first five offers. A persistence failure rejects the search without issuing an attestation. Browser and legacy V1 searches retain deferred best-effort persistence. Only raw supplier offers are cached; each request applies its own profile and ranking. The canonical display mapper preserves weight-only baggage allowances as well as quantity-based baggage.
+
 4. **Search HTTP Boundary (`FlightsController`)**:
    - Both public search aliases return `FlightSearchResponseDto` through Nest's passthrough response path, preserving direct controller invocation and DTO serialization.
    - The controller sets `Cache-Control: private, no-store`, removes any existing `ETag`, and uses a response-local Express application view that omits only the `etag fn` setting during final JSON serialization. No global Express ETag setting is mutated, so unrelated concurrent responses retain their normal behavior.
@@ -1015,3 +1153,52 @@ Feature 019 restructures high-leverage boundaries without changing public produc
    - The trusted NestJS-to-Next.js search response is parsed as an exact Zod discriminated union. Untagged legacy responses are rejected; `MATCHED` requires valid non-null match results plus `flight-match-v1` aggregate metadata, while `RANKED` requires `matchResult: null` and `scoringVersion: null`.
    - The seam rejects raw provider-prefixed public IDs case-insensitively, validates dimension values and six-decimal active-weight totals through the shared match schema, preserves local opaque IDs and upstream order, and uses an explicit browser-safe projection that strips `duffelOfferId`.
    - `formatExplanation(explanation: Explanation): string` is a pure allowlisted formatter for all 24 explanation keys. It uses only approved primitive parameters, returns deterministic English copy, falls back safely for unknown or malformed runtime inputs, and HTML-escapes dynamic airline/window strings without React, DOM APIs, or `dangerouslySetInnerHTML`.
+
+6. **Search Form Integration & Result Composition (`apps/web/components/search/`, `apps/web/app/search/`)**:
+   - `FlightResultCard.tsx`: Pure provider-blind flight card rendering airline name, flight number, departure/arrival airports, times, formatted duration, stops, price, currency, cabin class, and baggage allowance. Embeds `FlightMatchBadge` and `FlightMatchBreakdown` when `matchResult` is present. Strictly adheres to provider ID isolation (`data-offer-id={offer.id}`) and semantic Tailwind styling.
+   - `FlightResults.tsx`: List container component preserving canonical server order by default in both `MATCHED` (`BEST_MATCH`) and `RANKED` (`RECOMMENDED`) modes, and performing client-side re-sorting for objective sort options (`PRICE`, `DURATION`, `STOPS`, `DEPARTURE_TIME`).
+   - `SearchFormClient.tsx`: Stateful client component retaining search outcome state (`mode`, `offers`, `meta`, `sortBy`), rendering `FlightRankingBanner` when `mode === 'RANKED'`, rendering `FlightResultsControls` with mode-aware defaults, and cleanly composing `<FlightResults>`.
+   - Cabin Preference Prefill & Precedence (`apps/web/app/search/page.tsx`, `apps/web/lib/search-prefill.ts`): Server component inspects authenticated session, fetches profile preferences server-side via `fetchProfile()`, and prefills `initialValues.cabinClass` with saved `classPreference` when no URL query param exists. Explicit URL `?cabinClass=` query parameters strictly override profile preferences. Zero-Client-Credential invariant is strictly maintained.
+
+## Planned Feature 023: Deterministic Guardrails and Security Verification
+
+Design baseline established (2026-09-04); current implementation descriptions above remain unchanged. See `specs/023-security-systems/plan.md` and `tasks.md` for the 52-task delivery plan.
+
+Phase 4 staged trusted-search persistence uses owner-scoped graph staging followed by one same-owner `commit_next` lifecycle operation. The repository's Redis Lua commit validates the expected next version and writes the snapshot, issued fence, and accepted fence atomically. A failed or multi-owner batch is rejected before persistence; direct tool invocations retain the existing allocation/save contract.
+
+Proposed flow: authenticated SSE -> thin ChatController -> ChatTurnRunner -> mandatory GuardrailGateway. Runner owns input, guarded tool execution and output streaming enforcement. Tool authorization/result validation must complete before ToolMessages, signal parsing, graph state/checkpoints, model continuation or public events; observing runner tool-end events is insufficient. Preserve existing auth, quotas, encrypted persistence, fencing, snapshots and dedicated handoff channels.
+
+Verification plan adds per-layer/boundary tests, static source analysis, separate dependency/secret scans, authenticated HTTP DAST and custom SSE/tool adversarial coverage. Production release requires complete evidence through existing `ci-status`.
+
+Phase 2 Foundation status (2026-09-05): Tasks T005–T011 implemented. `scripts/security/evaluate-results.mjs` provides the fail-closed results evaluation engine and boundary enforcer (coverage >=95/90%, 0 Critical/High SAST/supply-chain/DAST, stage-local and aggregate TPR >=95%/FPR <=2%, SEC28 stage-reachability, 100% invariants, complete shard union); `scripts/security/validate-corpus.mjs` validates the canonical JSONL corpus against `tests/security/corpus/schema.json` and holdout quotas (100/250, 50/125, 50/125); `scripts/security/write-report.mjs` generates sanitized evidence records with allowlisted fields and privacy redaction. `evaluate-results.mjs` loads `tests/security/coverage-policy.json` and enforces weighted statement/branch thresholds for every exact and wildcard scope, failing closed when a required module is absent or has no measurable branch data. The policy covers chat-turn controller/runner, startup/config, immutable guardrails, ASGI middleware, SSE/chunk streaming, memory, sanitization and tool clients/projections. `agent.guardrails.base` defines strict immutable admission, sealed capability, fail-closed decision, payload, layer and response-key contracts. The closed-registry contract suite is isolated with an explicit expected skip pending T013, so normal agent collection remains green while the contract activates when the registry exists. T007 adds an internal-network Compose stack with synthetic PostgreSQL/Redis/API/agent/mock services, a loopback-pinned transport with request/response bounds, a lifecycle harness that preserves configured Docker context discovery, and dedicated unprivileged API/agent container users. The harness migrates, health-checks, authenticates two isolated users and tears down only its own project; `--smoke` verifies this lifecycle and full detector/DAST execution remains T037–T041.
+
+Feature 023 plan convergence (2026-09-04): admission context is separate from post-router/gate sealed tool authority. The design now specifies bounded PII spans, stage-local DAST oracles and quota profiles, validated generated summaries and payload-free model callbacks. Two independent review cycles closed six planning findings; see `specs/023-security-systems/review-convergence.md`. Runtime implementation remains pending.
+
+### Phase 5 US3 — Static Application Security Testing (SAST) Architecture
+
+CI review follow-up (2026-09-11): application and shared-package changes route both static security jobs. Weekly scheduled runs bypass PR path detection and run the full security scans. The SAST job installs frozen Node dependencies for its TypeScript parser; the supply-chain job provisions pinned pnpm/uv without installing the Node dependency tree. Gitleaks uses a full-history checkout (`fetch-depth: 0`). Advisory query timestamps are distinct from database publication timestamps; freshness verification must reject missing, stale, or unverifiable evidence.
+
+1. **Rule Panning and Separation (`tests/security/sast/`)**:
+   - `guardrails.yml`: Pinned custom rules with severity `ERROR` targeting hard boundaries:
+     - `no-llm-in-guardrails`: blocks LLM initialization or invocation inside deterministic guardrails.
+     - `no-dynamic-imports-in-guardrails`: blocks dynamic module loading/eval/exec inside guardrail boundaries.
+     - `no-unshielded-tool-execution`: ensures tool executions are mediated through the security gateway.
+     - `no-raw-payload-logging`: blocks unredacted sensitive payload/prompt logging across services.
+     - `safe-html-interpolation`: forbids raw `dangerouslySetInnerHTML` injections in web UI components.
+   - `ruleset.yml`: Semgrep v1.88.0 ruleset bundling `guardrails.yml`, standard reviewed rulesets (`p/default`, `p/owasp-top-ten`, `p/security-audit`, `p/secrets`), and defining behavioral test requirements for interprocedural state properties.
+   - Fixture separation: Safe/unsafe fixture pairs in `tests/security/sast/fixtures/` strictly segregated from census and production scans.
+
+2. **Scanner Driver & File Census (`scripts/security/run-sast.mjs`)**:
+   - Recursive workspace census validating target file minimums (`apps/agent >= 30`, `apps/api >= 20`, `apps/web >= 20`, `packages/shared >= 1`), failing closed if census drops below thresholds.
+   - Target resolution supporting `--mode full` (scans all workspace source files) and `--mode diff` (filters git diff changed files, failing closed on git failure).
+   - Semgrep configuration passing custom rules and default reviewed packages (`p/default`, `p/owasp-top-ten`, `p/security-audit`, `p/secrets`).
+   - SARIF normalization (CVSS score parsing, rule metadata, and level mapping) and fail-closed exit code enforcement on missing tools, malformed SARIF, scanner crashes, and unbaselined findings.
+   - Platform-aware AST fallback (`runAstFallbackScan`) providing deterministic rule scanning on environments where native Semgrep CLI is unavailable, evaluating custom guardrail rules and configured standard rulesets (`p/default`, `p/owasp-top-ten`, `p/security-audit`, `p/secrets`). Performs full syntax parsing and validation for Python (`ast.parse`) and JavaScript/TypeScript/TSX/MJS (`typescript.createSourceFile` with `parseDiagnostics`), failing closed immediately on malformed files before evaluating rules or regexes.
+
+3. **Canonical Baseline and <=30-Day Exception Schema (`baseline.json` & `exceptions.json`)**:
+   - `tests/security/sast/baseline.json`: Clean draft 2020-12 baseline format tracking known findings (`ruleId`, `file`, `line`, `fingerprint`, `context`). Baseline matching requires path-boundary matching and cannot suppress hard rules or Critical/High/Error findings.
+   - `tests/security/exceptions.json`: Strict exception schema requiring `id`, `ruleId`, `file`, `owner`, `rationale`, `compensatingControl`, `createdAt`, `expiresAt`. Exceptions scope by path boundary, optional `line`, and optional `fingerprint`, with single-use consumption preventing cross-finding suppression.
+   - Validation engine (`validateException`, `validateExceptionsSchema`, `validateBaselineSchema`) enforces:
+     - Maximum 30-day lifetime from creation date (`expiresAt - createdAt <= 30 days`).
+     - Immediate fail-closed rejection on expired exceptions (`expiresAt < currentDate`).
+     - Non-bypassable hard rules: `no-llm-in-guardrails`, `no-unshielded-tool-execution`, and any Critical, High, or Error severity findings can NEVER be suppressed by baseline or exceptions.

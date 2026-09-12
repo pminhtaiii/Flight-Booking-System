@@ -1,8 +1,10 @@
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 
 from agent.agents.chat_agent import get_chat_model
 from agent.graph.state import AgentState
+from agent.guardrails.base import TurnCapabilities
+from agent.guardrails.output_pipeline import approved_model_content, payload_free_config
 from agent.tools.registry import get_travel_tools
 
 TRAVEL_PROMPT = (
@@ -27,10 +29,17 @@ TRAVEL_PROMPT = (
 async def travel_assistant_node(state: AgentState, config: RunnableConfig) -> dict:
     """Call the LLM with Travel Assistant tools bound."""
     model = get_chat_model()
-    tools = get_travel_tools()
+    capabilities = state.get("turn_capabilities")
+    sealed = set(capabilities.sealed_tools) if isinstance(capabilities, TurnCapabilities) else set()
+    tools = [tool for tool in get_travel_tools() if tool.name in sealed]
     model_with_tools = model.bind_tools(tools)
 
-    messages = list(state.get("messages", []))
+    messages = [
+        message
+        for message in state.get("messages", [])
+        if not isinstance(message, ToolMessage)
+        or message.additional_kwargs.get("guardrail_validated") is True
+    ]
     has_system = any(isinstance(m, SystemMessage) for m in messages)
     if not has_system:
         messages.insert(0, SystemMessage(content=TRAVEL_PROMPT))
@@ -45,5 +54,9 @@ async def travel_assistant_node(state: AgentState, config: RunnableConfig) -> di
             )
         )
 
-    response = await model_with_tools.ainvoke(messages, config=config)
-    return {"messages": [response]}
+    response = await model_with_tools.ainvoke(messages, config=payload_free_config(config))
+    return (
+        {"messages": [response]}
+        if await approved_model_content(response.content, config)
+        else {"messages": []}
+    )

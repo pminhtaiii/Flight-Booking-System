@@ -1,423 +1,240 @@
-import asyncio
-import json
-import logging
-import time
-from datetime import datetime, timezone
-from typing import AsyncGenerator, Tuple
+"""Deterministic public model-output boundary."""
 
-import tiktoken
+from __future__ import annotations
 
-from agent.guardrails.base import GuardrailService
-from agent.sanitization.pii_scrubber import detect_pii
+import re
+from collections.abc import Mapping
+from typing import Any, AsyncGenerator
+
+from agent.sanitization.pii_scrubber import is_luhn_valid
 from agent.streaming.chunk_buffer import ChunkBuffer
 
 
 class OutputGuardrailBlockedError(Exception):
-    """
-    Raised when an output chunk fails safety validation.
-    """
-
     def __init__(
         self,
         partial_response: str,
         layer: str,
         rule: str,
         message: str = "Response was blocked for safety reasons.",
-    ):
-        self.partial_response = partial_response
-        self.layer = layer
-        self.rule = rule
+    ) -> None:
+        self.partial_response, self.layer, self.rule = partial_response, layer, rule
         super().__init__(message)
 
 
-class OutputGuardrailPipeline:
-    """
-    Orchestrates output safety validation using a layered pipeline.
-    """
+_PASSPORT = re.compile(r"(?<![A-Z0-9])[A-Z][0-9]{7,10}(?![A-Z0-9])")
+_PASSPORT_ADJACENT = re.compile(r"(?<![A-Z0-9])[A-Z][0-9]{7,10}(?=[A-Z0-9])")
+_CARD = re.compile(r"(?<![0-9])(?:[0-9][ -]?){12,18}[0-9](?![0-9])")
+_PHONE = re.compile(
+    r"(?<!\d)(?<!\d-)\+?(?!\d{4}-\d{2}-\d{2})[0-9](?:[0-9]|[- .()](?!\d{4}-\d{2}-\d{2})){5,38}[0-9](?![0-9:])"
+)
+_EMAIL = re.compile(r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]{1,64}@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+")
+_EMAIL_LIKE = re.compile(r"\S{1,255}@\S+")
+_CREDENTIAL = re.compile(
+    r"(?:api_key[=:][ \t]{0,4}|access_token[=:][ \t]{0,4}|secret[=:][ \t]{0,4}|bearer[ \t]{1,4})\S{1,495}",
+    re.I,
+)
+_CREDENTIAL_PREFIX = re.compile(
+    r"(?:api_key[=:][ \t]{0,4}|access_token[=:][ \t]{0,4}|secret[=:][ \t]{0,4}|bearer[ \t]{0,4})\S*$",
+    re.I,
+)
+_PASSPORT_PREFIX = re.compile(r"(?<![A-Z0-9])[A-Z][0-9]{0,10}$")
+_CARD_PREFIX = re.compile(r"(?<![0-9])[0-9][0-9 -]{0,35}$")
+_PHONE_PREFIX = re.compile(
+    r"(?:^|(?<=\s))\+?(?!\d{4}-\d{2}-\d{2})[0-9](?:[0-9]|[- .()](?!\d{4}-\d{2}-\d{2})){0,38}$"
+)
+_EMAIL_PREFIX = re.compile(r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]{1,64}@?[A-Za-z0-9.-]*$")
+_DATETIME = re.compile(
+    r"\b\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?\b"
+)
+_DATE_RANGE = re.compile(
+    r"^\s*\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?"
+    r"\s*(?:-|–|—|to|\/)\s*"
+    r"\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?\s*$"
+)
 
-    def __init__(self, config, nemo_service: GuardrailService, session_id: str = None):
-        self.config = config
-        self.nemo_service = nemo_service
-        self.session_id = session_id
-        self.buffer = ChunkBuffer(max_chunk_tokens=getattr(config, "max_chunk_tokens", 200))
-        self.overlap_tokens = getattr(config, "overlap_tokens", 30)
-        self.partial_response = ""
-        self.pending_chunk = None
-        self.pending_validation_task = None
-        self.chunk_index = 0
-        try:
-            self.encoding = tiktoken.get_encoding("cl100k_base")
-        except Exception:
-            self.encoding = None
 
-    def _log_sync_check(
-        self, layer: str, verdict: str, latency_ms: float, chunk_index: int
-    ) -> None:
-        logger = logging.getLogger("agent.guardrails")
-        logger.info(
-            json.dumps(
-                {
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "session_id": self.session_id,
-                    "chunk_index": chunk_index,
-                    "layer": layer,
-                    "verdict": verdict,
-                    "latency_ms": round(latency_ms, 2),
-                }
+def _is_itinerary_or_date(match: re.Match[str], text: str) -> bool:
+    val = match.group(0).strip()
+    if _DATETIME.fullmatch(val) or _DATE_RANGE.fullmatch(val):
+        return True
+    start, end = match.start(), match.end()
+    for dt_m in _DATETIME.finditer(text):
+        if dt_m.start() <= start and end <= dt_m.end():
+            return True
+    return False
+
+
+def deterministic_pii_match(text: str, *, include_credentials: bool = True) -> re.Match[str] | None:
+    matches = (
+        list(_PASSPORT.finditer(text))
+        + list(_PASSPORT_ADJACENT.finditer(text))
+        + [m for m in _CARD.finditer(text) if is_luhn_valid(m.group(0))]
+        + [
+            m
+            for m in _PHONE.finditer(text)
+            if sum(char.isdigit() for char in m.group(0)) >= 10
+            and not _is_itinerary_or_date(m, text)
+        ]
+        + list(_EMAIL.finditer(text))
+        + (list(_CREDENTIAL.finditer(text)) if include_credentials else [])
+    )
+    # Any non-ASCII or overlong email-like identifier is unsupported and must
+    # fail closed rather than being released as a near-miss.
+    matches += [
+        match
+        for match in _EMAIL_LIKE.finditer(text)
+        if not match.group(0).isascii() or len(match.group(0)) > 254
+    ]
+    return min(matches, key=lambda match: match.start()) if matches else None
+
+
+def payload_free_config(config: Any = None) -> dict[str, Any]:
+    source = config if isinstance(config, Mapping) else {}
+    incoming = source.get("configurable", {})
+    configurable = incoming if isinstance(incoming, Mapping) else {}
+    return {
+        "callbacks": [],
+        "configurable": {
+            k: value
+            for k, value in configurable.items()
+            if k
+            in (
+                "trace_id",
+                "user_id",
+                "thread_id",
+                "guardrail_gateway",
+                "nestjs_client",
+                "trusted_snapshot",
             )
+        },
+    }
+
+
+def _is_output_guardrail_disabled(config: Any) -> bool:
+    if config is None:
+        return False
+    if getattr(config, "enabled", True) is False:
+        return True
+    og = getattr(config, "output_guardrail", None)
+    if og is not None and getattr(og, "enabled", True) is False:
+        return True
+    if isinstance(config, Mapping):
+        if config.get("enabled") is False:
+            return True
+        og_dict = config.get("output_guardrail")
+        if isinstance(og_dict, Mapping) and og_dict.get("enabled") is False:
+            return True
+        if og_dict is not None and getattr(og_dict, "enabled", True) is False:
+            return True
+        conf = config.get("configurable")
+        if isinstance(conf, Mapping):
+            if conf.get("enabled") is False:
+                return True
+            og_conf = conf.get("output_guardrail")
+            if isinstance(og_conf, Mapping) and og_conf.get("enabled") is False:
+                return True
+            if og_conf is not None and getattr(og_conf, "enabled", True) is False:
+                return True
+    return False
+
+
+async def approved_model_content(content: Any, config: Any = None) -> bool:
+    if _is_output_guardrail_disabled(config):
+        return True
+    return isinstance(content, str) and not deterministic_pii_match(content)
+
+
+class OutputGuardrailPipeline:
+    def __init__(
+        self, config: Any, nemo_service: Any = None, session_id: str | None = None
+    ) -> None:
+        self.config, self.session_id = config, session_id
+        self.buffer, self.partial_response, self.closed = (
+            ChunkBuffer(),
+            "",
+            False,
         )
 
-    async def _validate_chunk_async_wrapper(self, chunk: str, chunk_index: int) -> Tuple[bool, str]:
-        start_time = time.perf_counter()
-        is_safe = False
-        reason = "Safety check unavailable."
-        try:
-            is_safe, reason = await self.nemo_service.validate_output_chunk(chunk)
-        except Exception as e:
-            reason = f"Exception: {e}"
-            raise
-        finally:
-            latency_ms = (time.perf_counter() - start_time) * 1000.0
-            verdict = "pass" if is_safe else "fail"
-            logger = logging.getLogger("agent.guardrails")
-            logger.info(
-                json.dumps(
-                    {
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                        "session_id": self.session_id,
-                        "chunk_index": chunk_index,
-                        "layer": "nemo",
-                        "verdict": verdict,
-                        "latency_ms": round(latency_ms, 2),
-                    }
-                )
-            )
-        return is_safe, reason
+    def _block(self, match: re.Match[str]) -> None:
+        self.partial_response += self.buffer.release_raw_prefix(
+            self.buffer.raw_index_for_normalized_index(match.start())
+        )
+        self.buffer.flush()
+        raise OutputGuardrailBlockedError(self.partial_response, "deterministic", "PII detection")
 
-    def _check_boundary_pii(self, chunk: str, context: str = None) -> None:
+    def _pending_candidate_start(self, normalized: str) -> int | None:
+        """Find the earliest suffix which can become a supported identifier.
+
+        Whitespace is not a release boundary: it can precede an identifier in
+        a later chunk. Only text before an actual detector prefix is approved.
         """
-        Maintains a sliding window of the last N tokens from the previous chunk
-        and tests the overlap region (tail of previous + head of current) with regex.
-        """
-        boundary_context = context if context is not None else self.partial_response
-        if not boundary_context:
-            return
+        starts = []
+        for pattern in (
+            _CREDENTIAL_PREFIX,
+            _PASSPORT_PREFIX,
+            _CARD_PREFIX,
+            _PHONE_PREFIX,
+            _EMAIL_PREFIX,
+        ):
+            match = pattern.search(normalized)
+            if match:
+                starts.append(match.start())
+        return min(starts) if starts else None
 
-        # Extract tail of the previous chunk
-        if self.encoding:
-            try:
-                prev_tokens = self.encoding.encode(boundary_context)
-                tail_tokens = (
-                    prev_tokens[-self.overlap_tokens :]
-                    if len(prev_tokens) > self.overlap_tokens
-                    else prev_tokens
-                )
-                tail_text = self.encoding.decode(tail_tokens)
-            except Exception:
-                char_limit = self.overlap_tokens * 4
-                tail_text = boundary_context[-char_limit:]
-        else:
-            char_limit = self.overlap_tokens * 4
-            tail_text = boundary_context[-char_limit:]
-
-        # Extract head of the current chunk
-        if self.encoding:
-            try:
-                curr_tokens = self.encoding.encode(chunk)
-                head_tokens = curr_tokens[: self.overlap_tokens]
-                head_text = self.encoding.decode(head_tokens)
-            except Exception:
-                char_limit = self.overlap_tokens * 4
-                head_text = chunk[:char_limit]
-        else:
-            char_limit = self.overlap_tokens * 4
-            head_text = chunk[:char_limit]
-
-        overlap_string = tail_text + head_text
-        if detect_pii(overlap_string):
-            raise OutputGuardrailBlockedError(
-                partial_response=self.partial_response,
-                layer="boundary",
-                rule="PII detection",
-                message="Output safety violation: PII detected.",
+    def _release(self) -> str:
+        normalized = self.buffer.normalized
+        candidate_start = self._pending_candidate_start(normalized)
+        if candidate_start is not None:
+            return self.buffer.release_raw_prefix(
+                self.buffer.raw_index_for_normalized_index(candidate_start)
             )
+        # A non-word terminator is a genuine detector boundary only after the
+        # candidate-prefix scan above has ruled out a format that accepts it.
+        if normalized and not normalized[-1].isalnum() and not normalized[-1].isidentifier():
+            return self.buffer.release_raw_prefix(len(self.buffer.raw))
+        if len(normalized) <= self.buffer.minimum_undecided_suffix_scalars:
+            return ""
+        boundary = self.buffer.raw_index_for_normalized_index(
+            len(normalized) - self.buffer.minimum_undecided_suffix_scalars
+        )
+        return self.buffer.release_raw_prefix(boundary)
 
     async def process_token(self, token: str) -> AsyncGenerator[str, None]:
-        """
-        Feeds a token into the pipeline, yielding any safe completed chunks.
-        """
-        if not getattr(self.config, "enabled", True):
+        if _is_output_guardrail_disabled(self.config):
             yield token
             return
-
-        chunk = self.buffer.add_token(token)
-        if chunk:
-            self.chunk_index += 1
-            chunk_idx = self.chunk_index
-
-            # If we had a pending validation, await it now
-            if self.pending_validation_task:
-                try:
-                    is_safe, reason = await self.pending_validation_task
-                    if not is_safe:
-                        raise OutputGuardrailBlockedError(
-                            partial_response=self.partial_response,
-                            layer="nemo",
-                            rule=reason or "Output safety violation.",
-                            message=reason or "Output safety violation.",
-                        )
-                except OutputGuardrailBlockedError:
-                    raise
-                except Exception as e:
-                    raise OutputGuardrailBlockedError(
-                        partial_response=self.partial_response,
-                        layer="nemo",
-                        rule="Safety check unavailable.",
-                        message="Safety check unavailable.",
-                    ) from e
-                self.partial_response += self.pending_chunk
-                yield self.pending_chunk
-                self.pending_validation_task = None
-                self.pending_chunk = None
-
-            # Boundary PII check (using partial_response + pending_chunk context)
-            context = self.partial_response + (self.pending_chunk or "")
-            start_boundary = time.perf_counter()
-            boundary_passed = False
-            try:
-                self._check_boundary_pii(chunk, context)
-                boundary_passed = True
-            except OutputGuardrailBlockedError:
-                raise
-            finally:
-                latency_boundary = (time.perf_counter() - start_boundary) * 1000.0
-                self._log_sync_check(
-                    layer="boundary",
-                    verdict="pass" if boundary_passed else "fail",
-                    latency_ms=latency_boundary,
-                    chunk_index=chunk_idx,
-                )
-
-            # Regex check
-            start_regex = time.perf_counter()
-            regex_passed = not detect_pii(chunk)
-            latency_regex = (time.perf_counter() - start_regex) * 1000.0
-            self._log_sync_check(
-                layer="regex",
-                verdict="pass" if regex_passed else "fail",
-                latency_ms=latency_regex,
-                chunk_index=chunk_idx,
+        self.buffer.add_token(token)
+        normalized = self.buffer.normalized
+        match = deterministic_pii_match(normalized)
+        if match:
+            self._block(match)
+        if self.buffer.raw_utf8_bytes > 8192:
+            self.buffer.flush()
+            raise OutputGuardrailBlockedError(
+                self.partial_response, "deterministic", "pending output overflow"
             )
-
-            if not regex_passed:
-                raise OutputGuardrailBlockedError(
-                    partial_response=self.partial_response,
-                    layer="regex",
-                    rule="PII detection",
-                    message="Output safety violation: PII detected.",
-                )
-
-            if not self.nemo_service:
-                raise OutputGuardrailBlockedError(
-                    partial_response=self.partial_response,
-                    layer="nemo",
-                    rule="Safety check unavailable.",
-                    message="Safety check unavailable.",
-                )
-
-            # If it is the first chunk, validate it immediately (unavoidable latency)
-            if not self.partial_response:
-                start_nemo = time.perf_counter()
-                try:
-                    is_safe, reason = await self.nemo_service.validate_output_chunk(chunk)
-                except Exception as e:
-                    is_safe, reason = False, f"Exception: {e}"
-                    raise OutputGuardrailBlockedError(
-                        partial_response=self.partial_response,
-                        layer="nemo",
-                        rule="Safety check unavailable.",
-                        message="Safety check unavailable.",
-                    ) from e
-                finally:
-                    latency_nemo = (time.perf_counter() - start_nemo) * 1000.0
-                    self._log_sync_check(
-                        layer="nemo",
-                        verdict="pass" if is_safe else "fail",
-                        latency_ms=latency_nemo,
-                        chunk_index=chunk_idx,
-                    )
-                if not is_safe:
-                    raise OutputGuardrailBlockedError(
-                        partial_response=self.partial_response,
-                        layer="nemo",
-                        rule=reason or "Output safety violation.",
-                        message=reason or "Output safety violation.",
-                    )
-                self.partial_response += chunk
-                yield chunk
-            else:
-                # Chunks 2+: start validation concurrently in background
-                self.pending_chunk = chunk
-                self.pending_validation_task = asyncio.create_task(
-                    self._validate_chunk_async_wrapper(chunk, chunk_idx)
-                )
+        safe = self._release()
+        if safe:
+            self.partial_response += safe
+            yield safe
 
     async def flush(self) -> AsyncGenerator[str, None]:
-        """
-        Flushes the remaining buffered tokens and validates the final chunk.
-        """
-        if not getattr(self.config, "enabled", True):
+        if _is_output_guardrail_disabled(self.config):
             return
-
-        chunk = self.buffer.flush()
-        if chunk:
-            self.chunk_index += 1
-            chunk_idx = self.chunk_index
-
-            # If we had a pending validation, await it now
-            if self.pending_validation_task:
-                try:
-                    is_safe, reason = await self.pending_validation_task
-                    if not is_safe:
-                        raise OutputGuardrailBlockedError(
-                            partial_response=self.partial_response,
-                            layer="nemo",
-                            rule=reason or "Output safety violation.",
-                            message=reason or "Output safety violation.",
-                        )
-                except OutputGuardrailBlockedError:
-                    raise
-                except Exception as e:
-                    raise OutputGuardrailBlockedError(
-                        partial_response=self.partial_response,
-                        layer="nemo",
-                        rule="Safety check unavailable.",
-                        message="Safety check unavailable.",
-                    ) from e
-                self.partial_response += self.pending_chunk
-                yield self.pending_chunk
-                self.pending_validation_task = None
-                self.pending_chunk = None
-
-            # Boundary PII check for the final chunk
-            context = self.partial_response + (self.pending_chunk or "")
-            start_boundary = time.perf_counter()
-            boundary_passed = False
-            try:
-                self._check_boundary_pii(chunk, context)
-                boundary_passed = True
-            except OutputGuardrailBlockedError:
-                raise
-            finally:
-                latency_boundary = (time.perf_counter() - start_boundary) * 1000.0
-                self._log_sync_check(
-                    layer="boundary",
-                    verdict="pass" if boundary_passed else "fail",
-                    latency_ms=latency_boundary,
-                    chunk_index=chunk_idx,
-                )
-
-            # Regex check
-            start_regex = time.perf_counter()
-            regex_passed = not detect_pii(chunk)
-            latency_regex = (time.perf_counter() - start_regex) * 1000.0
-            self._log_sync_check(
-                layer="regex",
-                verdict="pass" if regex_passed else "fail",
-                latency_ms=latency_regex,
-                chunk_index=chunk_idx,
+        match = deterministic_pii_match(self.buffer.normalized)
+        if match:
+            self._block(match)
+        if self.buffer.raw_utf8_bytes > 8192:
+            self.buffer.flush()
+            raise OutputGuardrailBlockedError(
+                self.partial_response, "deterministic", "pending output overflow"
             )
-
-            if not regex_passed:
-                raise OutputGuardrailBlockedError(
-                    partial_response=self.partial_response,
-                    layer="regex",
-                    rule="PII detection",
-                    message="Output safety violation: PII detected.",
-                )
-
-            if not self.nemo_service:
-                raise OutputGuardrailBlockedError(
-                    partial_response=self.partial_response,
-                    layer="nemo",
-                    rule="Safety check unavailable.",
-                    message="Safety check unavailable.",
-                )
-
-            # Final chunk must be validated immediately
-            start_nemo = time.perf_counter()
-            try:
-                is_safe, reason = await self.nemo_service.validate_output_chunk(chunk)
-            except Exception as e:
-                is_safe, reason = False, f"Exception: {e}"
-                raise OutputGuardrailBlockedError(
-                    partial_response=self.partial_response,
-                    layer="nemo",
-                    rule="Safety check unavailable.",
-                    message="Safety check unavailable.",
-                ) from e
-            finally:
-                latency_nemo = (time.perf_counter() - start_nemo) * 1000.0
-                self._log_sync_check(
-                    layer="nemo",
-                    verdict="pass" if is_safe else "fail",
-                    latency_ms=latency_nemo,
-                    chunk_index=chunk_idx,
-                )
-
-            if not is_safe:
-                raise OutputGuardrailBlockedError(
-                    partial_response=self.partial_response,
-                    layer="nemo",
-                    rule=reason or "Output safety violation.",
-                    message=reason or "Output safety violation.",
-                )
-            self.partial_response += chunk
-            yield chunk
-
-        else:
-            # If no new final chunk, but we still have a pending validation, await it
-            if self.pending_validation_task:
-                try:
-                    is_safe, reason = await self.pending_validation_task
-                    if not is_safe:
-                        raise OutputGuardrailBlockedError(
-                            partial_response=self.partial_response,
-                            layer="nemo",
-                            rule=reason or "Output safety violation.",
-                            message=reason or "Output safety violation.",
-                        )
-                except OutputGuardrailBlockedError:
-                    raise
-                except Exception as e:
-                    raise OutputGuardrailBlockedError(
-                        partial_response=self.partial_response,
-                        layer="nemo",
-                        rule="Safety check unavailable.",
-                        message="Safety check unavailable.",
-                    ) from e
-                self.partial_response += self.pending_chunk
-                yield self.pending_chunk
-                self.pending_validation_task = None
-                self.pending_chunk = None
+        safe = self.buffer.flush()
+        if safe:
+            self.partial_response += safe
+            yield safe
 
     async def aclose(self) -> None:
-        """
-        Cancels and cleans up any background validation tasks.
-        """
-        task = self.pending_validation_task
-        self.pending_validation_task = None
-        self.pending_chunk = None
-
-        if task:
-            if not task.done():
-                task.cancel()
-            try:
-                await task
-            except asyncio.CancelledError:
-                pass
-            except Exception as e:  # noqa: BLE001
-                logger = logging.getLogger("agent.guardrails")
-                logger.warning(
-                    f"Background validation task encountered error during cleanup: {e!s}"
-                )
+        self.closed = True
+        self.buffer.flush()

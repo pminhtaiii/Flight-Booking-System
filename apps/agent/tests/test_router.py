@@ -42,7 +42,7 @@ async def test_strict_router_output(base_state):
 
 @pytest.mark.asyncio
 async def test_router_malformed_output(base_state):
-    """Test that malformed output falls back to Travel Assistant (SEARCH intent)."""
+    """Test that malformed output is surfaced for fail-closed graph routing."""
     with patch("agent.graph.router.get_chat_model") as mock_get_model:
         mock_llm = MagicMock()
         mock_with_structured = AsyncMock()
@@ -51,10 +51,10 @@ async def test_router_malformed_output(base_state):
         mock_llm.with_structured_output.return_value = mock_with_structured
         mock_get_model.return_value = mock_llm
 
-        decision = await invoke_router(base_state)
-
-        assert isinstance(decision, RouteDecision)
-        assert decision.intent in ["SEARCH", "BOOKING_INQUIRY"]  # Travel Assistant intents
+        # User-authorized correction (2026-09-08): malformed output must no longer
+        # synthesize SEARCH authority; router_node converts this into static clarification.
+        with pytest.raises(RuntimeError, match="Router output rejected"):
+            await invoke_router(base_state)
 
 
 @pytest.mark.asyncio
@@ -76,3 +76,17 @@ async def test_router_confidence_bound(base_state):
         assert isinstance(decision, RouteDecision)
         # Should fallback to Travel Assistant (SEARCH/BOOKING_INQUIRY) due to low confidence
         assert decision.intent in ["SEARCH", "BOOKING_INQUIRY"]
+        assert decision.confidence == 0.1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "messages",
+    [[], [MagicMock(type="ai", content="not a user message")]],
+)
+async def test_router_missing_or_non_human_input_fails_closed(messages):
+    """Missing trusted human input must not synthesize SEARCH authority."""
+    state: AgentState = {"messages": messages}
+
+    with pytest.raises(RuntimeError, match="Router input rejected"):
+        await invoke_router(state)

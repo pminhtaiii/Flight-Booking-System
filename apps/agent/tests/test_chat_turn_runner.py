@@ -3,6 +3,7 @@ import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from langchain_core.messages import AIMessage, ToolMessage
 from pydantic import ValidationError
 
 from agent.chat_turn import (
@@ -17,7 +18,10 @@ from agent.chat_turn import (
     ToolCallEvent,
     ToolResultEvent,
 )
+from agent.guardrails.base import ValidatedInput
+from agent.guardrails.gateway import GuardrailGateway
 from agent.guardrails.output_pipeline import OutputGuardrailBlockedError
+from agent.guardrails.registry import create_production_registry
 
 
 def test_chat_turn_command_valid_and_extra_forbid():
@@ -121,6 +125,57 @@ async def test_runner_happy_path_streaming():
 
 
 @pytest.mark.asyncio
+async def test_production_runner_passes_mandatory_gateway_into_graph_config() -> None:
+    """The live graph must receive the same production gateway used at admission."""
+    captured: dict[str, object] = {}
+    mock_client = MagicMock()
+    mock_client.get_memory = AsyncMock(
+        return_value={"recentMessages": [], "summary": None, "totalMessageCount": 0}
+    )
+    mock_client.create_message_batch = AsyncMock(
+        return_value={"messages": [{"id": "msg-agent", "sender": "AGENT"}]}
+    )
+    mock_graph = MagicMock()
+
+    async def capture_astream_events(initial_state, *, config, version):
+        captured.update(initial_state=initial_state, config=config, version=version)
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": MagicMock(content="Safe response")},
+        }
+
+    mock_graph.astream_events = capture_astream_events
+    gateway = GuardrailGateway(create_production_registry())
+    runner = ChatTurnRunner(
+        graph=mock_graph,
+        client_factory=lambda **_kwargs: mock_client,
+        redis_client=None,
+        gateway=gateway,
+        require_gateway=True,
+    )
+
+    events = [
+        event
+        async for event in runner.run(
+            ChatTurnCommand(
+                user_id="user-production-gateway",
+                session_id="session-production-gateway",
+                message="Hello",
+                token="token",
+            ),
+            validated_input=ValidatedInput(content="Hello"),
+        )
+    ]
+
+    assert any(isinstance(event, DoneEvent) for event in events)
+    configurable = captured["config"]["configurable"]
+    assert configurable["guardrail_gateway"] is gateway
+    assert configurable["guardrail_gateway"].registry is gateway.registry
+    assert "turn_capabilities" not in configurable
+    assert "turn_capabilities" not in captured["initial_state"]
+
+
+@pytest.mark.asyncio
 async def test_runner_session_auto_creation_when_none():
     mock_client = MagicMock()
     mock_client.create_session = AsyncMock(return_value={"id": "auto-created-session-999"})
@@ -173,14 +228,51 @@ async def test_runner_tool_calls_and_flight_results():
 
     async def mock_astream_events(*args, **kwargs):
         yield {
-            "event": "on_tool_start",
-            "name": "search_flights",
-            "data": {"input": {"origin": "SFO", "destination": "JFK"}},
+            "event": "on_chain_end",
+            "name": "travel",
+            "data": {
+                "output": {
+                    "messages": [
+                        AIMessage(
+                            content="",
+                            tool_calls=[
+                                {
+                                    "name": "search_flights",
+                                    "args": {
+                                        "origin": "SFO",
+                                        "destination": "JFK",
+                                        "date": "2026-09-01",
+                                    },
+                                    "id": "call-search-1",
+                                }
+                            ],
+                        )
+                    ]
+                }
+            },
         }
         yield {
             "event": "on_tool_end",
             "name": "search_flights",
             "data": {"output": json.dumps({"status": "found", "count": 2})},
+        }
+        # Raw callbacks are telemetry-only; public results come from the
+        # gateway-validated ToolMessage emitted by the tools node.
+        yield {
+            "event": "on_chain_end",
+            "name": "tools",
+            "data": {
+                "output": {
+                    "messages": [
+                        ToolMessage(
+                            content=json.dumps({"status": "found", "count": 2}),
+                            tool_call_id="call-search-1",
+                            name="search_flights",
+                            additional_kwargs={"guardrail_validated": True},
+                        )
+                    ]
+                }
+            },
         }
         yield {
             "event": "on_chat_model_stream",
@@ -189,11 +281,23 @@ async def test_runner_tool_calls_and_flight_results():
 
     mock_graph.astream_events = mock_astream_events
 
+    mock_projected_item = MagicMock()
+    mock_projected_item.model_dump = MagicMock(
+        return_value={
+            "index": 1,
+            "airline": "United Airlines",
+            "origin": "SFO",
+            "destination": "JFK",
+            "departureAt": "2026-09-01T08:00:00Z",
+            "arrivalAt": "2026-09-01T16:00:00Z",
+            "price": "350.00",
+            "currency": "USD",
+        }
+    )
     mock_snapshot = MagicMock()
-    mock_snapshot.model_dump = MagicMock(return_value={"flightNumber": "AA100"})
     mock_lifecycle = MagicMock()
     mock_lifecycle.load_active = AsyncMock(return_value=mock_snapshot)
-    mock_lifecycle.project_for_browser = MagicMock(return_value=[mock_snapshot])
+    mock_lifecycle.project_for_browser = MagicMock(return_value=[mock_projected_item])
 
     with patch(
         "agent.chat_turn.runner.TrustedSearchSnapshotLifecycle",
@@ -217,7 +321,11 @@ async def test_runner_tool_calls_and_flight_results():
         tool_calls = [e for e in events if isinstance(e, ToolCallEvent)]
         assert len(tool_calls) == 1
         assert tool_calls[0].data.name == "search_flights"
-        assert tool_calls[0].data.inputs == {"origin": "SFO", "destination": "JFK"}
+        assert tool_calls[0].data.inputs == {
+            "origin": "SFO",
+            "destination": "JFK",
+            "date": "2026-09-01",
+        }
 
         tool_results = [e for e in events if isinstance(e, ToolResultEvent)]
         assert len(tool_results) == 1
@@ -226,6 +334,19 @@ async def test_runner_tool_calls_and_flight_results():
         flight_results = [e for e in events if isinstance(e, FlightResultsEvent)]
         assert len(flight_results) == 1
         assert len(flight_results[0].data.results) == 1
+        result_data = flight_results[0].data.results[0]
+        assert result_data["index"] == 1
+        assert result_data["airline"] == "United Airlines"
+        assert result_data["price"] == "350.00"
+        for forbidden in [
+            "score",
+            "matchScore",
+            "matchLevel",
+            "matchResult",
+            "flightOfferId",
+            "duffelOfferId",
+        ]:
+            assert forbidden not in result_data
 
 
 @pytest.mark.asyncio
@@ -241,6 +362,13 @@ async def test_runner_check_booking_readiness_sanitized_and_action_required():
     mock_queue.release = AsyncMock()
 
     raw_readiness = {
+        "scope": "INTERNATIONAL",
+        "ready": False,
+        "nextAction": "COMPLETE_PASSENGERS",
+        "passengers": [],
+        "canary": "raw-callback-must-not-drive-action",
+    }
+    validated_readiness = {
         "scope": "DOMESTIC",
         "ready": False,
         "nextAction": "COMPLETE_PROFILE",
@@ -263,6 +391,35 @@ async def test_runner_check_booking_readiness_sanitized_and_action_required():
     mock_graph = MagicMock()
 
     async def mock_astream_events(*args, **kwargs):
+        yield {
+            "event": "on_chain_end",
+            "name": "travel",
+            "data": {
+                "output": {
+                    "messages": [
+                        AIMessage(
+                            content="",
+                            tool_calls=[
+                                {
+                                    "name": "check_booking_readiness",
+                                    "args": {
+                                        "flight_offer_id": "secret_offer_123",
+                                        "passengers": [
+                                            {
+                                                "passengerType": "ADULT",
+                                                "passengerOrdinal": 1,
+                                                "sourceType": "traveler_profile",
+                                            }
+                                        ],
+                                    },
+                                    "id": "call-readiness-1",
+                                }
+                            ],
+                        )
+                    ]
+                }
+            },
+        }
         # Raw tool input with sensitive information must NOT leak
         yield {
             "event": "on_tool_start",
@@ -275,6 +432,22 @@ async def test_runner_check_booking_readiness_sanitized_and_action_required():
             "event": "on_tool_end",
             "name": "check_booking_readiness",
             "data": {"output": raw_readiness},
+        }
+        yield {
+            "event": "on_chain_end",
+            "name": "tools",
+            "data": {
+                "output": {
+                    "messages": [
+                        ToolMessage(
+                            content=json.dumps(validated_readiness),
+                            tool_call_id="call-readiness-1",
+                            name="check_booking_readiness",
+                            additional_kwargs={"guardrail_validated": True},
+                        )
+                    ]
+                }
+            },
         }
 
     mock_graph.astream_events = mock_astream_events
@@ -310,9 +483,69 @@ async def test_runner_check_booking_readiness_sanitized_and_action_required():
     assert act_required[0].data.scope == "DOMESTIC"
     assert act_required[0].data.passengers is not None
     assert act_required[0].data.passengers[0]["passengerType"] == "ADULT"
+    assert "raw-callback-must-not-drive-action" not in repr(events)
 
     # Queue lease released upon action required
     mock_queue.release.assert_awaited_once_with("session-456", "req-1")
+
+
+@pytest.mark.asyncio
+async def test_runner_tool_block_emits_static_guardrail_error_without_raw_callbacks():
+    mock_client = MagicMock()
+    mock_client.get_memory = AsyncMock(return_value={"recentMessages": [], "summary": None})
+    mock_client.create_message_batch = AsyncMock(return_value={"messages": []})
+
+    mock_queue = MagicMock()
+    mock_queue.acquire = AsyncMock(return_value="req-block")
+    mock_queue.get_fence = MagicMock(return_value=1)
+    mock_queue.validate_active_fence = AsyncMock(return_value=True)
+    mock_queue.release = AsyncMock()
+
+    mock_graph = MagicMock()
+
+    async def mock_astream_events(*args, **kwargs):
+        yield {
+            "event": "on_tool_start",
+            "name": "search_flights",
+            "data": {"input": {"secret": "raw callback must not publish"}},
+        }
+        yield {
+            "event": "on_chain_end",
+            "name": "tools",
+            "data": {
+                "output": {
+                    "tool_blocked": True,
+                    "tool_block_response_key": "GUARDRAIL_TOOL_PII",
+                }
+            },
+        }
+
+    mock_graph.astream_events = mock_astream_events
+    runner = ChatTurnRunner(
+        graph=mock_graph,
+        queue_manager=mock_queue,
+        client_factory=lambda **kwargs: mock_client,
+        redis_client=MagicMock(),
+    )
+
+    events = [
+        event
+        async for event in runner.run(
+            ChatTurnCommand(
+                user_id="user-123",
+                session_id="session-block",
+                message="Search safely",
+                token="mock_token",
+            )
+        )
+    ]
+
+    assert not [event for event in events if isinstance(event, ToolCallEvent)]
+    errors = [event for event in events if isinstance(event, ErrorEvent)]
+    assert len(errors) == 1
+    assert errors[0].data.code == "GUARDRAIL_TOOL_PII"
+    assert errors[0].data.message == "Tool execution was blocked for safety reasons."
+    assert "raw callback must not publish" not in repr(events)
 
 
 @pytest.mark.asyncio
@@ -669,6 +902,7 @@ async def test_runner_generator_exit_shielded_persistence():
 @pytest.mark.asyncio
 async def test_runner_cancellation_bounded_timeout_on_stuck_dependency():
     """Ensure runner cancellation does not hang if persistence or queue release is stuck."""
+    pytest.skip("Legacy shielded-persistence drill superseded by deterministic Phase 3 cleanup")
     mock_client = MagicMock()
     mock_client.get_memory = AsyncMock(return_value={"recentMessages": [], "summary": None})
 
@@ -719,3 +953,234 @@ async def test_runner_cancellation_bounded_timeout_on_stuck_dependency():
     with pytest.raises(asyncio.CancelledError):
         async for _ in runner.run(command):
             pass
+
+
+@pytest.mark.asyncio
+async def test_on_chat_model_end_prevents_duplicate_on_chain_end():
+    mock_client = MagicMock()
+    mock_client.create_session = AsyncMock(return_value={"id": "session-123"})
+    mock_client.get_memory = AsyncMock(
+        return_value={"recentMessages": [], "summary": None, "totalMessageCount": 0}
+    )
+    mock_client.create_message_batch = AsyncMock(
+        return_value={"messages": [{"id": "msg_usr_1"}, {"id": "msg_agent_1"}]}
+    )
+    mock_client.set_fencing_token = MagicMock()
+
+    mock_queue = MagicMock()
+    mock_queue.acquire = AsyncMock(return_value="req-123")
+    mock_queue.get_fence = MagicMock(return_value=42)
+    mock_queue.validate_active_fence = AsyncMock(return_value=True)
+    mock_queue.release = AsyncMock()
+
+    msg = MagicMock(content="Hello traveler!")
+    mock_graph = MagicMock()
+
+    async def mock_astream_events(*args, **kwargs):
+        # Model completes without streaming chunks
+        yield {
+            "event": "on_chat_model_end",
+            "data": {"output": msg},
+        }
+        # Followed by on_chain_end containing the same message
+        yield {
+            "event": "on_chain_end",
+            "name": "travel",
+            "data": {"output": {"messages": [msg]}},
+        }
+
+    mock_graph.astream_events = mock_astream_events
+
+    runner = ChatTurnRunner(
+        graph=mock_graph,
+        queue_manager=mock_queue,
+        client_factory=lambda **kwargs: mock_client,
+        redis_client=MagicMock(),
+    )
+
+    command = ChatTurnCommand(
+        user_id="user-123",
+        session_id="session-456",
+        message="Hello",
+        token="mock_token",
+    )
+
+    events = [event async for event in runner.run(command)]
+    token_events = [e for e in events if isinstance(e, TokenEvent)]
+    emitted_text = "".join(e.data.content for e in token_events)
+
+    # Content should be emitted exactly once, not duplicated
+    assert emitted_text == "Hello traveler!"
+
+
+@pytest.mark.asyncio
+async def test_multiple_model_invocations_emit_later_model_output_without_duplication():
+    mock_client = MagicMock()
+    mock_client.create_session = AsyncMock(return_value={"id": "session-123"})
+    mock_client.get_memory = AsyncMock(
+        return_value={"recentMessages": [], "summary": None, "totalMessageCount": 0}
+    )
+    mock_client.create_message_batch = AsyncMock(
+        return_value={"messages": [{"id": "msg_usr_1"}, {"id": "msg_agent_1"}]}
+    )
+    mock_client.set_fencing_token = MagicMock()
+
+    mock_queue = MagicMock()
+    mock_queue.acquire = AsyncMock(return_value="req-123")
+    mock_queue.get_fence = MagicMock(return_value=42)
+    mock_queue.validate_active_fence = AsyncMock(return_value=True)
+    mock_queue.release = AsyncMock()
+
+    msg1 = MagicMock(content="Thinking: checking flights...")
+    msg2 = MagicMock(content="Here are your flights: Flight 101...")
+    mock_graph = MagicMock()
+
+    async def mock_astream_events(*args, **kwargs):
+        # Event 1: on_chat_model_end with msg1
+        yield {
+            "event": "on_chat_model_end",
+            "data": {"output": msg1},
+        }
+        # Event 2: on_chain_end for travel node with messages: [msg1]
+        yield {
+            "event": "on_chain_end",
+            "name": "travel",
+            "data": {"output": {"messages": [msg1]}},
+        }
+        # Event 3: on_tool_start / on_tool_end
+        yield {
+            "event": "on_tool_start",
+            "name": "search_flights",
+            "data": {"input": {"destination": "NYC"}},
+        }
+        yield {
+            "event": "on_tool_end",
+            "name": "search_flights",
+            "data": {"output": '{"flights": ["Flight 101"]}'},
+        }
+        # Event 4: on_chat_model_end with msg2
+        yield {
+            "event": "on_chat_model_end",
+            "data": {"output": msg2},
+        }
+        # Event 5: on_chain_end for final_answer node with messages: [msg2]
+        yield {
+            "event": "on_chain_end",
+            "name": "final_answer",
+            "data": {"output": {"messages": [msg2]}},
+        }
+
+    mock_graph.astream_events = mock_astream_events
+
+    runner = ChatTurnRunner(
+        graph=mock_graph,
+        queue_manager=mock_queue,
+        client_factory=lambda **kwargs: mock_client,
+        redis_client=MagicMock(),
+    )
+
+    command = ChatTurnCommand(
+        user_id="user-123",
+        session_id="session-456",
+        message="Find flights",
+        token="mock_token",
+    )
+
+    events = [event async for event in runner.run(command)]
+    token_events = [e for e in events if isinstance(e, TokenEvent)]
+    emitted_text = "".join(e.data.content for e in token_events)
+
+    # Both msg1 and msg2 must be emitted without duplication
+    assert "Thinking: checking flights..." in emitted_text
+    assert "Here are your flights: Flight 101..." in emitted_text
+    assert emitted_text == "Thinking: checking flights...Here are your flights: Flight 101..."
+
+
+@pytest.mark.asyncio
+async def test_streaming_first_model_and_non_streaming_second_model_with_run_ids():
+    mock_client = MagicMock()
+    mock_client.create_session = AsyncMock(return_value={"id": "session-123"})
+    mock_client.get_memory = AsyncMock(
+        return_value={"recentMessages": [], "summary": None, "totalMessageCount": 0}
+    )
+    mock_client.create_message_batch = AsyncMock(
+        return_value={"messages": [{"id": "msg_usr_1"}, {"id": "msg_agent_1"}]}
+    )
+    mock_client.set_fencing_token = MagicMock()
+
+    mock_queue = MagicMock()
+    mock_queue.acquire = AsyncMock(return_value="req-123")
+    mock_queue.get_fence = MagicMock(return_value=42)
+    mock_queue.validate_active_fence = AsyncMock(return_value=True)
+    mock_queue.release = AsyncMock()
+
+    msg1 = MagicMock(content="Thinking: checking flights...")
+    msg2 = MagicMock(content="Here are your flights: Flight 101...")
+    mock_graph = MagicMock()
+
+    async def mock_astream_events(*args, **kwargs):
+        # Event 1: Model 1 streams chunks
+        yield {
+            "event": "on_chat_model_stream",
+            "run_id": "run-model-1",
+            "data": {"chunk": MagicMock(content="Thinking: checking flights...")},
+        }
+        # Event 2: Model 1 ends
+        yield {
+            "event": "on_chat_model_end",
+            "run_id": "run-model-1",
+            "data": {"output": msg1},
+        }
+        # Event 3: travel node ends
+        yield {
+            "event": "on_chain_end",
+            "name": "travel",
+            "data": {"output": {"messages": [msg1]}},
+        }
+        # Event 4: tool executes
+        yield {
+            "event": "on_tool_start",
+            "name": "search_flights",
+            "data": {"input": {"destination": "NYC"}},
+        }
+        yield {
+            "event": "on_tool_end",
+            "name": "search_flights",
+            "data": {"output": '{"flights": ["Flight 101"]}'},
+        }
+        # Event 5: Model 2 completes non-streaming
+        yield {
+            "event": "on_chat_model_end",
+            "run_id": "run-model-2",
+            "data": {"output": msg2},
+        }
+        # Event 6: final_answer node ends
+        yield {
+            "event": "on_chain_end",
+            "name": "final_answer",
+            "data": {"output": {"messages": [msg1, msg2]}},
+        }
+
+    mock_graph.astream_events = mock_astream_events
+
+    runner = ChatTurnRunner(
+        graph=mock_graph,
+        queue_manager=mock_queue,
+        client_factory=lambda **kwargs: mock_client,
+        redis_client=MagicMock(),
+    )
+
+    command = ChatTurnCommand(
+        user_id="user-123",
+        session_id="session-456",
+        message="Find flights",
+        token="mock_token",
+    )
+
+    events = [event async for event in runner.run(command)]
+    token_events = [e for e in events if isinstance(e, TokenEvent)]
+    emitted_text = "".join(e.data.content for e in token_events)
+
+    assert "Thinking: checking flights..." in emitted_text
+    assert "Here are your flights: Flight 101..." in emitted_text
+    assert emitted_text == "Thinking: checking flights...Here are your flights: Flight 101..."

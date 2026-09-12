@@ -11,6 +11,8 @@ from langchain_core.runnables import RunnableConfig
 from agent.graph.graph import graph, router_node
 from agent.graph.nodes import create_handoff_token
 from agent.graph.state import AgentState
+from agent.guardrails.gateway import GuardrailGateway
+from agent.guardrails.registry import create_production_registry
 from agent.main import app
 from agent.models.requests import RouteDecision
 from agent.tools.nestjs_client import NestJSClient
@@ -169,6 +171,10 @@ async def test_step1_rollback_sse_stream_emits_no_action_handoff_on_disabled_fla
     headers = get_auth_headers()
 
     trusted_snapshot = {
+        # User-approved CI fixture correction (2026-09-09): trusted snapshots
+        # must identify the authenticated owner and session for handoff validation.
+        "userId": "12345",
+        "sessionId": "session-step1-rollback",
         "version": 1,
         "attestation": "test_attestation_token",
         "fingerprint": "test_fingerprint",
@@ -199,7 +205,7 @@ async def test_step1_rollback_sse_stream_emits_no_action_handoff_on_disabled_fla
         def bind_tools(self, tools: Any, **kwargs: Any) -> Any:
             return self
 
-        def _generate(self, messages: List[BaseMessage], **kwargs: Any) -> ChatResult:
+        def _generate(self, messages: List[BaseMessage], *args: Any, **kwargs: Any) -> ChatResult:
             resp = self.responses.pop(0) if self.responses else AIMessage(content="Hello")
             return ChatResult(generations=[ChatGeneration(message=resp)])
 
@@ -239,14 +245,25 @@ async def test_step1_rollback_sse_stream_emits_no_action_handoff_on_disabled_fla
 
     mock_snapshot_obj = MagicMock()
     mock_snapshot_obj.model_dump.return_value = trusted_snapshot
+    from agent.config import get_settings as load_settings
+
+    graph_settings = load_settings().model_copy(
+        update={"FEATURE_FLAG_CHAT_MULTI_AGENT": True, "AGENT_MAX_ITERATIONS": 5}
+    )
 
     with (
         patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client),
         patch("agent.agents.chat_agent.ChatOpenAI", return_value=llm),
         patch(
             "agent.graph.graph.invoke_router",
-            return_value=RouteDecision(intent="CHECKOUT", confidence=1.0, isCommitment=True),
+            return_value=RouteDecision(
+                intent="CHECKOUT",
+                confidence=1.0,
+                isCommitment=True,
+                selectionIndex=1,
+            ),
         ),
+        patch("agent.graph.graph.agent_config.get_settings", return_value=graph_settings),
         patch("agent.graph.nodes.get_settings") as mock_settings,
         patch(
             "agent.streaming.sse.TrustedSnapshotRepository.get_snapshot",
@@ -254,6 +271,9 @@ async def test_step1_rollback_sse_stream_emits_no_action_handoff_on_disabled_fla
             return_value=mock_snapshot_obj,
         ),
     ):
+        # User-authorized CI fixture correction (2026-09-08): this test
+        # exercises the handoff-issuance rollback, so keep the independent
+        # multi-agent rollback enabled and allow checkout routing to run.
         mock_settings.return_value.FEATURE_FLAG_CHAT_HANDOFF_ISSUE = False
         mock_settings.return_value.FEATURE_FLAG_CHAT_HANDOFF_ACCEPT = True
         mock_settings.return_value.AGENT_MAX_ITERATIONS = 5
@@ -311,14 +331,21 @@ async def test_step2_rollback_router_node_bypasses_router_llm():
     config = RunnableConfig(configurable={"thread_id": "test_thread_rollback_3"})
 
     with (
-        patch("agent.graph.graph.get_settings") as mock_settings,
+        patch("agent.graph.graph.agent_config.get_settings") as mock_settings,
         patch("agent.graph.graph.invoke_router") as mock_invoke_router,
     ):
         mock_settings.return_value.FEATURE_FLAG_CHAT_MULTI_AGENT = False
 
         decision = await router_node(state, config)
 
-        assert decision == {"route": "travel", "disambiguation": None}
+        assert decision["route"] == "travel"
+        # User-approved CI fixture correction (2026-09-09): single-agent
+        # routing uses the canonical "none" disambiguation value.
+        assert decision["disambiguation"] == "none"
+        capabilities = decision["turn_capabilities"]
+        assert capabilities.is_sealed is True
+        assert capabilities.provenance == "trusted_router_single_agent"
+        assert "search_flights" in capabilities.sealed_tools
         mock_invoke_router.assert_not_called()
 
 
@@ -379,12 +406,13 @@ async def test_step2_rollback_single_agent_flight_search_succeeds(mock_nestjs_cl
             "nestjs_client": mock_nestjs_client,
             "thread_id": "test_thread_single_agent_search",
             "user_id": "user_single_agent_1",
+            "guardrail_gateway": GuardrailGateway(create_production_registry()),
         }
     )
 
     with (
         patch("agent.agents.chat_agent.ChatOpenAI", return_value=mock_model),
-        patch("agent.graph.graph.get_settings") as mock_graph_settings,
+        patch("agent.graph.graph.agent_config.get_settings") as mock_graph_settings,
         patch("agent.graph.graph.invoke_router") as mock_invoke_router,
     ):
         mock_graph_settings.return_value.FEATURE_FLAG_CHAT_MULTI_AGENT = False
@@ -454,12 +482,13 @@ async def test_step2_rollback_single_agent_preference_query_succeeds(mock_nestjs
             "nestjs_client": mock_nestjs_client,
             "thread_id": "test_thread_single_agent_prefs",
             "user_id": "user_single_agent_2",
+            "guardrail_gateway": GuardrailGateway(create_production_registry()),
         }
     )
 
     with (
         patch("agent.agents.chat_agent.ChatOpenAI", return_value=mock_model),
-        patch("agent.graph.graph.get_settings") as mock_graph_settings,
+        patch("agent.graph.graph.agent_config.get_settings") as mock_graph_settings,
         patch("agent.graph.graph.invoke_router") as mock_invoke_router,
     ):
         mock_graph_settings.return_value.FEATURE_FLAG_CHAT_MULTI_AGENT = False
@@ -506,12 +535,13 @@ async def test_step2_rollback_out_of_bounds_query_no_unhandled_exception(
             "nestjs_client": mock_nestjs_client,
             "thread_id": "test_thread_single_agent_oob",
             "user_id": "user_single_agent_3",
+            "guardrail_gateway": GuardrailGateway(create_production_registry()),
         }
     )
 
     with (
         patch("agent.agents.chat_agent.ChatOpenAI", return_value=mock_model),
-        patch("agent.graph.graph.get_settings") as mock_graph_settings,
+        patch("agent.graph.graph.agent_config.get_settings") as mock_graph_settings,
         patch("agent.graph.graph.invoke_router") as mock_invoke_router,
     ):
         mock_graph_settings.return_value.FEATURE_FLAG_CHAT_MULTI_AGENT = False

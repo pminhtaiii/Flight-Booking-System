@@ -125,8 +125,8 @@ async def test_check_and_summarize_exceeds_budget():
         mock_model.ainvoke.assert_called_once()
         # Verify the prompt includes the older message and existing summary
         called_args = mock_model.ainvoke.call_args[0][0]
-        called_prompt = called_args[0].content
-        assert "Existing Summary:" in called_prompt
+        called_prompt = " ".join(msg.content for msg in called_args)
+        assert "Existing Summary" in called_prompt
         assert "Existing summary" in called_prompt
         assert "very long older message about travel planning to Paris" in called_prompt
 

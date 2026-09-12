@@ -5,6 +5,7 @@ from langgraph.graph import END
 from agent.agents.chat_agent import get_chat_model
 from agent.config import get_settings
 from agent.graph.state import AgentState
+from agent.guardrails.output_pipeline import payload_free_config
 from agent.models.requests import RouteDecision
 from agent.observability.chat_observability import ChatTelemetry
 
@@ -15,38 +16,37 @@ chat_telemetry = ChatTelemetry(logger)
 async def invoke_router(state: AgentState) -> RouteDecision:
     """
     Invoke the Intent Router model to classify the user's latest message.
-    Returns a strict RouteDecision, falling back to Travel Assistant (SEARCH intent)
-    if the output is malformed, unknown, or has low confidence for a non-checkout message.
+    Returns a strict RouteDecision. Missing input and malformed output are surfaced
+    so the graph can fail closed; low-confidence non-checkout input is routed to
+    Travel Assistant while retaining its low-confidence provenance.
     """
     messages = state.get("messages", [])
     if not messages:
-        decision = RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False)
         chat_telemetry.emit_safely(
             "router_decision",
             status="fallback",
             fields={
-                "intent": decision.intent,
-                "confidence_bucket": "high",
+                "intent": "UNKNOWN",
+                "confidence_bucket": "unknown",
                 "outcome": "empty_state",
             },
         )
-        return decision
+        raise RuntimeError("Router input rejected")
 
     last_message = messages[-1]
 
     # We only route HumanMessages.
     if last_message.type != "human":
-        decision = RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False)
         chat_telemetry.emit_safely(
             "router_decision",
             status="fallback",
             fields={
-                "intent": decision.intent,
-                "confidence_bucket": "high",
+                "intent": "UNKNOWN",
+                "confidence_bucket": "unknown",
                 "outcome": "non_human_message",
             },
         )
-        return decision
+        raise RuntimeError("Router input rejected")
 
     model = get_chat_model()
     router_model = model.with_structured_output(RouteDecision)
@@ -59,21 +59,21 @@ async def invoke_router(state: AgentState) -> RouteDecision:
                     "content": "You are an intent classifier. Classify the user's intent into GENERAL, SEARCH, BOOKING_INQUIRY, or CHECKOUT.",
                 },
                 {"role": "user", "content": last_message.content},
-            ]
+            ],
+            config=payload_free_config(),
         )
     except Exception:
         logger.warning("router_output_rejected")
-        decision = RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False)
         chat_telemetry.emit_safely(
             "router_decision",
             status="fallback",
             fields={
-                "intent": decision.intent,
-                "confidence_bucket": "high",
+                "intent": "UNKNOWN",
+                "confidence_bucket": "unknown",
                 "outcome": "malformed_output",
             },
         )
-        return decision
+        raise RuntimeError("Router output rejected") from None
 
     # Check for low confidence fallback
     # The requirement says: "Given low confidence for a non-checkout message... fallback to Travel Assistant"
@@ -82,7 +82,11 @@ async def invoke_router(state: AgentState) -> RouteDecision:
         logger.info(
             "Low confidence router decision for non-checkout message, falling back to SEARCH"
         )
-        fallback = RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False)
+        fallback = RouteDecision(
+            intent="SEARCH",
+            confidence=decision.confidence,
+            isCommitment=False,
+        )
         chat_telemetry.emit_safely(
             "router_decision",
             status="fallback",

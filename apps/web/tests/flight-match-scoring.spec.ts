@@ -3,11 +3,17 @@ import { describe, it } from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-import type { DimensionScore, FlightMatchResult, FlightSearchOfferView } from '@shared/types';
+import type { DimensionScore, FlightMatchResult, FlightSearchMeta, FlightSearchOfferView, FlightSearchOutcome, FlightSearchQuery, FlightSelectionOutcome } from '@shared/types';
 import { FlightMatchBadge } from '../components/search/FlightMatchBadge';
 import { FlightMatchBreakdown } from '../components/search/FlightMatchBreakdown';
 import { FlightRankingBanner } from '../components/search/FlightRankingBanner';
 import { FlightResultsControls } from '../components/search/FlightResultsControls';
+import { FlightResultCard } from '../components/search/FlightResultCard';
+import { FlightResults } from '../components/search/FlightResults';
+import { SearchFormClient } from '../components/search/SearchFormClient';
+import { getInitialValues } from '../lib/search-prefill';
+import { fetchProfileCabinPreference } from '../lib/profile';
+import { formatExplanation } from '../components/search/flight-match-explanations';
 
 describe('FlightMatchBadge (T050)', (): void => {
   const mockEligibleResult = (
@@ -712,11 +718,2128 @@ describe('FlightResultsControls (T052)', (): void => {
       assert.match(html, /border-secondary-border/);
       assert.match(html, /bg-card/);
       assert.match(html, /text-text-primary/);
-      assert.match(html, /focus:border-accent/);
-      assert.match(html, /focus:ring-accent/);
+      assert.match(html, /focus-visible:ring-accent/);
+      assert.match(html, /focus-visible:ring-offset-2/);
       assert.doesNotMatch(html, /#[0-9a-fA-F]{3,6}/);
     });
   });
 });
 
+describe('FlightResultCard (T053)', (): void => {
+  const createMockOffer = (overrides?: Partial<FlightSearchOfferView>): FlightSearchOfferView => ({
+    id: 'offer-delta-101',
+    price: 350,
+    currency: 'USD',
+    airline: 'Delta Air Lines',
+    flightNumber: 'DL1234',
+    origin: 'JFK',
+    destination: 'LAX',
+    departureAt: '2026-10-01T08:30:00Z',
+    arrivalAt: '2026-10-01T11:45:00Z',
+    duration: 'PT3H15M',
+    stops: 0,
+    slices: [
+      {
+        origin: 'JFK',
+        destination: 'LAX',
+        departureAt: '2026-10-01T08:30:00Z',
+        arrivalAt: '2026-10-01T11:45:00Z',
+        duration: 'PT3H15M',
+        stops: 0,
+        segments: [
+          {
+            airline: 'Delta Air Lines',
+            flightNumber: 'DL1234',
+            origin: 'JFK',
+            destination: 'LAX',
+            departureAt: '2026-10-01T08:30:00Z',
+            arrivalAt: '2026-10-01T11:45:00Z',
+            duration: 'PT3H15M',
+            cabinClass: 'economy',
+          },
+        ],
+      },
+    ],
+    ...overrides,
+  });
+
+  const mockEligibleResult = (score = 85): FlightMatchResult => ({
+    eligibility: { eligible: true, violations: [] },
+    score,
+    matchLevel: score >= 75 ? 'STRONG' : 'GOOD',
+    breakdown: [
+      {
+        dimension: 'PRICE',
+        score: 0.9,
+        weight: 0.2,
+        contribution: 0.18,
+        signal: 'POSITIVE',
+        explanation: { key: 'match.price.below_median', params: { percentDiff: 15 } },
+      },
+      {
+        dimension: 'BAGGAGE',
+        score: 1.0,
+        weight: 0.1,
+        contribution: 0.1,
+        signal: 'POSITIVE',
+        explanation: { key: 'match.baggage.checked_included', params: {} },
+      },
+    ],
+    metadata: {
+      scoringVersion: 'flight-match-v1',
+      activeWeights: {
+        PRICE: 0.2,
+        AIRLINE: 0.15,
+        ARRIVAL_SCHEDULE: 0.15,
+        STOPS: 0.12,
+        CABIN: 0.1,
+        DEPARTURE_SCHEDULE: 0.1,
+        BAGGAGE: 0.1,
+        DURATION: 0.08,
+      },
+    },
+  });
+
+  const mockIneligibleResult = (carrier = 'Spirit'): FlightMatchResult => ({
+    eligibility: {
+      eligible: false,
+      violations: [
+        {
+          constraint: 'BLACKLISTED_AIRLINE',
+          explanation: { key: 'constraint.airline.blacklisted', params: { airline: carrier } },
+        },
+      ],
+    },
+    score: null,
+    matchLevel: null,
+    breakdown: [],
+    metadata: {
+      scoringVersion: 'flight-match-v1',
+      activeWeights: {
+        PRICE: 0.2,
+        AIRLINE: 0.15,
+        ARRIVAL_SCHEDULE: 0.15,
+        STOPS: 0.12,
+        CABIN: 0.1,
+        DEPARTURE_SCHEDULE: 0.1,
+        BAGGAGE: 0.1,
+        DURATION: 0.08,
+      },
+    },
+  });
+
+  describe('Flight details presentation', (): void => {
+    it('renders airline, flight number, route, formatted duration, and price', (): void => {
+      const offer = createMockOffer({
+        airline: 'Delta Air Lines',
+        flightNumber: 'DL1234',
+        origin: 'JFK',
+        destination: 'LAX',
+        duration: 'PT3H15M',
+        price: 350,
+        currency: 'USD',
+        stops: 0,
+      });
+
+      const html = renderToStaticMarkup(
+        React.createElement(FlightResultCard, {
+          offer,
+          onSelect: () => {},
+        }),
+      );
+
+      assert.match(html, /Delta Air Lines/);
+      assert.match(html, /DL1234/);
+      assert.match(html, /JFK/);
+      assert.match(html, /LAX/);
+      assert.match(html, /3h 15m/);
+      assert.match(html, /Non-stop/);
+      assert.match(html, /350/);
+      assert.match(html, /USD/);
+    });
+
+    it('renders stop count variations correctly (1 stop, 2 stops)', (): void => {
+      const singleStopOffer = createMockOffer({ stops: 1, duration: 'PT5H30M' });
+      const htmlSingle = renderToStaticMarkup(
+        React.createElement(FlightResultCard, {
+          offer: singleStopOffer,
+          onSelect: () => {},
+        }),
+      );
+      assert.match(htmlSingle, /1 stop/);
+      assert.match(htmlSingle, /5h 30m/);
+
+      const multiStopOffer = createMockOffer({ stops: 2, duration: 'PT8H45M' });
+      const htmlMulti = renderToStaticMarkup(
+        React.createElement(FlightResultCard, {
+          offer: multiStopOffer,
+          onSelect: () => {},
+        }),
+      );
+      assert.match(htmlMulti, /2 stops/);
+      assert.match(htmlMulti, /8h 45m/);
+    });
+
+    it('renders cabin class and baggage allowance', (): void => {
+      const offer = createMockOffer({
+        matchResult: mockEligibleResult(),
+        slices: [
+          {
+            origin: 'JFK',
+            destination: 'LAX',
+            departureAt: '2026-10-01T08:30:00Z',
+            arrivalAt: '2026-10-01T11:45:00Z',
+            duration: 'PT3H15M',
+            stops: 0,
+            segments: [
+              {
+                airline: 'Delta Air Lines',
+                flightNumber: 'DL1234',
+                origin: 'JFK',
+                destination: 'LAX',
+                departureAt: '2026-10-01T08:30:00Z',
+                arrivalAt: '2026-10-01T11:45:00Z',
+                duration: 'PT3H15M',
+                cabinClass: 'business',
+              },
+            ],
+          },
+        ],
+      });
+
+      const html = renderToStaticMarkup(
+        React.createElement(FlightResultCard, {
+          offer,
+          onSelect: () => {},
+        }),
+      );
+
+      assert.match(html, /Business/i);
+      assert.match(html, /Checked bag included/i);
+    });
+
+    it('displays Business for mixed-cabin itinerary with shorter 1st segment in economy (PT1H) and longer 2nd segment in business (PT8H)', (): void => {
+      const mixedCabinOffer = createMockOffer({
+        stops: 1,
+        duration: 'PT9H',
+        slices: [
+          {
+            origin: 'JFK',
+            destination: 'CDG',
+            departureAt: '2026-10-01T08:00:00Z',
+            arrivalAt: '2026-10-01T22:00:00Z',
+            duration: 'PT9H',
+            stops: 1,
+            segments: [
+              {
+                airline: 'Delta Air Lines',
+                flightNumber: 'DL101',
+                origin: 'JFK',
+                destination: 'BOS',
+                departureAt: '2026-10-01T08:00:00Z',
+                arrivalAt: '2026-10-01T09:00:00Z',
+                duration: 'PT1H',
+                cabinClass: 'economy',
+              },
+              {
+                airline: 'Delta Air Lines',
+                flightNumber: 'DL102',
+                origin: 'BOS',
+                destination: 'CDG',
+                departureAt: '2026-10-01T11:00:00Z',
+                arrivalAt: '2026-10-01T22:00:00Z',
+                duration: 'PT8H',
+                cabinClass: 'business',
+              },
+            ],
+          },
+        ],
+      });
+
+      const html = renderToStaticMarkup(
+        React.createElement(FlightResultCard, {
+          offer: mixedCabinOffer,
+          onSelect: () => {},
+        }),
+      );
+
+      assert.match(html, />\s*Business\s*</);
+      assert.doesNotMatch(html, />\s*Economy\s*</);
+    });
+  });
+
+  describe('Embedded match transparency components', (): void => {
+    it('renders FlightMatchBadge and FlightMatchBreakdown when eligible matchResult is present', (): void => {
+      const offer = createMockOffer({ matchResult: mockEligibleResult(85) });
+      const html = renderToStaticMarkup(
+        React.createElement(FlightResultCard, {
+          offer,
+          onSelect: () => {},
+        }),
+      );
+
+      assert.match(html, /85%/);
+      assert.match(html, /Strong Match/i);
+      assert.match(html, /text-text-match-strong/);
+      assert.match(html, /<details/);
+      assert.match(html, /<summary/);
+      assert.match(html, /15% below median price/);
+    });
+
+    it('renders warning badge and breakdown when ineligible matchResult is present', (): void => {
+      const offer = createMockOffer({
+        airline: 'Spirit',
+        matchResult: mockIneligibleResult('Spirit'),
+      });
+      const html = renderToStaticMarkup(
+        React.createElement(FlightResultCard, {
+          offer,
+          onSelect: () => {},
+        }),
+      );
+
+      assert.match(html, /Blacklisted airline \(Spirit\)/);
+      assert.match(html, /text-text-cancelled/);
+      assert.match(html, /<details/);
+    });
+
+    it('renders cleanly with zero match badges or breakdowns when matchResult is null or undefined', (): void => {
+      const offer = createMockOffer({ matchResult: null });
+      const html = renderToStaticMarkup(
+        React.createElement(FlightResultCard, {
+          offer,
+          onSelect: () => {},
+        }),
+      );
+
+      assert.doesNotMatch(html, /\d+%/);
+      assert.doesNotMatch(html, /Strong Match|Good Match|Fair Match|Weak Match/i);
+      assert.doesNotMatch(html, /<details/);
+      assert.doesNotMatch(html, /match score|breakdown/i);
+    });
+  });
+
+  describe('Strict Provider-Blind Invariant & Selection Interaction', (): void => {
+    it('attaches local deterministic ID to DOM attributes and never leaks provider IDs', (): void => {
+      const localId = 'offer-local-deterministic-789';
+      const offer = createMockOffer({ id: localId });
+
+      const html = renderToStaticMarkup(
+        React.createElement(FlightResultCard, {
+          offer,
+          onSelect: () => {},
+        }),
+      );
+
+      assert.match(html, /data-offer-id="offer-local-deterministic-789"/);
+      assert.doesNotMatch(html, /off_[0-9a-zA-Z]+/);
+    });
+
+    it('renders interactive button with disabled state when isSelecting is true', (): void => {
+      const offer = createMockOffer({ id: 'offer-123' });
+
+      const htmlEnabled = renderToStaticMarkup(
+        React.createElement(FlightResultCard, {
+          offer,
+          onSelect: () => {},
+          isSelecting: false,
+        }),
+      );
+      assert.match(htmlEnabled, /<button[^>]*data-offer-id="offer-123"/);
+      assert.doesNotMatch(htmlEnabled, /\sdisabled(?!=:)[=>\s]/);
+
+      const htmlSelecting = renderToStaticMarkup(
+        React.createElement(FlightResultCard, {
+          offer,
+          onSelect: () => {},
+          isSelecting: true,
+        }),
+      );
+      assert.match(htmlSelecting, /\sdisabled(?!=:)[=>\s]/);
+      assert.match(htmlSelecting, /Loading|Selecting/i);
+    });
+
+    it('uses semantic Tailwind classes with zero hardcoded hex colors', (): void => {
+      const offer = createMockOffer({ matchResult: mockEligibleResult() });
+      const html = renderToStaticMarkup(
+        React.createElement(FlightResultCard, {
+          offer,
+          onSelect: () => {},
+          className: 'custom-card-test',
+        }),
+      );
+
+      assert.match(html, /card/);
+      assert.match(html, /text-text-primary/);
+      assert.match(html, /btn-primary/);
+      assert.match(html, /custom-card-test/);
+      assert.doesNotMatch(html, /#[0-9a-fA-F]{3,6}/);
+    });
+  });
+});
+
+describe('FlightResults (T053)', (): void => {
+  const createMockOffer = (
+    id: string,
+    price: number,
+    duration: string,
+    stops: number,
+    departureAt: string,
+    overrides?: Partial<FlightSearchOfferView>,
+  ): FlightSearchOfferView => ({
+    id,
+    price,
+    currency: 'USD',
+    airline: 'Delta Air Lines',
+    flightNumber: 'DL100',
+    origin: 'JFK',
+    destination: 'LAX',
+    departureAt,
+    arrivalAt: '2026-10-01T12:00:00Z',
+    duration,
+    stops,
+    slices: [
+      {
+        origin: 'JFK',
+        destination: 'LAX',
+        departureAt,
+        arrivalAt: '2026-10-01T12:00:00Z',
+        duration,
+        stops,
+        segments: [
+          {
+            airline: 'Delta Air Lines',
+            flightNumber: 'DL100',
+            origin: 'JFK',
+            destination: 'LAX',
+            departureAt,
+            arrivalAt: '2026-10-01T12:00:00Z',
+            duration,
+            cabinClass: 'economy',
+          },
+        ],
+      },
+    ],
+    ...overrides,
+  });
+
+  const offerA = createMockOffer('offer-A', 300, 'PT4H00M', 1, '2026-10-01T10:00:00Z');
+  const offerB = createMockOffer('offer-B', 150, 'PT6H00M', 0, '2026-10-01T08:00:00Z');
+  const offerC = createMockOffer('offer-C', 450, 'PT2H30M', 2, '2026-10-01T06:00:00Z');
+
+  describe('Server canonical ordering preservation', (): void => {
+    it('preserves canonical server order when sortBy is undefined', (): void => {
+      const html = renderToStaticMarkup(
+        React.createElement(FlightResults, {
+          offers: [offerA, offerB, offerC],
+          onSelectFlight: () => {},
+        }),
+      );
+
+      const idxA = html.indexOf('data-offer-id="offer-A"');
+      const idxB = html.indexOf('data-offer-id="offer-B"');
+      const idxC = html.indexOf('data-offer-id="offer-C"');
+
+      assert.ok(idxA !== -1 && idxB !== -1 && idxC !== -1);
+      assert.ok(idxA < idxB, 'Offer A must precede Offer B');
+      assert.ok(idxB < idxC, 'Offer B must precede Offer C');
+    });
+
+    it('preserves canonical server order when sortBy is BEST_MATCH in MATCHED mode', (): void => {
+      const html = renderToStaticMarkup(
+        React.createElement(FlightResults, {
+          offers: [offerA, offerB, offerC],
+          mode: 'MATCHED',
+          sortBy: 'BEST_MATCH',
+          onSelectFlight: () => {},
+        }),
+      );
+
+      const idxA = html.indexOf('data-offer-id="offer-A"');
+      const idxB = html.indexOf('data-offer-id="offer-B"');
+      const idxC = html.indexOf('data-offer-id="offer-C"');
+
+      assert.ok(idxA < idxB && idxB < idxC);
+    });
+
+    it('preserves canonical server order when sortBy is RECOMMENDED in RANKED mode', (): void => {
+      const html = renderToStaticMarkup(
+        React.createElement(FlightResults, {
+          offers: [offerA, offerB, offerC],
+          mode: 'RANKED',
+          sortBy: 'RECOMMENDED',
+          onSelectFlight: () => {},
+        }),
+      );
+
+      const idxA = html.indexOf('data-offer-id="offer-A"');
+      const idxB = html.indexOf('data-offer-id="offer-B"');
+      const idxC = html.indexOf('data-offer-id="offer-C"');
+
+      assert.ok(idxA < idxB && idxB < idxC);
+    });
+  });
+
+  describe('Objective client-side sorting', (): void => {
+    it('re-sorts offers ascending by PRICE ($150 < $300 < $450)', (): void => {
+      const html = renderToStaticMarkup(
+        React.createElement(FlightResults, {
+          offers: [offerA, offerB, offerC],
+          sortBy: 'PRICE',
+          onSelectFlight: () => {},
+        }),
+      );
+
+      const idxB = html.indexOf('data-offer-id="offer-B"'); // 150
+      const idxA = html.indexOf('data-offer-id="offer-A"'); // 300
+      const idxC = html.indexOf('data-offer-id="offer-C"'); // 450
+
+      assert.ok(idxB < idxA, 'Offer B ($150) must precede Offer A ($300)');
+      assert.ok(idxA < idxC, 'Offer A ($300) must precede Offer C ($450)');
+    });
+
+    it('re-sorts offers ascending by DURATION (2h30m < 4h00m < 6h00m)', (): void => {
+      const html = renderToStaticMarkup(
+        React.createElement(FlightResults, {
+          offers: [offerA, offerB, offerC],
+          sortBy: 'DURATION',
+          onSelectFlight: () => {},
+        }),
+      );
+
+      const idxC = html.indexOf('data-offer-id="offer-C"'); // 2h30m
+      const idxA = html.indexOf('data-offer-id="offer-A"'); // 4h00m
+      const idxB = html.indexOf('data-offer-id="offer-B"'); // 6h00m
+
+      assert.ok(idxC < idxA, 'Offer C (2h30m) must precede Offer A (4h00m)');
+      assert.ok(idxA < idxB, 'Offer A (4h00m) must precede Offer B (6h00m)');
+    });
+
+    it('re-sorts offers ascending by STOPS (0 stops < 1 stop < 2 stops)', (): void => {
+      const html = renderToStaticMarkup(
+        React.createElement(FlightResults, {
+          offers: [offerA, offerB, offerC],
+          sortBy: 'STOPS',
+          onSelectFlight: () => {},
+        }),
+      );
+
+      const idxB = html.indexOf('data-offer-id="offer-B"'); // 0 stops
+      const idxA = html.indexOf('data-offer-id="offer-A"'); // 1 stop
+      const idxC = html.indexOf('data-offer-id="offer-C"'); // 2 stops
+
+      assert.ok(idxB < idxA, 'Offer B (0 stops) must precede Offer A (1 stop)');
+      assert.ok(idxA < idxC, 'Offer A (1 stop) must precede Offer C (2 stops)');
+    });
+
+    it('re-sorts offers ascending by DEPARTURE_TIME (06:00 < 08:00 < 10:00)', (): void => {
+      const html = renderToStaticMarkup(
+        React.createElement(FlightResults, {
+          offers: [offerA, offerB, offerC],
+          sortBy: 'DEPARTURE_TIME',
+          onSelectFlight: () => {},
+        }),
+      );
+
+      const idxC = html.indexOf('data-offer-id="offer-C"'); // 06:00
+      const idxB = html.indexOf('data-offer-id="offer-B"'); // 08:00
+      const idxA = html.indexOf('data-offer-id="offer-A"'); // 10:00
+
+      assert.ok(idxC < idxB, 'Offer C (06:00) must precede Offer B (08:00)');
+      assert.ok(idxB < idxA, 'Offer B (08:00) must precede Offer A (10:00)');
+    });
+
+    it('preserves stable relative order when objective values are tied', (): void => {
+      const offerTied1 = createMockOffer('offer-T1', 200, 'PT3H', 0, '2026-10-01T08:00:00Z');
+      const offerTied2 = createMockOffer('offer-T2', 200, 'PT3H', 0, '2026-10-01T08:00:00Z');
+
+      const html = renderToStaticMarkup(
+        React.createElement(FlightResults, {
+          offers: [offerTied1, offerTied2],
+          sortBy: 'PRICE',
+          onSelectFlight: () => {},
+        }),
+      );
+
+      const idx1 = html.indexOf('data-offer-id="offer-T1"');
+      const idx2 = html.indexOf('data-offer-id="offer-T2"');
+
+      assert.ok(idx1 < idx2, 'Tied offer T1 must precede T2 by stable initial order');
+    });
+  });
+
+  describe('Mode banner, empty state, and booking state pass-through', (): void => {
+    it('renders FlightRankingBanner when mode is RANKED', (): void => {
+      const html = renderToStaticMarkup(
+        React.createElement(FlightResults, {
+          offers: [offerA],
+          mode: 'RANKED',
+          onSelectFlight: () => {},
+        }),
+      );
+
+      assert.match(html, /Showing standard category ranking/);
+      assert.match(html, /Update Preferences/);
+    });
+
+    it('does not render FlightRankingBanner when mode is MATCHED', (): void => {
+      const html = renderToStaticMarkup(
+        React.createElement(FlightResults, {
+          offers: [offerA],
+          mode: 'MATCHED',
+          onSelectFlight: () => {},
+        }),
+      );
+
+      assert.doesNotMatch(html, /Showing standard category ranking/);
+    });
+
+    it('renders accessible empty state when offers array is empty', (): void => {
+      const html = renderToStaticMarkup(
+        React.createElement(FlightResults, {
+          offers: [],
+          onSelectFlight: () => {},
+        }),
+      );
+
+      assert.match(html, /No flight offers found|No flights found/i);
+    });
+
+    it('passes bookingOfferId to correct card for loading indicator', (): void => {
+      const html = renderToStaticMarkup(
+        React.createElement(FlightResults, {
+          offers: [offerA, offerB],
+          bookingOfferId: 'offer-B',
+          onSelectFlight: () => {},
+        }),
+      );
+
+      assert.match(html, /data-offer-id="offer-A"/);
+      assert.match(html, /data-offer-id="offer-B"/);
+      assert.match(html, /\sdisabled(?!=:)[=>\s]/);
+    });
+
+    it('disables all select buttons in results container when bookingOfferId is passed', (): void => {
+      const html = renderToStaticMarkup(
+        React.createElement(FlightResults, {
+          offers: [offerA, offerB],
+          bookingOfferId: 'offer-B',
+          onSelectFlight: () => {},
+        }),
+      );
+
+      const buttonMatches = [...html.matchAll(/<button[^>]*>/g)];
+      assert.strictEqual(buttonMatches.length, 2, 'Must render select buttons for both offer cards');
+      for (const match of buttonMatches) {
+        assert.match(
+          match[0],
+          /\sdisabled(?!=:)[=>\s]/,
+          'Every select button must be disabled when booking is pending',
+        );
+      }
+      assert.match(html, /Loading\.\.\./, 'Selected card must display Loading...');
+      assert.match(
+        html,
+        /Select flight/,
+        'Non-selected card must retain Select flight text while disabled',
+      );
+    });
+
+    it('uses semantic styling with zero hardcoded hex colors', (): void => {
+      const html = renderToStaticMarkup(
+        React.createElement(FlightResults, {
+          offers: [offerA, offerB],
+          mode: 'RANKED',
+          className: 'custom-results-container',
+          onSelectFlight: () => {},
+        }),
+      );
+
+      assert.match(html, /custom-results-container/);
+      assert.doesNotMatch(html, /#[0-9a-fA-F]{3,6}/);
+    });
+  });
+});
+
+describe('SearchFormClient (T054)', (): void => {
+  const mockEligibleResult = (score = 92): FlightMatchResult => ({
+    eligibility: { eligible: true, violations: [] },
+    score,
+    matchLevel: 'STRONG',
+    breakdown: [
+      {
+        dimension: 'PRICE',
+        score: 0.95,
+        weight: 0.25,
+        contribution: 0.2375,
+        signal: 'POSITIVE',
+        explanation: { key: 'match.price.below_median', params: { percentDiff: 20 } },
+      },
+      {
+        dimension: 'AIRLINE',
+        score: 1.0,
+        weight: 0.2,
+        contribution: 0.2,
+        signal: 'POSITIVE',
+        explanation: { key: 'match.airline.preferred', params: { airline: 'Delta' } },
+      },
+    ],
+    metadata: {
+      scoringVersion: 'flight-match-v1',
+      activeWeights: {
+        PRICE: 0.25,
+        AIRLINE: 0.2,
+        ARRIVAL_SCHEDULE: 0.15,
+        STOPS: 0.1,
+        CABIN: 0.1,
+        DEPARTURE_SCHEDULE: 0.1,
+        BAGGAGE: 0.05,
+        DURATION: 0.05,
+      },
+    },
+  });
+
+  const createMockOffer = (
+    id: string,
+    price: number,
+    airline: string,
+    matchResult?: FlightMatchResult | null,
+    overrides?: Partial<FlightSearchOfferView>,
+  ): FlightSearchOfferView => ({
+    id,
+    price,
+    currency: 'USD',
+    airline,
+    flightNumber: 'DL101',
+    origin: 'JFK',
+    destination: 'LAX',
+    departureAt: '2026-10-01T08:00:00Z',
+    arrivalAt: '2026-10-01T11:30:00Z',
+    duration: 'PT3H30M',
+    stops: 0,
+    slices: [
+      {
+        origin: 'JFK',
+        destination: 'LAX',
+        departureAt: '2026-10-01T08:00:00Z',
+        arrivalAt: '2026-10-01T11:30:00Z',
+        duration: 'PT3H30M',
+        stops: 0,
+        segments: [
+          {
+            airline,
+            flightNumber: 'DL101',
+            origin: 'JFK',
+            destination: 'LAX',
+            departureAt: '2026-10-01T08:00:00Z',
+            arrivalAt: '2026-10-01T11:30:00Z',
+            duration: 'PT3H30M',
+            cabinClass: 'economy',
+          },
+        ],
+      },
+    ],
+    matchResult: matchResult ?? null,
+    ...overrides,
+  });
+
+  const mockMeta: FlightSearchMeta = {
+    totalReturned: 2,
+    currency: 'USD',
+    searchId: 'search-unit-test-123',
+    scoringVersion: 'flight-match-v1',
+  };
+
+  const offerMatched1 = createMockOffer('offer-m1', 250, 'Delta Air Lines', mockEligibleResult(92));
+  const offerMatched2 = createMockOffer('offer-m2', 400, 'United Airlines', mockEligibleResult(78));
+
+  const offerRanked1 = createMockOffer('offer-r1', 220, 'Delta Air Lines', null);
+  const offerRanked2 = createMockOffer('offer-r2', 310, 'American Airlines', null);
+
+  describe('Outcome and mode retention across renders', (): void => {
+    it('renders initial empty search state with prompt when no outcome is present', (): void => {
+      const html = renderToStaticMarkup(React.createElement(SearchFormClient, {}));
+
+      assert.match(html, /<form/);
+      assert.match(html, /Search Flights/);
+      assert.match(html, /No flight offers search results yet\. Enter search criteria and search\./);
+      assert.doesNotMatch(html, /Flight Offers/);
+      assert.doesNotMatch(html, /Sort by/);
+    });
+
+    it('renders initial input values in form fields when provided', (): void => {
+      const html = renderToStaticMarkup(
+        React.createElement(SearchFormClient, {
+          initialValues: {
+            origin: 'SFO',
+            destination: 'NRT',
+            departureDate: '2026-11-15',
+            adults: 2,
+            cabinClass: 'business',
+          },
+        }),
+      );
+
+      assert.match(html, /value="SFO"/);
+      assert.match(html, /value="NRT"/);
+      assert.match(html, /value="2026-11-15"/);
+      assert.match(html, /value="2"/);
+      assert.match(html, /<option[^>]*value="business"[^>]*selected/);
+    });
+
+    it('retains MATCHED mode, offers, and meta, rendering controls and match score badges', (): void => {
+      const matchedOutcome: FlightSearchOutcome = {
+        ok: true,
+        mode: 'MATCHED',
+        offers: [offerMatched1, offerMatched2],
+        meta: mockMeta,
+      };
+
+      const html = renderToStaticMarkup(
+        React.createElement(SearchFormClient, {
+          initialOutcome: matchedOutcome,
+        }),
+      );
+
+      assert.match(html, /Sort by/);
+      assert.match(html, /Best Match/);
+      assert.match(html, /92%/);
+      assert.match(html, /Strong Match/i);
+      assert.match(html, /data-offer-id="offer-m1"/);
+      assert.match(html, /data-offer-id="offer-m2"/);
+      assert.doesNotMatch(html, /Showing standard category ranking/);
+    });
+
+    it('retains RANKED mode, offers, and meta, rendering controls, ranking banner, and no match score claims', (): void => {
+      const rankedOutcome: FlightSearchOutcome = {
+        ok: true,
+        mode: 'RANKED',
+        offers: [offerRanked1, offerRanked2],
+        meta: mockMeta,
+      };
+
+      const html = renderToStaticMarkup(
+        React.createElement(SearchFormClient, {
+          initialOutcome: rankedOutcome,
+        }),
+      );
+
+      assert.match(html, /Sort by/);
+      assert.match(html, /Recommended \(Category Rank\)/);
+      assert.match(html, /Showing standard category ranking \(stops, price, duration\)/);
+      assert.match(html, /Update Preferences/);
+      assert.match(html, /data-offer-id="offer-r1"/);
+      assert.match(html, /data-offer-id="offer-r2"/);
+      // Strictly no match score claims in RANKED mode
+      assert.doesNotMatch(html, /\d+%/);
+      assert.doesNotMatch(html, /Strong Match|Good Match|Fair Match|Weak Match/i);
+    });
+
+    it('renders error banner when outcome has ok: false', (): void => {
+      const errorOutcome: FlightSearchOutcome = {
+        ok: false,
+        message: 'Origin and destination cannot be identical.',
+      };
+
+      const html = renderToStaticMarkup(
+        React.createElement(SearchFormClient, {
+          initialOutcome: errorOutcome,
+        }),
+      );
+
+      assert.match(html, /Search Error/);
+      assert.match(html, /Origin and destination cannot be identical\./);
+      assert.doesNotMatch(html, /data-offer-id/);
+    });
+  });
+
+  describe('Controls and Banner rendering in MATCHED vs RANKED mode', (): void => {
+    it('in MATCHED mode: renders FlightResultsControls with "Best Match" default and hides FlightRankingBanner', (): void => {
+      const matchedOutcome: FlightSearchOutcome = {
+        ok: true,
+        mode: 'MATCHED',
+        offers: [offerMatched1],
+        meta: mockMeta,
+      };
+
+      const html = renderToStaticMarkup(
+        React.createElement(SearchFormClient, {
+          initialOutcome: matchedOutcome,
+        }),
+      );
+
+      assert.match(html, /<option[^>]*value="BEST_MATCH"[^>]*selected/);
+      assert.match(html, /1 flight found/);
+      assert.doesNotMatch(html, /Showing standard category ranking/);
+    });
+
+    it('in RANKED mode: renders FlightResultsControls with "Recommended (Category Rank)" default and displays FlightRankingBanner', (): void => {
+      const rankedOutcome: FlightSearchOutcome = {
+        ok: true,
+        mode: 'RANKED',
+        offers: [offerRanked1, offerRanked2],
+        meta: mockMeta,
+      };
+
+      const html = renderToStaticMarkup(
+        React.createElement(SearchFormClient, {
+          initialOutcome: rankedOutcome,
+        }),
+      );
+
+      assert.match(html, /<option[^>]*value="RECOMMENDED"[^>]*selected/);
+      assert.match(html, /2 flights found/);
+      assert.match(html, /Showing standard category ranking/);
+      assert.match(html, /href="\/profile"/);
+    });
+  });
+
+  describe('Results composition with sorting and selection delegation', (): void => {
+    it('re-sorts offers when initialSortBy is PRICE ($250 < $400)', (): void => {
+      const matchedOutcome: FlightSearchOutcome = {
+        ok: true,
+        mode: 'MATCHED',
+        offers: [offerMatched2, offerMatched1], // United ($400), Delta ($250)
+        meta: mockMeta,
+      };
+
+      const html = renderToStaticMarkup(
+        React.createElement(SearchFormClient, {
+          initialOutcome: matchedOutcome,
+          initialSortBy: 'PRICE',
+        }),
+      );
+
+      const idx1 = html.indexOf('data-offer-id="offer-m1"'); // 250
+      const idx2 = html.indexOf('data-offer-id="offer-m2"'); // 400
+
+      assert.ok(idx1 !== -1 && idx2 !== -1);
+      assert.ok(idx1 < idx2, 'Delta ($250) must precede United ($400) when sorted by PRICE');
+    });
+
+    it('renders local deterministic offer IDs on select buttons and never leaks provider IDs', (): void => {
+      const localId1 = 'offer-local-det-101';
+      const localId2 = 'offer-local-det-102';
+      const matchedOutcome: FlightSearchOutcome = {
+        ok: true,
+        mode: 'MATCHED',
+        offers: [
+          createMockOffer(localId1, 200, 'Delta', mockEligibleResult(90)),
+          createMockOffer(localId2, 300, 'Delta', mockEligibleResult(80)),
+        ],
+        meta: mockMeta,
+      };
+
+      const html = renderToStaticMarkup(
+        React.createElement(SearchFormClient, {
+          initialOutcome: matchedOutcome,
+        }),
+      );
+
+      assert.match(html, /data-offer-id="offer-local-det-101"/);
+      assert.match(html, /data-offer-id="offer-local-det-102"/);
+      assert.doesNotMatch(html, /off_[0-9a-zA-Z]+/);
+    });
+
+    it('uses semantic Tailwind classes with zero hardcoded hex colors', (): void => {
+      const matchedOutcome: FlightSearchOutcome = {
+        ok: true,
+        mode: 'MATCHED',
+        offers: [offerMatched1],
+        meta: mockMeta,
+      };
+
+      const html = renderToStaticMarkup(
+        React.createElement(SearchFormClient, {
+          initialOutcome: matchedOutcome,
+        }),
+      );
+
+      assert.match(html, /btn-primary/);
+      assert.match(html, /text-text-primary/);
+      assert.match(html, /form-input/);
+      assert.doesNotMatch(html, /#[0-9a-fA-F]{3,6}/);
+    });
+
+    it('verifies that handleBook ignores concurrent selection clicks and retains lock after successful selection navigation', async (): Promise<void> => {
+      let capturedOnSelectFlight: ((offerId: string) => Promise<void>) | null = null;
+      let actionCallCount = 0;
+      let resolveFirstAction!: (value: FlightSelectionOutcome) => void;
+      const firstActionPromise = new Promise<FlightSelectionOutcome>((resolve) => {
+        resolveFirstAction = resolve;
+      });
+
+      const mockSelectAction = async (_offerId: string): Promise<FlightSelectionOutcome> => {
+        actionCallCount++;
+        return firstActionPromise;
+      };
+
+      const navigatedUrls: string[] = [];
+      const mockNavigate = (url: string): void => {
+        navigatedUrls.push(url);
+      };
+
+      renderToStaticMarkup(
+        React.createElement(SearchFormClient, {
+          initialOutcome: {
+            ok: true,
+            mode: 'MATCHED',
+            offers: [offerMatched1, offerMatched2],
+            meta: mockMeta,
+          },
+          onSelectAction: mockSelectAction,
+          onNavigate: mockNavigate,
+          onBookFlightCapture: (fn) => {
+            capturedOnSelectFlight = fn;
+          },
+        }),
+      );
+
+      assert.ok(
+        capturedOnSelectFlight !== null,
+        'FlightResults must receive handleBook onSelectFlight handler',
+      );
+
+      // First click begins selection and is in-flight
+      const firstClickPromise = (capturedOnSelectFlight as (offerId: string) => Promise<void>)(
+        'offer-m1',
+      );
+      assert.strictEqual(actionCallCount, 1, 'First click must initiate selection');
+
+      // Second click concurrently while first selection is in flight
+      const secondClickPromise = (capturedOnSelectFlight as (offerId: string) => Promise<void>)(
+        'offer-m2',
+      );
+      assert.strictEqual(actionCallCount, 1, 'Concurrent click while in-flight must be ignored');
+
+      // Complete the first selection
+      resolveFirstAction({ ok: true, checkoutPath: '/checkout/step-1' });
+      await Promise.all([firstClickPromise, secondClickPromise]);
+
+      assert.strictEqual(actionCallCount, 1, 'Selection action must be invoked exactly once');
+      assert.deepStrictEqual(navigatedUrls, ['/checkout/step-1']);
+
+      // Subsequent click during navigation transition must also be ignored because lock remains held
+      await (capturedOnSelectFlight as (offerId: string) => Promise<void>)('offer-m2');
+      assert.strictEqual(
+        actionCallCount,
+        1,
+        'Subsequent click during navigation transition must be ignored',
+      );
+    });
+
+    it('verifies that handleBook releases lock when selection fails, allowing subsequent selection attempt', async (): Promise<void> => {
+      let capturedOnSelectFlight: ((offerId: string) => Promise<void>) | null = null;
+      let actionCallCount = 0;
+      let shouldSucceed = false;
+
+      const mockSelectAction = async (_offerId: string): Promise<FlightSelectionOutcome> => {
+        actionCallCount++;
+        if (!shouldSucceed) {
+          return { ok: false, message: 'Offer expired' };
+        }
+        return { ok: true, checkoutPath: '/checkout/step-1' };
+      };
+
+      renderToStaticMarkup(
+        React.createElement(SearchFormClient, {
+          initialOutcome: {
+            ok: true,
+            mode: 'MATCHED',
+            offers: [offerMatched1, offerMatched2],
+            meta: mockMeta,
+          },
+          onSelectAction: mockSelectAction,
+          onBookFlightCapture: (fn) => {
+            capturedOnSelectFlight = fn;
+          },
+        }),
+      );
+
+      assert.ok(
+        capturedOnSelectFlight !== null,
+        'FlightResults must receive handleBook onSelectFlight handler',
+      );
+
+      // First click fails
+      await (capturedOnSelectFlight as (offerId: string) => Promise<void>)('offer-m1');
+      assert.strictEqual(actionCallCount, 1, 'First attempt was invoked');
+
+      // Second click after failure should proceed because lock was released
+      shouldSucceed = true;
+      await (capturedOnSelectFlight as (offerId: string) => Promise<void>)('offer-m2');
+      assert.strictEqual(actionCallCount, 2, 'Subsequent selection attempt proceeds after failure');
+    });
+
+    it('verifies that submitting search form while booking is in progress is a no-op, does not trigger searchAction, does not clear navigation lock, and leaves search button/fieldset disabled', async (): Promise<void> => {
+      let capturedOnSelectFlight: ((offerId: string) => Promise<void>) | null = null;
+      let capturedOnSubmit: ((event: unknown) => Promise<void>) | null = null;
+
+      let selectCallCount = 0;
+      let searchCallCount = 0;
+      let resolveSelect!: (value: FlightSelectionOutcome) => void;
+      const selectPromise = new Promise<FlightSelectionOutcome>((resolve) => {
+        resolveSelect = resolve;
+      });
+
+      const mockSelectAction = async (_offerId: string): Promise<FlightSelectionOutcome> => {
+        selectCallCount++;
+        return selectPromise;
+      };
+
+      const mockSearchAction = async (_query: FlightSearchQuery): Promise<FlightSearchOutcome> => {
+        searchCallCount++;
+        return {
+          ok: true,
+          mode: 'MATCHED',
+          offers: [],
+          meta: mockMeta,
+        };
+      };
+
+      const navigatedUrls: string[] = [];
+      const mockNavigate = (url: string): void => {
+        navigatedUrls.push(url);
+      };
+
+      const html = renderToStaticMarkup(
+        React.createElement(SearchFormClient, {
+          initialOutcome: {
+            ok: true,
+            mode: 'MATCHED',
+            offers: [offerMatched1, offerMatched2],
+            meta: mockMeta,
+          },
+          initialBookingOfferId: 'offer-m1',
+          onSelectAction: mockSelectAction,
+          onSearchAction: mockSearchAction,
+          onNavigate: mockNavigate,
+          onBookFlightCapture: (fn) => {
+            capturedOnSelectFlight = fn;
+          },
+          onSubmitCapture: (fn) => {
+            capturedOnSubmit = fn;
+          },
+        }),
+      );
+
+      // Verify search button and fieldset are disabled when booking is active
+      assert.match(html, /<fieldset[^>]*disabled/);
+      assert.match(html, /<button[^>]*disabled/);
+
+      assert.ok(capturedOnSubmit !== null, 'Form onSubmit must be captured');
+
+      // Attempt to submit search form while booking lock is held
+      let preventDefaultCalled = false;
+      await (capturedOnSubmit as (event: unknown) => Promise<void>)({
+        preventDefault: () => {
+          preventDefaultCalled = true;
+        },
+      });
+
+      assert.ok(preventDefaultCalled, 'preventDefault must be called');
+      assert.strictEqual(
+        searchCallCount,
+        0,
+        'searchAction must NOT be called when booking is in progress',
+      );
+
+      // Test dynamic flow: start selection in flight, submit search, ensure lock not cleared
+      let capturedDynamicOnSelect: ((offerId: string) => Promise<void>) | null = null;
+      let capturedDynamicOnSubmit: ((event: unknown) => Promise<void>) | null = null;
+
+      renderToStaticMarkup(
+        React.createElement(SearchFormClient, {
+          initialOutcome: {
+            ok: true,
+            mode: 'MATCHED',
+            offers: [offerMatched1, offerMatched2],
+            meta: mockMeta,
+          },
+          onSelectAction: mockSelectAction,
+          onSearchAction: mockSearchAction,
+          onNavigate: mockNavigate,
+          onBookFlightCapture: (fn) => {
+            capturedDynamicOnSelect = fn;
+          },
+          onSubmitCapture: (fn) => {
+            capturedDynamicOnSubmit = fn;
+          },
+        }),
+      );
+
+      assert.ok(capturedDynamicOnSelect !== null, 'capturedDynamicOnSelect must not be null');
+      assert.ok(capturedDynamicOnSubmit !== null, 'capturedDynamicOnSubmit must not be null');
+
+      // Initiate selection
+      const flightSelectPromise = (
+        capturedDynamicOnSelect as (offerId: string) => Promise<void>
+      )('offer-m1');
+      assert.strictEqual(selectCallCount, 1, 'Selection must be initiated');
+
+      // Attempt search submit while booking selection is in progress
+      await (capturedDynamicOnSubmit as (event: unknown) => Promise<void>)({
+        preventDefault: () => {},
+      });
+      assert.strictEqual(
+        searchCallCount,
+        0,
+        'searchAction must not be called during in-flight selection',
+      );
+
+      // Resolve first selection to complete navigation
+      resolveSelect({ ok: true, checkoutPath: '/checkout/step-1' });
+      await flightSelectPromise;
+      assert.deepStrictEqual(navigatedUrls, ['/checkout/step-1']);
+
+      // Attempt search submit again after navigation succeeded (lock still held)
+      await (capturedDynamicOnSubmit as (event: unknown) => Promise<void>)({
+        preventDefault: () => {},
+      });
+      assert.strictEqual(
+        searchCallCount,
+        0,
+        'searchAction must not be called after navigation lock is held',
+      );
+
+      // Verify navigation lock is retained: subsequent select attempt must still be ignored
+      await (capturedDynamicOnSelect as (offerId: string) => Promise<void>)('offer-m2');
+      assert.strictEqual(
+        selectCallCount,
+        1,
+        'Lock must be retained: competing selection ignored',
+      );
+    });
+  });
+});
+
+describe('SearchPage Cabin Prefill & Precedence (T055)', (): void => {
+  describe('Profile prefill without query param', (): void => {
+    it('prefills cabinClass from profile classPreference (business) when URL query param is omitted', (): void => {
+      const searchParams = { origin: 'JFK', destination: 'LHR' };
+      const initialValues = getInitialValues(searchParams, 'business');
+
+      assert.equal(initialValues.cabinClass, 'business');
+
+      const html = renderToStaticMarkup(
+        React.createElement(SearchFormClient, { initialValues }),
+      );
+      assert.match(html, /<option[^>]*value="business"[^>]*selected/);
+    });
+
+    it('prefills cabinClass from profile classPreference (premium_economy) when URL query param is omitted', (): void => {
+      const searchParams = { origin: 'JFK', destination: 'LHR' };
+      const initialValues = getInitialValues(searchParams, 'premium_economy');
+
+      assert.equal(initialValues.cabinClass, 'premium_economy');
+
+      const html = renderToStaticMarkup(
+        React.createElement(SearchFormClient, { initialValues }),
+      );
+      assert.match(html, /<option[^>]*value="premium_economy"[^>]*selected/);
+    });
+
+    it('prefills cabinClass from profile classPreference (first) when URL query param is omitted', (): void => {
+      const searchParams = { origin: 'JFK', destination: 'LHR' };
+      const initialValues = getInitialValues(searchParams, 'first');
+
+      assert.equal(initialValues.cabinClass, 'first');
+
+      const html = renderToStaticMarkup(
+        React.createElement(SearchFormClient, { initialValues }),
+      );
+      assert.match(html, /<option[^>]*value="first"[^>]*selected/);
+    });
+  });
+
+  describe('URL query precedence over profile classPreference', (): void => {
+    it('strictly overrides profile preference (business) with explicit URL query param (?cabinClass=economy)', (): void => {
+      const searchParams = { origin: 'JFK', destination: 'LHR', cabinClass: 'economy' };
+      const initialValues = getInitialValues(searchParams, 'business');
+
+      assert.equal(initialValues.cabinClass, 'economy');
+
+      const html = renderToStaticMarkup(
+        React.createElement(SearchFormClient, { initialValues }),
+      );
+      assert.match(html, /<option[^>]*value="economy"[^>]*selected/);
+      assert.doesNotMatch(html, /<option[^>]*value="business"[^>]*selected/);
+    });
+
+    it('strictly overrides profile preference (economy) with explicit URL query param (?cabinClass=first)', (): void => {
+      const searchParams = { origin: 'JFK', destination: 'LHR', cabinClass: 'first' };
+      const initialValues = getInitialValues(searchParams, 'economy');
+
+      assert.equal(initialValues.cabinClass, 'first');
+
+      const html = renderToStaticMarkup(
+        React.createElement(SearchFormClient, { initialValues }),
+      );
+      assert.match(html, /<option[^>]*value="first"[^>]*selected/);
+    });
+  });
+
+  describe('Fallback and invalid preference handling', (): void => {
+    it('falls back to default economy when neither URL query nor profile preference is provided', (): void => {
+      const searchParams = { origin: 'JFK', destination: 'LHR' };
+      const initialValues = getInitialValues(searchParams, undefined);
+
+      assert.equal(initialValues.cabinClass, undefined);
+
+      const html = renderToStaticMarkup(
+        React.createElement(SearchFormClient, { initialValues }),
+      );
+      assert.match(html, /<option[^>]*value="economy"[^>]*selected/);
+    });
+
+    it('falls back to default economy when unauthenticated or profile fetch fails', async (): void => {
+      const pref = await fetchProfileCabinPreference(null);
+      assert.equal(pref, null);
+
+      const searchParams = {};
+      const initialValues = getInitialValues(searchParams, undefined);
+
+      const html = renderToStaticMarkup(
+        React.createElement(SearchFormClient, { initialValues }),
+      );
+      assert.match(html, /<option[^>]*value="economy"[^>]*selected/);
+    });
+
+    it('safely ignores invalid profile classPreference and leaves cabinClass unset', (): void => {
+      const searchParams = { origin: 'JFK', destination: 'LHR' };
+      const invalidPref = 'supersonic_luxury' as unknown as FlightSearchQuery['cabinClass'];
+      const initialValues = getInitialValues(searchParams, invalidPref);
+
+      assert.equal(initialValues.cabinClass, undefined);
+
+      const html = renderToStaticMarkup(
+        React.createElement(SearchFormClient, { initialValues }),
+      );
+      assert.match(html, /<option[^>]*value="economy"[^>]*selected/);
+    });
+
+    it('safely ignores invalid URL query cabinClass and falls back to profile preference', (): void => {
+      const searchParams = { origin: 'JFK', destination: 'LHR', cabinClass: 'invalid_class' };
+      const initialValues = getInitialValues(searchParams, 'business');
+
+      assert.equal(initialValues.cabinClass, 'business');
+
+      const html = renderToStaticMarkup(
+        React.createElement(SearchFormClient, { initialValues }),
+      );
+      assert.match(html, /<option[^>]*value="business"[^>]*selected/);
+    });
+  });
+
+  describe('SearchFormClient form submission retains cabinClass', (): void => {
+    it('initializes cabinClass state from initialValues and passes it to searchAction', async (): void => {
+      let submittedQuery: FlightSearchQuery | null = null;
+      const initialValues: Partial<FlightSearchQuery> = {
+        origin: 'JFK',
+        destination: 'LHR',
+        departureDate: '2026-12-01',
+        cabinClass: 'business',
+      };
+
+      const html = renderToStaticMarkup(
+        React.createElement(SearchFormClient, {
+          initialValues,
+          onSearchAction: async (q: FlightSearchQuery) => {
+            submittedQuery = q;
+            return {
+              ok: true,
+              mode: 'MATCHED',
+              offers: [],
+              meta: {
+                totalResults: 0,
+                searchHash: 'mock-hash',
+                cached: false,
+                requestedCabinClass: 'business',
+                scoringVersion: 'flight-match-v1',
+                eligibleCount: 0,
+                matchLevelCounts: { STRONG: 0, GOOD: 0, FAIR: 0, WEAK: 0 },
+              },
+            };
+          },
+        }),
+      );
+
+      assert.match(html, /<option[^>]*value="business"[^>]*selected/);
+    });
+  });
+});
+
+describe('T058: Viewport Responsiveness & Keyboard a11y', (): void => {
+  const mockOffer: FlightSearchOfferView = {
+    id: 'local-offer-t058',
+    price: 320,
+    currency: 'USD',
+    airline: 'SkyWays',
+    flightNumber: 'SW456',
+    origin: 'SFO',
+    destination: 'JFK',
+    departureAt: '2026-11-15T09:00:00Z',
+    arrivalAt: '2026-11-15T17:30:00Z',
+    duration: 'PT5H30M',
+    stops: 0,
+    slices: [
+      {
+        origin: 'SFO',
+        destination: 'JFK',
+        departureAt: '2026-11-15T09:00:00Z',
+        arrivalAt: '2026-11-15T17:30:00Z',
+        duration: 'PT5H30M',
+        stops: 0,
+        segments: [
+          {
+            airline: 'SkyWays',
+            flightNumber: 'SW456',
+            origin: 'SFO',
+            destination: 'JFK',
+            departureAt: '2026-11-15T09:00:00Z',
+            arrivalAt: '2026-11-15T17:30:00Z',
+            duration: 'PT5H30M',
+            cabinClass: 'economy',
+          },
+        ],
+      },
+    ],
+    matchResult: {
+      eligibility: {
+        eligible: true,
+        violations: [],
+      },
+      score: 88,
+      matchLevel: 'STRONG',
+      breakdown: [
+        {
+          dimension: 'PRICE',
+          score: 0.95,
+          weight: 0.2,
+          contribution: 0.19,
+          signal: 'POSITIVE',
+          explanation: {
+            key: 'match.price.below_median',
+            params: { percentDiff: 20 },
+          },
+        },
+      ],
+      metadata: {
+        scoringVersion: 'flight-match-v1',
+        activeWeights: {
+          PRICE: 0.2,
+          AIRLINE: 0.15,
+          ARRIVAL_SCHEDULE: 0.15,
+          STOPS: 0.12,
+          CABIN: 0.1,
+          DEPARTURE_SCHEDULE: 0.1,
+          BAGGAGE: 0.1,
+          DURATION: 0.08,
+        },
+      },
+    },
+  };
+
+  const mockIneligibleOffer: FlightSearchOfferView = {
+    ...mockOffer,
+    id: 'local-offer-ineligible',
+    matchResult: {
+      eligibility: {
+        eligible: false,
+        violations: [
+          {
+            constraint: 'BLACKLISTED_AIRLINE',
+            explanation: {
+              key: 'constraint.airline.blacklisted',
+              params: { airline: 'BadAir' },
+            },
+          },
+        ],
+      },
+      score: null,
+      matchLevel: null,
+      breakdown: [],
+      metadata: {
+        scoringVersion: 'flight-match-v1',
+        activeWeights: {
+          PRICE: 0.2,
+          AIRLINE: 0.15,
+          ARRIVAL_SCHEDULE: 0.15,
+          STOPS: 0.12,
+          CABIN: 0.1,
+          DEPARTURE_SCHEDULE: 0.1,
+          BAGGAGE: 0.1,
+          DURATION: 0.08,
+        },
+      },
+    },
+  };
+
+  describe('Touch Targets (>= 44x44px standard)', (): void => {
+    it('FlightResultCard select button meets the >= 44px height touch target standard', (): void => {
+      const html = renderToStaticMarkup(
+        React.createElement(FlightResultCard, {
+          offer: mockOffer,
+          onSelect: () => {},
+        }),
+      );
+      assert.match(html, /<button[^>]*class="[^"]*min-h-\[44px\]/);
+    });
+
+    it('FlightMatchBreakdown summary toggle meets the >= 44px height touch target standard (eligible)', (): void => {
+      const html = renderToStaticMarkup(
+        React.createElement(FlightMatchBreakdown, {
+          matchResult: mockOffer.matchResult,
+        }),
+      );
+      assert.match(html, /<summary[^>]*class="[^"]*min-h-\[44px\]/);
+    });
+
+    it('FlightMatchBreakdown summary toggle meets the >= 44px height touch target standard (ineligible)', (): void => {
+      const html = renderToStaticMarkup(
+        React.createElement(FlightMatchBreakdown, {
+          matchResult: mockIneligibleOffer.matchResult,
+        }),
+      );
+      assert.match(html, /<summary[^>]*class="[^"]*min-h-\[44px\]/);
+    });
+
+    it('FlightResultsControls sort dropdown meets the >= 44px height touch target standard', (): void => {
+      const html = renderToStaticMarkup(
+        React.createElement(FlightResultsControls, {
+          mode: 'MATCHED',
+        }),
+      );
+      assert.match(html, /<select[^>]*class="[^"]*min-h-\[44px\]/);
+    });
+
+    it('SearchFormClient submit button meets the >= 44px height touch target standard', (): void => {
+      const html = renderToStaticMarkup(
+        React.createElement(SearchFormClient, {
+          initialOutcome: null,
+        }),
+      );
+      assert.match(html, /<button[^>]*type="submit"[^>]*class="[^"]*min-h-\[44px\]/);
+    });
+  });
+
+  describe('Viewport Responsiveness (360px / 768px / Desktop)', (): void => {
+    it('FlightResultCard has responsive vertical stacking and md row layout without horizontal overflow', (): void => {
+      const html = renderToStaticMarkup(
+        React.createElement(FlightResultCard, {
+          offer: mockOffer,
+          onSelect: () => {},
+        }),
+      );
+      // Card layout transitions from vertical (flex-col) on mobile to md:flex-row on tablet/desktop
+      assert.match(html, /flex-col md:flex-row md:items-center md:justify-between/);
+      // Header row wraps items gracefully to avoid overflow on 360px
+      assert.match(html, /flex flex-wrap items-center gap-2/);
+      // Price & select action transitions from horizontal row on mobile to md:flex-col
+      assert.match(html, /flex-row md:flex-col/);
+      // Select button expands to full width on mobile and auto on md
+      assert.match(html, /w-full md:w-auto/);
+    });
+
+    it('FlightResultsControls smoothly transitions from vertical to horizontal layout at tablet md breakpoint (768px)', (): void => {
+      const html = renderToStaticMarkup(
+        React.createElement(FlightResultsControls, {
+          mode: 'MATCHED',
+          totalResults: 15,
+        }),
+      );
+      assert.match(html, /flex-col md:flex-row md:items-center md:justify-between/);
+    });
+  });
+
+  describe('Keyboard Navigation & Focus Indicators', (): void => {
+    it('FlightResultCard select button has clear focus-visible rings using semantic tokens', (): void => {
+      const html = renderToStaticMarkup(
+        React.createElement(FlightResultCard, {
+          offer: mockOffer,
+          onSelect: () => {},
+        }),
+      );
+      assert.match(html, /<button[^>]*class="[^"]*focus-visible:ring-2[^"]*focus-visible:ring-accent[^"]*focus-visible:ring-offset-2/);
+    });
+
+    it('FlightMatchBreakdown summary has aria-expanded, aria-controls, and clear focus-visible rings (eligible)', (): void => {
+      const html = renderToStaticMarkup(
+        React.createElement(FlightMatchBreakdown, {
+          matchResult: mockOffer.matchResult,
+        }),
+      );
+      assert.doesNotMatch(html, /<summary[^>]*tabindex/i);
+      assert.match(html, /<summary[^>]*aria-expanded="false"/);
+      const controlsMatch = html.match(/<summary[^>]*aria-controls="([^"]+)"/);
+      assert.ok(controlsMatch, 'Summary must have aria-controls attribute');
+      const controlledId = controlsMatch[1];
+      assert.match(html, new RegExp(`<div[^>]*id="${controlledId}"[^>]*role="region"`));
+      assert.match(html, /<summary[^>]*class="[^"]*focus-visible:ring-2[^"]*focus-visible:ring-accent[^"]*focus-visible:ring-offset-2/);
+    });
+
+    it('FlightMatchBreakdown summary has aria-expanded, aria-controls, and clear focus-visible rings (ineligible)', (): void => {
+      const html = renderToStaticMarkup(
+        React.createElement(FlightMatchBreakdown, {
+          matchResult: mockIneligibleOffer.matchResult,
+        }),
+      );
+      assert.doesNotMatch(html, /<summary[^>]*tabindex/i);
+      assert.match(html, /<summary[^>]*aria-expanded="false"/);
+      const controlsMatch = html.match(/<summary[^>]*aria-controls="([^"]+)"/);
+      assert.ok(controlsMatch, 'Summary must have aria-controls attribute');
+      const controlledId = controlsMatch[1];
+      assert.match(html, new RegExp(`<div[^>]*id="${controlledId}"[^>]*role="region"`));
+      assert.match(html, /<summary[^>]*class="[^"]*focus-visible:ring-2[^"]*focus-visible:ring-accent[^"]*focus-visible:ring-offset-2/);
+    });
+
+    it('FlightResultsControls sort select has clear focus-visible rings using semantic tokens', (): void => {
+      const html = renderToStaticMarkup(
+        React.createElement(FlightResultsControls, {
+          mode: 'MATCHED',
+        }),
+      );
+      assert.match(html, /<select[^>]*class="[^"]*focus-visible:ring-2[^"]*focus-visible:ring-accent[^"]*focus-visible:ring-offset-2/);
+    });
+  });
+
+  describe('ARIA Semantic Attributes', (): void => {
+    it('FlightMatchBadge has role="status" and meaningful aria-label (eligible & ineligible)', (): void => {
+      const eligibleHtml = renderToStaticMarkup(
+        React.createElement(FlightMatchBadge, { matchResult: mockOffer.matchResult }),
+      );
+      assert.match(eligibleHtml, /role="status"/);
+      assert.match(eligibleHtml, /aria-label="88% match - Strong Match"/);
+
+      const ineligibleHtml = renderToStaticMarkup(
+        React.createElement(FlightMatchBadge, { matchResult: mockIneligibleOffer.matchResult }),
+      );
+      assert.match(ineligibleHtml, /role="status"/);
+      assert.match(ineligibleHtml, /aria-label="Flight violates preference: Blacklisted airline \(BadAir\)"/);
+    });
+
+    it('FlightMatchBreakdown has role="region" and descriptive aria-label on disclosure body', (): void => {
+      const eligibleHtml = renderToStaticMarkup(
+        React.createElement(FlightMatchBreakdown, { matchResult: mockOffer.matchResult }),
+      );
+      assert.match(eligibleHtml, /<div[^>]*role="region"[^>]*aria-label="Flight match breakdown"/);
+
+      const ineligibleHtml = renderToStaticMarkup(
+        React.createElement(FlightMatchBreakdown, { matchResult: mockIneligibleOffer.matchResult }),
+      );
+      assert.match(ineligibleHtml, /<div[^>]*role="region"[^>]*aria-label="Constraint violations"/);
+    });
+
+    it('FlightResultsControls has htmlFor and id association with descriptive aria-label', (): void => {
+      const html = renderToStaticMarkup(
+        React.createElement(FlightResultsControls, { mode: 'RANKED' }),
+      );
+      assert.match(html, /<label[^>]*for="flight-sort-select"/);
+      assert.match(html, /<select[^>]*id="flight-sort-select"[^>]*aria-label="Sort flight results"/);
+    });
+
+    it('FlightResultCard select button has descriptive aria-label with flight number', (): void => {
+      const html = renderToStaticMarkup(
+        React.createElement(FlightResultCard, {
+          offer: mockOffer,
+          onSelect: () => {},
+        }),
+      );
+      assert.match(html, /<button[^>]*aria-label="Select flight SW456"/);
+    });
+  });
+
+  describe('Strict Invariants (No Hex & No Provider IDs)', (): void => {
+    it('all search components strictly contain zero hardcoded hex colors', (): void => {
+      const cardHtml = renderToStaticMarkup(
+        React.createElement(FlightResultCard, { offer: mockOffer, onSelect: () => {} }),
+      );
+      const breakdownHtml = renderToStaticMarkup(
+        React.createElement(FlightMatchBreakdown, { matchResult: mockOffer.matchResult }),
+      );
+      const controlsHtml = renderToStaticMarkup(
+        React.createElement(FlightResultsControls, { mode: 'MATCHED' }),
+      );
+      const badgeHtml = renderToStaticMarkup(
+        React.createElement(FlightMatchBadge, { matchResult: mockOffer.matchResult }),
+      );
+
+      const combined = cardHtml + breakdownHtml + controlsHtml + badgeHtml;
+      assert.doesNotMatch(combined, /#[0-9a-fA-F]{3,6}/, 'Never use hardcoded hex colors');
+    });
+
+    it('all search components strictly contain zero provider IDs in DOM', (): void => {
+      const cardHtml = renderToStaticMarkup(
+        React.createElement(FlightResultCard, { offer: mockOffer, onSelect: () => {} }),
+      );
+      assert.doesNotMatch(cardHtml, /off_[a-zA-Z0-9]+|ord_[a-zA-Z0-9]+/);
+    });
+  });
+});
+
+describe('T059: Negative Privacy Scan & Explanation Allowlist Characterization', (): void => {
+    const rawProviderIdRegex = /off_[a-zA-Z0-9_\-]+|ord_[a-zA-Z0-9_\-]+|duffel_[a-zA-Z0-9_\-]+/i;
+    const bearerTokenRegex = /bearer\s+[a-zA-Z0-9\-._~+/]+=*|eyJ[a-zA-Z0-9_\-]{10,}/i;
+    const passportRegex = /\b[A-Z]{1,2}\d{6,9}\b/;
+    const dobRegex = /\b(?:19\d\d|20[0-2]\d)-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])\b/;
+    const streetAddressRegex = /\b\d+\s+[A-Za-z0-9\s,\.]+(?:Street|St|Avenue|Ave|Boulevard|Blvd|Road|Rd|Drive|Dr|Lane|Ln|Terrace|Way)\b/i;
+
+    const poisonedOffer: FlightSearchOfferView = {
+      id: 'local-offer-clean-id',
+      airline: 'SkyJet',
+      flightNumber: 'SJ101',
+      origin: 'SFO',
+      destination: 'JFK',
+      departureAt: '2026-11-15T09:00:00Z',
+      arrivalAt: '2026-11-15T17:30:00Z',
+      duration: 'PT5H30M',
+      stops: 0,
+      price: 350,
+      currency: 'USD',
+      slices: [
+        {
+          origin: 'SFO',
+          destination: 'JFK',
+          departureAt: '2026-11-15T09:00:00Z',
+          arrivalAt: '2026-11-15T17:30:00Z',
+          duration: 'PT5H30M',
+          stops: 0,
+          segments: [
+            {
+              airline: 'SkyJet',
+              flightNumber: 'SJ101',
+              origin: 'SFO',
+              destination: 'JFK',
+              departureAt: '2026-11-15T09:00:00Z',
+              arrivalAt: '2026-11-15T17:30:00Z',
+              duration: 'PT5H30M',
+              cabinClass: 'economy',
+            },
+          ],
+        },
+      ],
+      // Injected upstream provider fields that must NEVER leak into DOM or rendered markup
+      ...({
+        duffelOfferId: 'off_poisoned_provider_offer_9999',
+        duffelOrderId: 'ord_poisoned_provider_order_8888',
+        providerSupplierId: 'duffel_supplier_7777',
+        upstreamToken: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.poisonedToken',
+        travelerPassport: 'PA987654321',
+        travelerDob: '1985-05-20',
+        travelerAddress: '742 Evergreen Terrace, Springfield, OR 97477',
+      } as unknown as Partial<FlightSearchOfferView>),
+      matchResult: {
+        eligibility: {
+          eligible: true,
+          violations: [],
+        },
+        score: 91,
+        matchLevel: 'STRONG',
+        breakdown: [
+          {
+            dimension: 'PRICE',
+            score: 0.95,
+            weight: 0.2,
+            contribution: 0.19,
+            signal: 'POSITIVE',
+            explanation: {
+              key: 'match.price.below_median',
+              params: { percentDiff: 15 },
+            },
+          },
+          {
+            dimension: 'AIRLINE',
+            score: 1.0,
+            weight: 0.15,
+            contribution: 0.15,
+            signal: 'POSITIVE',
+            explanation: {
+              key: 'match.airline.preferred',
+              params: { airline: 'SkyJet' },
+            },
+          },
+        ],
+        metadata: {
+          scoringVersion: 'flight-match-v1',
+          activeWeights: {
+            PRICE: 0.2,
+            AIRLINE: 0.15,
+            ARRIVAL_SCHEDULE: 0.15,
+            STOPS: 0.12,
+            CABIN: 0.1,
+            DEPARTURE_SCHEDULE: 0.1,
+            BAGGAGE: 0.1,
+            DURATION: 0.08,
+          },
+        },
+      },
+    };
+
+    describe('Negative Privacy Boundary - Zero Raw Provider IDs', (): void => {
+      it('asserts ZERO raw provider identifiers (off_..., ord_..., duffel_...) in FlightResultCard markup', (): void => {
+        const cardHtml = renderToStaticMarkup(
+          React.createElement(FlightResultCard, {
+            offer: poisonedOffer,
+            onSelect: () => {},
+          }),
+        );
+
+        assert.doesNotMatch(
+          cardHtml,
+          rawProviderIdRegex,
+          'Zero raw provider identifiers (off_..., ord_..., duffel_...) must appear in FlightResultCard DOM',
+        );
+        assert.doesNotMatch(cardHtml, /off_poisoned|ord_poisoned|duffel_supplier/i);
+      });
+
+      it('asserts ZERO raw provider identifiers in FlightMatchBadge, FlightMatchBreakdown, and FlightResults markup', (): void => {
+        const badgeHtml = renderToStaticMarkup(
+          React.createElement(FlightMatchBadge, {
+            matchResult: poisonedOffer.matchResult,
+          }),
+        );
+        const breakdownHtml = renderToStaticMarkup(
+          React.createElement(FlightMatchBreakdown, {
+            matchResult: poisonedOffer.matchResult,
+          }),
+        );
+        const resultsHtml = renderToStaticMarkup(
+          React.createElement(FlightResults, {
+            offers: [poisonedOffer],
+            mode: 'MATCHED',
+            onSelectFlight: () => {},
+          }),
+        );
+
+        const combinedMarkup = `${badgeHtml} ${breakdownHtml} ${resultsHtml}`;
+        assert.doesNotMatch(
+          combinedMarkup,
+          rawProviderIdRegex,
+          'Zero raw provider identifiers must appear across search presentation components',
+        );
+      });
+
+      it('asserts ZERO raw provider identifiers in SearchFormClient markup even with poisoned initial outcome', (): void => {
+        const outcome: FlightSearchOutcome = {
+          ok: true,
+          mode: 'MATCHED',
+          offers: [poisonedOffer],
+          meta: {
+            totalResults: 1,
+            searchHash: 'local-hash-abc',
+            cached: false,
+            requestedCabinClass: 'economy',
+            scoringVersion: 'flight-match-v1',
+          },
+        };
+
+        const formHtml = renderToStaticMarkup(
+          React.createElement(SearchFormClient, {
+            initialOutcome: outcome,
+            initialSortBy: 'BEST_MATCH',
+          }),
+        );
+
+        assert.doesNotMatch(
+          formHtml,
+          rawProviderIdRegex,
+          'Zero raw provider identifiers must appear in SearchFormClient DOM tree',
+        );
+      });
+
+      it('safely neutralizes raw provider identifiers if present in explanation params', (): void => {
+        const providerPoisonedExplanations = [
+          {
+            key: 'match.airline.preferred',
+            params: { airline: 'off_duffel_carrier_9988' },
+          },
+          {
+            key: 'constraint.airline.blacklisted',
+            params: { airline: 'ord_provider_blocked_7766' },
+          },
+          {
+            key: 'match.arrival.in_window',
+            params: { windowStart: 'off_start_time', windowEnd: 12 },
+          },
+          {
+            key: 'match.departure.in_window',
+            params: { windowStart: 8, windowEnd: 'duffel_end_time' },
+          },
+        ];
+
+        for (const exp of providerPoisonedExplanations) {
+          const formatted = formatExplanation(exp as unknown as Parameters<typeof formatExplanation>[0]);
+          assert.doesNotMatch(
+            formatted,
+            rawProviderIdRegex,
+            `formatExplanation must never leak raw provider IDs for key ${exp.key}`,
+          );
+        }
+      });
+    });
+
+    describe('Negative Privacy Boundary - Zero Customer PII & Auth Tokens', (): void => {
+      it('asserts ZERO customer PII or bearer auth tokens in FlightResultCard or search cards markup', (): void => {
+        const cardHtml = renderToStaticMarkup(
+          React.createElement(FlightResultCard, {
+            offer: poisonedOffer,
+            onSelect: () => {},
+          }),
+        );
+
+        assert.doesNotMatch(cardHtml, bearerTokenRegex, 'No bearer tokens in search card DOM');
+        assert.doesNotMatch(cardHtml, passportRegex, 'No passport numbers in search card DOM');
+        assert.doesNotMatch(cardHtml, dobRegex, 'No dates of birth in search card DOM');
+        assert.doesNotMatch(cardHtml, streetAddressRegex, 'No street addresses in search card DOM');
+      });
+
+      it('safely neutralizes customer PII and bearer auth tokens if injected into explanation params', (): void => {
+        const piiPoisonedExplanations = [
+          {
+            key: 'match.airline.preferred',
+            params: { airline: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.secretToken' },
+          },
+          {
+            key: 'constraint.airline.blacklisted',
+            params: { airline: 'PA987654321' },
+          },
+          {
+            key: 'match.airline.preferred',
+            params: { airline: '1985-05-20' },
+          },
+          {
+            key: 'match.airline.preferred',
+            params: { airline: '742 Evergreen Terrace, Springfield, OR 97477' },
+          },
+          {
+            key: 'match.arrival.in_window',
+            params: { windowStart: 'Bearer eyJtoken', windowEnd: 10 },
+          },
+        ];
+
+        for (const exp of piiPoisonedExplanations) {
+          const formatted = formatExplanation(exp as unknown as Parameters<typeof formatExplanation>[0]);
+          assert.doesNotMatch(formatted, bearerTokenRegex, `Bearer token leaked in ${exp.key}`);
+          assert.doesNotMatch(formatted, passportRegex, `Passport number leaked in ${exp.key}`);
+          assert.doesNotMatch(formatted, dobRegex, `Date of birth leaked in ${exp.key}`);
+          assert.doesNotMatch(formatted, streetAddressRegex, `Street address leaked in ${exp.key}`);
+        }
+      });
+    });
+
+    describe('Explanation Allowlist Verification', (): void => {
+      const allApprovedKeys = [
+        'match.price.below_median',
+        'match.price.above_median',
+        'match.price.at_median',
+        'match.airline.preferred',
+        'match.airline.neutral',
+        'match.arrival.in_window',
+        'match.arrival.near_window',
+        'match.arrival.outside_window',
+        'match.cabin.exact',
+        'match.cabin.adjacent',
+        'match.cabin.mismatch',
+        'match.departure.in_window',
+        'match.departure.near_window',
+        'match.departure.outside_window',
+        'match.baggage.checked_included',
+        'match.baggage.checked_missing',
+        'match.baggage.not_required',
+        'match.duration.below_median',
+        'match.duration.at_median',
+        'match.duration.above_median',
+        'match.stops.within_preference',
+        'match.stops.exceeds_preference',
+        'match.stops.relative',
+        'constraint.airline.blacklisted',
+      ];
+
+      it('asserts that raw server keys are NEVER shown directly to users across all approved keys', (): void => {
+        const sampleParams: Record<string, unknown> = {
+          percentDiff: 10,
+          airline: 'SkyWings',
+          windowStart: 8,
+          windowEnd: 11,
+          stops: 1,
+          maxStops: 2,
+        };
+
+        for (const key of allApprovedKeys) {
+          const formatted = formatExplanation({
+            key,
+            params: sampleParams,
+          });
+
+          // Must not be empty
+          assert.ok(formatted.length > 0);
+          // Must never contain the raw server key
+          assert.doesNotMatch(
+            formatted,
+            new RegExp(`\\b${key.replace('.', '\\.')}\\b`),
+            `Raw server key "${key}" must not be exposed in user-facing explanation`,
+          );
+          assert.doesNotMatch(formatted, /^match\.|^constraint\./);
+        }
+      });
+
+      it('safely falls back to "Match criterion" for unknown or unapproved keys', (): void => {
+        const unapprovedKeys = [
+          'match.unknown.server_internal_key',
+          'constraint.unknown.rule',
+          'random.server.metric',
+          '',
+          'completely_invalid_key',
+        ];
+
+        for (const key of unapprovedKeys) {
+          const formatted = formatExplanation({
+            key,
+            params: { someData: 123 },
+          });
+          assert.equal(formatted, 'Match criterion');
+        }
+      });
+
+      it('safely falls back to "Match criterion" for JavaScript object prototype property keys', (): void => {
+        const prototypeProperties = [
+          'toString',
+          'valueOf',
+          'constructor',
+          '__proto__',
+          'isPrototypeOf',
+          'hasOwnProperty',
+          'propertyIsEnumerable',
+        ];
+
+        for (const key of prototypeProperties) {
+          const formatted = formatExplanation({
+            key,
+            params: {},
+          });
+          assert.equal(formatted, 'Match criterion');
+        }
+      });
+
+      it('formats plain text explanations cleanly without literal HTML entities like &#39; or &amp;', (): void => {
+        const formattedAirline = formatExplanation({
+          key: 'match.airline.preferred',
+          params: { airline: "Sky's Limit & Oceanic Air" },
+        });
+        assert.equal(formattedAirline, "Matches preferred airline (Sky's Limit & Oceanic Air)");
+        assert.doesNotMatch(formattedAirline, /&#39;|&amp;|&quot;|&lt;|&gt;/);
+
+        const formattedViolation = formatExplanation({
+          key: 'constraint.airline.blacklisted',
+          params: { airline: "Devil's Airline" },
+        });
+        assert.equal(formattedViolation, "Blacklisted airline (Devil's Airline)");
+        assert.doesNotMatch(formattedViolation, /&#39;|&amp;|&quot;|&lt;|&gt;/);
+      });
+
+      it('verifies XSS prevention: untrusted parameter values cannot inject HTML or script tags', (): void => {
+        const xssPayloads = [
+          '<script>alert("XSS")</script>',
+          '<img src=x onerror="alert(\'XSS\')" />',
+          '<svg onload=alert(1)>',
+          '"><script>alert(document.cookie)</script>',
+          "'-alert(1)-'",
+          '<iframe src="javascript:alert(1)">',
+        ];
+
+        for (const payload of xssPayloads) {
+          const formattedAirline = formatExplanation({
+            key: 'match.airline.preferred',
+            params: { airline: payload },
+          });
+
+          // Assert raw dangerous HTML tags do not exist in string
+          assert.doesNotMatch(formattedAirline, /<script[^>]*>|<img[^>]*>|<svg[^>]*>|<iframe[^>]*>/i);
+
+          const formattedViolation = formatExplanation({
+            key: 'constraint.airline.blacklisted',
+            params: { airline: payload },
+          });
+          assert.doesNotMatch(formattedViolation, /<script[^>]*>|<img[^>]*>|<svg[^>]*>|<iframe[^>]*>/i);
+
+          // Render into breakdown and badge components to ensure static markup is safe
+          const xssMatchResult: FlightMatchResult = {
+            eligibility: {
+              eligible: false,
+              violations: [
+                {
+                  constraint: 'BLACKLISTED_AIRLINE',
+                  explanation: {
+                    key: 'constraint.airline.blacklisted',
+                    params: { airline: payload },
+                  },
+                },
+              ],
+            },
+            score: null,
+            matchLevel: null,
+            breakdown: [],
+            metadata: {
+              scoringVersion: 'flight-match-v1',
+              activeWeights: poisonedOffer.matchResult!.metadata.activeWeights,
+            },
+          };
+
+          const breakdownHtml = renderToStaticMarkup(
+            React.createElement(FlightMatchBreakdown, { matchResult: xssMatchResult }),
+          );
+          const badgeHtml = renderToStaticMarkup(
+            React.createElement(FlightMatchBadge, { matchResult: xssMatchResult }),
+          );
+
+          assert.doesNotMatch(breakdownHtml, /<script|<iframe/i);
+          assert.doesNotMatch(badgeHtml, /<script|<iframe/i);
+        }
+      });
+    });
+
+    describe('Strict Invariants (Zero Hex & Semantic Tokens)', (): void => {
+      it('asserts ZERO hardcoded hex colors across all search components rendered in T059', (): void => {
+        const cardHtml = renderToStaticMarkup(
+          React.createElement(FlightResultCard, { offer: poisonedOffer, onSelect: () => {} }),
+        );
+        const badgeHtml = renderToStaticMarkup(
+          React.createElement(FlightMatchBadge, { matchResult: poisonedOffer.matchResult }),
+        );
+        const breakdownHtml = renderToStaticMarkup(
+          React.createElement(FlightMatchBreakdown, { matchResult: poisonedOffer.matchResult }),
+        );
+        const controlsHtml = renderToStaticMarkup(
+          React.createElement(FlightResultsControls, { mode: 'MATCHED' }),
+        );
+        const resultsHtml = renderToStaticMarkup(
+          React.createElement(FlightResults, {
+            offers: [poisonedOffer],
+            mode: 'MATCHED',
+            onSelectFlight: () => {},
+          }),
+        );
+
+        const allMarkup = `${cardHtml} ${badgeHtml} ${breakdownHtml} ${controlsHtml} ${resultsHtml}`;
+        assert.doesNotMatch(allMarkup, /#[0-9a-fA-F]{3,6}/, 'Never use hardcoded hex colors');
+      });
+
+      it('asserts ZERO raw Tailwind palette classes (e.g. text-blue-500, bg-red-600) across components', (): void => {
+        const cardHtml = renderToStaticMarkup(
+          React.createElement(FlightResultCard, { offer: poisonedOffer, onSelect: () => {} }),
+        );
+        const badgeHtml = renderToStaticMarkup(
+          React.createElement(FlightMatchBadge, { matchResult: poisonedOffer.matchResult }),
+        );
+        const breakdownHtml = renderToStaticMarkup(
+          React.createElement(FlightMatchBreakdown, { matchResult: poisonedOffer.matchResult }),
+        );
+
+        const allMarkup = `${cardHtml} ${badgeHtml} ${breakdownHtml}`;
+        // Verify no raw tailwind palette color classes like text-red-500, bg-blue-600, border-gray-200
+        const rawPaletteClassRegex = /\b(?:text|bg|border)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3}\b/;
+        assert.doesNotMatch(allMarkup, rawPaletteClassRegex, 'Only semantic tokens permitted');
+      });
+    });
+  });
 

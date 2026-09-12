@@ -181,9 +181,7 @@ The repository enforces automated continuous integration via `.github/workflows/
    - **Branch Protection Requirement**: Only require `ci-status` on branch protection rules for `development`.
 
 <!-- SPECKIT START -->
-
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/022-flight-match-scoring/plan.md
-
+at specs/023-security-systems/plan.md
 <!-- SPECKIT END -->

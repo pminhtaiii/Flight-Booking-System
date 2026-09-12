@@ -8,8 +8,8 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from agent.config import get_settings
-from agent.guardrails.nemo import NemoGuardrailService
 from agent.middleware.auth import JWTAuthMiddleware
+from agent.middleware.body_limit import BodyLimitMiddleware
 from agent.streaming.sse import router as sse_router
 
 settings = get_settings()
@@ -30,11 +30,6 @@ async def lifespan(app: FastAPI):
     if settings.REDIS_URL:
         await init_redis(settings.REDIS_URL)
 
-    # Pre-load NeMo Guardrails configuration at service startup (M6)
-    guardrails = NemoGuardrailService()
-    app.state.guardrails = guardrails
-    # Run async probe on startup
-    await guardrails.probe()
     # Initialize message queue manager
     from agent.queue.message_queue import MessageQueueManager
 
@@ -43,6 +38,11 @@ async def lifespan(app: FastAPI):
         lock_ttl_ms=settings.SESSION_LOCK_TTL_MS,
         refresh_interval=settings.SESSION_LOCK_REFRESH_INTERVAL_SECONDS,
     )
+
+    from agent.guardrails.gateway import GuardrailGateway
+    from agent.guardrails.registry import create_production_registry
+
+    app.state.guardrail_gateway = GuardrailGateway(create_production_registry())
     yield
     # Graceful shutdown: cancel and await all active runner tasks
     if active_runners:
@@ -98,6 +98,7 @@ async def validate_origin_middleware(request: Request, call_next):
     return await call_next(request)
 
 
+app.add_middleware(BodyLimitMiddleware, max_bytes=65536)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
@@ -127,7 +128,7 @@ async def health_live() -> dict[str, str]:
 @app.get("/health")
 async def health_check(request: Request):
     """
-    Perform a health check verification by checking NestJS, Redis, and NeMo Guardrails status.
+    Perform a health check for transport dependencies only.
     """
     nestjs_status = "ok"
     nestjs_latency = 0
@@ -147,24 +148,6 @@ async def health_check(request: Request):
 
     nestjs_latency = int((time.time() - start_time) * 1000)
 
-    guardrails = getattr(request.app.state, "guardrails", None)
-
-    guardrails_configured = bool(
-        guardrails is not None and settings.MIMO_API_URL and settings.MIMO_API_KEY
-    )
-    guardrails_healthy = guardrails.is_healthy() if guardrails_configured else False
-
-    if guardrails_configured:
-        guardrails_status = "ok" if guardrails_healthy else "down"
-        model_loaded = guardrails_healthy
-        llm_status = "ok" if guardrails_healthy else "down"
-    else:
-        guardrails_status = "not_configured"
-        model_loaded = False
-        llm_status = "not_configured"
-
-    llm_latency = None
-
     redis_status = "ok"
     try:
         from agent.infrastructure.redis import get_redis_client
@@ -181,20 +164,14 @@ async def health_check(request: Request):
         redis_status = "down"
 
     overall_status = "ok"
-    if (
-        nestjs_status == "down"
-        or redis_status == "down"
-        or not guardrails_configured
-        or not guardrails_healthy
-    ):
+    if nestjs_status == "down" or redis_status == "down":
         overall_status = "degraded"
 
     return {
         "status": overall_status,
         "dependencies": {
-            "llm": {"status": llm_status, "latencyMs": llm_latency},
             "nestjsApi": {"status": nestjs_status, "latencyMs": nestjs_latency},
-            "guardrails": {"status": guardrails_status, "modelLoaded": model_loaded},
+            "guardrails": {"status": "deterministic"},
             "redis": {"status": redis_status},
         },
         "version": "0.1.0",

@@ -268,6 +268,23 @@ def test_trusted_search_result_validates_fields_and_forbids_extra():
     with pytest.raises(ValidationError):
         TrustedSearchResult.model_validate(extra_payload)
 
+    # Forbids V2 score and match fields
+    forbidden_score_fields = [
+        "score",
+        "matchScore",
+        "matchLevel",
+        "scoreBreakdown",
+        "matchResult",
+        "algorithmVersion",
+        "mode",
+        "scoringVersion",
+    ]
+    for field in forbidden_score_fields:
+        score_payload = _make_valid_result_payload(1)
+        score_payload[field] = 95.0 if "score" in field.lower() else "STRONG"
+        with pytest.raises(ValidationError):
+            TrustedSearchResult.model_validate(score_payload)
+
 
 def test_trusted_snapshot_validates_contiguous_1_indexed_results():
     # Valid: 1, 2, 3
@@ -344,6 +361,13 @@ def test_trusted_snapshot_forbids_extra_fields():
     with pytest.raises(ValidationError) as exc_info:
         TrustedSearchSnapshot.model_validate(extra_result)
     assert "Extra inputs are not permitted" in str(exc_info.value)
+
+    # Forbids score fields on snapshot
+    for field in ["score", "matchScore", "matchLevel", "matchResult", "algorithmVersion", "mode"]:
+        extra_score_snapshot = _make_valid_snapshot_payload(**{field: "disallowed"})
+        with pytest.raises(ValidationError) as exc_info:
+            TrustedSearchSnapshot.model_validate(extra_score_snapshot)
+        assert "Extra inputs are not permitted" in str(exc_info.value)
 
 
 def test_trusted_snapshot_validates_required_fields():
@@ -634,3 +658,31 @@ def test_project_snapshot_results_excludes_all_pii_and_internal_ids():
     assert item["currency"] == "USD"
     assert item["departureAt"] in ("2026-09-01T08:30:00Z", "2026-09-01T08:30:00+00:00")
     assert item["arrivalAt"] in ("2026-09-01T10:30:00Z", "2026-09-01T10:30:00+00:00")
+
+    # Confirm score and match fields are strictly excluded from browser projection
+    for field in ["score", "matchScore", "matchLevel", "matchResult", "algorithmVersion", "mode"]:
+        assert field not in item
+
+
+@pytest.mark.asyncio
+async def test_persisted_snapshot_is_strictly_score_free():
+    fake_redis = FakeAsyncRedis()
+    repo = TrustedSnapshotRepository(fake_redis)
+
+    snapshot = TrustedSearchSnapshot.model_validate(
+        _make_valid_snapshot_payload(userId="user_score_free", sessionId="session_score_free")
+    )
+    await repo.save_snapshot(snapshot)
+
+    raw_json = await fake_redis.get("chat:snapshot:user_score_free:session_score_free")
+    assert raw_json is not None
+    stored = json.loads(raw_json)
+
+    # Ensure no score keys at root
+    for key in ["score", "matchScore", "matchLevel", "matchResult", "algorithmVersion", "mode"]:
+        assert key not in stored
+
+    # Ensure no score keys in results
+    for res in stored.get("results", []):
+        for key in ["score", "matchScore", "matchLevel", "matchResult", "breakdown", "weights"]:
+            assert key not in res

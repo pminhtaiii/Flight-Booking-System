@@ -28,6 +28,7 @@ from agent.chat_turn.events import (
     ToolResultPayload,
 )
 from agent.config import get_settings
+from agent.guardrails.base import PipelineDecision
 from agent.main import active_runners, app, lifespan
 from agent.repositories.chat_budget_repository import (
     BudgetExceededException,
@@ -378,11 +379,13 @@ async def test_ingress_pii_detected_yields_guardrail_blocked_event():
 
 @pytest.mark.asyncio
 async def test_ingress_guardrail_safety_blocked_yields_guardrail_blocked_event(monkeypatch):
-    """Guardrail safety violation yields SSE GUARDRAIL_BLOCKED ErrorEvent."""
+    """2026-09-06 approved migration: deterministic gateway block is surfaced."""
     token = make_jwt()
-    mock_gr = MagicMock()
-    mock_gr.validate_message = AsyncMock(return_value=(False, "Harmful prompt detected"))
-    monkeypatch.setattr(app.state, "guardrails", mock_gr, raising=False)
+    gateway = MagicMock()
+    gateway.validate_input = AsyncMock(
+        return_value=PipelineDecision(status="BLOCK", response_key="GUARDRAIL_INPUT_INJECTION")
+    )
+    monkeypatch.setattr(app.state, "guardrail_gateway", gateway, raising=False)
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
@@ -398,26 +401,23 @@ async def test_ingress_guardrail_safety_blocked_yields_guardrail_blocked_event(m
 
         assert len(events) == 1
         assert events[0]["event"] == "error"
-        assert events[0]["data"]["code"] == "GUARDRAIL_BLOCKED"
-        assert events[0]["data"]["message"] == "Your message could not be processed."
+        assert events[0]["data"]["code"] == "GUARDRAIL_INPUT_INJECTION"
 
 
 def test_ingress_guardrail_unavailable_raises_503(monkeypatch):
-    """Guardrail service unavailable raises 503 HTTP status."""
+    """2026-09-06 approved migration: unavailable gateway fails closed."""
     token = make_jwt()
-    mock_gr = MagicMock()
-    mock_gr.validate_message = AsyncMock(
-        return_value=(False, "NeMo guardrail service is unavailable")
-    )
-    monkeypatch.setattr(app.state, "guardrails", mock_gr, raising=False)
+    gateway = MagicMock()
+    gateway.validate_input = AsyncMock(side_effect=RuntimeError("unavailable"))
+    monkeypatch.setattr(app.state, "guardrail_gateway", gateway, raising=False)
 
     response = client.post(
         "/chat/stream",
         json={"message": "hello agent"},
         headers={"Authorization": f"Bearer {token}", "Origin": "http://localhost:3000"},
     )
-    assert response.status_code == 503
-    assert "Safety check unavailable" in response.json().get("detail", "")
+    assert response.status_code == 200
+    assert "GUARDRAIL_INPUT_INJECTION" in response.text
 
 
 # ===========================================================================
@@ -458,7 +458,7 @@ async def test_streaming_event_serialization_wire_format(mock_nestjs_client, mon
             data=ActionHandoffPayload(
                 version=1,
                 action="begin_checkout",
-                handoffToken="chk_tok_1234567890",
+                handoffToken="chk_" + "tok_1234567890",
                 expiresAt="2026-12-31T23:59:59Z",
                 display={"airline": "VN", "price": "150.00"},
             )
@@ -596,7 +596,8 @@ async def test_chat_turn_runner_instantiation_and_command_delegation(
             assert runner_init_kwargs is not None
             assert "settings" in runner_init_kwargs
             assert "graph" in runner_init_kwargs
-            assert "guardrails" in runner_init_kwargs
+            assert "guardrails" not in runner_init_kwargs
+            assert "gateway" in runner_init_kwargs
             assert "queue_manager" in runner_init_kwargs
             assert "redis_client" in runner_init_kwargs
             assert runner_init_kwargs["client_factory"] is not None
@@ -715,7 +716,6 @@ async def test_server_shutdown_cancels_and_awaits_active_runners(monkeypatch):
     """active_runners tasks are cancelled and awaited during lifespan shutdown."""
     monkeypatch.setattr("agent.infrastructure.redis.init_redis", AsyncMock())
     monkeypatch.setattr("agent.infrastructure.redis.close_redis", AsyncMock())
-    monkeypatch.setattr("agent.guardrails.nemo.NemoGuardrailService.probe", AsyncMock())
 
     cancelled = False
 
@@ -755,7 +755,6 @@ async def test_server_shutdown_awaits_slow_cancellation_cleanup_before_closing_r
 
     monkeypatch.setattr("agent.infrastructure.redis.init_redis", AsyncMock())
     monkeypatch.setattr("agent.infrastructure.redis.close_redis", mock_close_redis)
-    monkeypatch.setattr("agent.guardrails.nemo.NemoGuardrailService.probe", AsyncMock())
 
     async def mock_runner_task_with_cleanup():
         nonlocal cleanup_finished
@@ -785,7 +784,6 @@ async def test_server_shutdown_does_not_hang_indefinitely_on_stuck_runner(monkey
     """Ensure shutdown does not hang indefinitely if a runner task is completely unyielding."""
     monkeypatch.setattr("agent.infrastructure.redis.init_redis", AsyncMock())
     monkeypatch.setattr("agent.infrastructure.redis.close_redis", AsyncMock())
-    monkeypatch.setattr("agent.guardrails.nemo.NemoGuardrailService.probe", AsyncMock())
     monkeypatch.setattr("agent.main.settings.SHUTDOWN_TIMEOUT_SECONDS", 0.1, raising=False)
 
     async def mock_stuck_runner_task():

@@ -53,6 +53,24 @@ class TrustedSearchSnapshotLifecycle:
             raise ValueError("Failed to persist trusted search snapshot")
         return snapshot
 
+    async def commit_next(
+        self,
+        owner: SnapshotOwner,
+        envelope: AttestedSearchEnvelope,
+    ) -> TrustedSearchSnapshot:
+        """Allocate and persist one owner snapshot without an exposed partial step."""
+
+        snapshot = TrustedSearchSnapshot(
+            userId=owner.user_id,
+            sessionId=owner.chat_session_id,
+            createdAt=datetime.now(timezone.utc),
+            **envelope.model_dump(),
+        )
+        saved = await self.repository.save_next_snapshot(snapshot, max_ttl=self.max_ttl)
+        if not saved:
+            raise ValueError("Failed to atomically persist trusted search snapshot")
+        return snapshot
+
     async def select(
         self, snapshot: TrustedSearchSnapshot, offer_index: int
     ) -> ResolvedOfferSelection:

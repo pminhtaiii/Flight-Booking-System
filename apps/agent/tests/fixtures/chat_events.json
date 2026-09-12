@@ -2,7 +2,7 @@
   "valid_handoff_event": {
     "version": 1,
     "action": "begin_checkout",
-    "handoffToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "handoffToken": "mock_handoff_token_placeholder",
     "expiresAt": "2026-08-05T10:00:00Z",
     "display": {
       "airline": "Delta Air Lines",
@@ -31,7 +31,7 @@
   "invalid_handoff_event_extra_fields": {
     "version": 1,
     "action": "begin_checkout",
-    "handoffToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "handoffToken": "mock_handoff_token_placeholder",
     "expiresAt": "2026-08-05T10:00:00Z",
     "display": {
       "airline": "Delta Air Lines",

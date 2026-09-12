@@ -38,20 +38,20 @@ export class AgentBookingReadinessRequestDto {
   passengers!: AgentBookingReadinessPassengerDto[];
 }
 
+export type AgentBookingReadinessIssueDto = {
+  section: string;
+  name: string;
+  status: string;
+  reason: string | null;
+};
+
 export type AgentBookingReadinessResponseDto = {
   scope: 'DOMESTIC' | 'INTERNATIONAL' | 'UNKNOWN';
   ready: boolean;
   passengers: Array<{
     passengerType: PassengerType;
     passengerOrdinal: number;
-    sections: Array<{
-      name: string;
-      fields: Array<{
-        name: string;
-        status: string;
-        reason: string | null;
-      }>;
-    }>;
+    issues: AgentBookingReadinessIssueDto[];
   }>;
   nextAction: 'COMPLETE_PROFILE' | 'CONTINUE_CHECKOUT';
 };

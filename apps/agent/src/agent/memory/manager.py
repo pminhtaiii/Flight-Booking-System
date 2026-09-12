@@ -2,9 +2,11 @@ import logging
 from typing import Any, Dict, List, Optional
 
 import tiktoken
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from agent.agents.chat_agent import get_chat_model
+from agent.guardrails.base import AdmissionContext
+from agent.guardrails.output_pipeline import approved_model_content, payload_free_config
 from agent.tools.nestjs_client import NestJSClient
 
 logger = logging.getLogger("agent.memory")
@@ -16,9 +18,15 @@ class MemoryManager:
     asynchronous summarization of sliding chat memory context.
     """
 
-    def __init__(self, window_size: int = 20, token_budget: int = 4000):
+    def __init__(
+        self,
+        window_size: int = 20,
+        token_budget: int = 4000,
+        gateway: Optional[Any] = None,
+    ):
         self.window_size = window_size
         self.token_budget = token_budget
+        self.gateway = gateway
         try:
             self.encoding = tiktoken.get_encoding("cl100k_base")
         except Exception as e:
@@ -110,26 +118,74 @@ class MemoryManager:
 
         history_text = "\n".join(formatted_messages)
 
-        # Build prompt
-        prompt = "You are a helpful travel assistant. Your task is to update the conversation summary with the new messages that have occurred. Be concise.\n\n"
-        if existing_summary:
-            prompt += f"Existing Summary:\n{existing_summary}\n\n"
+        # Build prompt using lower-trust envelope: instructions in trusted SystemMessage,
+        # and untrusted existing summary / new messages in HumanMessage envelope
+        system_instruction = (
+            "You are a helpful travel assistant. Your task is to update the conversation summary "
+            "with the new messages that have occurred. Be concise."
+        )
 
-        prompt += f"New Messages to incorporate:\n{history_text}\n\n"
-        prompt += "Please provide a new consolidated summary of the conversation so far."
+        envelope_parts = []
+        if existing_summary:
+            envelope_parts.append(
+                f"[System Note: Existing Summary (untrusted context)]:\n{existing_summary}"
+            )
+
+        envelope_parts.append(
+            f"[System Note: New Messages to incorporate (untrusted context)]:\n{history_text}"
+        )
+        envelope_parts.append(
+            "Please provide a new consolidated summary of the conversation so far."
+        )
+
+        envelope_content = "\n\n".join(envelope_parts)
 
         try:
             model = get_chat_model()
-            # Generate new summary using the model
-            messages = [SystemMessage(content=prompt)]
-            response = await model.ainvoke(messages)
+            messages = [
+                SystemMessage(content=system_instruction),
+                HumanMessage(content=envelope_content),
+            ]
+            response = await model.ainvoke(messages, config=payload_free_config())
             new_summary = response.content
+
+            if not await approved_model_content(new_summary):
+                logger.warning("generated_summary_rejected")
+                return
+
+            # Validate summary through security gateway before persistence
+            if self.gateway is not None:
+                try:
+                    trace_id_val = getattr(client, "trace_id", None)
+                    if not isinstance(trace_id_val, str):
+                        trace_id_val = "trace-summary"
+                    corr_id_val = getattr(client, "correlation_id", None)
+                    if not isinstance(corr_id_val, str):
+                        corr_id_val = None
+
+                    context = AdmissionContext(
+                        user_id="system-summary",
+                        chat_session_id=session_id,
+                        trace_id=trace_id_val,
+                        correlation_id=corr_id_val,
+                        policy_version="2026-09-05",
+                    )
+                    decision = await self.gateway.validate_input(context, str(new_summary))
+                    if decision.status != "PASS":
+                        logger.warning(
+                            "Generated summary rejected by guardrail gateway: %s",
+                            decision.response_key or "BLOCK",
+                        )
+                        return
+                except Exception:
+                    logger.warning("Guardrail validation of summary failed closed.")
+                    return
 
             # Persist summary via NestJS API
             await client.create_message(
                 session_id=session_id, sender="AGENT", message_type="SUMMARY", content=new_summary
             )
-            logger.info(f"Successfully updated summary for session {session_id}.")
-        except Exception as e:
-            logger.error(f"Failed to generate or persist summary: {e!s}. Fallback to truncation.")
+            logger.info("Successfully updated summary for session %s.", session_id)
+        except Exception:
+            logger.error("Failed to generate or persist summary. Fallback to truncation.")
             # Do not raise the exception; fallback to truncation is handled by not saving the summary.

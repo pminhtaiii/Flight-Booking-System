@@ -1,94 +1,135 @@
-from unittest.mock import AsyncMock, MagicMock, patch
+"""End-to-end deterministic output-boundary regression coverage.
 
-import httpx
+2026-09-06 user-approved replacement for output NeMo integration tests.
+"""
+
+from types import SimpleNamespace
+
 import pytest
-from langchain_core.messages import AIMessage
 
-from agent.config import get_settings
-from agent.main import app
-from agent.models.requests import RouteDecision
-from tests.test_sse_integration import MockStreamingLLM, get_auth_headers, parse_sse
-
-
-@pytest.fixture
-def mock_nestjs_client():
-    client = MagicMock()
-    client.check_user_access = AsyncMock(return_value={"allowed": True})
-    client.get_memory = AsyncMock(return_value={"recentMessages": [], "summary": None})
-    client.create_message_batch = AsyncMock(
-        return_value={
-            "messages": [
-                {"id": "msg-user-111", "sender": "USER"},
-                {"id": "msg-agent-222", "sender": "AGENT"},
-            ]
-        }
-    )
-    return client
+from agent.guardrails.output_pipeline import OutputGuardrailBlockedError, OutputGuardrailPipeline
 
 
 @pytest.mark.asyncio
-async def test_e2e_output_guardrail_pipeline_validation(mock_nestjs_client, monkeypatch):
-    # Enable output guardrail in config
-    settings = get_settings()
-    monkeypatch.setattr(settings, "OUTPUT_GUARDRAIL_ENABLED", True)
+async def test_safe_completion_flushes_after_deterministic_inspection() -> None:
+    pipeline = OutputGuardrailPipeline(SimpleNamespace(enabled=True))
+    emitted = [chunk async for chunk in pipeline.process_token("A safe itinerary update.")]
+    emitted.extend([chunk async for chunk in pipeline.flush()])
+    assert "".join(emitted) == "A safe itinerary update."
 
-    # Setup mocked NeMo guardrail service
-    mock_gr = MagicMock()
-    mock_gr.is_healthy.return_value = True
-    mock_gr.validate_message = AsyncMock(return_value=(True, ""))
 
-    # First chunk is safe, second is UNSAFE (contains "unsafe" or PII)
-    async def mock_validate_chunk(chunk: str):
-        if "unsafe" in chunk.lower():
-            return False, "Output safety violation: unsafe text."
-        return True, ""
+@pytest.mark.asyncio
+async def test_detected_card_raises_hard_stop() -> None:
+    pipeline = OutputGuardrailPipeline(SimpleNamespace(enabled=True))
+    with pytest.raises(OutputGuardrailBlockedError):
+        async for _ in pipeline.process_token("4111-1111-1111-1111"):
+            pass
 
-    mock_gr.validate_output_chunk = AsyncMock(side_effect=mock_validate_chunk)
-    monkeypatch.setattr(app.state, "guardrails", mock_gr, raising=False)
 
-    headers = get_auth_headers()
-    llm = MockStreamingLLM(
-        responses=[AIMessage(content="Chunk number one is safe. Chunk number two is unsafe.")]
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Your flight is confirmed for 2026-09-10 10:30.",
+        "Departure: 2026-09-10 10:30, Arrival: 2026-09-10 14:00.",
+        "Trip dates: 2026-09-10 - 2026-09-15.",
+        "Flight at 2026-09-10 10:30:00 departing on 2026-09-10.",
+        "ISO timestamp 2026-09-10T10:30:00Z confirmed.",
+    ],
+)
+async def test_itinerary_timestamps_not_blocked_by_guardrail(text: str) -> None:
+    from agent.guardrails.output_pipeline import (
+        _PHONE,
+        approved_model_content,
+        deterministic_pii_match,
     )
 
-    # Run the E2E stream request
-    with (
-        patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client),
-        patch("agent.agents.chat_agent.ChatOpenAI", return_value=llm),
-        patch(
-            "agent.graph.graph.invoke_router",
-            return_value=RouteDecision(intent="SEARCH", confidence=1.0, isCommitment=False),
-        ),
-    ):
-        transport = httpx.ASGITransport(app=app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
-            response = await ac.post(
-                "/chat/stream",
-                json={"message": "run e2e guardrail check", "sessionId": "session-e2e-og"},
-                headers=headers,
-            )
-            assert response.status_code == 200
+    # Neither _PHONE nor deterministic_pii_match should falsely flag itinerary dates/times
+    phone_matches = [m for m in _PHONE.finditer(text) if sum(c.isdigit() for c in m.group(0)) >= 10]
+    assert phone_matches == []
+    assert deterministic_pii_match(text) is None
+    assert await approved_model_content(text) is True
 
-            lines = [line async for line in response.aiter_lines()]
-            events = parse_sse(lines)
+    pipeline = OutputGuardrailPipeline(SimpleNamespace(enabled=True))
+    emitted = [chunk async for chunk in pipeline.process_token(text)]
+    emitted.extend([chunk async for chunk in pipeline.flush()])
+    assert "".join(emitted) == text
 
-            token_events = [e for e in events if e["event"] == "token"]
-            error_events = [e for e in events if e["event"] == "error"]
-            done_events = [e for e in events if e["event"] == "done"]
 
-            # The safe chunk must be streamed
-            assert len(token_events) == 1
-            assert token_events[0]["data"]["content"] == "Chunk number one is safe. "
+@pytest.mark.asyncio
+async def test_real_phone_with_itinerary_timestamp_is_blocked() -> None:
+    from agent.guardrails.output_pipeline import deterministic_pii_match
 
-            # The unsafe chunk must cause an OUTPUT_GUARDRAIL_BLOCKED error
-            assert len(error_events) == 1
-            assert error_events[0]["data"]["code"] == "OUTPUT_GUARDRAIL_BLOCKED"
-            assert error_events[0]["data"]["partialMessageId"] == "msg-agent-222"
-            assert len(done_events) == 0
+    text = "Your flight is on 2026-09-10 10:30. Call support at +1 415 555 2671."
+    match = deterministic_pii_match(text)
+    assert match is not None
+    assert "+1 415 555 2671" in match.group(0)
 
-            # Verify NestJS Client was called to persist only the safe chunk
-            assert mock_nestjs_client.create_message_batch.call_count == 2
-            call_args = mock_nestjs_client.create_message_batch.mock_calls[1].args
-            payload = call_args[1]
-            assert len(payload) == 1
-            assert payload[0]["content"] == "Chunk number one is safe. "
+    pipeline = OutputGuardrailPipeline(SimpleNamespace(enabled=True))
+    with pytest.raises(OutputGuardrailBlockedError):
+        async for _ in pipeline.process_token(text):
+            pass
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "text",
+    [
+        "2026-09-10 415-555-2671",
+        "415-555-2671 2026-09-10",
+        "Flight 2026-09-10 415-555-2671 confirmed",
+        "Call 415-555-2671 before 2026-09-10",
+    ],
+)
+async def test_adjacent_date_phone_numbers_are_blocked(text: str) -> None:
+    from agent.guardrails.output_pipeline import deterministic_pii_match
+
+    match = deterministic_pii_match(text)
+    assert match is not None, f"Expected phone number in {text!r} to be matched as PII"
+    assert "415-555-2671" in match.group(0) or "415" in match.group(0)
+
+    pipeline = OutputGuardrailPipeline(SimpleNamespace(enabled=True))
+    with pytest.raises(OutputGuardrailBlockedError):
+        async for _ in pipeline.process_token(text):
+            pass
+        async for _ in pipeline.flush():
+            pass
+
+
+@pytest.mark.asyncio
+async def test_approved_model_content_and_pipeline_respect_disabled_config() -> None:
+    from agent.guardrails.output_pipeline import approved_model_content
+
+    unsafe_content = "Contact traveler at +1 415 555 2671 or card 4111-1111-1111-1111"
+
+    # Default/enabled blocks unsafe content
+    assert await approved_model_content(unsafe_content) is False
+    assert await approved_model_content(unsafe_content, SimpleNamespace(enabled=True)) is False
+
+    # Disabled configs approve without blocking
+    assert await approved_model_content(unsafe_content, SimpleNamespace(enabled=False)) is True
+    assert (
+        await approved_model_content(
+            unsafe_content,
+            SimpleNamespace(output_guardrail=SimpleNamespace(enabled=False)),
+        )
+        is True
+    )
+    assert await approved_model_content(unsafe_content, {"enabled": False}) is True
+    assert (
+        await approved_model_content(unsafe_content, {"output_guardrail": {"enabled": False}})
+        is True
+    )
+    assert (
+        await approved_model_content(
+            unsafe_content,
+            {"configurable": {"output_guardrail": {"enabled": False}}},
+        )
+        is True
+    )
+
+    # Pipeline with disabled config allows content through without error
+    pipeline = OutputGuardrailPipeline(SimpleNamespace(enabled=False))
+    emitted = [chunk async for chunk in pipeline.process_token(unsafe_content)]
+    emitted.extend([chunk async for chunk in pipeline.flush()])
+    assert "".join(emitted) == unsafe_content

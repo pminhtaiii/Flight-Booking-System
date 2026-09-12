@@ -48,7 +48,7 @@ export function FlightResultsControls({
   const options: SortConfig[] = [primaryOption, ...OBJECTIVE_SORT_OPTIONS];
 
   const containerClasses = [
-    'flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 py-2',
+    'flex flex-col md:flex-row md:items-center md:justify-between gap-4 py-2',
     className,
   ]
     .filter(Boolean)
@@ -64,7 +64,7 @@ export function FlightResultsControls({
         )}
       </div>
 
-      <div className="flex items-center gap-2 self-end sm:self-auto">
+      <div className="flex items-center gap-2 self-start md:self-auto">
         <label htmlFor="flight-sort-select" className="text-xs font-medium text-text-secondary">
           Sort by
         </label>
@@ -75,7 +75,7 @@ export function FlightResultsControls({
           onChange={(event) => {
             onSortChange?.(event.target.value as FlightSortOption);
           }}
-          className="rounded-md border border-secondary-border bg-card px-3 py-1.5 text-xs font-medium text-text-primary shadow-sm transition focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          className="min-h-[44px] rounded-md border border-secondary-border bg-card px-3 py-1.5 text-xs font-medium text-text-primary shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
         >
           {options.map((option) => (
             <option key={option.value} value={option.value}>

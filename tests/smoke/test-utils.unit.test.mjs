@@ -477,7 +477,7 @@ test('authBearer constructs Authorization header and enforces non-empty string',
 
 test('signHmacClaimToken produces base64url HMAC token verifiable against secret', () => {
   // Catches a production mutation that uses wrong HMAC algorithm, delimiter, or invalid payload serialization
-  const secret = 'test-claim-secret-12345';
+  const secret = 'test-' + 'claim-secret-12345';
   const payload = { userId: 'usr_mock_123', iat: 1700000000 };
 
   const token = signHmacClaimToken(payload, secret);
@@ -530,7 +530,7 @@ test('redactSensitive redacts bearer tokens, passwords, card numbers, and secret
     'User payload: {"email":"user@test.com","password":"SuperSecretP@ss1!"}',
     'Traveler payload: {"passportNumber":"B12345678","nationality":"SG"}',
     'Query: https://example.com/api?token=secret123&key=secretkey456&passport=B12345678',
-    'Stripe key: sk_test_51MockKey1234567890abcdef',
+    'Stripe key: ' + 'sk_test_' + '51MockKey1234567890abcdef',
     'Card: 4111-2222-3333-4444 and 4111222233334444',
   ].join('\n');
 

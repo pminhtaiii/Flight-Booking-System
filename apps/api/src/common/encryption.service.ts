@@ -42,7 +42,7 @@ export class EncryptionService {
     let lastError: Error | null = null;
     for (const key of this.candidateKeys) {
       try {
-        const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+        const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv, { authTagLength: 16 });
         decipher.setAuthTag(authTag);
         const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
         return decrypted.toString('utf8');
@@ -102,7 +102,7 @@ export class EncryptionService {
     let lastError: Error | null = null;
     for (const key of this.candidateKeys) {
       try {
-        const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+        const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv, { authTagLength: 16 });
         decipher.setAAD(aad);
         decipher.setAuthTag(authTag);
         const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);

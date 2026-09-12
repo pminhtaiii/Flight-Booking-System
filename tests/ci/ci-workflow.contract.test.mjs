@@ -20,6 +20,7 @@ function validResults(changes = {}) {
     api: changes.api ? 'true' : 'false',
     web: changes.web ? 'true' : 'false',
     agent: changes.agent ? 'true' : 'false',
+    security: changes.security ? 'true' : 'false',
     'detect-changes': 'success',
     [smokeAndSanityJob]: ['api', 'web', 'agent'].some((service) => changes[service])
       ? 'success'
@@ -219,7 +220,7 @@ test('evaluator rejects every false-green job result', () => {
 test('evaluator accepts nested GitHub-summary shaped results and never throws for invalid input', () => {
   const flat = validResults({ api: true, agent: true });
   const nested = {
-    outputs: { api: flat.api, web: flat.web, agent: flat.agent },
+    outputs: { api: flat.api, web: flat.web, agent: flat.agent, security: flat.security },
     jobs: Object.fromEntries(workflowJobIds.map((job) => [job, flat[job]])),
   };
   assert.equal(evaluateCiStatus(nested).passed, true);
@@ -249,6 +250,7 @@ test('evaluator CLI emits JSON and fails closed', () => {
       API_CHANGED: 'false',
       WEB_CHANGED: 'false',
       AGENT_CHANGED: 'false',
+      SECURITY_CHANGED: 'false',
       API_GATE_RESULT: 'skipped',
       API_UNIT_TESTS_RESULT: 'skipped',
       API_E2E_TESTS_RESULT: 'skipped',
@@ -256,6 +258,8 @@ test('evaluator CLI emits JSON and fails closed', () => {
       WEB_BUILD_RESULT: 'skipped',
       AGENT_GATE_RESULT: 'skipped',
       AGENT_TESTS_RESULT: 'skipped',
+      SECURITY_SAST_RESULT: 'skipped',
+      SECURITY_SUPPLY_CHAIN_RESULT: 'skipped',
       SMOKE_AND_SANITY_RESULT: 'skipped',
     },
   });
@@ -275,13 +279,8 @@ test('workflow envelope uses the stable event, permissions, concurrency, and tim
   const source = workflow();
   assertContains(
     source,
-    /^on:\s*\n\s+pull_request:\s*\n\s+branches:\s*(?:\[development\]|\n\s+- development)\s*$/m,
-    'workflow must target development pull requests only',
-  );
-  assert.doesNotMatch(
-    source,
-    /^\s*(push|schedule|workflow_dispatch|workflow_call):/m,
-    'workflow must not have another trigger',
+    /^on:\s*\n\s+pull_request:\s*\n\s+branches:\s*(?:\[development\]|\n\s+- development)\s*\n\s+schedule:\s*\n\s+- cron:\s*['"][^'"]+['"]\s*$/m,
+    'workflow must target development pull requests and periodic scans',
   );
   assertContains(
     source,
@@ -471,9 +470,10 @@ test('workflow defines the required job graph, routing matrix, and fail-closed s
 
   const detect = jobBlock(source, 'detect-changes');
   for (const output of Object.keys(services)) {
+    const expression = `^\\s+${output}:\\s+\\$\\{\\{(?=.*outputs\\.${output}).*\\}\\}`;
     assertContains(
       detect,
-      new RegExp(`^\\s+${output}:\\s+\\$\\{\\{\\s*steps\\..*\\.outputs\\.${output}\\s*\\}\\}`, 'm'),
+      new RegExp(expression, 'm'),
       `detect-changes must publish ${output}`,
     );
   }
@@ -715,4 +715,78 @@ test('ci-status consumes the shared smoke-and-sanity result', () => {
     /SMOKE_AND_SANITY_RESULT:\s*\$\{\{\s*needs\.smoke-and-sanity\.result\s*\}\}/,
     'ci-status must pass the shared job conclusion to the evaluator',
   );
+});
+
+test('security routing handles required paths', () => {
+  const detect = jobBlock(workflow(), 'detect-changes');
+  const filter = filterBlock(detect, 'security');
+  const expectedPaths = [
+    '.github/workflows/**',
+    '.gitleaks.toml',
+    'scripts/security/**',
+    'tests/security/**',
+    'tests/security/toolchain.json',
+    'tests/security/exceptions.json',
+    'docs/security/**',
+    'package.json',
+    'pnpm-lock.yaml',
+    'pyproject.toml',
+    'apps/agent/pyproject.toml',
+    'uv.lock',
+    'apps/api/src/auth/**',
+    'apps/web/**auth**',
+    'apps/api/src/**',
+    'apps/agent/src/**',
+    'apps/web/components/**',
+  ];
+  for (const p of expectedPaths) {
+    assert.ok(filter.includes(p), `security filter must include ${p}`);
+  }
+});
+
+test('security-sast and security-supply-chain jobs meet strict CI guidelines', () => {
+  const source = workflow();
+  const sast = jobBlock(source, 'security-sast');
+  const sc = jobBlock(source, 'security-supply-chain');
+
+  for (const job of [sast, sc]) {
+    assertContains(job, /^    runs-on:\s+ubuntu-latest\s*$/m, 'must use fresh Ubuntu runner');
+    assertContains(job, /^    timeout-minutes:\s+10\s*$/m, 'must declare 10min timeout');
+    assertContains(job, /^    permissions:\s*\n\s+contents:\s+read\s*$/m, 'permissions must be contents: read');
+    assertContains(job, /^    needs:\s+(?:\[[^\]]*detect-changes[^\]]*\]|detect-changes)\s*$/m, 'must need detect-changes');
+    assertContains(job, /^    if:\s+\$\{\{\s*needs\.detect-changes\.outputs\.security\s*==\s*['"]true['"]\s*\}\}\s*$/m, 'must gate on security changed');
+  }
+
+  assertContains(sast, /pnpm\/action-setup@[a-f0-9]{40}/, 'sast must use pinned pnpm setup');
+  assertContains(sast, /version:\s*9\.15\.4/, 'sast must use pnpm 9.15.4');
+  assertContains(sast, /actions\/setup-node@[a-f0-9]{40}/, 'sast must use pinned setup-node');
+  assertContains(sast, /pnpm install --frozen-lockfile/, 'sast must install frozen dependencies');
+  assertContains(sast, /astral-sh\/setup-uv@[a-f0-9]{40}/, 'must use setup-uv');
+  assertContains(sast, /uv tool install --python 3\.11 --with "setuptools<80" semgrep==1\.88\.0/, 'must install semgrep 1.88.0');
+  assertContains(sast, /node scripts\/security\/run-sast\.mjs --mode full --sarif-output artifacts\/security\/sast\.json --strict-scanner/, 'must run run-sast');
+  assertContains(sast, /actions\/upload-artifact@[a-f0-9]{40}/, 'must upload artifacts');
+  assertContains(sast, /^        if:\s+always\(\)\s*$/m, 'must upload always');
+
+  assertContains(sc, /pnpm\/action-setup@[a-f0-9]{40}/, 'supply chain must use pinned pnpm setup');
+  assertContains(sc, /version:\s*9\.15\.4/, 'supply chain must use pnpm 9.15.4');
+  assertContains(sc, /actions\/setup-node@[a-f0-9]{40}/, 'supply chain must use pinned setup-node');
+  assertContains(sc, /astral-sh\/setup-uv@[a-f0-9]{40}/, 'supply chain must use pinned setup-uv');
+  assertContains(sc, /fetch-depth:\s+0/, 'Gitleaks history scan must fetch full history');
+  assertContains(sc, /ba6dbb656933921c775ee5a2d1c13a91046e7952e9d919f9bac4cec61d628e7d/, 'must verify Gitleaks v8.18.4 checksum');
+  assertContains(sc, /node scripts\/security\/run-supply-chain\.mjs --output artifacts\/security\/supply-chain\.json --strict/, 'must run run-supply-chain');
+  assertContains(sc, /actions\/upload-artifact@[a-f0-9]{40}/, 'must upload artifacts always');
+});
+
+test('ci-status processes security aggregates correctly', () => {
+  const source = workflow();
+  const summary = jobBlock(source, 'ci-status');
+
+  assertContains(summary, /SECURITY_CHANGED:\s*\$\{\{\s*needs\.detect-changes\.outputs\.security\s*\}\}/, 'must pass SECURITY_CHANGED');
+  assertContains(summary, /SECURITY_SAST_RESULT:\s*\$\{\{\s*needs\.security-sast\.result\s*\}\}/, 'must pass SECURITY_SAST_RESULT');
+  assertContains(summary, /SECURITY_SUPPLY_CHAIN_RESULT:\s*\$\{\{\s*needs\.security-supply-chain\.result\s*\}\}/, 'must pass SECURITY_SUPPLY_CHAIN_RESULT');
+  assertContains(summary, /SECURITY_REPORT_DIRECTORY:\s*artifacts\/security/, 'must pass SECURITY_REPORT_DIRECTORY');
+
+  assertContains(summary, /actions\/download-artifact@[a-f0-9]{40}/, 'must download artifact');
+  assertContains(summary, /^        if:\s+always\(\)\s*$/m, 'must download always');
+  assertContains(summary, /^        continue-on-error:\s+true\s*$/m, 'download must continue on error');
 });

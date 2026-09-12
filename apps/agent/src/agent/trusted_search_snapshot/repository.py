@@ -126,6 +126,84 @@ redis.call('SET', issued_key, next_version, 'EX', counter_ttl)
 return next_version
 """
 
+_COMMIT_NEXT_SNAPSHOT_LUA = """
+local snapshot_key = KEYS[1]
+local issued_key = KEYS[2]
+local accepted_key = KEYS[3]
+local incoming_json = ARGV[1]
+local incoming_version = tonumber(ARGV[2])
+local ttl_seconds = tonumber(ARGV[3])
+
+if not incoming_json or not incoming_version or incoming_version <= 0
+  or incoming_version ~= math.floor(incoming_version) then
+  return 0
+end
+if not ttl_seconds or ttl_seconds <= 0 or ttl_seconds ~= math.floor(ttl_seconds) then
+  return 0
+end
+
+local incoming_ok, incoming = pcall(cjson.decode, incoming_json)
+if not incoming_ok or type(incoming) ~= 'table' or type(incoming.snapshotVersion) ~= 'number'
+  or incoming.snapshotVersion <= 0 or incoming.snapshotVersion ~= math.floor(incoming.snapshotVersion)
+  or incoming.snapshotVersion ~= incoming_version then
+  return 0
+end
+
+local existing_json = redis.call('GET', snapshot_key)
+local existing_version = 0
+if existing_json then
+  local ok, existing = pcall(cjson.decode, existing_json)
+  if not ok or type(existing) ~= 'table' or type(existing.snapshotVersion) ~= 'number'
+    or existing.snapshotVersion <= 0 or existing.snapshotVersion ~= math.floor(existing.snapshotVersion) then
+    return 0
+  end
+  existing_version = existing.snapshotVersion
+  if redis.call('TTL', snapshot_key) <= 0 then
+    return 0
+  end
+end
+
+local issued_raw = redis.call('GET', issued_key)
+local issued_version = 0
+if issued_raw then
+  issued_version = tonumber(issued_raw)
+  if not issued_version or issued_version <= 0 or issued_version ~= math.floor(issued_version) then
+    return 0
+  end
+end
+
+local accepted_raw = redis.call('GET', accepted_key)
+local accepted_version = 0
+if accepted_raw then
+  accepted_version = tonumber(accepted_raw)
+  if not accepted_version or accepted_version <= 0 or accepted_version ~= math.floor(accepted_version) then
+    return 0
+  end
+end
+
+if not existing_json then
+  local issued_ttl = issued_raw and redis.call('TTL', issued_key) or 0
+  local accepted_ttl = accepted_raw and redis.call('TTL', accepted_key) or 0
+  if issued_raw and issued_ttl <= 0 then return 0 end
+  if accepted_raw and accepted_ttl <= 0 then return 0 end
+end
+
+local effective_accepted_version = math.max(existing_version, accepted_version)
+if incoming_version <= effective_accepted_version then
+  return 0
+end
+
+local next_version = math.max(existing_version, issued_version, accepted_version) + 1
+if incoming_version ~= next_version then
+  return 0
+end
+
+redis.call('SET', snapshot_key, incoming_json, 'EX', ttl_seconds)
+redis.call('SET', issued_key, incoming_version, 'EX', ttl_seconds)
+redis.call('SET', accepted_key, incoming_version, 'EX', ttl_seconds)
+return 1
+"""
+
 _DELETE_SNAPSHOT_LUA = """
 local snapshot_key = KEYS[1]
 local issued_key = KEYS[2]
@@ -263,6 +341,47 @@ class TrustedSnapshotRepository:
         try:
             result = await eval_method(
                 _REPLACE_SNAPSHOT_LUA,
+                3,
+                snapshot_key,
+                issued_key,
+                accepted_key,
+                payload,
+                snapshot.snapshotVersion,
+                ttl_seconds,
+            )
+        except NotImplementedError:
+            return False
+        if isinstance(result, (list, tuple)):
+            result = result[0] if result else 0
+        try:
+            return int(result) == 1
+        except (TypeError, ValueError):
+            return False
+
+    async def save_next_snapshot(
+        self, snapshot: TrustedSearchSnapshot, max_ttl: int = 3600
+    ) -> bool:
+        """Allocate and persist the next owner snapshot in one Redis script."""
+
+        if isinstance(max_ttl, bool) or not isinstance(max_ttl, int) or max_ttl <= 0:
+            return False
+
+        remaining_seconds = int((snapshot.expiresAt - datetime.now(timezone.utc)).total_seconds())
+        if remaining_seconds <= 0:
+            return False
+
+        ttl_seconds = min(remaining_seconds, max_ttl)
+        snapshot_key = self._get_key(snapshot.userId, snapshot.sessionId)
+        issued_key = self._version_key(snapshot.userId, snapshot.sessionId)
+        accepted_key = self._accepted_key(snapshot.userId, snapshot.sessionId)
+        payload = snapshot.model_dump_json()
+
+        eval_method = getattr(self.redis, "eval", None)
+        if not callable(eval_method):
+            return False
+        try:
+            result = await eval_method(
+                _COMMIT_NEXT_SNAPSHOT_LUA,
                 3,
                 snapshot_key,
                 issued_key,

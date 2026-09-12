@@ -5,16 +5,10 @@ from pydantic import BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_OUTPUT_GUARDRAIL_ENABLED = True
-DEFAULT_OUTPUT_GUARDRAIL_OVERLAP_TOKENS = 30
-DEFAULT_OUTPUT_GUARDRAIL_MAX_CHUNK_TOKENS = 200
-DEFAULT_OUTPUT_GUARDRAIL_NEMO_TIMEOUT = 2.0
 
 
 class OutputGuardrailConfig(BaseModel):
     enabled: bool = DEFAULT_OUTPUT_GUARDRAIL_ENABLED
-    overlap_tokens: int = DEFAULT_OUTPUT_GUARDRAIL_OVERLAP_TOKENS
-    max_chunk_tokens: int = DEFAULT_OUTPUT_GUARDRAIL_MAX_CHUNK_TOKENS
-    nemo_timeout: float = DEFAULT_OUTPUT_GUARDRAIL_NEMO_TIMEOUT
 
 
 class Settings(BaseSettings):
@@ -86,9 +80,7 @@ class Settings(BaseSettings):
         return ring if ring else [self.CLAIM_TOKEN_SECRET]
 
     OUTPUT_GUARDRAIL_ENABLED: bool = DEFAULT_OUTPUT_GUARDRAIL_ENABLED
-    OUTPUT_GUARDRAIL_OVERLAP_TOKENS: int = DEFAULT_OUTPUT_GUARDRAIL_OVERLAP_TOKENS
-    OUTPUT_GUARDRAIL_MAX_CHUNK_TOKENS: int = DEFAULT_OUTPUT_GUARDRAIL_MAX_CHUNK_TOKENS
-    OUTPUT_GUARDRAIL_NEMO_TIMEOUT: float = DEFAULT_OUTPUT_GUARDRAIL_NEMO_TIMEOUT
+    REQUIRE_GUARDRAIL_GATEWAY: bool = True
 
     FEATURE_FLAG_CHAT_MULTI_AGENT: bool = False
     FEATURE_FLAG_CHAT_HANDOFF_ACCEPT: bool = False
@@ -104,12 +96,7 @@ class Settings(BaseSettings):
 
     @property
     def output_guardrail(self) -> OutputGuardrailConfig:
-        return OutputGuardrailConfig(
-            enabled=self.OUTPUT_GUARDRAIL_ENABLED,
-            overlap_tokens=self.OUTPUT_GUARDRAIL_OVERLAP_TOKENS,
-            max_chunk_tokens=self.OUTPUT_GUARDRAIL_MAX_CHUNK_TOKENS,
-            nemo_timeout=self.OUTPUT_GUARDRAIL_NEMO_TIMEOUT,
-        )
+        return OutputGuardrailConfig(enabled=self.OUTPUT_GUARDRAIL_ENABLED)
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

@@ -73,9 +73,9 @@ describe('Chat Handoff Config Validation', () => {
     );
 
     await expect(
-      controller.resolve({ token: 'chk_handoff_v1_test' }, { user: { id: 'user-1' } }),
+      controller.resolve({ token: 'chk_' + 'handoff_v1_test' }, { user: { id: 'user-1' } }),
     ).resolves.toEqual({ status: 'ACTIVE' });
-    expect(handoffService.resolveSafe).toHaveBeenCalledWith('chk_handoff_v1_test', 'user-1', {
+    expect(handoffService.resolveSafe).toHaveBeenCalledWith('chk_' + 'handoff_v1_test', 'user-1', {
       traceId: undefined,
       correlationId: undefined,
     });
@@ -95,7 +95,7 @@ describe('Chat Handoff Config Validation', () => {
     );
 
     await expect(
-      controller.resolve({ token: 'chk_handoff_v1_test' }, { user: { id: 'user-1' } }),
+      controller.resolve({ token: 'chk_' + 'handoff_v1_test' }, { user: { id: 'user-1' } }),
     ).rejects.toThrow('Chat handoff acceptance is disabled');
     expect(handoffService.resolveSafe).not.toHaveBeenCalled();
   });

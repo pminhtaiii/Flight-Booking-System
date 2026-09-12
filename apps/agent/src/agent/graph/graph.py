@@ -1,10 +1,10 @@
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
 
+from agent import config as agent_config
 from agent.agents.checkout_orchestrator import checkout_orchestrator_node
-from agent.agents.general_agent import general_agent_node
+from agent.agents.general_agent import SAFE_ROUTER_CLARIFICATION, general_agent_node
 from agent.agents.travel_assistant import travel_assistant_node
-from agent.config import get_settings
 from agent.graph.checkout_gate import evaluate_checkout_gate
 from agent.graph.nodes import (
     create_handoff_token,
@@ -14,15 +14,80 @@ from agent.graph.nodes import (
 )
 from agent.graph.router import invoke_router
 from agent.graph.state import AgentState
+from agent.guardrails.capabilities import seal_turn_capabilities
+from agent.models.requests import RouteDecision
 
 
 async def router_node(state: AgentState, config: RunnableConfig | None = None) -> dict:
-    settings = get_settings()
+    settings = agent_config.get_settings()
+
+    def safe_failure(provenance: str) -> dict:
+        return {
+            "route": "general",
+            "disambiguation": "none",
+            "safe_clarification": SAFE_ROUTER_CLARIFICATION,
+            "routing_provenance": provenance,
+            "turn_capabilities": seal_turn_capabilities(
+                None,
+                provenance="trusted_router",
+            ),
+        }
+
+    # Routing provenance is output-only. Any value supplied by a caller is
+    # treated as forged before the classifier can influence authority.
+    if "routing_provenance" in state or "provenance" in state:
+        return safe_failure("missing_provenance")
+
     if not getattr(settings, "FEATURE_FLAG_CHAT_MULTI_AGENT", True):
-        return {"route": "travel", "disambiguation": None}
-    decision = await invoke_router(state)
-    gate_result = evaluate_checkout_gate(state, decision)
-    return gate_result  # Updates 'route' and 'disambiguation' in AgentState
+        gate_result = {"route": "travel", "disambiguation": "none"}
+        return {
+            **gate_result,
+            "routing_provenance": "single_agent",
+            "turn_capabilities": seal_turn_capabilities(
+                None,
+                multi_agent=False,
+                provenance="trusted_router",
+            ),
+        }
+
+    try:
+        decision = await invoke_router(state)
+        if not isinstance(decision, RouteDecision):
+            return safe_failure("router_malformed")
+        if decision.intent not in {"GENERAL", "SEARCH", "BOOKING_INQUIRY", "CHECKOUT"}:
+            return safe_failure("unknown_intent")
+        gate_result = evaluate_checkout_gate(state, decision)
+        if not isinstance(gate_result, dict):
+            return safe_failure("invalid_gate")
+        route = gate_result.get("route")
+        disambiguation = gate_result.get("disambiguation")
+        if route not in {"general", "travel", "checkout"} or disambiguation not in {
+            "none",
+            "possible_checkout",
+        }:
+            return safe_failure("invalid_gate")
+        if gate_result.get("routing_provenance") == "invalid_gate":
+            return safe_failure("invalid_gate")
+        capabilities = seal_turn_capabilities(
+            decision,
+            gate_result=gate_result,
+            provenance="trusted_router",
+        )
+        if capabilities.sealed_tools == () and decision.intent != "GENERAL":
+            return safe_failure(
+                "unknown_intent" if capabilities.provenance == "unknown_intent" else "invalid_gate"
+            )
+        routing_provenance = gate_result.get("routing_provenance") or "trusted_router"
+        if decision.intent in {"SEARCH", "BOOKING_INQUIRY"} and decision.confidence < 0.6:
+            routing_provenance = "low_confidence"
+        return {
+            "route": route,
+            "disambiguation": disambiguation,
+            "routing_provenance": routing_provenance,
+            "turn_capabilities": capabilities,
+        }
+    except Exception:
+        return safe_failure("router_exception")
 
 
 def route_after_router(state: AgentState) -> str:
@@ -43,7 +108,7 @@ def should_continue(state: AgentState) -> str:
     if not getattr(last_message, "tool_calls", None):
         return END
 
-    settings = get_settings()
+    settings = agent_config.get_settings()
     max_iterations = getattr(settings, "AGENT_MAX_ITERATIONS", 5)
     current_iterations = state.get("iteration_count", 0)
 
@@ -53,6 +118,8 @@ def should_continue(state: AgentState) -> str:
 
 
 def route_after_tools(state: AgentState) -> str:
+    if state.get("tool_blocked"):
+        return END
     signal = state.get("signal")
     if signal and signal.get("intent") == "checkout":
         return "validate_handoff"

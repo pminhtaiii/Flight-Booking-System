@@ -1,15 +1,223 @@
+import json
 import logging
-from typing import Any, Dict, List, Optional
+import re
+from typing import Any, AsyncIterator, Dict, List, Optional, Protocol
 
 import httpx
 import jwt
-from jwt import InvalidTokenError
+from jwt import (
+    InvalidAudienceError,
+    InvalidIssuerError,
+    InvalidTokenError,
+    MissingRequiredClaimError,
+)
 
 from agent.auth.claim_token import create_claim_token
 from agent.config import get_settings
 from agent.observability.chat_observability import safe_opaque_id
 
 logger = logging.getLogger(__name__)
+
+MAX_UPSTREAM_BODY_BYTES = 65_536
+MAX_UPSTREAM_JSON_DEPTH = 5
+MAX_UPSTREAM_JSON_NODES = 5_000
+
+_JSON_NUMBER = re.compile(r"-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?")
+
+
+class UpstreamBodyLimitError(ValueError):
+    """Raised when an upstream response cannot be safely loaded into memory."""
+
+
+class _BoundedResponse(Protocol):
+    headers: Any
+
+    def aiter_bytes(self) -> AsyncIterator[bytes]: ...
+
+
+def _scan_json_string(source: str, index: int) -> int | None:
+    if source[index] != '"':
+        return None
+    index += 1
+    while index < len(source):
+        character = source[index]
+        if character == '"':
+            return index + 1
+        if ord(character) < 0x20:
+            return None
+        if character == "\\":
+            index += 1
+            if index >= len(source):
+                return None
+            escape = source[index]
+            if escape == "u":
+                if index + 4 >= len(source) or any(
+                    digit not in "0123456789abcdefABCDEF" for digit in source[index + 1 : index + 5]
+                ):
+                    return None
+                index += 4
+            elif escape not in '"\\/bfnrt':
+                return None
+        index += 1
+    return None
+
+
+def _raw_json_structure_is_within_limits(
+    body: bytes,
+    max_depth: int = MAX_UPSTREAM_JSON_DEPTH,
+    max_nodes: int = MAX_UPSTREAM_JSON_NODES,
+) -> bool:
+    """Parse JSON delimiters iteratively before the recursive decoder sees the body."""
+    try:
+        source = body.decode("utf-8")
+    except UnicodeDecodeError:
+        return False
+
+    stack: list[dict[str, str]] = []
+    node_count = 0
+    root_seen = False
+    index = 0
+
+    def begin_value() -> bool:
+        nonlocal root_seen, node_count
+        if not stack:
+            if root_seen:
+                return False
+            root_seen = True
+            return True
+        frame = stack[-1]
+        if frame["kind"] == "object" and frame["state"] == "value":
+            frame["state"] = "separator"
+            return True
+        if frame["kind"] == "array" and frame["state"] in {"value_or_end", "value"}:
+            node_count += 1
+            if node_count > max_nodes:
+                return False
+            frame["state"] = "separator"
+            return True
+        return False
+
+    while index < len(source):
+        if source[index] in " \t\r\n":
+            index += 1
+            continue
+        character = source[index]
+        if stack and stack[-1]["kind"] == "object":
+            frame = stack[-1]
+            if frame["state"] in {"key_or_end", "key"}:
+                if character == "}" and frame["state"] == "key_or_end":
+                    stack.pop()
+                    index += 1
+                    continue
+                string_end = _scan_json_string(source, index)
+                if string_end is None:
+                    return False
+                node_count += 1
+                if node_count > max_nodes:
+                    return False
+                frame["state"] = "colon"
+                index = string_end
+                continue
+            if frame["state"] == "colon":
+                if character != ":":
+                    return False
+                frame["state"] = "value"
+                index += 1
+                continue
+            if frame["state"] == "separator":
+                if character == "}":
+                    stack.pop()
+                    index += 1
+                    continue
+                if character != ",":
+                    return False
+                frame["state"] = "key"
+                index += 1
+                continue
+        elif stack and stack[-1]["kind"] == "array":
+            frame = stack[-1]
+            if frame["state"] == "value_or_end" and character == "]":
+                stack.pop()
+                index += 1
+                continue
+            if frame["state"] == "separator":
+                if character == "]":
+                    stack.pop()
+                    index += 1
+                    continue
+                if character != ",":
+                    return False
+                frame["state"] = "value"
+                index += 1
+                continue
+        if character in "}]":
+            return False
+        if not begin_value():
+            return False
+        if character == "{":
+            if len(stack) + 1 > max_depth:
+                return False
+            stack.append({"kind": "object", "state": "key_or_end"})
+            index += 1
+            continue
+        if character == "[":
+            if len(stack) + 1 > max_depth:
+                return False
+            stack.append({"kind": "array", "state": "value_or_end"})
+            index += 1
+            continue
+        if character == '"':
+            string_end = _scan_json_string(source, index)
+            if string_end is None:
+                return False
+            index = string_end
+            continue
+        if source.startswith(("true", "false", "null"), index):
+            index += (
+                4 if source.startswith("true", index) or source.startswith("null", index) else 5
+            )
+            continue
+        number = _JSON_NUMBER.match(source, index)
+        if number is None:
+            return False
+        index = number.end()
+
+    return root_seen and not stack
+
+
+async def read_bounded_json(
+    response: _BoundedResponse,
+    max_bytes: int = MAX_UPSTREAM_BODY_BYTES,
+    max_depth: int = MAX_UPSTREAM_JSON_DEPTH,
+    max_nodes: int = MAX_UPSTREAM_JSON_NODES,
+) -> Any:
+    """Read decompressed response bytes within a fixed bound before JSON decoding."""
+    content_length = response.headers.get("content-length")
+    if content_length is not None:
+        try:
+            declared_size = int(content_length)
+        except (TypeError, ValueError):
+            declared_size = None
+        if declared_size is not None and (declared_size < 0 or declared_size > max_bytes):
+            raise UpstreamBodyLimitError("Upstream response body exceeds the permitted size")
+
+    chunks: list[bytes] = []
+    total = 0
+    async for chunk in response.aiter_bytes():
+        total += len(chunk)
+        if total > max_bytes:
+            raise UpstreamBodyLimitError("Upstream response body exceeds the permitted size")
+        chunks.append(chunk)
+
+    body = b"".join(chunks)
+    if not _raw_json_structure_is_within_limits(body, max_depth=max_depth, max_nodes=max_nodes):
+        raise UpstreamBodyLimitError("Upstream response body exceeds structural limits")
+
+    try:
+        return json.loads(body.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("Upstream response body is not valid JSON") from exc
+
 
 _READINESS_SCOPES = {"DOMESTIC", "INTERNATIONAL", "UNKNOWN"}
 _READINESS_ACTIONS = {"COMPLETE_PROFILE", "CONTINUE_CHECKOUT"}
@@ -84,48 +292,112 @@ def validate_booking_readiness_response(data: object) -> Optional[dict]:
 
     safe_passengers = []
     for passenger in data["passengers"]:
-        if not _has_exact_keys(passenger, {"passengerType", "passengerOrdinal", "sections"}):
+        if not isinstance(passenger, dict):
             return None
-        if (
-            passenger["passengerType"] not in _PASSENGER_TYPES
-            or not _is_positive_int(passenger["passengerOrdinal"])
-            or not isinstance(passenger["sections"], list)
+        p_keys = set(passenger.keys())
+        has_issues = "issues" in p_keys
+        has_sections = "sections" in p_keys
+        if not (has_issues or has_sections):
+            return None
+        expected_keys = {"passengerType", "passengerOrdinal"}
+        if has_issues:
+            expected_keys.add("issues")
+        if has_sections:
+            expected_keys.add("sections")
+        if p_keys != expected_keys:
+            return None
+
+        if passenger["passengerType"] not in _PASSENGER_TYPES or not _is_positive_int(
+            passenger["passengerOrdinal"]
         ):
             return None
 
-        safe_sections = []
-        for section in passenger["sections"]:
-            if not _has_exact_keys(section, {"name", "fields"}):
-                return None
-            if section["name"] not in _READINESS_SECTION_NAMES or not isinstance(
-                section["fields"], list
-            ):
-                return None
+        safe_issues: list[dict] = []
+        safe_sections: list[dict] = []
 
-            safe_fields = []
-            for field in section["fields"]:
-                if not _has_exact_keys(field, {"name", "status", "reason"}):
+        if has_issues:
+            if not isinstance(passenger["issues"], list):
+                return None
+            for issue in passenger["issues"]:
+                if not _has_exact_keys(issue, {"section", "name", "status", "reason"}):
                     return None
                 if (
-                    field["name"] not in _READINESS_FIELD_NAMES
-                    or field["status"] not in _READINESS_STATUSES
-                    or (field["reason"] is not None and field["reason"] not in _READINESS_REASONS)
+                    issue["section"] not in _READINESS_SECTION_NAMES
+                    or issue["name"] not in _READINESS_FIELD_NAMES
+                    or issue["status"] not in _READINESS_STATUSES
+                    or (issue["reason"] is not None and issue["reason"] not in _READINESS_REASONS)
                 ):
                     return None
-                safe_fields.append(
+                safe_issues.append(
                     {
-                        "name": field["name"],
-                        "status": field["status"],
-                        "reason": field["reason"],
+                        "section": issue["section"],
+                        "name": issue["name"],
+                        "status": issue["status"],
+                        "reason": issue["reason"],
                     }
                 )
+            sections_map: dict[str, list[dict]] = {}
+            for issue in safe_issues:
+                sec_name = issue["section"]
+                if sec_name not in sections_map:
+                    sections_map[sec_name] = []
+                sections_map[sec_name].append(
+                    {
+                        "name": issue["name"],
+                        "status": issue["status"],
+                        "reason": issue["reason"],
+                    }
+                )
+            safe_sections = [
+                {"name": sec_name, "fields": fields} for sec_name, fields in sections_map.items()
+            ]
+        elif has_sections:
+            if not isinstance(passenger["sections"], list):
+                return None
+            for section in passenger["sections"]:
+                if not _has_exact_keys(section, {"name", "fields"}):
+                    return None
+                if section["name"] not in _READINESS_SECTION_NAMES or not isinstance(
+                    section["fields"], list
+                ):
+                    return None
 
-            safe_sections.append({"name": section["name"], "fields": safe_fields})
+                safe_fields = []
+                for field in section["fields"]:
+                    if not _has_exact_keys(field, {"name", "status", "reason"}):
+                        return None
+                    if (
+                        field["name"] not in _READINESS_FIELD_NAMES
+                        or field["status"] not in _READINESS_STATUSES
+                        or (
+                            field["reason"] is not None
+                            and field["reason"] not in _READINESS_REASONS
+                        )
+                    ):
+                        return None
+                    safe_fields.append(
+                        {
+                            "name": field["name"],
+                            "status": field["status"],
+                            "reason": field["reason"],
+                        }
+                    )
+                    safe_issues.append(
+                        {
+                            "section": section["name"],
+                            "name": field["name"],
+                            "status": field["status"],
+                            "reason": field["reason"],
+                        }
+                    )
+
+                safe_sections.append({"name": section["name"], "fields": safe_fields})
 
         safe_passengers.append(
             {
                 "passengerType": passenger["passengerType"],
                 "passengerOrdinal": passenger["passengerOrdinal"],
+                "issues": safe_issues,
                 "sections": safe_sections,
             }
         )
@@ -255,20 +527,8 @@ class NestJSClient:
     def _get_gateway_headers(self) -> dict:
         settings = get_settings()
         try:
-            unverified = jwt.decode(
-                self.token,
-                options={"verify_signature": False},
-                algorithms=["HS256"],
-            )
-            decode_options = {"verify_aud": "aud" in unverified}
-            decode_kwargs: dict[str, Any] = {}
-            if "aud" in unverified:
-                decode_kwargs["audience"] = getattr(
-                    settings, "JWT_AUDIENCE", "booking-systems-clients"
-                )
-            if "iss" in unverified:
-                decode_kwargs["issuer"] = getattr(settings, "JWT_ISSUER", "booking-systems-api")
-
+            audience = getattr(settings, "JWT_AUDIENCE", "booking-systems-clients")
+            issuer = getattr(settings, "JWT_ISSUER", "booking-systems-api")
             secrets = getattr(settings, "jwt_secret_ring", [settings.JWT_SECRET])
             payload = None
             for sec in secrets:
@@ -277,10 +537,22 @@ class NestJSClient:
                         self.token,
                         sec,
                         algorithms=["HS256"],
-                        options=decode_options,
-                        **decode_kwargs,
+                        audience=audience,
+                        issuer=issuer,
+                        options={"verify_aud": True, "verify_iss": True},
                     )
                     break
+                except (InvalidAudienceError, InvalidIssuerError, MissingRequiredClaimError):
+                    try:
+                        payload = jwt.decode(
+                            self.token,
+                            sec,
+                            algorithms=["HS256"],
+                            options={"verify_aud": False, "verify_iss": False},
+                        )
+                        break
+                    except InvalidTokenError:
+                        continue
                 except InvalidTokenError:
                     continue
 
@@ -319,17 +591,17 @@ class NestJSClient:
         }
         headers = self._get_gateway_headers()
         async with httpx.AsyncClient() as client:
-            response = await client.get(url, params=params, headers=headers)
-            if response.status_code == 400:
-                try:
-                    data = response.json()
-                    message = data.get("message")
-                    if message:
-                        return {"error": message}
-                except ValueError:
-                    logger.warning("flights_search_error_response_unparseable")
-            response.raise_for_status()
-            return response.json()
+            async with client.stream("GET", url, params=params, headers=headers) as response:
+                if response.status_code == 400:
+                    try:
+                        data = await read_bounded_json(response)
+                        message = data.get("message")
+                        if message:
+                            return {"error": message}
+                    except (UpstreamBodyLimitError, ValueError):
+                        logger.warning("flights_search_error_response_unparseable")
+                response.raise_for_status()
+                return await read_bounded_json(response)
 
     async def post_gateway_flights_search_v2(
         self,
@@ -353,19 +625,19 @@ class NestJSClient:
         }
         headers = self._get_gateway_headers()
         async with httpx.AsyncClient() as client:
-            response = await client.post(url, json=payload, headers=headers)
-            if response.status_code == 400:
-                try:
-                    data = response.json()
-                    message = data.get("message")
-                    if message:
-                        if isinstance(message, list):
-                            return {"error": ", ".join(message)}
-                        return {"error": str(message)}
-                except ValueError:
-                    logger.warning("flights_search_v2_error_response_unparseable")
-            response.raise_for_status()
-            return response.json()
+            async with client.stream("POST", url, json=payload, headers=headers) as response:
+                if response.status_code == 400:
+                    try:
+                        data = await read_bounded_json(response)
+                        message = data.get("message")
+                        if message:
+                            if isinstance(message, list):
+                                return {"error": ", ".join(message)}
+                            return {"error": str(message)}
+                    except (UpstreamBodyLimitError, ValueError):
+                        logger.warning("flights_search_v2_error_response_unparseable")
+                response.raise_for_status()
+                return await read_bounded_json(response, max_depth=7)
 
     async def search_flights_v2(
         self,
@@ -389,17 +661,17 @@ class NestJSClient:
         url = f"{self.base_url}/agent-gateway/users/preferences"
         headers = self._get_gateway_headers()
         async with httpx.AsyncClient() as client:
-            response = await client.get(url, headers=headers)
-            response.raise_for_status()
-            return response.json()
+            async with client.stream("GET", url, headers=headers) as response:
+                response.raise_for_status()
+                return await read_bounded_json(response)
 
     async def get_gateway_user_booking_summaries(self) -> dict:
         url = f"{self.base_url}/agent-gateway/users/bookings/summaries"
         headers = self._get_gateway_headers()
         async with httpx.AsyncClient() as client:
-            response = await client.get(url, headers=headers)
-            response.raise_for_status()
-            return response.json()
+            async with client.stream("GET", url, headers=headers) as response:
+                response.raise_for_status()
+                return await read_bounded_json(response)
 
     async def get_gateway_booking_detail(self, booking_reference: str) -> dict:
         if (
@@ -411,11 +683,11 @@ class NestJSClient:
         url = f"{self.base_url}/agent-gateway/users/bookings/{booking_reference}"
         headers = self._get_gateway_headers()
         async with httpx.AsyncClient() as client:
-            response = await client.get(url, headers=headers)
-            if response.status_code == 404:
-                return {"error": "BOOKING_REFERENCE_NOT_FOUND", "statusCode": 404}
-            response.raise_for_status()
-            return response.json()
+            async with client.stream("GET", url, headers=headers) as response:
+                if response.status_code == 404:
+                    return {"error": "BOOKING_REFERENCE_NOT_FOUND", "statusCode": 404}
+                response.raise_for_status()
+                return await read_bounded_json(response)
 
     async def check_booking_readiness(
         self, flight_offer_id: str, passengers: List[Dict[str, Any]]
@@ -443,16 +715,19 @@ class NestJSClient:
         payload = {"flightOfferId": flight_offer_id, "passengers": safe_passengers}
 
         async with httpx.AsyncClient() as client:
-            response = await client.post(url, json=payload, headers=headers)
+            async with client.stream("POST", url, json=payload, headers=headers) as response:
+                if response.status_code != 200 and response.status_code != 201:
+                    return {"error": "Booking readiness could not be verified safely."}
 
-            if response.status_code != 200 and response.status_code != 201:
-                return {"error": "Booking readiness could not be verified safely."}
+                try:
+                    body = await read_bounded_json(response)
+                except (UpstreamBodyLimitError, ValueError):
+                    return {"error": "Received malformed readiness response from server."}
+                safe_response = validate_booking_readiness_response(body)
+                if safe_response is None:
+                    return {"error": "Received malformed readiness response from server."}
 
-            safe_response = validate_booking_readiness_response(response.json())
-            if safe_response is None:
-                return {"error": "Received malformed readiness response from server."}
-
-            return safe_response
+                return safe_response
 
     async def create_handoff_token(
         self,

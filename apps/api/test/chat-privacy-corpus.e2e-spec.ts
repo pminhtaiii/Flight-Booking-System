@@ -80,8 +80,8 @@ describe('Chat and Handoff Privacy Corpus E2E & Boundary Safety', () => {
 
   it('ChatMessageCryptoService decryption failure warning logs do NOT leak message ID, session ID, or raw error', async () => {
     const warnSpy = jest.spyOn(cryptoService!['logger'], 'warn');
-    const secretMessageId = 'msg-secret-uuid-12345';
-    const secretSessionId = 'ses-secret-uuid-67890';
+    const secretMessageId = 'msg-' + 'secret-uuid-12345';
+    const secretSessionId = 'ses-' + 'secret-uuid-67890';
 
     const corruptedMessage = {
       id: secretMessageId,

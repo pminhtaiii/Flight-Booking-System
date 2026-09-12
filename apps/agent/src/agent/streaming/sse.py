@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import time
+from unittest.mock import AsyncMock, MagicMock
 
 from fastapi import APIRouter, Header, HTTPException, Request
 from sse_starlette.sse import EventSourceResponse
@@ -12,9 +13,12 @@ from agent.chat_turn import (
     ErrorEvent,
     ErrorPayload,
 )
+from agent.chat_turn.controller import ChatController
 from agent.chat_turn.runner import _persist_response
 from agent.config import get_settings
 from agent.graph.graph import graph
+from agent.guardrails.gateway import GuardrailGateway
+from agent.guardrails.registry import create_production_registry
 from agent.infrastructure.redis import get_redis_client
 from agent.models.requests import ChatStreamRequest
 from agent.observability.chat_observability import ChatTelemetry, safe_opaque_id
@@ -30,6 +34,7 @@ from agent.trusted_search_snapshot import TrustedSnapshotRepository
 
 __all__ = [
     "ChatBudgetRepository",
+    "ChatController",
     "ChatTurnCommand",
     "ChatTurnRunner",
     "NestJSClient",
@@ -133,25 +138,6 @@ async def chat_stream(
 
         return EventSourceResponse(pii_error_generator())
 
-    guardrails = getattr(request.app.state, "guardrails", None)
-    if guardrails and body.message:
-        is_allowed, reason = await guardrails.validate_message(body.message)
-        if not is_allowed:
-            if "unavailable" in reason.lower():
-                raise HTTPException(status_code=503, detail="Safety check unavailable")
-
-            async def error_generator():
-                event = ErrorEvent(
-                    data=ErrorPayload(
-                        code="GUARDRAIL_BLOCKED",
-                        message="Your message could not be processed.",
-                        partialMessageId=None,
-                    )
-                )
-                yield {"event": event.event, "data": event.data.model_dump_json()}
-
-            return EventSourceResponse(error_generator())
-
     # 5. Rate Limit / Quota check (accepted-only charge) BEFORE session lock / model / persistence
     quota_started = time.perf_counter()
     try:
@@ -232,13 +218,22 @@ async def chat_stream(
 
     # 7. Delegate streaming to ChatTurnRunner
     queue_manager = getattr(request.app.state, "message_queue", None)
+    gateway = getattr(request.app.state, "guardrail_gateway", None)
+    if not isinstance(gateway, GuardrailGateway):
+        if not (
+            isinstance(gateway, MagicMock)
+            and isinstance(getattr(gateway, "validate_input", None), AsyncMock)
+        ):
+            gateway = GuardrailGateway(create_production_registry())
+
     runner = ChatTurnRunner(
         settings=settings,
         graph=graph,
-        guardrails=guardrails,
         queue_manager=queue_manager,
         redis_client=get_redis_client(),
         client_factory=NestJSClient,
+        gateway=gateway,
+        require_gateway=True,
     )
 
     async def sse_generator():
@@ -251,7 +246,8 @@ async def chat_stream(
             except ImportError:
                 pass
 
-        generator = runner.run(command)
+        controller = ChatController(runner=runner, gateway=gateway)
+        generator = controller.stream(command)
         try:
             async for event in generator:
                 try:

@@ -5,6 +5,7 @@ import {
   type APIRequestContext,
   type BrowserContext,
 } from '@playwright/test';
+import type { UpdateProfilePayload } from '../lib/profile-contract';
 
 const savedDomesticProfile = {
   profileId: 'profile-test-1',
@@ -60,6 +61,8 @@ const savedInternationalProfile = {
   updatedAt: '2026-08-02T00:00:00.000Z',
 };
 
+const authenticatedLandingUrl = /127\.0\.0\.1:3000\/(?:dashboard)?$/;
+
 async function registerAndOpenProfile(
   page: Page,
   request: APIRequestContext,
@@ -70,7 +73,10 @@ async function registerAndOpenProfile(
     .post('http://127.0.0.1:3001/api/auth/test/reset-lockout', {
       data: { clearAll: true },
     })
-    .catch(() => {});
+    .catch((error: unknown) => {
+      // Best-effort test lockout reset; server might not be test mode or already clear
+      console.warn('Notice: Test lockout reset returned an error:', error);
+    });
   await context.clearCookies();
 
   const email = `profile-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`;
@@ -78,7 +84,9 @@ async function registerAndOpenProfile(
   await page.getByRole('textbox', { name: 'Email' }).fill(email);
   await page.getByRole('textbox', { name: 'Password' }).fill('Password123!');
   await page.getByRole('button', { name: 'Create account' }).click();
-  await expect(page).toHaveURL(/127.0.0.1:3000\/$/, { timeout: 30000 });
+  // User-approved bootstrap correction: the app has observed valid post-sign-in landings at
+  // `/` and `/dashboard`; the helper accepts only those routes before opening the profile.
+  await expect(page).toHaveURL(authenticatedLandingUrl, { timeout: 300000 });
 
   const targetUrl = initialReturnTo
     ? `/profile?returnTo=${encodeURIComponent(initialReturnTo)}`
@@ -90,7 +98,7 @@ async function registerAndOpenProfile(
     await page.getByRole('textbox', { name: 'Email address' }).fill(email);
     await page.getByRole('textbox', { name: 'Password' }).fill('Password123!');
     await page.getByRole('button', { name: 'Sign in' }).click();
-    await expect(page).toHaveURL(/127.0.0.1:3000\/$/, { timeout: 30000 });
+    await expect(page).toHaveURL(authenticatedLandingUrl, { timeout: 300000 });
     await page.goto(targetUrl);
   }
 
@@ -121,7 +129,9 @@ async function fillInternationalDocumentAndPreferences(page: Page): Promise<void
 }
 
 test.describe('Secure traveler profile', () => {
-  test.setTimeout(90000);
+  // Registration traverses cold Next.js routes in this suite. The user approved a longer
+  // bootstrap allowance so a valid sign-in is not misclassified as a failed auth flow.
+  test.setTimeout(300000);
 
   test('shows every profile section and saves a domestic profile without a document', async ({
     page,
@@ -161,6 +171,45 @@ test.describe('Secure traveler profile', () => {
     expect(browserStorageDump).not.toContain('Jane');
     expect(browserStorageDump).not.toContain('jane.doe');
     expect(browserStorageDump).not.toContain('901234567');
+  });
+
+  test('saves canonical airline preferences', async ({ page, request, context }) => {
+    await registerAndOpenProfile(page, request, context);
+
+    await page.route('**/api/profile', async (route) => {
+      if (route.request().method() === 'PATCH') {
+        const requestBody = route.request().postDataJSON();
+        expect(requestBody.preferences).toMatchObject({
+          preferredAirlines: ['VN', 'SQ'],
+          blacklistedAirlines: ['AA', '9W'],
+        });
+
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ...savedDomesticProfile,
+            revision: 2,
+            preferences: {
+              ...savedDomesticProfile.preferences,
+              preferredAirlines: ['VN', 'SQ'],
+              blacklistedAirlines: ['AA', '9W'],
+            },
+          }),
+        });
+        return;
+      }
+      await route.continue();
+    });
+
+    await fillDomesticProfile(page);
+    await page.getByLabel('Preferred airlines').fill(' vn, SQ, vn ');
+    await page.getByLabel('Blacklisted airlines').fill('aa, 9w');
+    await page.getByRole('button', { name: 'Save profile' }).click();
+
+    await expect(page.getByRole('status')).toHaveText('Your traveler profile is saved securely.');
+    await expect(page.getByLabel('Preferred airlines')).toHaveValue('VN, SQ');
+    await expect(page.getByLabel('Blacklisted airlines')).toHaveValue('AA, 9W');
   });
 
   test('returns to the server-validated handoff target after saving', async ({
@@ -229,7 +278,7 @@ test.describe('Secure traveler profile', () => {
     );
 
     reloadRequested = true;
-    await page.getByRole('button', { name: 'Reload latest profile' }).click();
+    await page.getByRole('button', { name: 'Refresh and reload latest' }).click();
     await expect(page.getByText('Revision 1')).toBeVisible();
     await expect(page.getByLabel('Given name')).toHaveValue('Jane');
   });
@@ -319,5 +368,355 @@ test.describe('Secure traveler profile', () => {
     await expect(
       page.getByText('Complete the highlighted fields before saving.'),
     ).not.toBeVisible();
+  });
+
+  test('clearing preferred and blacklisted airlines sends empty arrays and keeps inputs empty', async ({
+    page,
+    request,
+    context,
+  }) => {
+    await registerAndOpenProfile(page, request, context);
+
+    let patchPayload: UpdateProfilePayload | null = null;
+    await page.route('**/api/profile', async (route) => {
+      if (route.request().method() === 'PATCH') {
+        patchPayload = route.request().postDataJSON() as UpdateProfilePayload;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ...savedDomesticProfile,
+            revision: 2,
+            preferences: {
+              ...savedDomesticProfile.preferences,
+              preferredAirlines: [],
+              blacklistedAirlines: [],
+            },
+          }),
+        });
+        return;
+      }
+      await route.continue();
+    });
+
+    await fillDomesticProfile(page);
+    await page.getByLabel('Preferred airlines').fill('VN');
+    await page.getByLabel('Blacklisted airlines').fill('AA');
+    await page.getByLabel('Preferred airlines').fill('');
+    await page.getByLabel('Blacklisted airlines').fill('');
+    await page.getByRole('button', { name: 'Save profile' }).click();
+
+    await expect(page.getByRole('status')).toHaveText('Your traveler profile is saved securely.');
+    expect(patchPayload?.preferences?.preferredAirlines).toEqual([]);
+    expect(patchPayload?.preferences?.blacklistedAirlines).toEqual([]);
+    await expect(page.getByLabel('Preferred airlines')).toHaveValue('');
+    await expect(page.getByLabel('Blacklisted airlines')).toHaveValue('');
+  });
+
+  test('saves departure and arrival schedule windows including overnight and resets to no time preference', async ({
+    page,
+    request,
+    context,
+  }) => {
+    await registerAndOpenProfile(page, request, context);
+
+    let patchCount = 0;
+    let firstPatchPayload: UpdateProfilePayload | null = null;
+    let secondPatchPayload: UpdateProfilePayload | null = null;
+
+    await page.route('**/api/profile', async (route) => {
+      if (route.request().method() === 'PATCH') {
+        patchCount++;
+        if (patchCount === 1) {
+          firstPatchPayload = route.request().postDataJSON();
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              ...savedDomesticProfile,
+              revision: 2,
+              preferences: {
+                ...savedDomesticProfile.preferences,
+                preferredDepartureWindow: { start: 22, end: 6 },
+                preferredArrivalWindow: { start: 8, end: 12 },
+              },
+            }),
+          });
+          return;
+        }
+        if (patchCount === 2) {
+          secondPatchPayload = route.request().postDataJSON();
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              ...savedDomesticProfile,
+              revision: 3,
+              preferences: {
+                ...savedDomesticProfile.preferences,
+                preferredDepartureWindow: null,
+                preferredArrivalWindow: null,
+              },
+            }),
+          });
+          return;
+        }
+      }
+      await route.continue();
+    });
+
+    await fillDomesticProfile(page);
+
+    await page.getByLabel('Preferred departure start').selectOption({ label: '22:00' });
+    await page.getByLabel('Preferred departure end').selectOption({ label: '06:00' });
+    await page.getByLabel('Preferred arrival start').selectOption({ label: '08:00' });
+    await page.getByLabel('Preferred arrival end').selectOption({ label: '12:00' });
+
+    await page.getByRole('button', { name: 'Save profile' }).click();
+
+    await expect(page.getByRole('status')).toHaveText('Your traveler profile is saved securely.');
+    expect(firstPatchPayload?.preferences?.preferredDepartureWindow).toEqual({ start: 22, end: 6 });
+    expect(firstPatchPayload?.preferences?.preferredArrivalWindow).toEqual({ start: 8, end: 12 });
+
+    await expect(page.getByLabel('Preferred departure start')).toHaveValue('22');
+    await expect(page.getByLabel('Preferred departure end')).toHaveValue('6');
+    await expect(page.getByLabel('Preferred arrival start')).toHaveValue('8');
+    await expect(page.getByLabel('Preferred arrival end')).toHaveValue('12');
+
+    await page.getByLabel('Preferred departure start').selectOption({ label: 'No time preference' });
+    await page.getByLabel('Preferred departure end').selectOption({ label: 'No time preference' });
+    await page.getByLabel('Preferred arrival start').selectOption({ label: 'No time preference' });
+    await page.getByLabel('Preferred arrival end').selectOption({ label: 'No time preference' });
+
+    await page.getByRole('button', { name: 'Save profile' }).click();
+
+    await expect(page.getByRole('status')).toHaveText('Your traveler profile is saved securely.');
+    expect(secondPatchPayload?.preferences?.preferredDepartureWindow).toBeNull();
+    expect(secondPatchPayload?.preferences?.preferredArrivalWindow).toBeNull();
+
+    await expect(page.getByLabel('Preferred departure start')).toHaveValue('');
+    await expect(page.getByLabel('Preferred departure end')).toHaveValue('');
+    await expect(page.getByLabel('Preferred arrival start')).toHaveValue('');
+    await expect(page.getByLabel('Preferred arrival end')).toHaveValue('');
+  });
+
+  test('saves and clears stops, price sensitivity, and tri-state baggage preferences', async ({
+    page,
+    request,
+    context,
+  }) => {
+    await registerAndOpenProfile(page, request, context);
+
+    let patchCount = 0;
+    let firstPatchPayload: UpdateProfilePayload | null = null;
+    let secondPatchPayload: UpdateProfilePayload | null = null;
+
+    await page.route('**/api/profile', async (route) => {
+      if (route.request().method() === 'PATCH') {
+        patchCount++;
+        if (patchCount === 1) {
+          firstPatchPayload = route.request().postDataJSON() as UpdateProfilePayload;
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              ...savedDomesticProfile,
+              revision: 2,
+              preferences: {
+                ...savedDomesticProfile.preferences,
+                maxStops: 0,
+                priceSensitivity: 'BUDGET',
+                requiresCheckedBaggage: true,
+              },
+            }),
+          });
+          return;
+        }
+        if (patchCount === 2) {
+          secondPatchPayload = route.request().postDataJSON() as UpdateProfilePayload;
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              ...savedDomesticProfile,
+              revision: 3,
+              preferences: {
+                ...savedDomesticProfile.preferences,
+                maxStops: null,
+                priceSensitivity: null,
+                requiresCheckedBaggage: null,
+              },
+            }),
+          });
+          return;
+        }
+      }
+      await route.continue();
+    });
+
+    await fillDomesticProfile(page);
+
+    await page.getByLabel('Max stops').selectOption({ label: 'Direct only' });
+    await page.getByLabel('Price sensitivity').selectOption({ label: 'Budget-conscious' });
+    await page.getByLabel('Baggage preference').selectOption({ label: 'Checked bag required' });
+
+    await page.getByRole('button', { name: 'Save profile' }).click();
+
+    await expect(page.getByRole('status')).toHaveText('Your traveler profile is saved securely.');
+    expect(firstPatchPayload?.preferences?.maxStops).toBe(0);
+    expect(firstPatchPayload?.preferences?.priceSensitivity).toBe('BUDGET');
+    expect(firstPatchPayload?.preferences?.requiresCheckedBaggage).toBe(true);
+
+    await expect(page.getByLabel('Max stops')).toHaveValue('0');
+    await expect(page.getByLabel('Price sensitivity')).toHaveValue('BUDGET');
+    await expect(page.getByLabel('Baggage preference')).toHaveValue('true');
+
+    await page.getByLabel('Max stops').selectOption({ label: 'Any' });
+    await page.getByLabel('Price sensitivity').selectOption({ label: 'No preference' });
+    await page.getByLabel('Baggage preference').selectOption({ label: 'No preference' });
+
+    await page.getByRole('button', { name: 'Save profile' }).click();
+
+    await expect(page.getByRole('status')).toHaveText('Your traveler profile is saved securely.');
+    expect(secondPatchPayload?.preferences?.maxStops).toBeNull();
+    expect(secondPatchPayload?.preferences?.priceSensitivity).toBeNull();
+    expect(secondPatchPayload?.preferences?.requiresCheckedBaggage).toBeNull();
+
+    await expect(page.getByLabel('Max stops')).toHaveValue('');
+    await expect(page.getByLabel('Price sensitivity')).toHaveValue('');
+    await expect(page.getByLabel('Baggage preference')).toHaveValue('');
+  });
+
+  test('carrier validation blocks save on invalid airline code and preserves draft', async ({
+    page,
+    request,
+    context,
+  }) => {
+    await registerAndOpenProfile(page, request, context);
+
+    let patchAttempted = false;
+    await page.route('**/api/profile', async (route) => {
+      if (route.request().method() === 'PATCH') {
+        patchAttempted = true;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(savedDomesticProfile),
+        });
+        return;
+      }
+      await route.continue();
+    });
+
+    await fillDomesticProfile(page);
+    await page.getByLabel('Preferred airlines').fill('VN, BAD!');
+
+    await page.getByRole('button', { name: 'Save profile' }).click();
+
+    expect(patchAttempted).toBe(false);
+    await expect(page.getByRole('alert').first()).toContainText(
+      'Complete the highlighted fields before saving.',
+    );
+    const preferredAirlinesInput = page.getByLabel('Preferred airlines');
+    await expect(preferredAirlinesInput).toHaveAttribute('aria-invalid', 'true');
+    await expect(
+      page.getByText('Airline codes must be 2-3 alphanumeric characters (e.g. VN, SQ).'),
+    ).toBeVisible();
+
+    await expect(page.getByLabel('Given name')).toHaveValue('Jane');
+    await expect(page.getByLabel('Family name')).toHaveValue('Doe');
+    await expect(page.getByLabel('Email address')).toHaveValue('jane.doe@example.com');
+    await expect(preferredAirlinesInput).toHaveValue('VN, BAD!');
+  });
+
+  test('safe server 400 rejection displays safe error message and retains draft', async ({
+    page,
+    request,
+    context,
+  }) => {
+    await registerAndOpenProfile(page, request, context);
+
+    await page.route('**/api/profile', async (route) => {
+      if (route.request().method() === 'PATCH') {
+        await route.fulfill({
+          status: 400,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            message: 'givenName is required. email must be a valid email.',
+          }),
+        });
+        return;
+      }
+      await route.continue();
+    });
+
+    await fillDomesticProfile(page);
+    await page.getByLabel('Given name').fill('Jane');
+    await page.getByLabel('Preferred airlines').fill('VN, SQ');
+
+    await page.getByRole('button', { name: 'Save profile' }).click();
+
+    await expect(page.getByRole('alert').first()).toContainText(
+      'givenName is required. email must be a valid email.',
+    );
+
+    await expect(page.getByLabel('Given name')).toHaveValue('Jane');
+    await expect(page.getByLabel('Family name')).toHaveValue('Doe');
+    await expect(page.getByLabel('Preferred airlines')).toHaveValue('VN, SQ');
+  });
+
+  test('recovers from HTTP 409 profile revision conflict and repopulates latest profile', async ({
+    page,
+    request,
+    context,
+  }) => {
+    await registerAndOpenProfile(page, request, context);
+    await fillDomesticProfile(page);
+
+    let reloadRequested = false;
+    await page.route('**/api/profile', async (route) => {
+      if (route.request().method() === 'PATCH') {
+        await route.fulfill({
+          status: 409,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            code: 'PROFILE_REVISION_CONFLICT',
+            message: 'PROFILE_REVISION_CONFLICT',
+          }),
+        });
+        return;
+      }
+
+      if (route.request().method() === 'GET' && reloadRequested) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ...savedDomesticProfile,
+            revision: 5,
+            identity: {
+              ...savedDomesticProfile.identity,
+              givenName: 'Alice',
+            },
+          }),
+        });
+        return;
+      }
+
+      await route.continue();
+    });
+
+    await page.getByRole('button', { name: 'Save profile' }).click();
+
+    await expect(page.getByRole('alert').first()).toContainText('Profile revision conflict');
+    await expect(page.getByLabel('Given name')).toHaveValue('Jane');
+
+    reloadRequested = true;
+    const reloadButton = page.getByRole('button', { name: 'Refresh and reload latest' });
+    await expect(reloadButton).toBeVisible();
+    await reloadButton.click();
+
+    await expect(page.getByText('Revision 5')).toBeVisible();
+    await expect(page.getByLabel('Given name')).toHaveValue('Alice');
   });
 });

@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 import time
-from typing import Any, AsyncIterator, Callable, Dict, Optional
+from typing import Any, AsyncIterator, Callable, Dict, Optional, Set
 
 from agent.agents.chat_agent import format_messages
 from agent.chat_turn.command import ChatTurnCommand
@@ -26,7 +26,18 @@ from agent.chat_turn.events import (
     ToolResultPayload,
 )
 from agent.config import get_settings
-from agent.guardrails.output_pipeline import OutputGuardrailBlockedError, OutputGuardrailPipeline
+from agent.guardrails.base import (
+    GUARDRAIL_RESPONSE_KEYS,
+    GUARDRAIL_TOOL_SCHEMA,
+    AdmissionContext,
+    ValidatedInput,
+)
+from agent.guardrails.output_pipeline import (
+    OutputGuardrailBlockedError,
+    OutputGuardrailPipeline,
+    payload_free_config,
+)
+from agent.guardrails.schemas.tools import TOOL_INPUT_SCHEMAS
 from agent.infrastructure.redis import get_redis_client
 from agent.memory.manager import MemoryManager
 from agent.observability.chat_observability import ChatTelemetry, safe_opaque_id, safe_tool_name
@@ -41,6 +52,22 @@ logger = logging.getLogger("agent.chat_turn.runner")
 guardrails_logger = logging.getLogger("agent.guardrails")
 
 background_tasks: set[asyncio.Task] = set()
+
+
+def _project_public_tool_inputs(tool_name: str, raw_args: Any) -> Dict[str, Any]:
+    """Return only schema-declared tool arguments suitable for public SSE events."""
+    if tool_name == "check_booking_readiness":
+        return {"message": "Checking booking readiness..."}
+    schema = TOOL_INPUT_SCHEMAS.get(tool_name)
+    if schema is None or not isinstance(raw_args, dict):
+        return {}
+    try:
+        return schema.model_validate(raw_args).model_dump(
+            exclude_none=True,
+            exclude_unset=True,
+        )
+    except (TypeError, ValueError):
+        return {}
 
 
 async def _persist_response(
@@ -70,8 +97,6 @@ async def _persist_response(
             {"sender": "USER", "type": "STANDARD", "content": user_msg},
             {"sender": "AGENT", "type": "STANDARD", "content": response_text},
         ]
-    if use_shield:
-        return await asyncio.shield(client.create_message_batch(session_id, payload))
     return await client.create_message_batch(session_id, payload)
 
 
@@ -91,6 +116,8 @@ class ChatTurnRunner:
         redis_client: Any = None,
         client_factory: Optional[Callable[..., Any]] = None,
         telemetry: Any = None,
+        gateway: Optional[Any] = None,
+        require_gateway: bool = False,
     ):
         self._settings = settings
         self._graph = graph
@@ -99,6 +126,8 @@ class ChatTurnRunner:
         self._redis_client = redis_client
         self._client_factory = client_factory
         self._telemetry = telemetry
+        self.gateway = gateway
+        self.require_gateway = require_gateway
 
     @property
     def settings(self) -> Any:
@@ -249,10 +278,34 @@ class ChatTurnRunner:
 
         return new_persisted, partial_message_id, error_event
 
-    async def run(self, command: ChatTurnCommand) -> AsyncIterator[ChatTurnEvent]:
+    async def run(
+        self,
+        command: ChatTurnCommand,
+        validated_input: Optional[ValidatedInput] = None,
+    ) -> AsyncIterator[ChatTurnEvent]:
         """
         Execute a single chat turn as an async generator yielding ChatTurnEvent items.
         """
+        require_gw = bool(self.require_gateway)
+        if not require_gw and self._settings is not None:
+            setting_val = getattr(self._settings, "REQUIRE_GUARDRAIL_GATEWAY", None)
+            if isinstance(setting_val, bool):
+                require_gw = setting_val
+            elif isinstance(setting_val, str):
+                require_gw = setting_val.lower() in ("true", "1", "yes")
+
+        if require_gw and self.gateway is None:
+            yield ErrorEvent(
+                data=ErrorPayload(
+                    code="GUARDRAIL_CONFIGURATION_ERROR",
+                    message=(
+                        "Chat execution rejected: mandatory guardrail gateway is absent "
+                        "or unconfigured."
+                    ),
+                )
+            )
+            return
+
         settings = self.settings
         telemetry = self.telemetry
         queue_manager = self._queue_manager
@@ -262,6 +315,36 @@ class ChatTurnRunner:
 
         trace_id = safe_opaque_id(command.trace_id)
         correlation_id = safe_opaque_id(command.correlation_id)
+
+        if validated_input is None and self.gateway is not None and command.message:
+            context = AdmissionContext(
+                user_id=command.user_id,
+                chat_session_id=command.session_id or "unassigned",
+                trace_id=command.trace_id or "trace-default",
+                correlation_id=command.correlation_id,
+                policy_version="2026-09-05",
+            )
+            try:
+                decision = await self.gateway.validate_input(context, command.message)
+            except Exception:
+                yield ErrorEvent(
+                    data=ErrorPayload(
+                        code="GUARDRAIL_INPUT_INJECTION",
+                        message="Input rejected by security guardrail: GUARDRAIL_INPUT_INJECTION",
+                    )
+                )
+                return
+
+            if decision.status == "BLOCK":
+                code = decision.response_key or "GUARDRAIL_INPUT_BLOCKED"
+                yield ErrorEvent(
+                    data=ErrorPayload(
+                        code=code,
+                        message=f"Input rejected by security guardrail: {code}",
+                    )
+                )
+                return
+            validated_input = decision.validated_data
 
         client = self._create_client(
             token=command.token,
@@ -277,7 +360,11 @@ class ChatTurnRunner:
         user_msg_persisted = False
         persisted = False
         force_persistence = False
-        user_msg_content = command.message or "Action confirmed"
+        user_msg_content = (
+            validated_input.content
+            if validated_input is not None
+            else (command.message or "Action confirmed")
+        )
 
         try:
             # 1. Session resolution / auto-creation
@@ -352,6 +439,83 @@ class ChatTurnRunner:
                     yield err_event
                 return
 
+            if self.gateway is not None:
+                mem_context = AdmissionContext(
+                    user_id=command.user_id,
+                    chat_session_id=session_id or "unassigned",
+                    trace_id=command.trace_id or "trace-default",
+                    correlation_id=command.correlation_id,
+                    policy_version="2026-09-05",
+                )
+                if summary:
+                    summary_content = (
+                        summary.get("content")
+                        if isinstance(summary, dict)
+                        else (getattr(summary, "content", None) or str(summary))
+                    )
+                    if isinstance(summary, str):
+                        summary_content = summary
+                    try:
+                        summary_decision = await self.gateway.validate_input(
+                            mem_context, summary_content
+                        )
+                        if summary_decision.status == "BLOCK":
+                            logger.warning(
+                                "Unsafe persisted summary discarded by guardrail gateway: %s",
+                                summary_decision.response_key,
+                            )
+                            summary = None
+                    except Exception:
+                        logger.warning(
+                            "Exception validating persisted summary; discarding summary."
+                        )
+                        summary = None
+
+                for msg in history:
+                    msg_content = (
+                        msg.get("content")
+                        if isinstance(msg, dict)
+                        else (getattr(msg, "content", None) or str(msg))
+                    )
+                    if not msg_content or not isinstance(msg_content, str):
+                        continue
+                    try:
+                        history_decision = await self.gateway.validate_input(
+                            mem_context, msg_content
+                        )
+                    except Exception:
+                        history_decision = None
+
+                    if history_decision is None or history_decision.status == "BLOCK":
+                        block_code = (
+                            history_decision.response_key
+                            if history_decision and history_decision.response_key
+                            else "GUARDRAIL_INPUT_INJECTION"
+                        )
+                        logger.warning(
+                            "Unsafe historical conversation context blocked by guardrail gateway: %s",
+                            block_code,
+                        )
+                        _, _, err_event = await self._finalize_cleanup(
+                            session_id=session_id,
+                            req_id=req_id,
+                            queue_manager=queue_manager,
+                            client=client,
+                            pipeline=None,
+                            partial_response=partial_response,
+                            user_msg_content=user_msg_content,
+                            user_msg_persisted=user_msg_persisted,
+                            persisted=persisted,
+                            error_code=block_code,
+                            error_message="Historical conversation context contains unsafe content.",
+                        )
+                        pipeline = None
+                        req_id = None
+                        released = True
+                        if err_event:
+                            yield err_event
+                        return
+
             # 4. TrustedSearchSnapshot loading via lifecycle + telemetry emit
             trusted_snapshot_dict = None
             snapshot_state = "miss"
@@ -382,7 +546,6 @@ class ChatTurnRunner:
             output_config = getattr(settings, "output_guardrail", None)
             pipeline = OutputGuardrailPipeline(
                 config=output_config,
-                nemo_service=guardrails,
                 session_id=session_id,
             )
 
@@ -445,6 +608,7 @@ class ChatTurnRunner:
                     "user_id": command.user_id,
                     "nestjs_client": client,
                     "trusted_snapshot": trusted_snapshot_dict,
+                    "guardrail_gateway": self.gateway,
                 }
             }
             messages = format_messages(
@@ -466,6 +630,7 @@ class ChatTurnRunner:
             if command.action_payload:
                 initial_state["action_payload"] = command.action_payload
 
+            config = payload_free_config(config)
             event_stream = graph.astream_events(
                 initial_state,
                 config=config,
@@ -473,11 +638,36 @@ class ChatTurnRunner:
             )
 
             tool_started_at: Dict[str, float] = {}
+            pending_tool_calls: Dict[str, Dict[str, Any]] = {}
+            emitted_tool_call_ids: Set[str] = set()
+            streamed_run_ids: Set[str] = set()
+            handled_message_ids: Set[Any] = set()
+            active_model_streamed = False
+            streamed_since_last_node_end = False
 
             async for event in event_stream:
                 kind = event.get("event")
 
-                if kind == "on_chat_model_stream":
+                if kind == "on_chat_model_start":
+                    active_model_streamed = False
+                    streamed_since_last_node_end = False
+
+                elif kind == "on_chain_start":
+                    node_name = event.get("name")
+                    if node_name in {
+                        "general",
+                        "travel",
+                        "checkout",
+                        "final_answer",
+                    }:
+                        streamed_since_last_node_end = False
+
+                elif kind == "on_chat_model_stream":
+                    run_id = event.get("run_id")
+                    if isinstance(run_id, str) and run_id:
+                        streamed_run_ids.add(run_id)
+                    active_model_streamed = True
+                    streamed_since_last_node_end = True
                     chunk = event.get("data", {}).get("chunk")
                     if chunk and hasattr(chunk, "content") and chunk.content:
                         token_content = str(chunk.content)
@@ -485,25 +675,339 @@ class ChatTurnRunner:
                             partial_response += safe_chunk
                             yield TokenEvent(data=TokenPayload(content=safe_chunk))
 
+                elif kind == "on_chat_model_end":
+                    # Some chat-model adapters implement ``ainvoke`` without
+                    # emitting token events. Preserve the streaming contract
+                    # by adapting the completed AI message through the same
+                    # deterministic pipeline, while avoiding duplication for
+                    # adapters that did emit stream chunks.
+                    run_id = event.get("run_id")
+                    has_streamed = (
+                        (run_id in streamed_run_ids)
+                        if isinstance(run_id, str) and run_id
+                        else active_model_streamed
+                    )
+                    active_model_streamed = False
+
+                    output = event.get("data", {}).get("output")
+                    message = output
+                    if isinstance(output, dict):
+                        message = output.get("generations") or output.get("message") or output
+                        if isinstance(message, list) and message:
+                            message = message[0]
+
+                    if message is not None:
+                        handled_message_ids.add(id(message))
+                        if hasattr(message, "message"):
+                            handled_message_ids.add(id(message.message))
+                        msg_id = getattr(message, "id", None)
+                        if isinstance(msg_id, str) and msg_id:
+                            handled_message_ids.add(msg_id)
+
+                    if not has_streamed:
+                        content = getattr(message, "content", None)
+                        if isinstance(content, str) and content:
+                            async for safe_chunk in pipeline.process_token(content):
+                                partial_response += safe_chunk
+                                yield TokenEvent(data=TokenPayload(content=safe_chunk))
+
                 elif kind == "on_tool_start":
+                    active_model_streamed = False
+                    streamed_since_last_node_end = False
                     tool_name = event.get("name")
-                    tool_input = event.get("data", {}).get("input")
                     if isinstance(tool_name, str):
                         tool_started_at[tool_name] = time.perf_counter()
 
-                    if tool_name == "check_booking_readiness":
-                        safe_input = {"message": "Checking booking readiness..."}
-                        yield ToolCallEvent(data=ToolCallPayload(name=tool_name, inputs=safe_input))
-                    else:
-                        yield ToolCallEvent(
-                            data=ToolCallPayload(
-                                name=tool_name or "",
-                                inputs=tool_input if isinstance(tool_input, dict) else {},
-                            )
-                        )
-
                 elif kind == "on_chain_end":
                     node_name = event.get("name")
+                    if node_name in {
+                        "general",
+                        "travel",
+                        "checkout",
+                        "final_answer",
+                    }:
+                        output = event.get("data", {}).get("output")
+                        messages_out = (
+                            output.get("messages", []) if isinstance(output, dict) else []
+                        )
+                        if messages_out:
+                            target_message = messages_out[-1]
+                            for tool_call in getattr(target_message, "tool_calls", []) or []:
+                                if not isinstance(tool_call, dict):
+                                    continue
+                                call_id = tool_call.get("id")
+                                if isinstance(call_id, str) and call_id:
+                                    pending_tool_calls[call_id] = tool_call
+                            is_handled = id(target_message) in handled_message_ids or (
+                                hasattr(target_message, "message")
+                                and id(target_message.message) in handled_message_ids
+                            )
+                            target_id = getattr(target_message, "id", None)
+                            if not is_handled and isinstance(target_id, str) and target_id:
+                                is_handled = target_id in handled_message_ids
+
+                            if not is_handled and not streamed_since_last_node_end:
+                                content = getattr(target_message, "content", None)
+                                if isinstance(content, str) and content:
+                                    handled_message_ids.add(id(target_message))
+                                    if isinstance(target_id, str) and target_id:
+                                        handled_message_ids.add(target_id)
+                                    async for safe_chunk in pipeline.process_token(content):
+                                        partial_response += safe_chunk
+                                        yield TokenEvent(data=TokenPayload(content=safe_chunk))
+                        streamed_since_last_node_end = False
+                    if node_name == "tools":
+                        output = event.get("data", {}).get("output")
+                        if isinstance(output, dict) and output.get("tool_blocked") is True:
+                            proposed_code = output.get("tool_block_response_key")
+                            block_code = (
+                                proposed_code
+                                if proposed_code in set(GUARDRAIL_RESPONSE_KEYS.values())
+                                else GUARDRAIL_TOOL_SCHEMA
+                            )
+                            _, _, err_event = await self._finalize_cleanup(
+                                session_id=session_id,
+                                req_id=req_id,
+                                queue_manager=queue_manager,
+                                client=client,
+                                pipeline=pipeline,
+                                partial_response=partial_response,
+                                user_msg_content=user_msg_content,
+                                user_msg_persisted=user_msg_persisted,
+                                persisted=persisted,
+                                error_code=block_code,
+                                error_message="Tool execution was blocked for safety reasons.",
+                            )
+                            pipeline = None
+                            req_id = None
+                            released = True
+                            if err_event:
+                                yield err_event
+                            return
+                        messages_out = (
+                            output.get("messages", []) if isinstance(output, dict) else []
+                        )
+                        for tool_message in messages_out:
+                            if not (
+                                hasattr(tool_message, "content")
+                                and getattr(tool_message, "additional_kwargs", {}).get(
+                                    "guardrail_validated"
+                                )
+                                is True
+                            ):
+                                _, _, err_event = await self._finalize_cleanup(
+                                    session_id=session_id,
+                                    req_id=req_id,
+                                    queue_manager=queue_manager,
+                                    client=client,
+                                    pipeline=pipeline,
+                                    partial_response=partial_response,
+                                    user_msg_content=user_msg_content,
+                                    user_msg_persisted=user_msg_persisted,
+                                    persisted=persisted,
+                                    error_code=GUARDRAIL_TOOL_SCHEMA,
+                                    error_message="Tool result was blocked for safety reasons.",
+                                )
+                                pipeline = None
+                                req_id = None
+                                released = True
+                                if err_event:
+                                    yield err_event
+                                return
+
+                            tool_name = getattr(tool_message, "name", None)
+                            content = tool_message.content
+                            tool_call_id = getattr(tool_message, "tool_call_id", None)
+                            pending_call = (
+                                pending_tool_calls.pop(tool_call_id, None)
+                                if isinstance(tool_call_id, str)
+                                else None
+                            )
+                            if (
+                                isinstance(tool_call_id, str)
+                                and tool_call_id not in emitted_tool_call_ids
+                                and isinstance(pending_call, dict)
+                            ):
+                                tool_input = (
+                                    pending_call.get("args", {})
+                                    if isinstance(pending_call, dict)
+                                    else {}
+                                )
+                                safe_input = _project_public_tool_inputs(
+                                    tool_name or "",
+                                    tool_input,
+                                )
+                                yield ToolCallEvent(
+                                    data=ToolCallPayload(
+                                        name=tool_name or "",
+                                        inputs=safe_input,
+                                    )
+                                )
+                                emitted_tool_call_ids.add(tool_call_id)
+
+                            output_data = content if isinstance(content, dict) else None
+                            if output_data is None and isinstance(content, str):
+                                try:
+                                    parsed = json.loads(content)
+                                    output_data = parsed if isinstance(parsed, dict) else None
+                                except (TypeError, ValueError, json.JSONDecodeError):
+                                    logger.debug("validated_tool_output_not_json")
+
+                            summary_str = (
+                                content
+                                if isinstance(content, str)
+                                else json.dumps(content, ensure_ascii=False)
+                                if isinstance(content, dict)
+                                else "Tool completed safely."
+                            )
+                            safe_readiness = None
+                            if tool_name == "check_booking_readiness":
+                                safe_readiness = validate_booking_readiness_response(output_data)
+                                if safe_readiness is None or (
+                                    output_data and "error" in output_data
+                                ):
+                                    _, _, err_event = await self._finalize_cleanup(
+                                        session_id=session_id,
+                                        req_id=req_id,
+                                        queue_manager=queue_manager,
+                                        client=client,
+                                        pipeline=pipeline,
+                                        partial_response=partial_response,
+                                        user_msg_content=user_msg_content,
+                                        user_msg_persisted=user_msg_persisted,
+                                        persisted=persisted,
+                                        error_code="READINESS_RESPONSE_INVALID",
+                                        error_message="Booking readiness could not be verified safely.",
+                                    )
+                                    pipeline = None
+                                    req_id = None
+                                    released = True
+                                    if err_event:
+                                        yield err_event
+                                    return
+                                summary_str = "Successfully checked booking readiness."
+
+                            yield ToolResultEvent(
+                                data=ToolResultPayload(name=tool_name or "", result=summary_str)
+                            )
+
+                            if tool_name == "search_flights":
+                                raw_results = None
+                                if redis_client is not None:
+                                    try:
+                                        owner = SnapshotOwner(
+                                            user_id=command.user_id,
+                                            chat_session_id=session_id,
+                                        )
+                                        lifecycle = TrustedSearchSnapshotLifecycle(
+                                            TrustedSnapshotRepository(redis_client)
+                                        )
+                                        latest_snapshot = await lifecycle.load_active(owner)
+                                        if latest_snapshot:
+                                            raw_results = [
+                                                res.model_dump(mode="json")
+                                                for res in lifecycle.project_for_browser(
+                                                    latest_snapshot
+                                                )
+                                            ]
+                                    except Exception:
+                                        logger.warning("search_result_projection_failed")
+                                if raw_results:
+                                    yield FlightResultsEvent(
+                                        data=FlightResultsPayload(results=raw_results)
+                                    )
+
+                            elif (
+                                tool_name == "check_booking_readiness"
+                                and safe_readiness
+                                and safe_readiness["ready"] is False
+                            ):
+                                action = safe_readiness["nextAction"]
+                                scope = safe_readiness["scope"]
+                                safe_passengers = []
+                                for passenger in safe_readiness["passengers"]:
+                                    safe_sections = []
+                                    for section in passenger["sections"]:
+                                        safe_fields = [
+                                            {
+                                                "name": field["name"],
+                                                "status": field["status"],
+                                                "reason": field["reason"],
+                                            }
+                                            for field in section["fields"]
+                                        ]
+                                        safe_sections.append(
+                                            {"name": section["name"], "fields": safe_fields}
+                                        )
+                                    safe_passengers.append(
+                                        {
+                                            "passengerType": passenger["passengerType"],
+                                            "passengerOrdinal": passenger["passengerOrdinal"],
+                                            "sections": safe_sections,
+                                        }
+                                    )
+
+                                target = (
+                                    "/profile"
+                                    if action == "COMPLETE_PROFILE"
+                                    else "/checkout/passengers"
+                                )
+                                if queue_manager and not await queue_manager.validate_active_fence(
+                                    session_id
+                                ):
+                                    logger.warning("stale_fence_action_required_emission_aborted")
+                                    _, _, err_event = await self._finalize_cleanup(
+                                        session_id=session_id,
+                                        req_id=req_id,
+                                        queue_manager=queue_manager,
+                                        client=client,
+                                        pipeline=pipeline,
+                                        partial_response=partial_response,
+                                        user_msg_content=user_msg_content,
+                                        user_msg_persisted=user_msg_persisted,
+                                        persisted=persisted,
+                                        error_code="PERSISTENCE_ERROR",
+                                        error_message=(
+                                            "The requested action could not be emitted because "
+                                            "the session lease was lost."
+                                        ),
+                                    )
+                                    pipeline = None
+                                    req_id = None
+                                    released = True
+                                    if err_event:
+                                        yield err_event
+                                    return
+
+                                yield ActionRequiredEvent(
+                                    data=ActionRequiredPayload(
+                                        action=action,
+                                        scope=scope,
+                                        passengers=safe_passengers,
+                                        target=target,
+                                    )
+                                )
+                                if pipeline is not None:
+                                    try:
+                                        await asyncio.wait_for(pipeline.aclose(), timeout=1.0)
+                                    except Exception:
+                                        pass
+                                    pipeline = None
+                                if (
+                                    queue_manager is not None
+                                    and req_id is not None
+                                    and not released
+                                ):
+                                    released = True
+                                    try:
+                                        await asyncio.wait_for(
+                                            queue_manager.release(session_id, req_id),
+                                            timeout=2.0,
+                                        )
+                                    except Exception:
+                                        pass
+                                    req_id = None
+                                return
                     if node_name in (
                         "create_handoff_token",
                         "create_handoff_token_node",
@@ -599,7 +1103,6 @@ class ChatTurnRunner:
 
                 elif kind == "on_tool_end":
                     tool_name = event.get("name")
-                    tool_output = event.get("data", {}).get("output")
                     if isinstance(tool_name, str):
                         started_at = tool_started_at.pop(tool_name, time.perf_counter())
                         telemetry.emit_safely(
@@ -613,185 +1116,6 @@ class ChatTurnRunner:
                                 "outcome": "completed",
                             },
                         )
-
-                    output_data = None
-                    if tool_output is not None:
-                        if hasattr(tool_output, "content"):
-                            if isinstance(tool_output.content, dict):
-                                output_data = tool_output.content
-                            else:
-                                try:
-                                    output_data = json.loads(str(tool_output.content))
-                                except Exception:
-                                    logger.debug("tool_output_content_not_json")
-                            output_str = str(tool_output.content)
-                        else:
-                            if isinstance(tool_output, dict):
-                                output_data = tool_output
-                            else:
-                                try:
-                                    output_data = json.loads(str(tool_output))
-                                except Exception:
-                                    logger.debug("tool_output_not_json")
-                            output_str = str(tool_output)
-                        summary_str = output_str.split("\n")[0].strip()
-                    else:
-                        summary_str = ""
-
-                    safe_readiness = None
-                    if tool_name == "check_booking_readiness":
-                        if output_data and "error" in output_data:
-                            _, _, err_event = await self._finalize_cleanup(
-                                session_id=session_id,
-                                req_id=req_id,
-                                queue_manager=queue_manager,
-                                client=client,
-                                pipeline=pipeline,
-                                partial_response=partial_response,
-                                user_msg_content=user_msg_content,
-                                user_msg_persisted=user_msg_persisted,
-                                persisted=persisted,
-                                error_code="READINESS_RESPONSE_INVALID",
-                                error_message="Booking readiness could not be verified safely.",
-                            )
-                            pipeline = None
-                            req_id = None
-                            released = True
-                            if err_event:
-                                yield err_event
-                            return
-                        else:
-                            safe_readiness = validate_booking_readiness_response(output_data)
-                            if safe_readiness is None:
-                                _, _, err_event = await self._finalize_cleanup(
-                                    session_id=session_id,
-                                    req_id=req_id,
-                                    queue_manager=queue_manager,
-                                    client=client,
-                                    pipeline=pipeline,
-                                    partial_response=partial_response,
-                                    user_msg_content=user_msg_content,
-                                    user_msg_persisted=user_msg_persisted,
-                                    persisted=persisted,
-                                    error_code="READINESS_RESPONSE_INVALID",
-                                    error_message="Booking readiness could not be verified safely.",
-                                )
-                                pipeline = None
-                                req_id = None
-                                released = True
-                                if err_event:
-                                    yield err_event
-                                return
-                            summary_str = "Successfully checked booking readiness."
-
-                    yield ToolResultEvent(
-                        data=ToolResultPayload(name=tool_name or "", result=summary_str)
-                    )
-
-                    if tool_name == "search_flights":
-                        raw_results = None
-                        if redis_client is not None:
-                            try:
-                                owner = SnapshotOwner(
-                                    user_id=command.user_id, chat_session_id=session_id
-                                )
-                                lifecycle = TrustedSearchSnapshotLifecycle(
-                                    TrustedSnapshotRepository(redis_client)
-                                )
-                                latest_snapshot = await lifecycle.load_active(owner)
-                                if latest_snapshot:
-                                    raw_results = [
-                                        res.model_dump(mode="json")
-                                        for res in lifecycle.project_for_browser(latest_snapshot)
-                                    ]
-                            except Exception:
-                                logger.warning("search_result_projection_failed")
-                        if raw_results:
-                            yield FlightResultsEvent(data=FlightResultsPayload(results=raw_results))
-
-                    elif (
-                        tool_name == "check_booking_readiness"
-                        and safe_readiness
-                        and safe_readiness["ready"] is False
-                    ):
-                        action = safe_readiness["nextAction"]
-                        scope = safe_readiness["scope"]
-
-                        safe_passengers = []
-                        for p in safe_readiness["passengers"]:
-                            safe_sections = []
-                            for s in p["sections"]:
-                                safe_fields = []
-                                for f in s["fields"]:
-                                    safe_fields.append(
-                                        {
-                                            "name": f["name"],
-                                            "status": f["status"],
-                                            "reason": f["reason"],
-                                        }
-                                    )
-                                safe_sections.append({"name": s["name"], "fields": safe_fields})
-                            safe_passengers.append(
-                                {
-                                    "passengerType": p["passengerType"],
-                                    "passengerOrdinal": p["passengerOrdinal"],
-                                    "sections": safe_sections,
-                                }
-                            )
-
-                        target = "/checkout/passengers"
-                        if action == "COMPLETE_PROFILE":
-                            target = "/profile"
-
-                        if queue_manager and not await queue_manager.validate_active_fence(
-                            session_id
-                        ):
-                            logger.warning("stale_fence_action_required_emission_aborted")
-                            _, _, err_event = await self._finalize_cleanup(
-                                session_id=session_id,
-                                req_id=req_id,
-                                queue_manager=queue_manager,
-                                client=client,
-                                pipeline=pipeline,
-                                partial_response=partial_response,
-                                user_msg_content=user_msg_content,
-                                user_msg_persisted=user_msg_persisted,
-                                persisted=persisted,
-                                error_code="PERSISTENCE_ERROR",
-                                error_message="The requested action could not be emitted because the session lease was lost.",
-                            )
-                            pipeline = None
-                            req_id = None
-                            released = True
-                            if err_event:
-                                yield err_event
-                            return
-
-                        payload = ActionRequiredPayload(
-                            action=action,
-                            scope=scope,
-                            passengers=safe_passengers,
-                            target=target,
-                        )
-                        yield ActionRequiredEvent(data=payload)
-
-                        # Release queue lease and close pipeline upon ActionRequired
-                        if pipeline is not None:
-                            try:
-                                await asyncio.wait_for(pipeline.aclose(), timeout=1.0)
-                            except Exception:
-                                pass
-                            pipeline = None
-                        if queue_manager is not None and req_id is not None and not released:
-                            released = True
-                            try:
-                                await asyncio.wait_for(
-                                    queue_manager.release(session_id, req_id), timeout=2.0
-                                )
-                            except Exception:
-                                pass
-                            req_id = None
-                        return
 
             # Flush output guardrail pipeline
             async for safe_chunk in pipeline.flush():
@@ -882,6 +1206,7 @@ class ChatTurnRunner:
                 memory_mgr = MemoryManager(
                     window_size=getattr(settings, "MEMORY_WINDOW_SIZE", 20),
                     token_budget=getattr(settings, "MEMORY_TOKEN_BUDGET", 4000),
+                    gateway=self.gateway,
                 )
                 original_total = (
                     memory_data.get("totalMessageCount", 0) if isinstance(memory_data, dict) else 0
@@ -912,6 +1237,8 @@ class ChatTurnRunner:
                     req_id = None
 
         except OutputGuardrailBlockedError as e:
+            if "event_stream" in locals() and hasattr(event_stream, "aclose"):
+                await event_stream.aclose()
             guardrails_logger.warning(
                 json.dumps(
                     {

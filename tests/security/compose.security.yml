@@ -1,0 +1,236 @@
+{
+  "services": {
+    "postgres_security": {
+      "image": "postgres:16-alpine",
+      "environment": {
+        "POSTGRES_USER": "security",
+        "POSTGRES_PASSWORD": "security_disposable",
+        "POSTGRES_DB": "security_dast"
+      },
+      "ports": [
+        "127.0.0.1:5433:5432"
+      ],
+      "volumes": [
+        "postgres_security_data:/var/lib/postgresql/data"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "pg_isready -U security -d security_dast"
+        ],
+        "interval": "2s",
+        "timeout": "3s",
+        "retries": 30
+      },
+      "networks": [
+        "security"
+      ]
+    },
+    "redis_security": {
+      "image": "redis:7-alpine",
+      "ports": [
+        "127.0.0.1:6380:6379"
+      ],
+      "command": [
+        "redis-server",
+        "--save",
+        "",
+        "--appendonly",
+        "no"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "redis-cli",
+          "ping"
+        ],
+        "interval": "2s",
+        "timeout": "3s",
+        "retries": 30
+      },
+      "networks": [
+        "security"
+      ]
+    },
+    "mock_security": {
+      "image": "node:22-bookworm-slim",
+      "working_dir": "/stubs",
+      "command": [
+        "node",
+        "mock-server.mjs"
+      ],
+      "volumes": [
+        "./mock-server.mjs:/stubs/mock-server.mjs:ro"
+      ],
+      "ports": [
+        "127.0.0.1:3400:3400"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3400/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        ],
+        "interval": "3s",
+        "timeout": "3s",
+        "retries": 40,
+        "start_period": "10s"
+      },
+      "networks": [
+        "security"
+      ]
+    },
+    "migrate": {
+      "image": "security-dast-api:local",
+      "build": {
+        "context": "../..",
+        "dockerfile": "tests/security/api.Dockerfile"
+      },
+      "profiles": [
+        "tools"
+      ],
+      "working_dir": "/app/apps/api",
+      "command": [
+        "./node_modules/.bin/prisma",
+        "migrate",
+        "deploy"
+      ],
+      "environment": {
+        "NODE_ENV": "test",
+        "JWT_SECRET": "security-synthetic-jwt-secret-only",
+        "AGENT_SERVICE_API_KEY": "security-synthetic-agent-key-only",
+        "CLAIM_TOKEN_SECRET": "security-synthetic-claim-secret-only",
+        "REDIS_URL": "redis://redis_security:6379/0",
+        "FRONTEND_URL": "http://localhost:3000",
+        "LANGCHAIN_TRACING_V2": "false",
+        "PORT": "3001",
+        "DATABASE_URL": "postgresql://security:security_disposable@postgres_security:5432/security_dast",
+        "AGENT_URL": "http://agent_security:3002",
+        "STRIPE_SECRET_KEY": "sk_test_security_synthetic",
+        "STRIPE_WEBHOOK_SECRET": "whsec_security_synthetic",
+        "STRIPE_API_URL": "http://mock_security:3400",
+        "DUFFEL_ACCESS_TOKEN": "duffel_test_security_synthetic",
+        "DUFFEL_API_URL": "http://mock_security:3400",
+        "ENCRYPTION_KEY": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "CHAT_ENCRYPTION_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "CHAT_ATTESTATION_KEY": "security-synthetic-attestation-only"
+      },
+      "networks": [
+        "security"
+      ]
+    },
+    "api_security": {
+      "image": "security-dast-api:local",
+      "build": {
+        "context": "../..",
+        "dockerfile": "tests/security/api.Dockerfile"
+      },
+      "environment": {
+        "NODE_ENV": "test",
+        "JWT_SECRET": "security-synthetic-jwt-secret-only",
+        "AGENT_SERVICE_API_KEY": "security-synthetic-agent-key-only",
+        "CLAIM_TOKEN_SECRET": "security-synthetic-claim-secret-only",
+        "REDIS_URL": "redis://redis_security:6379/0",
+        "FRONTEND_URL": "http://localhost:3000",
+        "LANGCHAIN_TRACING_V2": "false",
+        "PORT": "3001",
+        "DATABASE_URL": "postgresql://security:security_disposable@postgres_security:5432/security_dast",
+        "AGENT_URL": "http://agent_security:3002",
+        "STRIPE_SECRET_KEY": "sk_test_security_synthetic",
+        "STRIPE_WEBHOOK_SECRET": "whsec_security_synthetic",
+        "STRIPE_API_URL": "http://mock_security:3400",
+        "DUFFEL_ACCESS_TOKEN": "duffel_test_security_synthetic",
+        "DUFFEL_API_URL": "http://mock_security:3400",
+        "ENCRYPTION_KEY": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "CHAT_ENCRYPTION_KEY": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "CHAT_ATTESTATION_KEY": "security-synthetic-attestation-only"
+      },
+      "ports": [
+        "127.0.0.1:3301:3001"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001/api/health/ping').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        ],
+        "interval": "3s",
+        "timeout": "3s",
+        "retries": 40,
+        "start_period": "10s"
+      },
+      "depends_on": {
+        "postgres_security": {
+          "condition": "service_healthy"
+        },
+        "redis_security": {
+          "condition": "service_healthy"
+        },
+        "mock_security": {
+          "condition": "service_healthy"
+        }
+      },
+      "networks": [
+        "security"
+      ]
+    },
+    "agent_security": {
+      "image": "security-dast-agent:local",
+      "build": {
+        "context": "../..",
+        "dockerfile": "tests/security/agent.Dockerfile"
+      },
+      "environment": {
+        "NODE_ENV": "test",
+        "JWT_SECRET": "security-synthetic-jwt-secret-only",
+        "AGENT_SERVICE_API_KEY": "security-synthetic-agent-key-only",
+        "CLAIM_TOKEN_SECRET": "security-synthetic-claim-secret-only",
+        "REDIS_URL": "redis://redis_security:6379/0",
+        "FRONTEND_URL": "http://localhost:3000",
+        "LANGCHAIN_TRACING_V2": "false",
+        "NESTJS_API_URL": "http://api_security:3001/api",
+        "MIMO_API_URL": "http://mock_security:3400/v1",
+        "MIMO_API_KEY": "security-synthetic-model-key",
+        "MIMO_MODEL_NAME": "security-stub",
+        "CHAT_QUOTA_DAILY": "${DAST_QUOTA_DAILY:-50}",
+        "CHAT_QUOTA_BURST": "${DAST_QUOTA_BURST:-60}"
+      },
+      "ports": [
+        "127.0.0.1:3302:3002"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "/app/.venv/bin/python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3002/health', timeout=2)"
+        ],
+        "interval": "3s",
+        "timeout": "3s",
+        "retries": 40,
+        "start_period": "10s"
+      },
+      "depends_on": {
+        "api_security": {
+          "condition": "service_healthy"
+        },
+        "mock_security": {
+          "condition": "service_healthy"
+        }
+      },
+      "networks": [
+        "security"
+      ]
+    }
+  },
+  "networks": {
+    "security": {
+      "internal": true
+    }
+  },
+  "volumes": {
+    "postgres_security_data": {}
+  }
+}
