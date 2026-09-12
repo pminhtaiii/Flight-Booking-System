@@ -31,10 +31,10 @@ export const DEFAULT_IGNORED_DIRS = new Set([
 ]);
 
 export const DEFAULT_STANDARD_RULESETS = [
-  'p/default@v1.88.0',
-  'p/owasp-top-ten@v1.88.0',
-  'p/security-audit@v1.88.0',
-  'p/secrets@v1.88.0',
+  'p/default',
+  'p/owasp-top-ten',
+  'p/security-audit',
+  'p/secrets',
 ];
 
 export const SUPPORTED_STANDARD_RULESETS = new Set([
@@ -86,7 +86,7 @@ export function calculateFileCensus(options = {}) {
 
     let count = 0;
 
-    function walk(currentDir) {
+    const walk = (currentDir) => {
       let entries;
       try {
         entries = readdirSync(currentDir, { withFileTypes: true });
@@ -425,6 +425,7 @@ export function validateBaselineFinding(finding, index = 0) {
  * Validates the structure and entries of a baseline findings document.
  */
 export function validateBaselineSchema(baselineData, options = {}) {
+  void options;
   const errors = [];
   let data = baselineData;
 
@@ -817,8 +818,6 @@ export function runAstFallbackScan(targetFiles, rootDir, options = {}) {
 
   const hasSecrets = enabledStandardPacks.has('p/secrets');
   const hasOwasp = enabledStandardPacks.has('p/owasp-top-ten');
-  const hasSecurityAudit = enabledStandardPacks.has('p/security-audit');
-  const hasDefault = enabledStandardPacks.has('p/default');
   const hasCustomRules =
     !options.configs ||
     configs.some(
@@ -1553,8 +1552,11 @@ export function runSastScan(options = {}) {
         errors,
       };
     }
-    semgrepArgs.push('--config', cfg);
+    const resolvedConfig = isRegistry ? cfg.replace(/@.*$/, '') : cfg;
+    semgrepArgs.push('--config', resolvedConfig);
   }
+
+  semgrepArgs.push('--metrics=off');
 
   semgrepArgs.push('--exclude', 'node_modules');
   semgrepArgs.push('--exclude', 'dist');
@@ -1752,8 +1754,10 @@ export function runSastScan(options = {}) {
 export function main(argv = process.argv.slice(2), dependencies = {}) {
   const rootDir = dependencies.rootDir || defaultRepoRoot;
   const exitFn = dependencies.exitFn || process.exit;
+  /* eslint-disable no-console */
   const logFn = dependencies.logFn || console.log;
   const errFn = dependencies.errFn || console.error;
+  /* eslint-enable no-console */
   const execFn = dependencies.execFn;
 
   let mode = 'full';

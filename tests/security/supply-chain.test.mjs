@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
 import {
   extractAdvisoryIdentifiers,
+  loadDependencyAdvisoryRegister,
   loadIgnoredGhas,
   main,
   normalisePnpmAudit,
@@ -593,3 +594,184 @@ test('normalisePnpmAudit does not synthesize placeholders when explicit advisori
   assert.equal(parsed.counts.Critical, 0);
   assert.equal(parsed.counts.High, 0);
 });
+
+test('report.exceptions contains structured exception objects with valid expiry dates', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'supply-chain-exceptions-'));
+  try {
+    const register = loadDependencyAdvisoryRegister(process.cwd());
+    assert.equal(register.errors.length, 0);
+    assert.equal(register.exceptions.length, 98);
+
+    const result = runSupplyChainScan({
+      rootDir: process.cwd(),
+      output: join(tempDir, 'supply-chain.json'),
+      strict: false,
+      now: () => new Date('2026-09-11T00:00:00.000Z'),
+      execFn: (command, args) => {
+        if (command === 'pnpm')
+          return {
+            status: 0,
+            stdout: JSON.stringify({ advisories: {}, metadata: { vulnerabilities: {} } }),
+            stderr: '',
+          };
+        if (command === 'gitleaks') return { status: 0, stdout: '[]', stderr: '' };
+        if (args[0] === 'export')
+          return { status: 0, stdout: '# frozen requirements\n', stderr: '' };
+        return { status: 0, stdout: JSON.stringify({ dependencies: [] }), stderr: '' };
+      },
+    });
+
+    assert.equal(result.exitCode, 0, result.errors.join('; '));
+    assert.equal(result.passed, true);
+    assert.ok(Array.isArray(result.report.exceptions));
+    assert.equal(result.report.exceptions.length, 98);
+
+    for (const exc of result.report.exceptions) {
+      assert.ok(/^GHSA-[A-Z0-9_-]+$/i.test(exc.id));
+      assert.equal(exc.ruleId, exc.id);
+      assert.ok(exc.package && typeof exc.package === 'string');
+      assert.ok(exc.severity && typeof exc.severity === 'string');
+      assert.equal(
+        exc.rationale,
+        'Upstream Next.js 14 -> 15 deferral documented in docs/security/dependency-advisories.md',
+      );
+      assert.equal(
+        exc.compensatingControl,
+        'Documented in docs/security/dependency-advisories.md',
+      );
+      assert.equal(exc.expiry, '2026-10-12T00:00:00.000Z');
+      assert.ok(!Number.isNaN(Date.parse(exc.expiry)));
+    }
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('an expired advisory register (Policy-Expires-At in the past) causes runSupplyChainScan to fail closed with exit code 1', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'supply-chain-expired-'));
+  try {
+    const result = runSupplyChainScan({
+      rootDir: process.cwd(),
+      output: join(tempDir, 'supply-chain.json'),
+      strict: false,
+      now: () => new Date('2026-10-15T00:00:00.000Z'),
+      execFn: (command, args) => {
+        if (command === 'pnpm')
+          return {
+            status: 0,
+            stdout: JSON.stringify({ advisories: {}, metadata: { vulnerabilities: {} } }),
+            stderr: '',
+          };
+        if (command === 'gitleaks') return { status: 0, stdout: '[]', stderr: '' };
+        if (args[0] === 'export')
+          return { status: 0, stdout: '# frozen requirements\n', stderr: '' };
+        return { status: 0, stdout: JSON.stringify({ dependencies: [] }), stderr: '' };
+      },
+    });
+
+    assert.equal(result.exitCode, 1);
+    assert.equal(result.passed, false);
+    assert.ok(
+      result.errors.some((err) =>
+        err.includes('[Supply Chain Exception Error] Dependency advisory deferral policy expired on 2026-10-12T00:00:00.000Z'),
+      ),
+    );
+
+    const mockDocPath = join(tempDir, 'expired-advisories.md');
+    writeFileSync(
+      mockDocPath,
+      '# Test Advisories\n\n> **Policy-Version**: 1.0.0\n> **Policy-Expires-At**: 2026-08-01T00:00:00.000Z\n\n| GHSA ID | Package | Severity |\n|---|---|---|\n',
+      'utf8',
+    );
+    const customResult = runSupplyChainScan({
+      rootDir: process.cwd(),
+      advisoriesDocPath: mockDocPath,
+      output: join(tempDir, 'supply-chain-custom.json'),
+      strict: false,
+      now: () => new Date('2026-09-11T00:00:00.000Z'),
+      execFn: () => ({ status: 0, stdout: '[]', stderr: '' }),
+    });
+    assert.equal(customResult.exitCode, 1);
+    assert.equal(customResult.passed, false);
+    assert.ok(
+      customResult.errors.some((err) =>
+        err.includes('[Supply Chain Exception Error] Dependency advisory deferral policy expired on 2026-08-01T00:00:00.000Z'),
+      ),
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('an uncataloged GHSA in options.ignoreGhas / package.json fails closed if not documented', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'supply-chain-uncataloged-'));
+  try {
+    const resultFromOptions = runSupplyChainScan({
+      rootDir: process.cwd(),
+      output: join(tempDir, 'supply-chain.json'),
+      strict: false,
+      ignoreGhas: ['GHSA-uncataloged-9999-xxxx'],
+      now: () => new Date('2026-09-11T00:00:00.000Z'),
+      execFn: (command, args) => {
+        if (command === 'pnpm')
+          return {
+            status: 0,
+            stdout: JSON.stringify({ advisories: {}, metadata: { vulnerabilities: {} } }),
+            stderr: '',
+          };
+        if (command === 'gitleaks') return { status: 0, stdout: '[]', stderr: '' };
+        if (args[0] === 'export')
+          return { status: 0, stdout: '# frozen requirements\n', stderr: '' };
+        return { status: 0, stdout: JSON.stringify({ dependencies: [] }), stderr: '' };
+      },
+    });
+
+    assert.equal(resultFromOptions.exitCode, 1);
+    assert.equal(resultFromOptions.passed, false);
+    assert.ok(
+      resultFromOptions.errors.some((err) =>
+        err.includes('[Supply Chain Policy Failure] Found uncataloged GHSA ignore: GHSA-UNCATALOGED-9999-XXXX without compensating controls'),
+      ),
+    );
+
+    const ignoredDirect = loadIgnoredGhas(process.cwd(), {
+      ignoreGhas: ['GHSA-fake-8888-yyyy'],
+    });
+    assert.ok(
+      ignoredDirect.errors.some((err) =>
+        err.includes('[Supply Chain Policy Failure] Found uncataloged GHSA ignore: GHSA-FAKE-8888-YYYY without compensating controls'),
+      ),
+    );
+
+    const fakeProjectDir = join(tempDir, 'fake-project');
+    mkdirSync(fakeProjectDir, { recursive: true });
+    writeFileSync(
+      join(fakeProjectDir, 'package.json'),
+      JSON.stringify({
+        pnpm: {
+          auditConfig: {
+            ignoreGhas: ['GHSA-fake-pkg-json-0001'],
+          },
+        },
+      }),
+      'utf8',
+    );
+    const resultFromPkg = runSupplyChainScan({
+      rootDir: fakeProjectDir,
+      output: join(tempDir, 'supply-chain-pkg.json'),
+      strict: false,
+      now: () => new Date('2026-09-11T00:00:00.000Z'),
+      execFn: () => ({ status: 0, stdout: '[]', stderr: '' }),
+    });
+    assert.equal(resultFromPkg.exitCode, 1);
+    assert.equal(resultFromPkg.passed, false);
+    assert.ok(
+      resultFromPkg.errors.some((err) =>
+        err.includes('[Supply Chain Policy Failure] Found uncataloged GHSA ignore: GHSA-FAKE-PKG-JSON-0001 without compensating controls'),
+      ),
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+

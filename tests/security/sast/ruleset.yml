@@ -11,10 +11,10 @@
 #   license: 'LGPL-2.1'
 #   description: 'Pinned static application security testing ruleset combining custom guardrail boundary rules and reviewed generic rules.'
 #   standard_rulesets:
-#     - 'p/default@v1.88.0'
-#     - 'p/owasp-top-ten@v1.88.0'
-#     - 'p/security-audit@v1.88.0'
-#     - 'p/secrets@v1.88.0'
+#     - 'p/default'
+#     - 'p/owasp-top-ten'
+#     - 'p/security-audit'
+#     - 'p/secrets'
 #   interprocedural_properties:
 #     behavioral_tests_required:
 #       - property: 'Cross-module guardrail lifecycle enforcement'

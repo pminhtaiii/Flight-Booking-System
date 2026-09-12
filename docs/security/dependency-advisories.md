@@ -1,5 +1,10 @@
 # Dependency Security Advisories & Upstream Deferral Register
 
+> **Policy-Version**: `1.0.0`  
+> **Policy-Expires-At**: `2026-10-12T00:00:00.000Z`  
+> **Policy Review Window**: 30 days  
+> **Target Milestone**: Next.js 15 migration milestone  
+
 ## 1. Executive Summary & Policy Context
 
 In accordance with **Feature 023 — Security Systems**, the repository enforces zero critical/high/moderate security vulnerabilities in automated supply-chain pipelines (`pnpm audit`, `pip-audit`, and `gitleaks`).

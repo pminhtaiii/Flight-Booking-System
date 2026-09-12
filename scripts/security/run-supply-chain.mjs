@@ -288,16 +288,140 @@ function advisoryEntries(data) {
   return entries;
 }
 
+export function loadDependencyAdvisoryRegister(rootDir, options = {}) {
+  const baseDir = resolve(rootDir || defaultRepoRoot);
+  let docPath =
+    options.advisoriesDocPath ||
+    join(baseDir, 'docs', 'security', 'dependency-advisories.md');
+  if (!existsSync(docPath) && !options.advisoriesDocPath) {
+    const fallback = join(defaultRepoRoot, 'docs', 'security', 'dependency-advisories.md');
+    if (existsSync(fallback)) {
+      docPath = fallback;
+    }
+  }
+
+  const errors = [];
+  const exceptions = [];
+  const catalogedGhas = new Set();
+  const catalogedAdvisories = new Map();
+
+  if (!existsSync(docPath)) {
+    errors.push(
+      `[Supply Chain Exception Error] Dependency advisories register document not found: ${docPath}`,
+    );
+    return {
+      policyVersion: null,
+      policyExpiresAt: null,
+      catalogedGhas,
+      catalogedAdvisories,
+      exceptions,
+      errors,
+    };
+  }
+
+  let docContent = '';
+  try {
+    docContent = readFileSync(docPath, 'utf8');
+  } catch {
+    errors.push(
+      `[Supply Chain Exception Error] Failed to read dependency advisories register: ${docPath}`,
+    );
+    return {
+      policyVersion: null,
+      policyExpiresAt: null,
+      catalogedGhas,
+      catalogedAdvisories,
+      exceptions,
+      errors,
+    };
+  }
+
+  const expiresMatch =
+    docContent.match(/Policy-Expires-At(?:\*\*|\b)[^:\r\n]*:\s*[`"']?([0-9T:.-]+Z?)[`"']?/i) ||
+    docContent.match(/(?:expires[_-]?at|expiry)(?:\*\*|\b)[^:\r\n]*:\s*[`"']?([0-9T:.-]+Z?)[`"']?/i);
+  const policyExpiresAt = expiresMatch ? expiresMatch[1].trim() : null;
+
+  const versionMatch = docContent.match(/Policy-Version(?:\*\*|\b)[^:\r\n]*:\s*[`"']?([0-9.]+)[`"']?/i);
+  const policyVersion = versionMatch ? versionMatch[1].trim() : '1.0.0';
+
+  if (!policyExpiresAt) {
+    errors.push(
+      '[Supply Chain Exception Error] Dependency advisory deferral policy missing Policy-Expires-At',
+    );
+  } else {
+    const expiryMs = Date.parse(policyExpiresAt);
+    if (Number.isNaN(expiryMs)) {
+      errors.push(
+        `[Supply Chain Exception Error] Dependency advisory deferral policy has invalid Policy-Expires-At: ${policyExpiresAt}`,
+      );
+    } else {
+      const currentDate = options.currentDate || (options.now ? options.now() : new Date());
+      const currentMs = new Date(currentDate).getTime();
+      if (currentMs > expiryMs) {
+        errors.push(
+          `[Supply Chain Exception Error] Dependency advisory deferral policy expired on ${policyExpiresAt}`,
+        );
+      }
+    }
+  }
+
+  const lines = docContent.split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('|')) continue;
+    const cells = trimmed.split('|').map((cell) => cell.trim());
+    if (cells.length >= 4) {
+      const idCell = cells[1];
+      const pkgCell = cells[2];
+      const sevCell = cells[3];
+      const ghsaMatch = idCell.match(/GHSA-[a-zA-Z0-9_-]+/i);
+      if (ghsaMatch) {
+        const ghsaId = ghsaMatch[0].toUpperCase();
+        const pkgName = pkgCell.replace(/[`*]/g, '').trim();
+        const rawSeverity = sevCell.replace(/[`*]/g, '').trim();
+        const severity = normalizeSeverity(rawSeverity, 'Medium');
+        catalogedGhas.add(ghsaId);
+        const exc = {
+          id: ghsaId,
+          ruleId: ghsaId,
+          package: pkgName,
+          severity,
+          rationale:
+            'Upstream Next.js 14 -> 15 deferral documented in docs/security/dependency-advisories.md',
+          compensatingControl:
+            'Documented in docs/security/dependency-advisories.md',
+          expiry: policyExpiresAt,
+        };
+        catalogedAdvisories.set(ghsaId, exc);
+        exceptions.push(exc);
+      }
+    }
+  }
+
+  return {
+    policyVersion,
+    policyExpiresAt,
+    catalogedGhas,
+    catalogedAdvisories,
+    exceptions,
+    errors,
+  };
+}
+
 export function loadIgnoredGhas(rootDir, options = {}) {
+  const register = loadDependencyAdvisoryRegister(rootDir, options);
+  const errors = [...register.errors];
   const ignored = new Set();
+  const configuredGhas = new Set();
+
   const explicit = options.ignoreGhas || options.ignoreGhsas || options.ignoredGhas;
   if (explicit) {
     if (typeof explicit === 'string' && explicit.trim()) {
-      ignored.add(explicit.trim().toUpperCase());
+      configuredGhas.add(explicit.trim().toUpperCase());
     } else if (typeof explicit[Symbol.iterator] === 'function') {
       for (const item of explicit) {
         if (typeof item === 'string' && item.trim()) {
-          ignored.add(item.trim().toUpperCase());
+          configuredGhas.add(item.trim().toUpperCase());
         }
       }
     }
@@ -318,7 +442,7 @@ export function loadIgnoredGhas(rootDir, options = {}) {
         if (Array.isArray(list)) {
           for (const item of list) {
             if (typeof item === 'string' && item.trim()) {
-              ignored.add(item.trim().toUpperCase());
+              configuredGhas.add(item.trim().toUpperCase());
             }
           }
         }
@@ -334,12 +458,28 @@ export function loadIgnoredGhas(rootDir, options = {}) {
       const yamlContent = readFileSync(workspacePath, 'utf8');
       const matches = yamlContent.match(/GHSA-[a-zA-Z0-9_-]+/gi) || [];
       for (const match of matches) {
-        ignored.add(match.trim().toUpperCase());
+        configuredGhas.add(match.trim().toUpperCase());
       }
     } catch {
       // Safe fallback if pnpm-workspace.yaml cannot be read
     }
   }
+
+  for (const id of configuredGhas) {
+    ignored.add(id);
+    if (!register.catalogedGhas.has(id)) {
+      errors.push(
+        `[Supply Chain Policy Failure] Found uncataloged GHSA ignore: ${id} without compensating controls`,
+      );
+    }
+  }
+
+  ignored.ignoredGhas = ignored;
+  ignored.exceptions = register.exceptions;
+  ignored.errors = errors;
+  ignored.policyExpiresAt = register.policyExpiresAt;
+  ignored.policyVersion = register.policyVersion;
+  ignored.catalogedGhas = register.catalogedGhas;
 
   return ignored;
 }
@@ -915,7 +1055,38 @@ export function runSupplyChainScan(options = {}) {
   const timestamp = safeNow(nowFn);
   const outputPath = resolve(rootDir, options.output || DEFAULT_OUTPUT);
   const temp = prepareRawReportDir(rootDir, options.rawReportDir);
-  const ignoredGhas = options.ignoredGhas || loadIgnoredGhas(rootDir, options);
+
+  const advisoryRegister = loadDependencyAdvisoryRegister(rootDir, {
+    ...options,
+    currentDate: timestamp,
+    now: nowFn,
+  });
+  const ignoredInfo = loadIgnoredGhas(rootDir, {
+    ...options,
+    currentDate: timestamp,
+    now: nowFn,
+  });
+  const ignoredGhas = options.ignoredGhas || ignoredInfo;
+  if (options.ignoredGhas && options.ignoredGhas !== ignoredInfo) {
+    const rawExplicit = options.ignoredGhas;
+    const explicitList =
+      typeof rawExplicit === 'string'
+        ? [rawExplicit]
+        : Array.from(rawExplicit || []);
+    for (const item of explicitList) {
+      if (typeof item === 'string' && item.trim()) {
+        const upper = item.trim().toUpperCase();
+        if (ignoredGhas instanceof Set) {
+          ignoredGhas.add(upper);
+        }
+        if (!advisoryRegister.catalogedGhas.has(upper)) {
+          ignoredInfo.errors.push(
+            `[Supply Chain Policy Failure] Found uncataloged GHSA ignore: ${upper} without compensating controls`,
+          );
+        }
+      }
+    }
+  }
 
   let pipAudit;
   let pnpmAudit;
@@ -946,6 +1117,9 @@ export function runSupplyChainScan(options = {}) {
   ];
   const counts = makeCounts(dedupedFindings);
   const errors = [pipAudit, pnpmAudit, gitleaks].flatMap((scanner) => scanner.errors || []);
+  if (ignoredInfo.errors && ignoredInfo.errors.length > 0) {
+    errors.push(...ignoredInfo.errors);
+  }
   for (const [name, scanner] of [
     ['pip-audit', pipAudit],
     ['pnpm audit', pnpmAudit],
@@ -980,8 +1154,8 @@ export function runSupplyChainScan(options = {}) {
     pipAudit,
     pnpmAudit,
     gitleaks,
-    ignoredAdvisories: [...loadIgnoredGhas(rootDir, options)],
-    exceptions: [],
+    ignoredAdvisories: [...(ignoredGhas instanceof Set ? ignoredGhas : loadIgnoredGhas(rootDir, options))],
+    exceptions: advisoryRegister.exceptions,
     errors,
   });
 
