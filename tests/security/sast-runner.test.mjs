@@ -2712,3 +2712,76 @@ test('runSastScan safeguards maxBuffer and handles sarifOutput file routing', ()
   }
 });
 
+test('evaluateFindings matches finding with snapshot-prefixed rule ID against unprefixed baseline entry', () => {
+  const prefixedFinding = {
+    ruleId:
+      'tests.security.sast.snapshots.javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp',
+    file: 'apps/api/src/cache/cache.service.ts',
+    startLine: 336,
+    severity: 'WARNING',
+    message: 'Non-literal RegExp',
+  };
+
+  const baselineEntry = {
+    ruleId:
+      'javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp',
+    file: 'apps/api/src/cache/cache.service.ts',
+    line: 336,
+  };
+
+  const resBaseline = evaluateFindings([prefixedFinding], {
+    baseline: [baselineEntry],
+  });
+
+  assert.equal(resBaseline.passed, true);
+  assert.equal(resBaseline.baselinedCount, 1);
+  assert.equal(resBaseline.unbaselinedCount, 0);
+
+  // Reverse match: unprefixed finding against prefixed baseline
+  const unprefixedFinding = {
+    ruleId:
+      'javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp',
+    file: 'apps/api/src/cache/cache.service.ts',
+    startLine: 336,
+    severity: 'WARNING',
+    message: 'Non-literal RegExp',
+  };
+
+  const prefixedBaselineEntry = {
+    ruleId:
+      'tests.security.sast.snapshots.javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp',
+    file: 'apps/api/src/cache/cache.service.ts',
+    line: 336,
+  };
+
+  const resReverse = evaluateFindings([unprefixedFinding], {
+    baseline: [prefixedBaselineEntry],
+  });
+
+  assert.equal(resReverse.passed, true);
+  assert.equal(resReverse.baselinedCount, 1);
+  assert.equal(resReverse.unbaselinedCount, 0);
+
+  // Exception match: prefixed finding against unprefixed exception
+  const resException = evaluateFindings([prefixedFinding], {
+    exceptions: [
+      {
+        id: 'EX-TEST-001',
+        ruleId:
+          'javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp',
+        file: 'apps/api/src/cache/cache.service.ts',
+        owner: 'security-team',
+        rationale: 'Testing prefix tolerance in exceptions',
+        compensatingControl: 'Input validated before regexp compilation',
+        createdAt: '2026-09-01T00:00:00Z',
+        expiresAt: '2026-09-20T00:00:00Z',
+      },
+    ],
+    currentDate: '2026-09-10T00:00:00Z',
+  });
+
+  assert.equal(resException.passed, true);
+  assert.equal(resException.exceptedCount, 1);
+  assert.equal(resException.unbaselinedCount, 0);
+});
+

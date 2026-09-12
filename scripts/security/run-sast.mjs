@@ -694,7 +694,10 @@ export function evaluateFindings(findings = [], options = {}) {
       const bFile = (b.file || b.path || '').replaceAll('\\', '/');
       const fileMatches =
         bFile === findingFile || (bFile.length > 0 && findingFile.endsWith('/' + bFile));
-      const ruleMatches = b.ruleId === finding.ruleId;
+      const ruleMatches =
+        b.ruleId === finding.ruleId ||
+        finding.ruleId.endsWith('.' + b.ruleId) ||
+        b.ruleId.endsWith('.' + finding.ruleId);
       const lineMatches = b.line === undefined || b.line === null || b.line === finding.startLine;
       return ruleMatches && fileMatches && lineMatches;
     });
@@ -721,7 +724,11 @@ export function evaluateFindings(findings = [], options = {}) {
         return false;
       }
 
-      if (ex.ruleId !== finding.ruleId) return false;
+      const ruleMatches =
+        ex.ruleId === finding.ruleId ||
+        finding.ruleId.endsWith('.' + ex.ruleId) ||
+        ex.ruleId.endsWith('.' + finding.ruleId);
+      if (!ruleMatches) return false;
 
       const exFile = (ex.file || ex.path || '').replaceAll('\\', '/');
       const fileMatches =
