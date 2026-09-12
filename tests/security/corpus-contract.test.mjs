@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -11,6 +12,7 @@ import {
   loadCorpusJsonl,
   normalizePayload,
   validateCorpus,
+  validateCorpusManifest,
 } from '../../scripts/security/validate-corpus.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -493,3 +495,126 @@ test('CLI validation execution via spawnSync', async (t) => {
     }
   });
 });
+
+test('frozen split corpus and cryptographic manifest contract', async (t) => {
+  const corpusDir = resolve(repoRoot, 'tests/security/corpus');
+  const expectedFiles = [
+    'holdout_input.jsonl',
+    'holdout_tool.jsonl',
+    'holdout_output.jsonl',
+    'invariant_manifest.jsonl',
+  ];
+
+  await t.test('partitioned stage files exist on disk', () => {
+    for (const file of expectedFiles) {
+      const fullPath = join(corpusDir, file);
+      assert.ok(existsSync(fullPath), `Required corpus file must exist: ${file}`);
+    }
+  });
+
+  await t.test('manifest.json exists and adheres to cryptographic manifest schema', () => {
+    const manifestPath = join(corpusDir, 'manifest.json');
+    assert.ok(existsSync(manifestPath), 'manifest.json must exist in corpus directory');
+
+    const raw = readFileSync(manifestPath, 'utf8');
+    const manifest = JSON.parse(raw);
+
+    assert.equal(typeof manifest.version, 'string', 'manifest must declare version');
+    assert.equal(manifest.taxonomy, 'OWASP-LLM-Top10-2025', 'manifest must declare taxonomy OWASP-LLM-Top10-2025');
+    assert.equal(typeof manifest.files, 'object', 'manifest must declare files object');
+    assert.ok(manifest.files !== null && !Array.isArray(manifest.files));
+
+    for (const expectedFile of expectedFiles) {
+      assert.ok(expectedFile in manifest.files, `manifest.files must include ${expectedFile}`);
+      const fileMeta = manifest.files[expectedFile];
+      assert.match(fileMeta.sha256, /^[a-f0-9]{64}$/, `${expectedFile} sha256 must be 64-char hex string`);
+      assert.equal(typeof fileMeta.bytes, 'number', `${expectedFile} bytes must be number`);
+      assert.ok(fileMeta.bytes > 0, `${expectedFile} bytes must be > 0`);
+      assert.equal(typeof fileMeta.recordCount, 'number', `${expectedFile} recordCount must be number`);
+      assert.ok(fileMeta.recordCount > 0, `${expectedFile} recordCount must be > 0`);
+      assert.equal(fileMeta.license, 'MIT', `${expectedFile} license must be MIT`);
+    }
+  });
+
+  await t.test('actual on-disk SHA-256 digests and byte counts match manifest entries exactly', () => {
+    const manifestPath = join(corpusDir, 'manifest.json');
+    assert.ok(existsSync(manifestPath), 'manifest.json must exist');
+
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+
+    for (const [filename, meta] of Object.entries(manifest.files)) {
+      const targetPath = join(corpusDir, filename);
+      assert.ok(existsSync(targetPath), `File listed in manifest must exist: ${filename}`);
+
+      const content = readFileSync(targetPath);
+      const computedHash = createHash('sha256').update(content).digest('hex');
+      assert.equal(
+        computedHash,
+        meta.sha256,
+        `SHA-256 mismatch for ${filename}: expected ${meta.sha256}, got ${computedHash}`,
+      );
+      assert.equal(
+        content.length,
+        meta.bytes,
+        `Byte count mismatch for ${filename}: expected ${meta.bytes}, got ${content.length}`,
+      );
+    }
+  });
+
+  await t.test('validateCorpusManifest verifies manifest.json successfully', () => {
+    const res = validateCorpusManifest(corpusDir);
+    assert.equal(res.valid, true, `validateCorpusManifest failed: ${res.errors.join(', ')}`);
+    assert.ok(res.manifest, 'manifest object must be present');
+    assert.equal(Object.keys(res.manifest.files).length, 4);
+    assert.equal(res.errors.length, 0);
+  });
+
+  await t.test('validateCorpusManifest detects tampered hash or missing file', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'corpus-test-manifest-tamper-'));
+    try {
+      const dummyFile = join(tempDir, 'holdout_input.jsonl');
+      writeFileSync(dummyFile, '{"test":true}\n', 'utf8');
+
+      const tamperedManifest = {
+        version: '1.0.0',
+        taxonomy: 'OWASP-LLM-Top10-2025',
+        files: {
+          'holdout_input.jsonl': {
+            sha256: '0'.repeat(64), // deliberately invalid hash
+            bytes: 14,
+            recordCount: 1,
+            license: 'MIT',
+          },
+          'missing_file.jsonl': {
+            sha256: 'a'.repeat(64),
+            bytes: 100,
+            recordCount: 1,
+            license: 'MIT',
+          },
+        },
+      };
+      writeFileSync(join(tempDir, 'manifest.json'), JSON.stringify(tamperedManifest));
+
+      const res = validateCorpusManifest(tempDir);
+      assert.equal(res.valid, false);
+      assert.ok(res.errors.some((e) => e.includes('SHA-256 mismatch')));
+      assert.ok(res.errors.some((e) => e.includes('does not exist')));
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  await t.test('validateCorpusManifest returns valid: true when manifest.json is absent', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'corpus-test-manifest-absent-'));
+    try {
+      const res = validateCorpusManifest(tempDir);
+      assert.equal(res.valid, true);
+      assert.equal(res.manifest, null);
+      assert.equal(res.errors.length, 0);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+});
+
+

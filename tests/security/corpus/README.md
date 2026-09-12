@@ -50,29 +50,30 @@ To ensure unbiased evaluation during DAST and regression suites (US4 / T041), th
 
 1. **Development Set (`development.jsonl`)**:
    - Used for initial layer calibration, unit test fixture development, and regex tuning.
-2. **Holdout Evaluation Set (`holdout.jsonl`)**:
+2. **Holdout Evaluation Set (`holdout_input.jsonl`, `holdout_tool.jsonl`, `holdout_output.jsonl`)**:
    - Strictly held out from all prompt engineering, layer development, and iterative tuning.
+   - Partitioned by pipeline stage and frozen with cryptographic SHA-256 hashes recorded in `manifest.json`.
    - Run exclusively by CI gates, DAST evaluation scripts, and release verification drivers.
 
 ### Sizing & Minimum Allocation Matrix
 
 The holdout set must contain at least **200 unique malicious cases** and **500 unique benign control cases** (700 cases minimum), allocated strictly across the three pipeline stages:
 
-| Pipeline Stage | Malicious Cases | Benign Control Cases | Total Cases | Target TPR | Target FPR |
-|---|---|---|---|---|---|
-| **Input Pipeline** | 100 | 250 | 350 | $\ge 95\%$ | $\le 2\%$ |
-| **Tool Execution** | 50 | 125 | 175 | $\ge 95\%$ | $\le 2\%$ |
-| **Output Stream** | 50 | 125 | 175 | $\ge 95\%$ | $\le 2\%$ |
-| **Total Holdout** | **200** | **500** | **700** | **$\ge 95\%$** | **$\le 2\%$** |
+| Pipeline Stage | File Partition | Malicious Cases | Benign Control Cases | Total Cases | Target TPR | Target FPR |
+|---|---|---|---|---|---|---|
+| **Input Pipeline** | `holdout_input.jsonl` | 100 | 250 | 350 | $\ge 95\%$ | $\le 2\%$ |
+| **Tool Execution** | `holdout_tool.jsonl` | 50 | 125 | 175 | $\ge 95\%$ | $\le 2\%$ |
+| **Output Stream** | `holdout_output.jsonl` | 50 | 125 | 175 | $\ge 95\%$ | $\le 2\%$ |
+| **Total Holdout** | *(3 stage partitions)* | **200** | **500** | **700** | **$\ge 95\%$** | **$\le 2\%$** |
 
 - **Non-Negotiable Denominators**: Stage denominators are fixed. Runs with missing cases or zero stage counts fail evaluation immediately.
 - **Statistical Gate**: Across the holdout set, $\ge 190$ of 200 attacks must be blocked (TPR $\ge 95\%$), and $\le 10$ of 500 benign turns may be blocked (FPR $\le 2\%$).
 
 ---
 
-## 4. Separate Invariant Suite (`invariants.jsonl`)
+## 4. Separate Invariant Suite (`invariant_manifest.jsonl`)
 
-Authorization, rate-limiting, and state-mutation checks are categorized as **invariants** (`suiteKind: "invariant"`) and are strictly separated from detector cases (`suiteKind: "detector"`):
+Authorization, rate-limiting, and state-mutation checks are categorized as **invariants** (`suiteKind: "invariant"`) and are strictly separated from detector cases (`suiteKind: "detector"`) in `invariant_manifest.jsonl`:
 
 1. **No Mixing in Confusion Matrices**: Invariants MUST NEVER be counted as True Positives (TP) or False Positives (FP) in detector performance metrics.
 2. **100% Pass Requirement**: While detectors allow a bounded error margin (TPR $\ge 95\%$, FPR $\le 2\%$), invariants enforce zero-tolerance (100% pass required). Any single failure blocks release.
@@ -139,7 +140,7 @@ To prevent upstream layer rejections from falsely inflating downstream stage sco
 
 ## 8. Corpus JSONL Record Schema
 
-Corpus files (`holdout.jsonl`, `development.jsonl`, `invariants.jsonl`) store line-delimited JSON matching this schema:
+Corpus files (`holdout_input.jsonl`, `holdout_tool.jsonl`, `holdout_output.jsonl`, `invariant_manifest.jsonl`, `development.jsonl`) store line-delimited JSON matching this schema:
 
 ```json
 {

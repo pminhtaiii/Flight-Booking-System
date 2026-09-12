@@ -240,6 +240,133 @@ export function validateRecordSchema(record, schema) {
 }
 
 /**
+ * Validates corpus manifest if manifest.json exists in corpusDir.
+ * Checks that all listed files exist, SHA-256 hashes match,
+ * bytes and record counts match, and license is 'MIT'.
+ * Also checks that no undeclared .jsonl files exist in corpusDir.
+ *
+ * @param {string} corpusDir
+ * @returns {{ valid: boolean, errors: string[], manifest: any }}
+ */
+export function validateCorpusManifest(corpusDir) {
+  const manifestPath = join(corpusDir, 'manifest.json');
+  if (!existsSync(manifestPath)) {
+    return { valid: true, errors: [], manifest: null };
+  }
+
+  const errors = [];
+  let manifest;
+  try {
+    const raw = readFileSync(manifestPath, 'utf8');
+    manifest = JSON.parse(raw);
+  } catch (err) {
+    return {
+      valid: false,
+      errors: [`[Manifest Error] Failed to parse manifest.json: ${err.message}`],
+      manifest: null,
+    };
+  }
+
+  if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) {
+    return {
+      valid: false,
+      errors: ['[Manifest Error] manifest.json must be a JSON object'],
+      manifest: null,
+    };
+  }
+
+  if (typeof manifest.version !== 'string' || manifest.version.trim().length === 0) {
+    errors.push('[Manifest Error] manifest.json must declare a non-empty version string');
+  }
+
+  if (manifest.taxonomy !== 'OWASP-LLM-Top10-2025') {
+    errors.push(
+      `[Manifest Error] manifest.json taxonomy must be "OWASP-LLM-Top10-2025", got "${manifest.taxonomy}"`,
+    );
+  }
+
+  if (!manifest.files || typeof manifest.files !== 'object' || Array.isArray(manifest.files)) {
+    errors.push('[Manifest Error] manifest.json must declare a files object');
+    return { valid: false, errors, manifest: null };
+  }
+
+  const declaredFiles = Object.keys(manifest.files);
+  if (declaredFiles.length === 0) {
+    errors.push('[Manifest Error] manifest.json files object must not be empty');
+  }
+
+  for (const [filename, fileMeta] of Object.entries(manifest.files)) {
+    const targetFile = join(corpusDir, filename);
+    if (!existsSync(targetFile)) {
+      errors.push(`[Manifest Error] File listed in manifest does not exist: ${filename}`);
+      continue;
+    }
+
+    if (!fileMeta || typeof fileMeta !== 'object' || Array.isArray(fileMeta)) {
+      errors.push(`[Manifest Error] Entry for ${filename} in manifest.json must be an object`);
+      continue;
+    }
+
+    if (!/^[a-f0-9]{64}$/.test(fileMeta.sha256 || '')) {
+      errors.push(
+        `[Manifest Error] ${filename} sha256 must be a 64-character lowercase hex digest, got "${fileMeta.sha256}"`,
+      );
+    }
+
+    if (typeof fileMeta.bytes !== 'number' || fileMeta.bytes < 0) {
+      errors.push(`[Manifest Error] ${filename} bytes must be a non-negative number`);
+    }
+
+    if (typeof fileMeta.recordCount !== 'number' || fileMeta.recordCount < 0) {
+      errors.push(`[Manifest Error] ${filename} recordCount must be a non-negative number`);
+    }
+
+    if (fileMeta.license !== 'MIT') {
+      errors.push(`[Manifest Error] ${filename} license must be "MIT", got "${fileMeta.license}"`);
+    }
+
+    const content = readFileSync(targetFile);
+    const computedHash = createHash('sha256').update(content).digest('hex');
+    if (fileMeta.sha256 && computedHash !== fileMeta.sha256) {
+      errors.push(
+        `[Manifest Hash Mismatch] ${filename}: SHA-256 mismatch. Manifest declared "${fileMeta.sha256}", computed "${computedHash}"`,
+      );
+    }
+
+    if (typeof fileMeta.bytes === 'number' && content.length !== fileMeta.bytes) {
+      errors.push(
+        `[Manifest Byte Count Mismatch] ${filename}: Byte count mismatch. Manifest declared ${fileMeta.bytes}, actual ${content.length}`,
+      );
+    }
+
+    try {
+      const records = loadCorpusJsonl(targetFile);
+      if (typeof fileMeta.recordCount === 'number' && records.length !== fileMeta.recordCount) {
+        errors.push(
+          `[Manifest Record Count Mismatch] ${filename}: Record count mismatch. Manifest declared ${fileMeta.recordCount}, actual ${records.length}`,
+        );
+      }
+    } catch (e) {
+      errors.push(`[Manifest Error] ${filename} failed to parse as JSONL: ${e.message}`);
+    }
+  }
+
+  // Ensure no undeclared .jsonl files in corpus directory
+  const onDiskFiles = readdirSync(corpusDir).filter((f) => f.endsWith('.jsonl'));
+  for (const f of onDiskFiles) {
+    if (!manifest.files[f]) {
+      errors.push(`[Manifest Error] Undeclared corpus file found in directory: ${f}`);
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    manifest,
+  };
+}
+
+/**
  * Validates corpus records against schema, deduplication, hash matching,
  * variant group split isolation, holdout quotas, and invariant segregation.
  *
@@ -271,6 +398,9 @@ export function validateCorpus(target, options = {}) {
     };
   }
 
+  const errors = [];
+  const stats = createEmptyStats();
+
   // Load records
   let itemsToValidate = [];
   if (typeof target === 'string') {
@@ -279,20 +409,32 @@ export function validateCorpus(target, options = {}) {
         valid: false,
         errors: [`Corpus target path does not exist: ${target}`],
         records: [],
-        stats: createEmptyStats(),
+        stats,
       };
     }
     const stat = statSync(target);
     if (stat.isDirectory()) {
+      const manifestResult = validateCorpusManifest(target);
+      if (!manifestResult.valid) {
+        errors.push(...manifestResult.errors);
+      }
+      if (manifestResult.manifest) {
+        stats.manifest = {
+          version: manifestResult.manifest.version,
+          taxonomy: manifestResult.manifest.taxonomy,
+          filesCount: Object.keys(manifestResult.manifest.files || {}).length,
+        };
+      }
+
       const files = readdirSync(target)
         .filter((f) => f.endsWith('.jsonl'))
         .sort();
       if (files.length === 0) {
         return {
           valid: false,
-          errors: [`No .jsonl corpus files found in directory: ${target}`],
+          errors: [`No .jsonl corpus files found in directory: ${target}`, ...errors],
           records: [],
-          stats: createEmptyStats(),
+          stats,
         };
       }
       for (const file of files) {
@@ -313,12 +455,9 @@ export function validateCorpus(target, options = {}) {
       valid: false,
       errors: ['Invalid target: must be a directory path, file path, or array of records'],
       records: [],
-      stats: createEmptyStats(),
+      stats,
     };
   }
-
-  const errors = [];
-  const stats = createEmptyStats();
 
   const seenIds = new Map(); // id -> { line, sourceFile }
   const seenNormalizedPayloads = new Map(); // normalizedPayload -> { id, line, sourceFile }
@@ -507,6 +646,7 @@ function createEmptyStats() {
       development: 0,
       invariant: 0,
     },
+    manifest: null,
   };
 }
 
@@ -550,5 +690,11 @@ if (isMain) {
   console.log(
     `  By split: holdout=${result.stats.bySplit.holdout}, dev=${result.stats.bySplit.development}, inv=${result.stats.bySplit.invariant}`,
   );
+  if (result.stats.manifest) {
+    console.log(
+      `  Manifest: verified (${result.stats.manifest.filesCount} files, version ${result.stats.manifest.version}, taxonomy ${result.stats.manifest.taxonomy})`,
+    );
+  }
   process.exit(0);
 }
+
