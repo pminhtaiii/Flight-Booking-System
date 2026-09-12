@@ -83,7 +83,8 @@
 │   ├── security/                      → Security test harnesses, toolchain pins, sast runner, zap runner, and corpus manifests
 │   │   ├── corpus/                    → schema.json, holdout_input.jsonl, holdout_tool.jsonl, holdout_output.jsonl, invariant_manifest.jsonl, manifest.json
 │   │   ├── sast/                      → guardrails.yml, ruleset.yml, snapshots/, and fixtures/ safe/unsafe control matrix
-│   │   └── zap/                       → routes.json (45 route catalog), automation.yaml (AF config), routes-config.test.mjs
+│   │   ├── zap/                       → routes.json (45 route catalog), automation.yaml (AF config), routes-config.test.mjs
+│   │   └── dast/                      → test_ownership.py (two-user isolation, JWT/claim validation, replay protection, Redis fencing) & test_adversarial.py (700-case holdout corpus replay, stage reachability)
 │   └── smoke/                         → Authoritative whole-stack smoke & sanity test harness
 │
 ├── scripts/
@@ -215,6 +216,22 @@ The atomic final-fix commands have green observed checkpoints (`349` agent tests
 one skip and `49` literal GOAL tests), local Redis verifies the new commit primitive,
 and the post-atomic T093 flow passed `1/1` with exit `0`. Phase 4 US2 T026–T028 task
 closure and workflow signoff are complete for this slice.
+
+### Runtime Penetration & DAST Boundaries (Feature 023, Phase 6 Slice 2: T038 & T039)
+
+1. **Two-User Ownership & Attestation Replay Suite (`tests/security/dast/test_ownership.py` / T038)**:
+   - Provisions two synthetic authenticated users (`user_a` and `user_b`) against the isolated local stack.
+   - **Cross-User Session & Booking Isolation**: Verifies that `user_a` cannot access, query, or stream `user_b`'s chat sessions, traveler profiles, booking records, or search snapshots. Requests fail with strict HTTP 403/404 or `CHAT_SESSION_NOT_FOUND`, with zero model/graph inference, zero database mutations, and zero PII or metadata leakage.
+   - **Claim & Service Key Validation**: Expired JWT tokens reject with 401 Unauthorized; forged HMAC `X-User-Claim` tokens (tampered `userId`, invalid signatures, expired `iat`, or inactive status) reject with 401/403; missing or invalid `AGENT_SERVICE_API_KEY` rejects with 401.
+   - **Stale Snapshot & Handoff Replay Protection**: Replaying consumed (HTTP 409) or expired (HTTP 410) handoff tokens fails closed without booking or payment side effects; tampering with flight price, currency, or passenger fields on a signed search snapshot breaks cryptographic HMAC validation and fails closed.
+   - **Redis Fencing Concurrency**: Concurrent turns for the same session fail closed via `SessionLockRepository` and `MessageQueueManager`; out-of-order execution with stale fence tokens is rejected from persistence; queue depth exceeding limit raises HTTP 429.
+
+2. **Adversarial Holdout Corpus Replay Engine (`tests/security/dast/test_adversarial.py` / T039)**:
+   - Executes the automated in-memory replay engine against all 700 frozen holdout corpus cases (`tests/security/corpus/`):
+     - **Input Attack Ingestion (350 cases)**: 100 malicious prompt injections, jailbreaks, PII inputs + 250 benign travel queries and greetings replayed through `GuardrailGateway` and `ChatTurnRunner`. Enforces static safe rejection events (`GUARDRAIL_BLOCKED`, `GUARDRAIL_INPUT_INJECTION`, `GUARDRAIL_INPUT_PII`) with zero downstream model/tool calls. Achieves TPR 100% (100/100 $\ge 95\%$) and FPR 0% (0/250 $\le 2\%$).
+     - **Tool Indirect Injection Replay (175 cases)**: 50 malicious tool outputs carrying indirect injection directives, JSON bombs, and PII leaks + 125 benign tool responses. Enforces `ToolOutputGuardrailPipeline` (`SizeStructureValidator`, `SchemaValidator`, `PIIScanner`, `UntrustedContentInjectionDetector`) blocking payloads before LangGraph state publication. Achieves TPR 100% (50/50 $\ge 95\%$) and FPR 0% (0/125 $\le 2\%$).
+     - **Output Token Partition Streaming Replay (175 cases)**: 50 malicious model outputs with PII/credentials + 125 benign outputs streamed across variable chunk boundaries (1-char, 3-char, word boundaries). Enforces candidate holdback via `OutputGuardrailPipeline` and `ChunkBuffer`, emitting `OUTPUT_GUARDRAIL_BLOCKED` with 0 sensitive bytes received by the client. Achieves TPR 100% (50/50 $\ge 95\%$) and FPR 0% (0/125 $\le 2\%$).
+     - **Stage Reachability Invariant (SEC28)**: Captures payload-free `reachedStageMarker` values tied to turn IDs and validates that unexpected upstream blocks do NOT count as downstream detector true positives.
 
 ---
 

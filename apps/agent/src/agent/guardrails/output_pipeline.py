@@ -30,8 +30,14 @@ _PHONE = re.compile(
 )
 _EMAIL = re.compile(r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]{1,64}@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+")
 _EMAIL_LIKE = re.compile(r"\S{1,255}@\S+")
-_CREDENTIAL = re.compile(r"(?:api_key=|access_token=|secret=|bearer )\S{1,505}", re.I)
-_CREDENTIAL_PREFIX = re.compile(r"(?:api_key=|access_token=|secret=|bearer )\S*$", re.I)
+_CREDENTIAL = re.compile(
+    r"(?:api_key[=:][ \t]{0,4}|access_token[=:][ \t]{0,4}|secret[=:][ \t]{0,4}|bearer[ \t]{1,4})\S{1,495}",
+    re.I,
+)
+_CREDENTIAL_PREFIX = re.compile(
+    r"(?:api_key[=:][ \t]{0,4}|access_token[=:][ \t]{0,4}|secret[=:][ \t]{0,4}|bearer[ \t]{0,4})\S*$",
+    re.I,
+)
 _PASSPORT_PREFIX = re.compile(r"(?<![A-Z0-9])[A-Z][0-9]{0,10}$")
 _CARD_PREFIX = re.compile(r"(?<![0-9])[0-9][0-9 -]{0,35}$")
 _PHONE_PREFIX = re.compile(

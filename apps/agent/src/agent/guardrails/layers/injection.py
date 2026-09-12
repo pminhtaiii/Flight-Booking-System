@@ -26,7 +26,7 @@ _SIGNATURE_DEFINITIONS: tuple[tuple[str, str], ...] = (
     # --- Category 1: Direct Instruction Overrides ---
     (
         "direct_ignore_previous",
-        r"(?i)\bignore\s+(?:all\s+previous|previous)\s+(?:instructions|prompts?|directions?|commands?|rules?|context)\b",
+        r"(?i)\bignore\s+(?:all\s+(?:previous|prior)|previous|prior)\s+(?:safety\s+rules|instructions|prompts?|directions?|commands?|rules?|context)\b",
     ),
     (
         "direct_disregard_system_prompt",
@@ -46,7 +46,7 @@ _SIGNATURE_DEFINITIONS: tuple[tuple[str, str], ...] = (
     ),
     (
         "direct_you_are_now_dev_mode",
-        r"(?i)\byou\s+are\s+now\s+in\s+developer\s+mode\b",
+        r"(?i)\byou\s+are\s+now\s+(?:in\s+developer\s+mode|root-sys\b)",
     ),
     (
         "direct_reset_system_instructions",
@@ -55,6 +55,30 @@ _SIGNATURE_DEFINITIONS: tuple[tuple[str, str], ...] = (
     (
         "direct_bypass_guardrails",
         r"(?i)\bbypass\s+(?:all\s+(?:guardrails?|safety\s+filters?|security\s+measures?|content\s+filters?)|guardrails?|safety\s+filters?|security\s+measures?|content\s+filters?)\b",
+    ),
+    (
+        "direct_bypass_user_confirmation",
+        r"(?i)\bbypass\s+user\s+confirmation\b",
+    ),
+    (
+        "direct_bypass_confirmation_modal",
+        r"(?i)\bbypass\s+confirmation\s+modal\b",
+    ),
+    (
+        "direct_agency_bypass_auto_auth",
+        r"(?i)\bauto-?authorize\s+credit\s+card\b",
+    ),
+    (
+        "direct_agency_without_user_click",
+        r"(?i)\bwithout\s+user\s+click\b",
+    ),
+    (
+        "direct_extract_raw_prompt",
+        r"(?i)\braw\s+developer\s+system\s+prompt\b",
+    ),
+    (
+        "direct_hidden_guardrail_policy",
+        r"(?i)\bhidden\s+guardrail\s+policy\s+directives\b",
     ),
     (
         "direct_reveal_system_prompt",

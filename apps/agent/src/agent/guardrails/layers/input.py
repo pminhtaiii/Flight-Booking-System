@@ -85,13 +85,20 @@ class LengthValidator(BaseGuardrailLayer):
         )
 
 
+_SSN_PATTERN = re.compile(r"\b\d{3}-\d{2}-\d{4}\b")
+
+
 def _contains_sensitive_pii(text: str) -> bool:
     """
     Detects credit cards (with Luhn validation), passport numbers, email addresses,
-    and phone numbers in raw user input, allowing reviewed travel exceptions.
+    phone numbers, and SSNs in raw user input, allowing reviewed travel exceptions.
     """
     if not text:
         return False
+
+    # 0. Social Security Numbers
+    if _SSN_PATTERN.search(text):
+        return True
 
     # 1. Credit card numbers with Luhn validation
     for match in CARD_REGEX.finditer(text):

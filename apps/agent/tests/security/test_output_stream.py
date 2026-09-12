@@ -59,10 +59,14 @@ def test_pii_policy_declares_finite_detector_and_buffer_bounds() -> None:
     assert detectors["credential"]["maximumMatchScalars"] == 512
     assert detectors["credential"]["prefixes"] == [
         "api_key=",
+        "api_key:",
         "access_token=",
+        "access_token:",
         "secret=",
+        "secret:",
         "bearer ",
     ]
+    assert detectors["credential"]["maximumWhitespaceScalars"] == 4
 
     for detector in detectors.values():
         inspection_span = (
