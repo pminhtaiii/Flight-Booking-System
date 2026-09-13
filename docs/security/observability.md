@@ -130,10 +130,10 @@ Emitted to `security_audit_log` on every deterministic guardrail evaluation acro
 | `trace_id` | string | `^[a-f0-9\-]+$` | Ephemeral distributed turn/request trace identifier. |
 | `subject_ref` | string | `^hmac_sha256:[a-f0-9]{64}$` | Daily rotating pseudonymized HMAC digest of user identifier. |
 | `stage` | string | `input` \| `tool` \| `output` | Pipeline execution stage. |
-| `layer_key` | string | e.g. `input.injection`, `output.pii` | Canonical dot-notation guardrail layer key. |
+| `layer_key` | string | Closed enum (9 canonical layers): `input.length`, `input.pii`, `input.injection`, `input.topic`, `output.pii`, `tool.size_structure`, `tool.schema`, `tool.pii`, `tool.untrusted_content_injection` | Canonical dot-notation guardrail layer key. |
 | `decision` | string | `PASS` \| `BLOCK` \| `SKIP` | Deterministic policy decision. |
 | `latency_ms` | number | $\ge 0.0$ | Active compute time in milliseconds. |
-| `reason` | string | Optional string token | Standardized failure code (e.g. `PII_MASKED`, `REJECTED`). |
+| `reason` | string | Optional closed enum (10 standardized tokens): `LENGTH_EXCEEDED`, `PII_MASKED`, `PROMPT_INJECTION_DETECTED`, `TOPIC_VIOLATION`, `TOOL_SIZE_EXCEEDED`, `TOOL_SCHEMA_INVALID`, `UNTRUSTED_CONTENT_DETECTED`, `CLASSIFIER_FAILED_CLOSED`, `PASSED`, `SKIPPED` | Standardized outcome or failure code. |
 
 *Additional properties outside this schema are rejected (`additionalProperties: false`).*
 
@@ -158,8 +158,8 @@ Emitted when an asynchronous or bounded ring-buffer telemetry emission fails:
 | `timestamp_utc` | string | ISO 8601 UTC date-time | Precise timestamp of emitter error. |
 | `trace_id` | string | `^[a-f0-9\-]+$` | Ephemeral distributed turn/request trace identifier. |
 | `sink` | string | `security_audit_log` \| `prometheus` \| `redis` | Telemetry sink that experienced the error. |
-| `error_type` | string | String token | Error classification code. |
-| `details` | string | Optional string | Diagnostic failure details (zero raw payloads). |
+| `error_type` | string | Closed enum (6 tokens): `connection_timeout`, `buffer_overflow`, `io_error`, `serialization_failure`, `sink_unreachable`, `authentication_failure` | Error classification code. |
+| `details` | string | Optional string (`maxLength: 128`, pattern `^[A-Za-z0-9_.: /\\-]{1,128}$`). Raw user prompts, exception traces, and newlines are strictly prohibited. | Diagnostic failure details (strictly sanitized and bounded). |
 
 *Additional properties outside this schema are rejected (`additionalProperties: false`).*
 

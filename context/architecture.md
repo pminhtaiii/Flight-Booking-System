@@ -94,7 +94,7 @@
 ├── docs/
 │   ├── adr/                           → Architectural Decision Records
 │   ├── runbooks/                      → Authoritative operational runbooks
-│   └── security/                      → observability.md, rollout.md, performance-validation.md, toolchain.md
+│   └── security/                      → observability.md, rollout.md, performance-validation.md, coverage-validation.md, toolchain.md
 │
 ├── context/
 │   ├── architecture.md                → This file
@@ -1246,11 +1246,27 @@ CI review follow-up (2026-09-11): application and shared-package changes route b
      - **Bounded Metric Telemetry**:
        - `security_guardrail_decisions_total` (counter, labels: `stage`, `decision`, `layer_key`, bounded cardinality $\le 90$).
        - `security_guardrail_latency_ms` (histogram, buckets: `[0.5, 1, 2, 5, 10, 25, 50, 100, 250]`, labels: `stage`, `layer_key`).
-       - `security_emitter_errors_total` (counter, labels: `sink`, `error_type`, bounded cardinality $\le 15$).
+       - `security_guardrail_turn_latency_ms` (histogram, buckets: `[0.5, 1, 2, 5, 10, 20, 50, 100]`, tracking aggregate turn compute against SC-004 $\le 10\text{ ms}$ budget).
+       - `security_emitter_errors_total` (counter, labels: `sink`, `error_type`, bounded cardinality $\le 18$).
+     - **Structured `oneOf` Event Schema Model**:
+       - Strictly separates `security_guardrail_eval` (pseudonymized `subject_ref`, `stage`, `layer_key`, `decision`, `latency_ms`, optional `reason`) from `security_emitter_error` (`sink`, `error_type`, bounded `details`).
+       - Closed Enums & Bounded Constraints:
+         - `layer_key`: closed enum of 9 canonical layers (`input.length`, `input.pii`, `input.injection`, `input.topic`, `output.pii`, `tool.size_structure`, `tool.schema`, `tool.pii`, `tool.untrusted_content_injection`).
+         - `reason`: closed enum of 10 standardized tokens (`LENGTH_EXCEEDED`, `PII_MASKED`, `PROMPT_INJECTION_DETECTED`, `TOPIC_VIOLATION`, `TOOL_SIZE_EXCEEDED`, `TOOL_SCHEMA_INVALID`, `UNTRUSTED_CONTENT_DETECTED`, `CLASSIFIER_FAILED_CLOSED`, `PASSED`, `SKIPPED`).
+         - `error_type`: closed enum of 6 tokens (`connection_timeout`, `buffer_overflow`, `io_error`, `serialization_failure`, `sink_unreachable`, `authentication_failure`).
+         - `details`: sanitized bounded string (`maxLength: 128`, pattern `^[A-Za-z0-9_.: /\\-]{1,128}$`), strictly prohibiting raw prompts, exception traces, or newlines.
      - **Strict Privacy Invariants**:
        - Zero Raw Payloads: Telemetry records and metric labels strictly forbid user prompts, model responses, tool outputs, session IDs, and customer PII (credit cards, passport numbers, emails, phone numbers).
        - Zero High-Cardinality Labels: Dynamic user identifiers and session IDs are disallowed as Prometheus labels (cardinality limit $\le 10$ keys per metric).
        - Pseudonymized Subject Reference: Structured event schema `security_guardrail_eval` requires `subject_ref` formatted strictly as an HMAC-SHA256 digest (`^hmac_sha256:[a-f0-9]{64}$`), governed by daily HMAC key rotation with 30-day retention and cryptographic shredding SOP without persisting raw user IDs.
+     - **Test Hardening & Contract Validation**:
+       - Zero hardcoded hex literals in test fixtures: dynamic `crypto.randomUUID()` trace generator and SHA-256 pseudonym digest generators (`crypto.createHash('sha256').update(...).digest('hex')`).
+       - Strict RFC3339 date-time validation (`/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/`).
+       - Finite number checks (`Number.isFinite`) preventing `NaN` and `Infinity` latencies.
+       - Comprehensive positive and negative test suites validating conforming events and asserting fail-closed rejection on unbounded fields, unrecognized keys, and forbidden payload properties (`additionalProperties: false`).
+     - **Holdout Corpus Immutability**:
+       - The 700-case holdout dataset (`tests/security/corpus/`) is frozen and immutable.
+       - Production-derived friction cases route exclusively to development regression suites, preventing evaluation holdout set contamination.
    - **Operational Dashboards & Alert Runbooks (`docs/security/observability.md`)**:
      - Codifies real-time Grafana dashboard panels for guardrail decisions, P50/P95/P99 latency decomposition, and telemetry emitter error rates.
      - Establishes Standard Operating Procedures (SOP) for false-positive tracking derived from offline labeled holdout evaluations and triage, not raw block counts.

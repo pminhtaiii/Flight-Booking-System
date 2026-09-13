@@ -1,7 +1,7 @@
 # Tasks: Deterministic Guardrails and Security Verification
 
 **Input**: `specs/023-security-systems/{spec,plan,research,data-model}.md`, contracts and security test matrix.
-**Status**: Phase 6 US4 complete; Phase 7 (US5) tasks T043, T045, T046, T047 completed and verified. This checklist records scoped evidence and does not claim tests or scanners outside that evidence have run.
+**Status**: Phase 7 (US5) complete; Phase 8 Closure next. All Phase 7 tasks (T042-T047) completed and verified. This checklist records scoped evidence and does not claim tests or scanners outside that evidence have run.
 **Format**: `- [ ] Tnnn [P?] [USn?] action with file path`. `[P]` means independent file work after stated prerequisites. Tests precede the implementation they verify. New paths are intentional implementation targets.
 
 ## Phase 1: Setup
@@ -82,9 +82,9 @@ Goal: measured attack resistance against real local boundaries. Independent test
 
 Goal: payload-free operations and safe rollout. Independent test: emitter failure preserves block, resource probes stay bounded and rollback never enables unguarded chat. Depends on runtime stories; final release evidence depends on US3/US4.
 
-- [ ] T042 [P] [US5] Add event-schema/privacy/canary/cardinality/sink-outage tests in `apps/agent/tests/security/test_security_events.py`; include PASS/BLOCK and distinguish skipped layers from passes.
+- [x] T042 [P] [US5] Add event-schema/privacy/canary/cardinality/sink-outage tests in `apps/agent/tests/security/test_security_events.py`; include PASS/BLOCK and distinguish skipped layers from passes.
 - [x] T043 [P] [US5] Add reproducible warm/cold and hostile near-limit benchmarks in `apps/agent/tests/security/test_security_performance.py`; report p50/p95/p99, hardware, memory, concurrency and buffer wait separately from guardrail compute.
-- [ ] T044 [US5] Implement SecurityEventEmitter in `apps/agent/src/agent/observability/security_events.py`; integrate gateway decisions with existing telemetry conventions, restricted HMAC subjectRef/keyId and no raw userId or high-cardinality metric labels.
+- [x] T044 [US5] Implement SecurityEventEmitter in `apps/agent/src/agent/observability/security_events.py`; integrate gateway decisions with existing telemetry conventions, restricted HMAC subjectRef/keyId and no raw userId or high-cardinality metric labels.
 - [x] T045 [US5] Define block/latency/error dashboards, pseudonym retention/rotation and alert runbook in `docs/security/observability.md` and `tests/security/observability-contract.json`; derive false-positive trends from labeled evaluations/triage, not raw block counts.
 - [x] T046 [US5] Run T043 benchmarks against proposed SC-004 and resource ceilings; record evidence and fix breaches in `docs/security/performance-validation.md`; do not silently lower thresholds when failing.
 - [x] T047 [US5] Rehearse rollout/rollback and fail-closed startup with tests in `apps/agent/tests/security/test_rollout.py` and `docs/security/rollout.md`; retain existing handoff flags and disable chat safely if a protected build cannot start.
@@ -93,7 +93,7 @@ Goal: payload-free operations and safe rollout. Independent test: emitter failur
 
 Goal: reviewable release evidence. Depends on all stories.
 
-- [ ] T048 Perform disposable mutation controls removing input check, dispatch allowlist, result scan and output holdback; require targeted tests to catch each mutation and record coverage/critical-transition evidence in `docs/security/coverage-validation.md`.
+- [x] T048 Perform disposable mutation controls removing input check, dispatch allowlist, result scan and output holdback; require targeted tests to catch each mutation and record coverage/critical-transition evidence in `docs/security/coverage-validation.md`.
 - [ ] T049 Run change-aware existing static/API/web/agent gates and all security suites using `specs/023-security-systems/quickstart.md`; record final exit codes, counts, skipped gates with justification and artifact hashes in `docs/security/release-evidence.md`.
 - [ ] T050 Triage/reproduce/fix/retest every release-blocking finding and benign neighbor; maintain fingerprint/owner/severity/retest ledger in `docs/security/findings.md`; no unresolved Critical/High or invariant failures at release.
 - [ ] T051 [P] Sync implemented behavior and remaining work in `context/architecture.md`, `context/progress-checker.md` and `context/library-docs.md`; document verified scanner commands without presenting planned work as shipped.
