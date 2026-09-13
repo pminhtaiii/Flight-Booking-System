@@ -3,19 +3,25 @@
 ### Feature 023 — Security Systems: Phase 7 US5 Observability Contract, Operational Runbooks & Rollout Hardening (Task T045 Completed) (2026-09-13)
 
 - **T045 Security Observability Contract, Dashboards, False Positive Tracking & Alert Runbooks (`tests/security/observability-contract.json`, `tests/security/observability-contract.test.mjs`, `docs/security/observability.md`)**:
-  - Implemented deterministic operational telemetry contract and verification suite (5/5 tests passing with exit code 0):
+  - Implemented deterministic operational telemetry contract and verification suite (8/8 tests passing with exit code 0):
     - **Telemetry Contract Schema (`tests/security/observability-contract.json`)**:
       - Bounded metric definitions:
         - `security_guardrail_decisions_total` (counter, labels `[stage, decision, layer_key]`, allowed stages `input/tool/output`, decisions `PASS/BLOCK/SKIP`, cardinality bound <= 90).
         - `security_guardrail_latency_ms` (histogram, buckets `[0.5, 1, 2, 5, 10, 25, 50, 100, 250]`, unit ms, labels `[stage, layer_key]`).
-        - `security_emitter_errors_total` (counter, labels `[sink, error_type]`, sinks `security_audit_log/prometheus/redis`, cardinality bound <= 15).
+        - `security_guardrail_turn_latency_ms` (histogram, buckets `[0.5, 1, 2, 5, 10, 20, 50, 100]`, unit ms, tracking aggregate turn compute against SC-004 <= 10ms budget).
+        - `security_emitter_errors_total` (counter, labels `[sink, error_type]`, sinks `security_audit_log/prometheus/redis`, cardinality bound <= 18).
       - Label constraints: Max label cardinality 10, disallow arbitrary dynamic labels, strictly forbids dynamic user/session payload fields (`user_id`, `prompt`, `message`, `content`, `session_id`, `token`, `payload`, `email`, `ip_address`).
-      - Structured event schema: `security_guardrail_eval` requiring `event_type`, `timestamp_utc`, `trace_id`, `subject_ref`, `stage`, `layer_key`, `decision`, `latency_ms`; subject reference strictly pseudonymized via HMAC-SHA256 (`^hmac_sha256:[a-f0-9]{64}$`).
+      - Structured `oneOf` event schema model:
+        - Strictly separates `security_guardrail_eval` (required: `event_type`, `timestamp_utc`, `trace_id`, `subject_ref`, `stage`, `layer_key`, `decision`, `latency_ms`, optional `reason`) from `security_emitter_error` (required: `event_type`, `timestamp_utc`, `trace_id`, `sink`, `error_type`, optional bounded `details`).
+        - Closed enums & constraints: `layer_key` (9 canonical layers: `input.length`, `input.pii`, `input.injection`, `input.topic`, `output.pii`, `tool.size_structure`, `tool.schema`, `tool.pii`, `tool.untrusted_content_injection`), `reason` (10 standardized tokens: `LENGTH_EXCEEDED`, `PII_MASKED`, `PROMPT_INJECTION_DETECTED`, `TOPIC_VIOLATION`, `TOOL_SIZE_EXCEEDED`, `TOOL_SCHEMA_INVALID`, `UNTRUSTED_CONTENT_DETECTED`, `CLASSIFIER_FAILED_CLOSED`, `PASSED`, `SKIPPED`), `error_type` (6 tokens: `connection_timeout`, `buffer_overflow`, `io_error`, `serialization_failure`, `sink_unreachable`, `authentication_failure`), `details` (`maxLength: 128`, pattern `^[A-Za-z0-9_.: /\\-]{1,128}$`, raw prompts, traces, or newlines strictly prohibited).
+        - `subject_ref` strictly pseudonymized via HMAC-SHA256 (`^hmac_sha256:[a-f0-9]{64}$`).
       - Alert rules with operational thresholds: `InjectionBlockRateSpike` (critical, 5x 7-day baseline), `GuardrailLatencyP95Breach` (warning, > 50 ms budget), `TelemetryEmitterDropRateHigh` (critical, > 1% errors).
-    - **Contract Verification Test Suite (`tests/security/observability-contract.test.mjs`)**:
-      - Validates JSON schema validity, metric types/buckets/labels, high-cardinality/PII prohibition, event schema regex patterns, and alert definitions.
-    - **Observability Runbook & Dashboard Specifications (`docs/security/observability.md`)**:
+    - **Contract Verification Test Suite Hardening (`tests/security/observability-contract.test.mjs`)**:
+      - 8/8 tests passing with exit code 0.
+      - Test hardening: zero hardcoded hex literals in test fixtures (dynamic `crypto.randomUUID()` trace generator and SHA-256 pseudonym digest generators), strict RFC3339 date-time validation (`RFC3339_REGEX`), finite number checks (`Number.isFinite`), and comprehensive positive and negative test suites verifying rejection of unbounded fields and forbidden payload properties (`additionalProperties: false`).
+    - **Observability Runbook, Dashboards & Holdout Corpus Immutability (`docs/security/observability.md`)**:
       - Real-time Grafana dashboard specs: Guardrail Decisions & Block Rates, Layer Latency Distribution (P50/P95/P99), Emitter Error and Health status.
+      - Holdout corpus immutability: the 700-case holdout dataset is frozen and immutable; production-derived friction cases route exclusively to development regression suites to prevent evaluation holdout set contamination.
       - False positive tracking standard operating procedure (SOP): derived strictly from labeled evaluation holdouts and offline triage without capturing raw user payloads.
       - Pseudonym retention and daily HMAC key rotation with 30-day retention and cryptographic shredding SOP: multi-key rotation window with zero plaintext identifier retention.
       - Operational alert runbooks: step-by-step triage, investigation commands, and escalation matrix for critical and warning alerts.
