@@ -14,7 +14,7 @@
     - **Gate 8 (Web Gate & Build)**: ESLint (0 errors), typecheck (0 errors), Next.js production build succeeded (35 routes compiled).
     - **Gate 9 (Agent Gate & Tests)**: Ruff check (0 errors), ruff format (155 files clean), Pytest (1,002/1,002 passed).
   - **T050 Security Findings Ledger & Triage (`docs/security/findings.md`)**:
-    - Released authoritative ledger tracking 12 remediation surfaces across SAST, SCA, Secrets, and DAST with verification commit `b4ccdd0deb924f990e1cbcf2ce949fa9e9494d43`.
+    - Released authoritative ledger tracking 12 remediation surfaces across SAST, SCA, Secrets, and DAST with verification commit `d3bbfacd374c1e5a702cc752736b29f8d01fd777`.
     - Confirmed strict invariants: **0 unresolved Critical findings, 0 unresolved High findings, and 0 security invariant breaches**.
     - Verified `tests/security/exceptions.json` contains 0 active exceptions, complying with draft 2020-12 schema and 30-day lifetime limits.
   - **T051 Monorepo Documentation & Context Synchronization**:

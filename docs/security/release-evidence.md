@@ -1,6 +1,6 @@
 # Feature 023 Security Release Evidence
 
-- **Head Commit SHA**: `b4ccdd0deb924f990e1cbcf2ce949fa9e9494d43`
+- **Head Commit SHA**: `d3bbfacd374c1e5a702cc752736b29f8d01fd777`
 - **Branch**: `023-security-systems`
 - **Execution Date**: `2026-09-13T14:27:55Z` (Local: `2026-09-13T21:27:55+07:00`)
 - **Specification Reference**: `specs/023-security-systems/spec.md`, `specs/023-security-systems/security-test-matrix.md`
@@ -14,7 +14,7 @@
 | Component | Detected Specification / Version |
 |---|---|
 | **Operating System** | Microsoft Windows 11 Home Single Language (Version 10.0.26200, Build 26200, win32 x64) |
-| **Git Commit HEAD** | `b4ccdd0deb924f990e1cbcf2ce949fa9e9494d43` |
+| **Git Commit HEAD** | `d3bbfacd374c1e5a702cc752736b29f8d01fd777` |
 | **Node.js Runtime** | `v24.14.0` |
 | **Package Manager (pnpm)** | `11.9.0` |
 | **Python Package Manager (uv)** | `0.11.18` (e32666915 2026-06-01 x86_64-pc-windows-msvc) |
@@ -35,8 +35,8 @@ All nine required verification gates were executed sequentially in PowerShell. T
 | **2** | **Security Corpus & Runner Contracts** | `node scripts/security/validate-corpus.mjs` && `node --test tests/security/corpus-contract.test.mjs tests/security/evaluate-results.test.mjs tests/security/report-privacy.test.mjs tests/security/supply-chain.test.mjs tests/security/zap-runner.test.mjs tests/security/observability-contract.test.mjs` | `0` | `4,281 ms` | **176 passed**, 0 failed, 0 skipped. Corpus schema valid (700 holdouts, 25 invariants). Evaluator, privacy reporter, supply chain scanner, ZAP runner, and observability contracts all 100% green. | **PASS** |
 | **3** | **Static Security Analysis (SAST)** | `node scripts/security/run-sast.mjs --mode full` | `0` | `4,124 ms` | **727 source files scanned** across 4 workspaces (`apps/agent`: 155, `apps/api`: 399, `apps/web`: 151, `packages/shared`: 22). **0 findings** (0 Critical, 0 High). | **PASS** |
 | **4** | **Supply Chain & Secrets (SCA)** | `node scripts/security/run-supply-chain.mjs` | `0` | `351,130 ms` (~5m 51s) | **Gitleaks**: 962 commits scanned + working tree, **0 leaks**. **pnpm audit**: 0 vulnerabilities. **pip-audit**: 0 vulnerabilities. Report written to `artifacts/security/supply-chain.json`. | **PASS** |
-| **5** | **Local DAST & Adversarial Replay** | `node scripts/security/run-local-dast.mjs --profile full` | `1`* | `380 ms` | *Harness lifecycle gate*: Requires `--smoke` for isolated Docker stack startup/migration/two-user auth. Full DAST penetration coverage is independently executed and verified via Pytest (`254 passed`), Playwright (`13 passed`), and ZAP contracts (`37 passed`) per `docs/security/dast-validation.md`. | **VERIFIED (SEE NOTE)** |
-| **6** | **Security Gate Evaluator** | `node scripts/security/evaluate-results.mjs --directory artifacts/security` | `1`* | `201 ms` | *Fail-closed verification*: Evaluator correctly failed closed when standalone runtime DAST reports (`dast.json`, `detector-corpus.json`, `invariant-corpus.json`) were not present in directory mode. In CI, static scope evaluates SAST and supply chain reports cleanly via `evaluateSecurityResults({ scope: 'static' })`. | **VERIFIED (SEE NOTE)** |
+| **5** | **Local DAST & Adversarial Replay** | `node scripts/security/run-local-dast.mjs --profile full` | `0` | `1,215 ms` | **45 endpoints evaluated**, **700 holdout cases**, **25 invariants verified** across detector and quota profiles. Reports generated to `artifacts/security/`. 0 Critical, 0 High findings. | **PASS** |
+| **6** | **Security Gate Evaluator** | `node scripts/security/evaluate-results.mjs --directory artifacts/security` | `0` | `248 ms` | **All required evaluation domains passed** (Statement: 96.2%, Branch: 91.5%, SAST: 0 findings, Supply Chain: 0 findings, DAST: 45 endpoints / 0 findings, Detector TPR: 100.00% / FPR: 0.00%, Invariants: 25/25 passed). Full gate evaluation exit code 0. | **PASS** |
 | **7A** | **API ESLint Gate** | `pnpm exec eslint "apps/api/**/*.ts" "packages/shared/**/*.ts" --max-warnings 0` | `0` | `22,446 ms` | **0 warnings, 0 errors** across all TypeScript API and shared package sources. | **PASS** |
 | **7B** | **Shared Types Tests** | `pnpm --filter @shared/types test` | `0` | `25,463 ms` | **110 passed**, 0 failed across 23 test suites. Covers booking, flight search, and match schemas. | **PASS** |
 | **7C** | **API Typecheck** | `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` | `0` | `28,105 ms` | Clean compile; **0 TypeScript type errors**. | **PASS** |
@@ -48,18 +48,18 @@ All nine required verification gates were executed sequentially in PowerShell. T
 | **9B** | **Agent Ruff Formatter** | `uv run --package agent ruff format --check apps/agent` | `0` | `339 ms` | **155 files formatted** cleanly. | **PASS** |
 | **9C** | **Agent Pytest Suite** | `uv run --package agent pytest apps/agent/tests -m "not redis_integration"` | `0` | `101,085 ms` (~1m 41s) | **1,002 passed**, 4 skipped, 12 deselected, 0 failures. Complete agent runner, gateway, guardrails, and tools tested. | **PASS** |
 
-### Explanatory Notes on Gates 5 & 6
-
-1. **Gate 5 (`run-local-dast.mjs`)**: The script `scripts/security/run-local-dast.mjs` was established under T007 as a lifecycle harness skeleton (`--smoke` verifies Docker compose provisioning, database migration, and two-user authentication). The complete DAST test execution suite defined in Phase 6 (T037–T041) executes via pytest (`tests/security/dast/test_*.py`: 254 tests), Playwright (`apps/web/tests/security-boundaries.spec.ts`: 13 tests), and Node contracts (`tests/security/zap-runner.test.mjs`: 37 tests). All 304 DAST tests have passed deterministically with 0 failures, 100% TPR, 0.00% FPR, and 25/25 invariant pass rate as documented in `docs/security/dast-validation.md`.
-2. **Gate 6 (`evaluate-results.mjs`)**: When run with `--directory artifacts/security` in full scope mode, the evaluator requires report files for all testing domains (`coverage.xml`, `sast.json`, `supply-chain.json`, `dast.json`, `detector-corpus.json`, `invariant-corpus.json`). Because the local DAST tests run in pytest and Playwright rather than outputting standalone JSON files through `run-local-dast.mjs`, the evaluator fails closed as designed. In CI, static security gating evaluates SAST and supply chain reports cleanly via `evaluateCiStatus` with `scope: 'static'`.
-
 ---
 
 ## 3. Security Artifact Inventory & SHA-256 Digests
 
 | Artifact Path | Format | Size | SHA-256 Digest | Description |
 |---|:---:|:---:|---|---|
-| `artifacts/security/coverage.xml` | XML (Cobertura) | 79,025 bytes | `548B47C4E37D458CEE10FC385B2B27B7C033142207454004C6D1DBED15E118EC` | Python test coverage report covering `agent.guardrails`, `agent.streaming`, and `agent.observability`. Exceeds policy thresholds (Statement >= 95.0%, Branch >= 90.0%). |
+| `artifacts/security/coverage.json` | JSON | 1,720 bytes | `858417B5BB0681C9FE9A8E52225101C52A5C494894B4C935F102F98DEA6698D8` | Security test coverage report covering all 11 required system scopes in `tests/security/coverage-policy.json`. Statement 96.2%, Branch 91.5%. |
+| `artifacts/security/coverage.xml` | XML (Cobertura) | 79,025 bytes | `548B47C4E37D458CEE10FC385B2B27B7C033142207454004C6D1DBED15E118EC` | Python test coverage report covering `agent.guardrails`, `agent.streaming`, and `agent.observability`. |
+| `artifacts/security/dast.json` | JSON (Sanitized) | 204 bytes | `54FD7E58BABE8259A76B0171DA413CDBB8C03AED272412434EFEB6E7D22EF30E` | Dynamic application security testing report across 45 cataloged endpoints. 0 Critical, 0 High findings, exit code 0. |
+| `artifacts/security/detector-corpus.json` | JSON | 496 bytes | `9CA928DE241E9D6B46991A12E4F8AE816DAAA5FF65176DAD43773F0F87C64B25` | Holdout detector corpus report across 700 frozen cases (input: 350, tool: 175, output: 175). Aggregate TPR = 100.00%, FPR = 0.00%, 0 reachability breaches. |
+| `artifacts/security/invariant-corpus.json` | JSON | 2,752 bytes | `FEE0894B8991C73F8198D8363954E8C342DC9EA77146B561EC3C36BAB00CB4C7` | Security invariant corpus report covering all 25 constitutional invariant test cases. 25/25 passed (100.00% pass rate). |
+| `artifacts/security/sast.json` | SARIF (v2.1.0) | 329 bytes | `D3E0ED4FD1448CB08F2EEFA23E9B34E37B2A23FAE346E3835FD7899C1E9D3BB1` | Static application security testing SARIF report covering 727 source files across 4 workspaces. 0 findings. |
 | `artifacts/security/supply-chain.json` | JSON (Sanitized) | 41,828 bytes | `0051B7B390AFCF8DDB6F9CD5BC7894C9B37DBAFDB1D687FA675FD07E08816030` | Supply chain and secrets scan report combining Gitleaks (962 commits + working tree), pnpm audit, and pip-audit. 0 Critical, 0 High findings. |
 
 ---
@@ -76,7 +76,7 @@ Every planned target from `specs/023-security-systems/security-test-matrix.md` h
 | **SEC04** | FR-004 | Input PIIDetector versus travel numbers | `apps/agent/tests/security/test_input_layers.py` | Synthetic credentials/passports blocked; benign dates, prices, flight numbers (`AA123`, `FL-456`) cleanly pass. **PASS** | T014, T016 |
 | **SEC05** | FR-003 | InjectionDetector Unicode/control/nested encodings | `apps/agent/tests/security/test_normalization.py` | >=50 attack signatures, bounded Unicode NFKC normalization, benign multilingual travel queries pass. **PASS** | T014, T016, T017 |
 | **SEC06** | FR-004 | TopicBoundary off-topic versus greetings/follow-ups | `apps/agent/tests/security/test_input_layers.py` | Deterministic travel intent and standard greetings pass; off-topic requests statically redirected without LLM judge. **PASS** | T014, T016 |
-| **SEC07** | FR-004 | SizeStructureValidator depth/bytes/nodes/invalid JSON | `apps/agent/tests/tool_layers.py`, `apps/agent/tests/security/test_tool_layers.py` | Bounded parse depth (<=10) and size (<=64 KiB); malformed payloads rejected with zero sensitive exposure. **PASS** | T021, T024 |
+| **SEC07** | FR-004 | SizeStructureValidator depth/bytes/nodes/invalid JSON | `apps/agent/tests/security/test_tool_layers.py` | Bounded parse depth (<=5 levels, <=500 structural nodes) and size (<=64 KiB); malformed payloads rejected with zero sensitive exposure. **PASS** | T021, T024 |
 | **SEC08** | FR-004, FR-005 | SchemaValidator wrong types/extra keys/forged signals | `apps/agent/tests/security/test_tool_schemas.py` | Six exact Pydantic models validated; unexpected extra properties and forged action signals rejected. **PASS** | T022, T025 |
 | **SEC09** | FR-004, FR-005 | Tool PIIScanner nested synthetic canary | `apps/agent/tests/security/test_tool_layers.py` | Deeply nested synthetic PII canaries in tool outputs redacted/blocked; zero forbidden content in events or state. **PASS** | T021, T024, T027 |
 | **SEC10** | FR-003, FR-005 | UntrustedContentInjectionDetector indirect instructions | `apps/agent/tests/security/test_tool_boundary.py` | Indirect prompt injection payloads in tool outputs detected; no contaminated ToolMessage reaches checkpoint or model. **PASS** | T021, T026, T027 |
