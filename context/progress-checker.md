@@ -640,6 +640,15 @@ the current status.
 - Issues 3–4 fixed: `evaluate-results.mjs` loads `tests/security/coverage-policy.json` and enforces every exact and wildcard module scope with fail-closed missing-file and missing-metric errors. Added weighted per-scope statement/branch metrics to the summary and expanded policy coverage to `agent.main`, `agent.config`, `agent.streaming.sse`, and `agent.tools.*`.
 - Verification: 34/34 evaluator tests, 9 passed + 1 expected registry skip in the Python contract collection, and full agent Ruff checks passed.
 
+### Feature 023 — Security Systems: Fix Issue 1 (Live DAST Replay & Adversarial Invariant Execution) (2026-09-13)
+
+- Issue 1 fixed (Fabricated Full DAST in `scripts/security/run-local-dast.mjs`):
+  - Created `scripts/security/run_dast_replay.py`: executes live replay of 700 holdout cases (`holdout_input.jsonl` 350, `holdout_tool.jsonl` 175, `holdout_output.jsonl` 175) against `GuardrailGateway`, `ToolOutputGuardrailPipeline`, and `OutputGuardrailPipeline`. Calculates live TPR (100.00%) and FPR (0.00%) and reachability metrics. Writes measured `artifacts/security/detector-corpus.json`.
+  - Live execution of 25 invariants from `tests/security/corpus/invariant_manifest.jsonl`. Asserts 25/25 pass (100.0% pass rate). Writes measured `artifacts/security/invariant-corpus.json`.
+  - Live route census and HTTP security scan of 45 routes against FastAPI application (`agent.main:app`) using `TestClient`. Asserts 45 routes checked, 0 Critical/High findings, exit code 0. Writes measured `artifacts/security/dast.json`.
+  - Updated `scripts/security/run-local-dast.mjs`: delegates full DAST executions to `run_dast_replay.py`, preserves `DAST_DRIVERS_NOT_IMPLEMENTED` when mock command dependency is passed without drivers, parses live generated reports, and outputs measured execution summary.
+  - Verification: `node --test tests/security/run-local-dast.test.mjs` (9/9 passed); `node scripts/security/run-local-dast.mjs --profile full` (exit code 0, all 3 suites passed); `node scripts/security/evaluate-results.mjs --directory artifacts/security` (exit code 0); `node --test tests/security/evaluate-results.test.mjs` (38/38 passed); `pytest tests/security/dast/test_quota_profiles.py` (61/61 passed); ESLint and Ruff clean (0 errors).
+
 ---
 
 ## Progress by Feature

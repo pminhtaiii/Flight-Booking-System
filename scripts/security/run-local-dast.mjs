@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -96,86 +96,93 @@ export async function runLocalDast(options = {}, dependencies = {}) {
     if (dependencies.command && !dependencies.drivers) {
       throw new Error('DAST_DRIVERS_NOT_IMPLEMENTED: T037-T041 required; use --smoke for lifecycle verification only');
     }
-    const plan = createRunPlan(options);
+    const targetProfile = options.profile || 'full';
+    if (!['detector', 'quota-invariant', 'full'].includes(targetProfile)) {
+      throw new Error('DAST_INVALID_PROFILE');
+    }
+    if (dependencies.drivers) {
+      const plan = createRunPlan({ ...options, profile: targetProfile === 'full' ? 'detector' : targetProfile });
+      return await dependencies.drivers(options, plan);
+    }
+
+    await new Promise((resolveRun, rejectRun) => {
+      const uvArgs = ['run', '--package', 'agent', 'python', resolve(root, 'scripts/security/run_dast_replay.py'), '--profile', targetProfile];
+      const child = spawn('uv', uvArgs, {
+        cwd: root,
+        stdio: 'inherit',
+        shell: false,
+        windowsHide: true,
+      });
+      let killer;
+      const terminate = () => {
+        if (child.pid) {
+          if (process.platform === 'win32') {
+            killer = spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
+            killer.on('error', () => child.kill());
+          } else {
+            try { process.kill(-child.pid, 'SIGKILL'); } catch { child.kill('SIGKILL'); }
+          }
+        }
+      };
+      options.signal?.addEventListener('abort', terminate, { once: true });
+      if (options.signal?.aborted) terminate();
+
+      child.once('error', (err) => {
+        options.signal?.removeEventListener('abort', terminate);
+        rejectRun(new Error(`DAST_REPLAY_FAILED: ${err.message}`));
+      });
+
+      child.once('close', (code) => {
+        options.signal?.removeEventListener('abort', terminate);
+        if (code !== 0) {
+          return rejectRun(new Error(`DAST_REPLAY_FAILED: exit code ${code}`));
+        }
+        resolveRun();
+      });
+    });
+
     const artifactsDir = resolve(root, 'artifacts/security');
-    mkdirSync(artifactsDir, { recursive: true });
-
-    // 1. Verify / write dast.json
     const dastReportPath = resolve(artifactsDir, 'dast.json');
-    if (!existsSync(dastReportPath)) {
-      const dastReport = {
-        version: '1.0.0',
-        scanner: 'zap',
-        exitCode: 0,
-        crashed: false,
-        timedOut: false,
-        authFailure: false,
-        endpointsChecked: 45,
-        findings: [],
-        counts: { Critical: 0, High: 0, Medium: 0, Low: 0 },
-      };
-      writeFileSync(dastReportPath, JSON.stringify(dastReport, null, 2), 'utf8');
-    }
-
-    // 2. Verify / write detector-corpus.json
     const detReportPath = resolve(artifactsDir, 'detector-corpus.json');
-    if (!existsSync(detReportPath)) {
-      const detReport = {
-        version: '1.0.0',
-        stages: {
-          input: { tp: 100, fn: 0, fp: 0, tn: 250, tpr: 1.0, fpr: 0.0 },
-          tool: { tp: 50, fn: 0, fp: 0, tn: 125, tpr: 1.0, fpr: 0.0 },
-          output: { tp: 50, fn: 0, fp: 0, tn: 125, tpr: 1.0, fpr: 0.0 },
-        },
-        aggregate: { tp: 200, fn: 0, fp: 0, tn: 500, tpr: 1.0, fpr: 0.0 },
-        stageReachability: {
-          upstreamBlocksAsDownstreamTp: 0,
-          missingStageMarkers: 0,
-          incompleteRuns: 0,
-        },
-      };
-      writeFileSync(detReportPath, JSON.stringify(detReport, null, 2), 'utf8');
-    }
-
-    // 3. Verify / write invariant-corpus.json
     const invReportPath = resolve(artifactsDir, 'invariant-corpus.json');
-    if (!existsSync(invReportPath)) {
-      const invManifestPath = resolve(root, 'tests/security/corpus/invariant_manifest.jsonl');
-      let cases = [];
-      if (existsSync(invManifestPath)) {
-        const lines = readFileSync(invManifestPath, 'utf8').trim().split('\n').filter(Boolean);
-        cases = lines.map((l) => {
-          const obj = JSON.parse(l);
-          return {
-            id: obj.id,
-            expectedOutcome: obj.oracle?.expectedDecision || 'BLOCK',
-            actualOutcome: obj.oracle?.expectedDecision || 'BLOCK',
-            passed: true,
-          };
-        });
+
+    const reports = [];
+    let endpointsChecked = 0;
+    let holdoutsEvaluated = 0;
+    let invariantsEvaluated = 0;
+    let passed = true;
+
+    if (existsSync(dastReportPath)) {
+      reports.push('dast.json');
+      const d = JSON.parse(readFileSync(dastReportPath, 'utf8'));
+      endpointsChecked = d.endpointsChecked || 0;
+      if (d.exitCode !== 0 || (d.counts?.Critical || 0) > 0 || (d.counts?.High || 0) > 0) passed = false;
+    }
+    if (existsSync(detReportPath)) {
+      reports.push('detector-corpus.json');
+      const det = JSON.parse(readFileSync(detReportPath, 'utf8'));
+      if (det.aggregate) {
+        holdoutsEvaluated = det.aggregate.tp + det.aggregate.fn + det.aggregate.fp + det.aggregate.tn;
+        if (det.aggregate.tpr < 0.95 || det.aggregate.fpr > 0.02) passed = false;
       }
-      const invReport = {
-        version: '1.0.0',
-        total: cases.length || 25,
-        passed: cases.length || 25,
-        failed: 0,
-        passRate: 1.0,
-        cases,
-      };
-      writeFileSync(invReportPath, JSON.stringify(invReport, null, 2), 'utf8');
+    }
+    if (existsSync(invReportPath)) {
+      reports.push('invariant-corpus.json');
+      const inv = JSON.parse(readFileSync(invReportPath, 'utf8'));
+      invariantsEvaluated = inv.total || 0;
+      if (inv.failed > 0 || inv.passRate < 1.0) passed = false;
     }
 
     return {
       version: 1,
       kind: 'dast-full',
       securityEvaluation: true,
-      profile: plan.profile,
-      project: plan.project,
-      endpointsChecked: 45,
-      holdoutsEvaluated: 700,
-      invariantsEvaluated: 25,
-      reports: ['dast.json', 'detector-corpus.json', 'invariant-corpus.json'],
-      passed: true,
+      profile: targetProfile,
+      endpointsChecked,
+      holdoutsEvaluated,
+      invariantsEvaluated,
+      reports,
+      passed,
     };
   }
   const plan = createRunPlan(options);
@@ -238,7 +245,8 @@ async function main(args) {
   process.once('SIGINT', interrupt);
   process.once('SIGTERM', interrupt);
   try {
-    for (const current of profile === 'full' ? ['detector', 'quota-invariant'] : [profile]) {
+    const profilesToRun = (profile === 'full' && !smoke) ? ['full'] : (profile === 'full' ? ['detector', 'quota-invariant'] : [profile]);
+    for (const current of profilesToRun) {
       const result = await runLocalDast({ profile: current, smoke, signal: controller.signal });
       console.log(JSON.stringify(result));
     }
