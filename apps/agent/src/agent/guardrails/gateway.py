@@ -32,6 +32,11 @@ class GuardrailGateway:
             )
         self.registry = registry
 
+    def is_healthy(self) -> bool:
+        if not isinstance(self.registry, GuardrailRegistry):
+            return False
+        return self.registry.is_healthy()
+
     async def validate_input(
         self,
         context: AdmissionContext,

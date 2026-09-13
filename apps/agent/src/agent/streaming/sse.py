@@ -2,7 +2,6 @@ import asyncio
 import json
 import logging
 import time
-from unittest.mock import AsyncMock, MagicMock
 
 from fastapi import APIRouter, Header, HTTPException, Request
 from sse_starlette.sse import EventSourceResponse
@@ -18,7 +17,6 @@ from agent.chat_turn.runner import _persist_response
 from agent.config import get_settings
 from agent.graph.graph import graph
 from agent.guardrails.gateway import GuardrailGateway
-from agent.guardrails.registry import create_production_registry
 from agent.infrastructure.redis import get_redis_client
 from agent.models.requests import ChatStreamRequest
 from agent.observability.chat_observability import ChatTelemetry, safe_opaque_id
@@ -73,7 +71,6 @@ async def chat_stream(
     """
     settings = get_settings()
 
-    # 1. Authorization validation first (canonical JWT profile: sub, iss, aud, jti)
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid authorization header")
     token = authorization.split(" ", 1)[1]
@@ -113,16 +110,13 @@ async def chat_stream(
     if hasattr(client, "correlation_id"):
         client.correlation_id = correlation_id
 
-    # 2. NestJS access check (active user & revocation check) BEFORE quota or session lock
     access_res = await client.check_user_access(sub=user_id, jti=jti)
     if not access_res.get("allowed"):
         raise HTTPException(status_code=401, detail="User account inactive or token revoked")
 
-    # 3. Message length check
     if body.message and len(body.message) > settings.MAX_MESSAGE_LENGTH:
         raise HTTPException(status_code=400, detail="Message exceeds maximum length")
 
-    # 4. Guardrails check (input safety & ingress PII detection)
     if body.message and detect_pii(body.message):
         guardrails_logger.warning("Ingress PII detected in user message: REDACTED")
 
@@ -138,7 +132,6 @@ async def chat_stream(
 
         return EventSourceResponse(pii_error_generator())
 
-    # 5. Rate Limit / Quota check (accepted-only charge) BEFORE session lock / model / persistence
     quota_started = time.perf_counter()
     try:
         redis_client = get_redis_client()
@@ -203,7 +196,6 @@ async def chat_stream(
         )
         raise HTTPException(status_code=503, detail="CHAT_CONTROL_PLANE_UNAVAILABLE") from e
 
-    # 6. Construct ChatTurnCommand
     command = ChatTurnCommand(
         user_id=user_id,
         session_id=body.sessionId,
@@ -216,15 +208,13 @@ async def chat_stream(
         correlation_id=correlation_id,
     )
 
-    # 7. Delegate streaming to ChatTurnRunner
     queue_manager = getattr(request.app.state, "message_queue", None)
     gateway = getattr(request.app.state, "guardrail_gateway", None)
-    if not isinstance(gateway, GuardrailGateway):
-        if not (
-            isinstance(gateway, MagicMock)
-            and isinstance(getattr(gateway, "validate_input", None), AsyncMock)
-        ):
-            gateway = GuardrailGateway(create_production_registry())
+    if gateway is None or not isinstance(gateway, GuardrailGateway) or not gateway.is_healthy():
+        raise HTTPException(
+            status_code=503,
+            detail="GUARDRAIL_GATEWAY_UNAVAILABLE: Guardrail gateway is uninitialized or degraded",
+        )
 
     runner = ChatTurnRunner(
         settings=settings,

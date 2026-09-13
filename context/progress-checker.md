@@ -1,5 +1,26 @@
 # Progress Tracker
 
+### Feature 023 — Security Systems: Phase 7 US5 Slice 3 T047 Rollout Hardening & Operational Runbook Completed (2026-09-13)
+
+- **T047 Fail-Closed Startup, Rollout, Rollback & Health Hardening (`apps/agent/tests/security/test_rollout.py`, `docs/security/rollout.md`)**:
+  - Implemented and verified complete Slice 3 hardening across startup, ingress, health probes, and emergency rollback (15/15 tests passing):
+    - **Startup & Ingress Fail-Closed Validation**:
+      - `AGENT_SERVICE_API_KEY`, `JWT_SECRET`, and `CLAIM_TOKEN_SECRET` fail-fast validation in Pydantic `Settings`. Empty keys abort startup immediately.
+      - `GuardrailGateway.is_healthy()` contract enforcing valid `GuardrailRegistry` and compulsory production layers.
+      - POST `/chat/stream` ingress fail-closed guard: returns HTTP 503 (`GUARDRAIL_GATEWAY_UNAVAILABLE`) if `guardrail_gateway` is None or degraded, with zero runner invocations.
+    - **Health Probe Key & Subsystem Verification**:
+      - `/health/live`: Lightweight probe guaranteed HTTP 200 with zero model inference, zero guardrail checks, zero Redis/external I/O (< 10ms).
+      - `/health`: Deep probe monitoring `guardrails: deterministic`, `redis`, and `nestjsApi`. Degrades status to `degraded` with `guardrails: {"status": "down"}` if gateway is None/degraded or if `AGENT_SERVICE_API_KEY`, `JWT_SECRET`, or `CLAIM_TOKEN_SECRET` are missing.
+    - **Emergency Rollback Mid-Stream Lock Purge & Teardown**:
+      - Rehearsed active streaming turn cancellation mid-flight. Verified `queue_manager.release()` cleanly purges session lock in Redis, resets active fence, leaves no orphan locks, and executes zero unauthenticated database mutations.
+      - Rehearsed stolen/stale fence invalidation during turn teardown; verified response batch persistence is safely aborted.
+    - **Operational Runbook & Documentation (`docs/security/rollout.md`)**:
+      - Codified Pre-Flight Verification Checklist (Corpus gates: 200 malicious, 500 benign, TPR >= 95%, FPR <= 2%, zero false negatives; SAST baseline; Clean SCA reports; Test suite green status).
+      - Codified Canary Rollout Steps (Stage 0: 1%, Stage 1: 5%, Stage 2: 25%, Stage 3: 100%, traffic drain commands, telemetry gates).
+      - Codified Key Rotation Procedures (Multi-key secret rings `jwt_secret_ring` and `claim_token_secret_ring`, 3-phase zero-downtime rotation, rolling restart commands).
+      - Codified Emergency Rollback Procedures (flag deprecation, traffic drain, session namespace purge, post-mortem incident triage).
+    - **Verification**: 15/15 tests passing in `apps/agent/tests/security/test_rollout.py` (6.42s); `ruff check` and `ruff format` 100% clean across all 4 touched files.
+
 ### Feature 023 — Security Systems: Phase 7 US5 Slice 2 Dual-Axis Code Review Remediation Completed (2026-09-13)
 
 - **Remediated Standards Violations & Performance Bottlenecks across Tasks T043, T046, T047**:

@@ -169,6 +169,12 @@ Feature 023 establishes a deterministic, multi-layered security architecture tha
    - `TurnCapabilities`: post-routing sealed capability bound to effective route intent and sealed tool list.
    - `PipelineDecision[T]`: frozen decision container automatically stripping payload data when `status == "BLOCK"`.
 
+6. **Gateway Health Contract & Zero Fail-Open Ingress (`apps/agent/src/agent/guardrails/gateway.py`, `apps/agent/src/agent/streaming/sse.py`, `apps/agent/src/agent/main.py`)**:
+   - `GuardrailGateway.is_healthy() -> bool`: Verifies that `self.registry` is a valid `GuardrailRegistry`, and if in production mode (`self.registry.production == True`), verifies that all compulsory layers (`COMPULSORY_PRODUCTION_LAYERS`) are present and registered.
+   - Fail-Closed Ingress (`/chat/stream`): If `request.app.state.guardrail_gateway` is `None` or degraded (`is_healthy() == False`), immediately aborts turn creation with HTTP 503 (`GUARDRAIL_GATEWAY_UNAVAILABLE`), preventing any unshielded model or tool invocations.
+   - Deep Health Probe (`/health`): Monitors `dependencies.guardrails`, `dependencies.redis`, and `dependencies.nestjsApi`. If `guardrail_gateway` is uninitialized or degraded, or if any mandatory HMAC secret (`AGENT_SERVICE_API_KEY`, `JWT_SECRET`, `CLAIM_TOKEN_SECRET`) is missing/empty, `guardrails` reports `status: "down"` and the overall service status degrades to `"degraded"`.
+   - Liveness Probe (`/health/live`): Fast (< 10ms), zero LLM model calls, zero guardrail classification overhead, and zero external network/cache I/O for orchestrator probes.
+
 ---
 
 ## Deterministic Tool Boundary and Handoff Validation (Feature 023, Phase 4 US2)
