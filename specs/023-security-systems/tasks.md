@@ -93,7 +93,7 @@ Goal: payload-free operations and safe rollout. Independent test: emitter failur
 
 Goal: reviewable release evidence. Depends on all stories.
 
-- [ ] T048 Perform disposable mutation controls removing input check, dispatch allowlist, result scan and output holdback; require targeted tests to catch each mutation and record coverage/critical-transition evidence in `docs/security/coverage-validation.md`.
+- [x] T048 Perform disposable mutation controls removing input check, dispatch allowlist, result scan and output holdback; require targeted tests to catch each mutation and record coverage/critical-transition evidence in `docs/security/coverage-validation.md`.
 - [ ] T049 Run change-aware existing static/API/web/agent gates and all security suites using `specs/023-security-systems/quickstart.md`; record final exit codes, counts, skipped gates with justification and artifact hashes in `docs/security/release-evidence.md`.
 - [ ] T050 Triage/reproduce/fix/retest every release-blocking finding and benign neighbor; maintain fingerprint/owner/severity/retest ledger in `docs/security/findings.md`; no unresolved Critical/High or invariant failures at release.
 - [ ] T051 [P] Sync implemented behavior and remaining work in `context/architecture.md`, `context/progress-checker.md` and `context/library-docs.md`; document verified scanner commands without presenting planned work as shipped.

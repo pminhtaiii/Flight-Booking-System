@@ -94,7 +94,7 @@
 ├── docs/
 │   ├── adr/                           → Architectural Decision Records
 │   ├── runbooks/                      → Authoritative operational runbooks
-│   └── security/                      → observability.md, rollout.md, performance-validation.md, toolchain.md
+│   └── security/                      → observability.md, rollout.md, performance-validation.md, coverage-validation.md, toolchain.md
 │
 ├── context/
 │   ├── architecture.md                → This file

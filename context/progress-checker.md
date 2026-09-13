@@ -217,7 +217,17 @@
   - Issue 9 (Dynamic Test Configuration): Removed hardcoded secret literals and URLs from module import level in `test_ownership.py`; resolved dynamically via `_resolve_test_env()` using `secrets.token_hex(32)` or environment variables in `conftest.py` / `test_ownership.py`.
   - Issue 10 (Comment Quality & Rationale): Purged redundant narration comments throughout both test modules; preserved only security rationale, threat model, and invariant explanations.
   - Sanitized failure diagnostics in `tests/security/dast/test_adversarial.py` leak assertions to report only `case_id`, `mode`, and `category`, preventing sensitive fixture strings or raw text disclosure in test outputs.
-  - Verified full test suite: 24/24 DAST tests passing in ~13s, 483/483 agent security tests passing in ~32s, and `ruff check` / `ruff format` 100% clean.
+  ### Feature 023 — Security Systems: Phase 8 Slice 1 (Task T048 Completed) (2026-09-13)
+
+- **T048 Disposable Mutation Controls & Critical Transition Verification**:
+  - Executed, observed, and documented 4 disposable code mutations across core enforcement boundaries with 100% kill rate:
+    1. MUT-01 (Input Guardrail Bypass in `gateway.py:validate_input`): killed by 7 failing unit tests in `test_gateway.py` and `test_input_layers.py` plus DAST `test_adversarial.py` input attack holdout. Cleanly reverted (92/92 passing).
+    2. MUT-02 (Dispatch Allowlist & Capability Sealing Bypass in `gateway.py:execute_tool*`): killed by 17 failing tests across `test_tool_authority.py` and `test_tool_integration.py`. Cleanly reverted (59/59 passing).
+    3. MUT-03 (Tool Result Scanning Removal in `tool_output_pipeline.py:validate`): killed by 11 failing tests in `test_tool_layers.py` (payload size, recursion depth, node count, PII, indirect injection) plus DAST `test_adversarial.py`. Cleanly reverted (39/39 passing).
+    4. MUT-04 (Streaming Output Holdback Buffer Bypass in `output_pipeline.py:process_token`): killed by 39 failing tests in `test_output_stream.py` (PII leaks, chunk splits, width boundaries) plus DAST `test_adversarial.py`. Cleanly reverted (41/41 passing).
+  - Evaluated statement and branch coverage across guardrails, streaming, and observability modules (511 security tests passing, 85.4% statements, 72.8% branches in security scope).
+  - Documented complete empirical evidence, diffs, failure signatures, and critical transition verification in `docs/security/coverage-validation.md`.
+  - Updated `specs/023-security-systems/tasks.md` marking T048 `[x]`. Verified 0 lingering code mutations with 100% clean working tree in `apps/agent/src/`.
 
 ### Feature 023 — Phase 5 CI Security Pipeline Remediation (2026-09-12, Completed)
 
