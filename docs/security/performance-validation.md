@@ -246,8 +246,8 @@ The following engineering decisions maintain sub-millisecond execution speeds un
    [`ChunkBuffer`](file:///c:/Booking%20Systems/apps/agent/src/agent/streaming/chunk_buffer.py) operates with a bounded 512-scalar sliding window. Confirmed safe text preceding the holdback window is flushed immediately to downstream SSE clients.
 5. **ASCII Fast-Path Ring Mapping**:
    [`ChunkBuffer._rebuild_mapping`](file:///c:/Booking%20Systems/apps/agent/src/agent/streaming/chunk_buffer.py) evaluates `raw.isascii()` to perform $O(1)$ range mapping, eliminating $O(N^2)$ repetitive `unicodedata.normalize` calls during 1-character token streaming.
-6. **Direct ASCII-Compiled Combined Regex Engine**:
-   [`InjectionSignatureEngine`](file:///c:/Booking%20Systems/apps/agent/src/agent/guardrails/layers/injection.py) compiles all 50+ signatures into a single ReDoS-safe combined regex with `re.IGNORECASE | re.ASCII`, scanning candidates directly to eliminate keyword pre-filter false negatives and minimize Unicode case-folding overhead.
+6. **Direct Unicode-Compiled Combined Regex Engine**:
+   [`InjectionSignatureEngine`](file:///c:/Booking%20Systems/apps/agent/src/agent/guardrails/layers/injection.py) compiles all 50+ signatures into a single ReDoS-safe combined regex with `re.IGNORECASE` (Unicode matching), scanning candidates directly to eliminate keyword pre-filter false negatives while ensuring Unicode whitespace separators (e.g. U+2028, U+2029) are recognized by `\s+`.
 
 ---
 

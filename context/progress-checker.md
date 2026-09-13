@@ -5,7 +5,7 @@
 - **Remediated Standards Violations & Performance Bottlenecks across Tasks T043, T046, T047**:
   - **Standards remediations**:
     - `apps/agent/src/agent/guardrails/layers/input.py`: Removed inline "what" comments in `_contains_sensitive_pii` and `LengthValidator`; moved deferred import `is_catastrophic_regex` in `TopicBoundary.__init__` to top-level.
-    - `apps/agent/src/agent/guardrails/layers/injection.py`: Removed inline "what" comments; eliminated false-negative risk from keyword pre-filter by matching candidate text directly against `_COMBINED_INJECTION_PATTERN` with `re.IGNORECASE | re.ASCII`.
+    - `apps/agent/src/agent/guardrails/layers/injection.py`: Removed inline "what" comments; eliminated false-negative risk from keyword pre-filter by matching candidate text directly against `_COMBINED_INJECTION_PATTERN` with `re.IGNORECASE` (Unicode matching).
     - `apps/agent/tests/security/test_rollout.py`: Replaced hardcoded test secrets with dynamic tokens generated via `secrets.token_hex(32)`.
     - `apps/agent/src/agent/guardrails/output_pipeline.py`: Renamed single-letter variables `k` and `m` to descriptive names (`keyword`, `prefix_match`, `card_match`, `phone_match`).
     - `apps/agent/src/agent/guardrails/layers/tool_output.py`: Deduplicated logic between `_contains_untrusted_directive` and `UntrustedContentInjectionDetector.check` into a single shared helper.
