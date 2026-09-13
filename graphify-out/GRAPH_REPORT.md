@@ -1,16 +1,16 @@
-# Graph Report - Booking Systems  (2026-09-13)
+# Graph Report - Booking Systems  (2026-08-21)
 
 ## Corpus Check
-- 3655 files · ~2,741,951 words
+- 3353 files · ~2,294,998 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 44848 nodes · 127063 edges · 1309 communities (1017 shown, 292 thin omitted)
-- Extraction: 74% EXTRACTED · 26% INFERRED · 0% AMBIGUOUS · INFERRED: 32724 edges (avg confidence: 0.54)
+- 40506 nodes · 118525 edges · 1193 communities (910 shown, 283 thin omitted)
+- Extraction: 73% EXTRACTED · 27% INFERRED · 0% AMBIGUOUS · INFERRED: 31426 edges (avg confidence: 0.53)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `e6a62757`
+- Built from commit: `f861ec13`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -985,6 +985,7 @@
 - [[_COMMUNITY_HexdumpLexer|HexdumpLexer]]
 - [[_COMMUNITY_NimrodLexer|NimrodLexer]]
 - [[_COMMUNITY_PureScriptLexer|PureScriptLexer]]
+- [[_COMMUNITY_rnc.py|rnc.py]]
 - [[_COMMUNITY_SaviLexer|SaviLexer]]
 - [[_COMMUNITY_snobol.py|snobol.py]]
 - [[_COMMUNITY_autumn.py|autumn.py]]
@@ -1139,133 +1140,15 @@
 - [[_COMMUNITY_Usage docs httpsdocs.pydantic.dev2.4conceptsserializationmodelmodel_dum|Usage docs: https://docs.pydantic.dev/2.4/concepts/serialization/#modelmodel_dum]]
 - [[_COMMUNITY_Usage docs httpsdocs.pydantic.dev2.4conceptsserializationmodelmodel_dum|Usage docs: https://docs.pydantic.dev/2.4/concepts/serialization/#modelmodel_dum]]
 - [[_COMMUNITY_SearchFormClient.tsx|SearchFormClient.tsx]]
-- [[_COMMUNITY_normalize_gemini_usage_metadata|normalize_gemini_usage_metadata]]
-- [[_COMMUNITY_.encoding|.encoding]]
-- [[_COMMUNITY_UrbiscriptLexer|UrbiscriptLexer]]
-- [[_COMMUNITY_Prototype Wayfinder Dashboard (Glassmorphic SaaS MVP)|Prototype: Wayfinder Dashboard (Glassmorphic SaaS MVP)]]
-- [[_COMMUNITY_research-llm-guardrail-architecture-decisions|research-llm-guardrail-architecture-decisions.md]]
-- [[_COMMUNITY_Booking Module Contracts|Booking Module Contracts]]
-- [[_COMMUNITY_Chat Turn Runner and Event Contract|Chat Turn Runner and Event Contract]]
-- [[_COMMUNITY_Web Server Seam Contracts|Web Server Seam Contracts]]
-- [[_COMMUNITY_7. Verification & Audit Checklist Tables|7. Verification & Audit Checklist Tables]]
-- [[_COMMUNITY_Verification Strategy|Verification Strategy]]
-- [[_COMMUNITY_User Scenarios & Testing|User Scenarios & Testing]]
-- [[_COMMUNITY_Research and Planning Decisions|Research and Planning Decisions]]
-- [[_COMMUNITY_Feature 023 Plan Review Convergence|Feature 023 Plan Review Convergence]]
-- [[_COMMUNITY_SafeDeterministicGuardrail|SafeDeterministicGuardrail]]
-- [[_COMMUNITY_scanners|scanners]]
-- [[_COMMUNITY_.__str__|.__str__]]
-- [[_COMMUNITY_.update|.update]]
-- [[_COMMUNITY_uvloop.py|uvloop.py]]
-- [[_COMMUNITY_.__aexit__|.__aexit__]]
-- [[_COMMUNITY_beta_response_custom_tool_call.py|beta_response_custom_tool_call.py]]
-- [[_COMMUNITY_ByteStream|ByteStream]]
-- [[_COMMUNITY_ECLLexer|ECLLexer]]
-- [[_COMMUNITY_FantomLexer|FantomLexer]]
-- [[_COMMUNITY_GDScriptLexer|GDScriptLexer]]
-- [[_COMMUNITY_HaxeLexer|HaxeLexer]]
-- [[_COMMUNITY_VerilogLexer|VerilogLexer]]
-- [[_COMMUNITY_IDLLexer|IDLLexer]]
-- [[_COMMUNITY_PrqlLexer|PrqlLexer]]
-- [[_COMMUNITY_Amadeus Self-Service API|Amadeus Self-Service API]]
-- [[_COMMUNITY_Open Questions (Not Yet Decided)|Open Questions (Not Yet Decided)]]
-- [[_COMMUNITY_Agent Gateway Capability Contracts|Agent Gateway Capability Contracts]]
-- [[_COMMUNITY_Slice 1 — Refund obligation, transaction reservation, and settlement|Slice 1 — Refund obligation, transaction reservation, and settlement]]
-- [[_COMMUNITY_Slice 2 — Booking Lifecycle, Management, and Cancellation|Slice 2 — Booking Lifecycle, Management, and Cancellation]]
-- [[_COMMUNITY_Slice 6 — Agent Gateway capability-local modules|Slice 6 — Agent Gateway capability-local modules]]
-- [[_COMMUNITY_File-by-File Change Index|File-by-File Change Index]]
-- [[_COMMUNITY_CI Job Design|CI Job Design]]
-- [[_COMMUNITY_chat_completion_message_custom_tool_call.py|chat_completion_message_custom_tool_call.py]]
-- [[_COMMUNITY_ActionScript3Lexer|ActionScript3Lexer]]
-- [[_COMMUNITY_YamlLexerContext|YamlLexerContext]]
-- [[_COMMUNITY_FloScriptLexer|FloScriptLexer]]
-- [[_COMMUNITY_ldap.py|ldap.py]]
-- [[_COMMUNITY_booking-response.dto.ts|booking-response.dto.ts]]
-- [[_COMMUNITY_page.tsx|page.tsx]]
-- [[_COMMUNITY_paths|paths]]
-- [[_COMMUNITY_Python Redis (redis.asyncio)|Python Redis (redis.asyncio)]]
-- [[_COMMUNITY_NestJS (Framework Patterns)|NestJS (Framework Patterns)]]
-- [[_COMMUNITY_Stripe|Stripe]]
-- [[_COMMUNITY_Python LangGraph|Python LangGraph]]
-- [[_COMMUNITY_NextAuth.js (Auth.js)|NextAuth.js (Auth.js)]]
-- [[_COMMUNITY_expectedLayerFamily|expectedLayerFamily]]
-- [[_COMMUNITY_id|id]]
-- [[_COMMUNITY_license|license]]
-- [[_COMMUNITY_payload|payload]]
-- [[_COMMUNITY_revision|revision]]
-- [[_COMMUNITY_split|split]]
-- [[_COMMUNITY_suiteKind|suiteKind]]
-- [[_COMMUNITY_taxonomyCode|taxonomyCode]]
-- [[_COMMUNITY_variantGroup|variantGroup]]
-- [[_COMMUNITY_exceptions.json|exceptions.json]]
-- [[_COMMUNITY_mock-server.mjs|mock-server.mjs]]
-- [[_COMMUNITY_baseline.json|baseline.json]]
-- [[_COMMUNITY_payload-logging.unsafe.py|payload-logging.unsafe.py]]
-- [[_COMMUNITY_smoke-simulation.test.mjs|smoke-simulation.test.mjs]]
 - [[_COMMUNITY_Phase 1  PR 2 — Shared contracts, state repair, additive schema, and migration|Phase 1 / PR 2 — Shared contracts, state repair, additive schema, and migration]]
 - [[_COMMUNITY_Phase 2  PR 3 — Duffel ancillary catalog, normalization, and cache discipline|Phase 2 / PR 3 — Duffel ancillary catalog, normalization, and cache discipline]]
 - [[_COMMUNITY_Phase 3  PR 4 — Owned ancillary readcommit API and optimistic recovery boundary|Phase 3 / PR 4 — Owned ancillary read/commit API and optimistic recovery boundary]]
 - [[_COMMUNITY_Phase 5  PR 6 — Authoritative validation, payment amount, and Duffel order services|Phase 5 / PR 6 — Authoritative validation, payment amount, and Duffel order services]]
 - [[_COMMUNITY_Phase 6  PR 7 — Read-only review, targeted edits, recovery, and cancellation disclosure|Phase 6 / PR 7 — Read-only review, targeted edits, recovery, and cancellation disclosure]]
 - [[_COMMUNITY_Phase 7  PR 8 — End-to-end resilience, observability, rollout, and documentation sync|Phase 7 / PR 8 — End-to-end resilience, observability, rollout, and documentation sync]]
-- [[_COMMUNITY_.serialize|.serialize]]
 - [[_COMMUNITY_seed-agent-tools.ts|seed-agent-tools.ts]]
 - [[_COMMUNITY_airports.ts|airports.ts]]
-- [[_COMMUNITY_.bind_pump|.bind_pump]]
-- [[_COMMUNITY_.output|.output]]
-- [[_COMMUNITY_.__init__|.__init__]]
-- [[_COMMUNITY_booking-list-query.dto.ts|booking-list-query.dto.ts]]
-- [[_COMMUNITY_tsconfig.json|tsconfig.json]]
-- [[_COMMUNITY_LangChain.js + Mimo|LangChain.js + Mimo]]
-- [[_COMMUNITY_class-validator|class-validator]]
-- [[_COMMUNITY_Next.js App Router|Next.js App Router]]
-- [[_COMMUNITY_Pydantic v2 (Agent Wire Models & State Snapshots)|Pydantic v2 (Agent Wire Models & State Snapshots)]]
-- [[_COMMUNITY_Prisma|Prisma]]
-- [[_COMMUNITY__CodesMeta|_CodesMeta]]
-- [[_COMMUNITY_Project Structure|Project Structure]]
-- [[_COMMUNITY_Security Test Coverage Matrix|Security Test Coverage Matrix]]
-- [[_COMMUNITY_html-interpolation.safe.tsx|html-interpolation.safe.tsx]]
-- [[_COMMUNITY_html-interpolation.unsafe.tsx|html-interpolation.unsafe.tsx]]
-- [[_COMMUNITY_payload-logging.safe.py|payload-logging.safe.py]]
-- [[_COMMUNITY_.build|.build]]
-- [[_COMMUNITY_.__aexit__|.__aexit__]]
-- [[_COMMUNITY_.with_streaming_response|.with_streaming_response]]
-- [[_COMMUNITY_.with_raw_response|.with_raw_response]]
-- [[_COMMUNITY_.with_streaming_response|.with_streaming_response]]
-- [[_COMMUNITY_.with_raw_response|.with_raw_response]]
-- [[_COMMUNITY_.with_streaming_response|.with_streaming_response]]
-- [[_COMMUNITY_.checkpoints|.checkpoints]]
-- [[_COMMUNITY_.checkpoints|.checkpoints]]
-- [[_COMMUNITY_.checkpoints|.checkpoints]]
-- [[_COMMUNITY_.checkpoints|.checkpoints]]
-- [[_COMMUNITY_.checkpoints|.checkpoints]]
-- [[_COMMUNITY_.checkpoints|.checkpoints]]
-- [[_COMMUNITY_beta_local_environment_param.py|beta_local_environment_param.py]]
-- [[_COMMUNITY_.__eq__|.__eq__]]
-- [[_COMMUNITY_.get|.get]]
-- [[_COMMUNITY_paraiso_light.py|paraiso_light.py]]
-- [[_COMMUNITY___init__.py|__init__.py]]
-- [[_COMMUNITY___init__.py|__init__.py]]
-- [[_COMMUNITY_tool_schemas.py|tool_schemas.py]]
-- [[_COMMUNITY___init__.py|__init__.py]]
-- [[_COMMUNITY___init__.py|__init__.py]]
-- [[_COMMUNITY___init__.py|__init__.py]]
-- [[_COMMUNITY_secret-scan-triage|secret-scan-triage.md]]
-- [[_COMMUNITY_gitleaks-config.test.mjs|gitleaks-config.test.mjs]]
-- [[_COMMUNITY_.translations|.translations]]
-- [[_COMMUNITY_.transcriptions|.transcriptions]]
-- [[_COMMUNITY_.item|.item]]
-- [[_COMMUNITY_.sessions|.sessions]]
-- [[_COMMUNITY_.sessions|.sessions]]
-- [[_COMMUNITY_.item|.item]]
-- [[_COMMUNITY_.sessions|.sessions]]
-- [[_COMMUNITY_.sessions|.sessions]]
-- [[_COMMUNITY_.sessions|.sessions]]
-- [[_COMMUNITY_.with_raw_response|.with_raw_response]]
-- [[_COMMUNITY_.with_streaming_response|.with_streaming_response]]
-- [[_COMMUNITY_.with_raw_response|.with_raw_response]]
-- [[_COMMUNITY_.with_streaming_response|.with_streaming_response]]
-- [[_COMMUNITY_PromptCacheBreakpoint|PromptCacheBreakpoint]]
+- [[_COMMUNITY_registration.schema.js|registration.schema.js]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `BaseModel` - 778 edges
@@ -1277,41 +1160,41 @@
 7. `path_template()` - 461 edges
 8. `words` - 413 edges
 9. `default` - 390 edges
-10. `RunnableConfig` - 323 edges
+10. `maybe_transform()` - 322 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `test_block_decision_requires_a_static_response_key()` --indirect_call--> `ValidationError`  [INFERRED]
-  apps/agent/tests/security/test_contracts.py → .uv-cache/archive-v0/07LJcCoU1c9l-0Om/langsmith/sandbox/_exceptions.py
-- `test_pass_decision_requires_validated_payload()` --indirect_call--> `ValidationError`  [INFERRED]
-  apps/agent/tests/security/test_contracts.py → .uv-cache/archive-v0/07LJcCoU1c9l-0Om/langsmith/sandbox/_exceptions.py
 - `run_config()` --calls--> `RunnableConfig`  [INFERRED]
   apps/agent/tests/test_booking_tools.py → .uv-cache/archive-v0/H9eqH_Gi5t5YT2hp/langchain_core/runnables/config.py
-- `run_config()` --calls--> `RunnableConfig`  [INFERRED]
-  apps/agent/tests/test_checkout_orchestrator.py → .uv-cache/archive-v0/H9eqH_Gi5t5YT2hp/langchain_core/runnables/config.py
 - `test_search_flights_strips_identifiers_and_saves_snapshot()` --calls--> `RunnableConfig`  [INFERRED]
   apps/agent/tests/test_search_snapshot.py → .uv-cache/archive-v0/H9eqH_Gi5t5YT2hp/langchain_core/runnables/config.py
+- `test_strict_privacy_no_identifiers_in_tool_output()` --calls--> `RunnableConfig`  [INFERRED]
+  apps/agent/tests/test_search_snapshot.py → .uv-cache/archive-v0/H9eqH_Gi5t5YT2hp/langchain_core/runnables/config.py
+- `run_config()` --calls--> `RunnableConfig`  [INFERRED]
+  apps/agent/tests/test_tools.py → .uv-cache/archive-v0/H9eqH_Gi5t5YT2hp/langchain_core/runnables/config.py
+- `run_config_with_readiness()` --calls--> `RunnableConfig`  [INFERRED]
+  apps/agent/tests/test_tools.py → .uv-cache/archive-v0/H9eqH_Gi5t5YT2hp/langchain_core/runnables/config.py
 
 ## Import Cycles
-- 1-file cycle: `.uv-cache/archive-v0/07LJcCoU1c9l-0Om/langsmith/_openapi_client/_utils/_typing.py -> .uv-cache/archive-v0/07LJcCoU1c9l-0Om/langsmith/_openapi_client/_utils/_typing.py`
+- 1-file cycle: `.uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/_utils/_typing.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/_utils/_typing.py`
 - 1-file cycle: `.uv-cache/archive-v0/H9eqH_Gi5t5YT2hp/langchain_core/document_loaders/langsmith.py -> .uv-cache/archive-v0/H9eqH_Gi5t5YT2hp/langchain_core/document_loaders/langsmith.py`
 - 1-file cycle: `.uv-cache/archive-v0/07LJcCoU1c9l-0Om/langsmith/_internal/_orjson.py -> .uv-cache/archive-v0/07LJcCoU1c9l-0Om/langsmith/_internal/_orjson.py`
-- 1-file cycle: `.uv-cache/archive-v0/H9eqH_Gi5t5YT2hp/langchain_core/output_parsers/pydantic.py -> .uv-cache/archive-v0/H9eqH_Gi5t5YT2hp/langchain_core/output_parsers/pydantic.py`
+- 1-file cycle: `.uv-cache/archive-v0/H9eqH_Gi5t5YT2hp/langchain_core/utils/pydantic.py -> .uv-cache/archive-v0/H9eqH_Gi5t5YT2hp/langchain_core/utils/pydantic.py`
 - 1-file cycle: `.uv-cache/archive-v0/07LJcCoU1c9l-0Om/langsmith/_openapi_client/__init__.py -> .uv-cache/archive-v0/07LJcCoU1c9l-0Om/langsmith/_openapi_client/__init__.py`
 - 1-file cycle: `.uv-cache/archive-v0/07LJcCoU1c9l-0Om/langsmith/_openapi_client/_httpx.py -> .uv-cache/archive-v0/07LJcCoU1c9l-0Om/langsmith/_openapi_client/_httpx.py`
-- 1-file cycle: `.uv-cache/archive-v0/nRlHas57HeZbAt63/pygments/formatters/html.py -> .uv-cache/archive-v0/nRlHas57HeZbAt63/pygments/formatters/html.py`
+- 1-file cycle: `.uv-cache/archive-v0/07LJcCoU1c9l-0Om/langsmith/wrappers/_anthropic.py -> .uv-cache/archive-v0/07LJcCoU1c9l-0Om/langsmith/wrappers/_anthropic.py`
+- 1-file cycle: `.uv-cache/archive-v0/H9eqH_Gi5t5YT2hp/langchain_core/prompts/string.py -> .uv-cache/archive-v0/H9eqH_Gi5t5YT2hp/langchain_core/prompts/string.py`
 - 1-file cycle: `.uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/__init__.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/__init__.py`
 - 1-file cycle: `.uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/version.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/version.py`
-- 3-file cycle: `.uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/__init__.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/_client.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/resources/files.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/__init__.py`
-- 3-file cycle: `.uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/_client.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/resources/files.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/_resource.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/_client.py`
-- 3-file cycle: `.uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/__init__.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/_client.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/resources/videos.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/__init__.py`
-- 3-file cycle: `.uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/_client.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/resources/videos.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/_resource.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/_client.py`
-- 3-file cycle: `.uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/__init__.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/_client.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/resources/batches.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/__init__.py`
-- 3-file cycle: `.uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/_client.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/resources/batches.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/_resource.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/_client.py`
-- 4-file cycle: `.uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/__init__.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/lib/azure.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/_client.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/resources/files.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/__init__.py`
-- 4-file cycle: `.uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/__init__.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/lib/bedrock.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/_client.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/resources/files.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/__init__.py`
-- 4-file cycle: `.uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/__init__.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/lib/azure.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/_client.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/resources/videos.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/__init__.py`
-- 4-file cycle: `.uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/__init__.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/lib/bedrock.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/_client.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/resources/videos.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/__init__.py`
-- 4-file cycle: `.uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/_client.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/resources/videos.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/_utils/_utils.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/lib/azure.py -> .uv-cache/archive-v0/emm7WBTAFw-pFLuz/openai/_client.py`
+- 3-file cycle: `apps/api/src/agent-gateway/agent-gateway.module.ts -> apps/api/src/booking-intent/booking-intent.module.ts -> apps/api/src/chat-handoff/chat-handoff.module.ts -> apps/api/src/agent-gateway/agent-gateway.module.ts`
+- 3-file cycle: `.uv-cache/archive-v0/bXDjKOITFODWqApM/websockets/__init__.py -> .uv-cache/archive-v0/bXDjKOITFODWqApM/websockets/asyncio/server.py -> .uv-cache/archive-v0/bXDjKOITFODWqApM/websockets/extensions/permessage_deflate.py -> .uv-cache/archive-v0/bXDjKOITFODWqApM/websockets/__init__.py`
+- 3-file cycle: `.uv-cache/archive-v0/bXDjKOITFODWqApM/websockets/__init__.py -> .uv-cache/archive-v0/bXDjKOITFODWqApM/websockets/asyncio/client.py -> .uv-cache/archive-v0/bXDjKOITFODWqApM/websockets/extensions/permessage_deflate.py -> .uv-cache/archive-v0/bXDjKOITFODWqApM/websockets/__init__.py`
+- 3-file cycle: `.uv-cache/archive-v0/bXDjKOITFODWqApM/websockets/datastructures.py -> .uv-cache/archive-v0/bXDjKOITFODWqApM/websockets/exceptions.py -> .uv-cache/archive-v0/bXDjKOITFODWqApM/websockets/http11.py -> .uv-cache/archive-v0/bXDjKOITFODWqApM/websockets/datastructures.py`
+- 3-file cycle: `.uv-cache/archive-v0/bXDjKOITFODWqApM/websockets/extensions/__init__.py -> .uv-cache/archive-v0/bXDjKOITFODWqApM/websockets/extensions/base.py -> .uv-cache/archive-v0/bXDjKOITFODWqApM/websockets/frames.py -> .uv-cache/archive-v0/bXDjKOITFODWqApM/websockets/extensions/__init__.py`
+- 3-file cycle: `.uv-cache/archive-v0/07LJcCoU1c9l-0Om/langsmith/_openapi_client/_client.py -> .uv-cache/archive-v0/07LJcCoU1c9l-0Om/langsmith/_openapi_client/resources/issues.py -> .uv-cache/archive-v0/07LJcCoU1c9l-0Om/langsmith/_openapi_client/_resource.py -> .uv-cache/archive-v0/07LJcCoU1c9l-0Om/langsmith/_openapi_client/_client.py`
+- 3-file cycle: `.uv-cache/archive-v0/07LJcCoU1c9l-0Om/langsmith/_openapi_client/_client.py -> .uv-cache/archive-v0/07LJcCoU1c9l-0Om/langsmith/_openapi_client/resources/annotation_queues/annotation_queues.py -> .uv-cache/archive-v0/07LJcCoU1c9l-0Om/langsmith/_openapi_client/_resource.py -> .uv-cache/archive-v0/07LJcCoU1c9l-0Om/langsmith/_openapi_client/_client.py`
+- 3-file cycle: `.uv-cache/archive-v0/07LJcCoU1c9l-0Om/langsmith/_openapi_client/_client.py -> .uv-cache/archive-v0/07LJcCoU1c9l-0Om/langsmith/_openapi_client/resources/datasets/datasets.py -> .uv-cache/archive-v0/07LJcCoU1c9l-0Om/langsmith/_openapi_client/_resource.py -> .uv-cache/archive-v0/07LJcCoU1c9l-0Om/langsmith/_openapi_client/_client.py`
+- 3-file cycle: `.uv-cache/archive-v0/07LJcCoU1c9l-0Om/langsmith/_openapi_client/_client.py -> .uv-cache/archive-v0/07LJcCoU1c9l-0Om/langsmith/_openapi_client/resources/info.py -> .uv-cache/archive-v0/07LJcCoU1c9l-0Om/langsmith/_openapi_client/_resource.py -> .uv-cache/archive-v0/07LJcCoU1c9l-0Om/langsmith/_openapi_client/_client.py`
+- 3-file cycle: `.uv-cache/archive-v0/07LJcCoU1c9l-0Om/langsmith/_openapi_client/_client.py -> .uv-cache/archive-v0/07LJcCoU1c9l-0Om/langsmith/_openapi_client/resources/online_evaluators.py -> .uv-cache/archive-v0/07LJcCoU1c9l-0Om/langsmith/_openapi_client/_resource.py -> .uv-cache/archive-v0/07LJcCoU1c9l-0Om/langsmith/_openapi_client/_client.py`
 
 ## Hyperedges (group relationships)
 - **Output Guardrails Safety Pipeline** — research_output_guardrails_architecture_sentence_boundary_chunking, research_output_guardrails_architecture_pipeline_parallelism, research_output_guardrails_architecture_cross_chunk_sliding_window, research_output_guardrails_architecture_layered_checks, research_output_guardrails_architecture_hard_stop_on_failure [EXTRACTED 1.00]
@@ -1321,83 +1204,83 @@
 - **Agent Gateway REST Endpoints** — specs_003_agent_tool_calling_contracts_agent_gateway_api_get_search_flights, specs_003_agent_tool_calling_contracts_agent_gateway_api_get_user_preferences, specs_003_agent_tool_calling_contracts_agent_gateway_api_get_user_bookings [EXTRACTED 1.00]
 - **Output Guardrail Pipeline Components** — specs_004_output_guardrails_data_model_chunkbuffer_model, specs_004_output_guardrails_data_model_slidingwindow_model, specs_004_output_guardrails_data_model_outputguardrailconfig_model, specs_004_output_guardrails_data_model_outputguardrailpipeline_model [EXTRACTED 1.00]
 
-## Communities (1309 total, 292 thin omitted)
+## Communities (1193 total, 283 thin omitted)
 
 ### Community 0 - "NestJSClient"
 Cohesion: 0.00
-Nodes (735): BaseModel, Item, RunCreateByKeyResponseItem, RunCreateResponseItem, BatchIngestConfig, CustomerInfo, SDKVersions, Event (+727 more)
+Nodes (1186): BaseModel, AssignedReviewer, Identity info for an assigned reviewer on an annotation queue., AssignedReviewer, Identity info for an assigned reviewer on an annotation queue., Item, RunCreateByKeyResponseItem, RunCreateResponseItem (+1178 more)
 
 ### Community 1 - "PrismaService"
 Cohesion: 0.06
 Nodes (30): Complexity Tracking, Constitution Check, Documentation (this feature), Implementation Phases, Implementation Plan: Map Integration, Phase 1: Airport Data Model & Database Seed (Backend), Phase 2: Airport REST API Endpoints (Backend), Phase 3: Map Component Foundation (Frontend) (+22 more)
 
 ### Community 2 - "prisma.service.ts"
-Cohesion: 0.07
-Nodes (34): CABIN_KEYWORDS, PASSENGER_KEYWORDS, AttestedFlightSearchController, AuthenticatedRequest, AttestedFlightSearchService, projectAgentMatchResult(), AgentFlightMatchResultDto, AttestedFlightSearchDto (+26 more)
+Cohesion: 0.14
+Nodes (19): FlightConditionChangeBeforeDepartureDto, FlightConditionsDto, FlightDetailResponseDto, CabinMismatchDetail, FlightOfferDto, FlightSearchRequestDto, FlightSearchResponseDto, FlightSearchResponseMetaDto (+11 more)
 
 ### Community 3 - "test_tools.py"
 Cohesion: 0.01
-Nodes (876): Attachment, DataSource, DataSourceConfig, Filters, Group, Hyperparameters, MessageContentPartParam, Method (+868 more)
+Nodes (817): Attachment, BetaResponseInputItemParam, DataSource, DataSourceConfig, Filters, Group, Hyperparameters, MessageContentPartParam (+809 more)
 
 ### Community 4 - "chat.controller.ts"
 Cohesion: 0.01
-Nodes (291): AsyncWebhooks, AzureOpenAI, TypeError, AsyncAPIClient, AsyncHttpxClientWrapper, BaseAsyncPage, BaseClient, BasePage (+283 more)
+Nodes (327): ResponseFormatTextConfigParam, TypeError, AsyncAPIClient, AsyncHttpxClientWrapper, AsyncPaginator, BaseAsyncPage, BaseClient, BasePage (+319 more)
 
 ### Community 5 - "dependencies"
 Cohesion: 0.08
-Nodes (25): dependencies, bcrypt, class-transformer, class-validator, @duffel/api, express, ioredis, langchain (+17 more)
+Nodes (24): dependencies, bcrypt, class-transformer, class-validator, @duffel/api, express, ioredis, @langchain/core (+16 more)
 
 ### Community 6 - "agent-gateway.service.ts"
 Cohesion: 0.05
 Nodes (40): Automated Refund Guardrails, `booking_intents` (payment-relevant additions to existing table), Creation Flow, Database Schema, Decision 10: Consistency Over Availability, Decision 11: Idempotency at Every Layer, Decision 1: Direct Charges (No Stripe Connect), Decision 2: Payment State Machine (Finite State Machine with Enforced Transitions) (+32 more)
 
 ### Community 7 - "dependencies"
-Cohesion: 0.11
-Nodes (18): dependencies, class-variance-authority, clsx, lucide-react, maplibre-gl, next, next-auth, postcss (+10 more)
+Cohesion: 0.12
+Nodes (17): dependencies, class-variance-authority, clsx, lucide-react, maplibre-gl, next, next-auth, postcss (+9 more)
 
 ### Community 8 - "tsconfig.json"
-Cohesion: 0.20
-Nodes (9): compilerOptions, baseUrl, outDir, paths, exclude, extends, include, @/* (+1 more)
+Cohesion: 0.18
+Nodes (10): tsconfig-paths, compilerOptions, baseUrl, outDir, paths, exclude, extends, include (+2 more)
 
 ### Community 10 - "MockStreamingLLM"
 Cohesion: 0.08
 Nodes (25): API Contracts: Stripe Payment System, DELETE /api/payments/methods/:methodId, Error Responses, Error Responses, Error Responses, Error Responses, GET /api/payments/methods, GET /api/payments/:paymentId/status (+17 more)
 
 ### Community 11 - "devDependencies"
-Cohesion: 0.12
-Nodes (16): compilerOptions, allowImportingTsExtensions, allowJs, esModuleInterop, incremental, isolatedModules, jsx, lib (+8 more)
+Cohesion: 0.10
+Nodes (20): compilerOptions, allowJs, esModuleInterop, incremental, isolatedModules, jsx, lib, module (+12 more)
 
 ### Community 12 - "devDependencies"
-Cohesion: 0.06
-Nodes (35): ignoreGhas, devDependencies, eslint, eslint-config-prettier, prettier, prisma, tsx, typescript (+27 more)
+Cohesion: 0.07
+Nodes (26): devDependencies, eslint, eslint-config-prettier, prettier, prisma, tsx, typescript, @typescript-eslint/eslint-plugin (+18 more)
 
 ### Community 13 - "get_nestjs_client"
-Cohesion: 0.04
-Nodes (66): BookingDetailToolInput, BookingDetailToolResult, BookingDetailUpstreamProjection, BookingReadinessUpstreamProjection, BookingSummariesToolInput, BookingSummariesToolResult, BookingSummariesUpstreamProjection, BookingSummaryUpstreamProjection (+58 more)
+Cohesion: 0.15
+Nodes (9): get_nestjs_client(), Extract NestJSClient from RunnableConfig's configurable key., get_booking_detail(), Get explicitly requested details for a specific flight booking.     Requires th, list_user_booking_summaries(), Retrieve summaries of the current user's flight bookings.     Returns opaque bo, get_user_preferences(), Retrieve the current user's saved travel preferences including seat preference, (+1 more)
 
 ### Community 16 - "page.tsx"
 Cohesion: 0.01
-Nodes (251): _has_header(), _has_omitted_header(), Headers, Get a vector representation of a given input that can be easily consumed by mach, Given a prompt and/or an input image, the model will generate a new image., Given text and/or image inputs, classifies if those inputs are potentially harmf, List and describe the various models available in the API., Create large batches of API requests to run asynchronously. (+243 more)
+Nodes (310): AsyncAPIResource, SyncAPIResource, UnwrapWebhookEvent, Get a vector representation of a given input that can be easily consumed by mach, Given a prompt and/or an input image, the model will generate a new image., Given text and/or image inputs, classifies if those inputs are potentially harmf, List and describe the various models available in the API., Create large batches of API requests to run asynchronously. (+302 more)
 
 ### Community 18 - "ChunkBuffer"
-Cohesion: 0.01
-Nodes (126): Agent, The agent that owns this multi-agent streaming event., Agent, The agent that owns this multi-agent streaming event., Agent, The agent that owns this multi-agent streaming event., Agent, The agent that owns this multi-agent streaming event. (+118 more)
+Cohesion: 0.08
+Nodes (26): MemoryManager, Any, Invoke LLM to generate an updated summary incorporating new slide-out messages a, Manager responsible for counting tokens, tracking budget, and triggering     as, Count tokens in text using tiktoken base encoding, falling back to approximation, Calculate total tokens of messages that slid out of window plus the existing sum, Check if the token count of older messages (messages that have slid out of the w, test_check_and_summarize_exceeds_budget() (+18 more)
 
 ### Community 19 - "detect_pii"
 Cohesion: 0.05
-Nodes (45): HandoffFastFailGuard, HandoffRequest, RequestFixture, AuthenticatedRequest, BookingHandoffController, AuthenticatedRequest, ChatHandoffController, AttestationOffer (+37 more)
+Nodes (42): test_standardized_metric_counters_conform_to_spec(), AgentApiKeyGuard, HandoffFastFailGuard, HandoffRequest, RequestFixture, AuthenticatedRequest, BookingHandoffController, AuthenticatedRequest (+34 more)
 
 ### Community 20 - ".eslintrc.json"
 Cohesion: 0.15
 Nodes (12): env, es2022, node, extends, ignorePatterns, parser, plugins, root (+4 more)
 
 ### Community 21 - "package.json"
-Cohesion: 0.07
-Nodes (28): default, types, default, types, default, dependencies, zod, devDependencies (+20 more)
+Cohesion: 0.15
+Nodes (12): dependencies, zod, devDependencies, typescript, main, name, private, scripts (+4 more)
 
 ### Community 23 - "compilerOptions"
-Cohesion: 0.11
-Nodes (17): tsconfig-paths, compilerOptions, baseUrl, emitDecoratorMetadata, esModuleInterop, experimentalDecorators, forceConsistentCasingInFileNames, module (+9 more)
+Cohesion: 0.17
+Nodes (11): compilerOptions, emitDecoratorMetadata, esModuleInterop, experimentalDecorators, forceConsistentCasingInFileNames, module, moduleResolution, noEmit (+3 more)
 
 ### Community 24 - "test_graph.py"
 Cohesion: 0.12
@@ -1412,24 +1295,24 @@ Cohesion: 0.20
 Nodes (9): compilerOptions, declaration, declarationMap, noEmit, outDir, rootDir, sourceMap, extends (+1 more)
 
 ### Community 27 - "devDependencies"
-Cohesion: 0.02
-Nodes (158): AdmissionContext, ApprovedChunk, GuardrailLayer, _ImmutableContract, PipelineDecision, Any, Authenticated context available before routing, with zero tool authority., Remove rejected content before it can become accessible on the model. (+150 more)
+Cohesion: 0.25
+Nodes (4): GuardrailService, Validates an output chunk.          Args:             chunk: The output chunk, Checks if the guardrail service is healthy and available.          Returns:, Validates the input message.          Args:             message: The raw inpu
 
 ### Community 28 - "nest-cli.json"
 Cohesion: 0.25
 Nodes (7): collection, compilerOptions, assets, deleteOutDir, watchAssets, $schema, sourceRoot
 
 ### Community 29 - "app.module.ts"
-Cohesion: 0.13
-Nodes (11): ActiveUser, JwtPayload, JwtStrategy, activeUser, payload, ValidatedUser, BenchmarkSummary, createHandoff() (+3 more)
+Cohesion: 0.02
+Nodes (70): BookingAgentProjectionService, SafeBookingProjectionData, SelectionAttestationOffer, SelectionAttestationPayload, SelectionAttestationService, AppModule, HttpExceptionFilter, CHAT_HANDOFF_OBSERVABILITY_CONTRACT (+62 more)
 
 ### Community 30 - "NemoGuardrailService"
-Cohesion: 0.03
-Nodes (113): DuffelAircraft, DuffelAirline, DuffelBaggage, DuffelBaggageMetadata, DuffelOffer, DuffelOfferAvailableService, DuffelOfferWithServices, DuffelPassenger (+105 more)
+Cohesion: 0.10
+Nodes (3): NemoGuardrailService, guardrail_service(), guardrail_service()
 
 ### Community 31 - "MessageQueueManager"
 Cohesion: 0.12
-Nodes (16): Assumptions, Context, Edge Cases, Feature Specification: LLM Output Guardrails, Functional Requirements, Key Entities, Measurable Outcomes, Requirements _(mandatory)_ (+8 more)
+Nodes (16): Assumptions, Context, Edge Cases, Feature Specification: LLM Output Guardrails, Functional Requirements, Key Entities, Measurable Outcomes, Requirements *(mandatory)* (+8 more)
 
 ### Community 32 - "NestJSClient"
 Cohesion: 0.06
@@ -1440,8 +1323,8 @@ Cohesion: 0.13
 Nodes (14): env, jest, extends, ignorePatterns, rules, no-console, no-constant-condition, no-empty (+6 more)
 
 ### Community 34 - "layout.tsx"
-Cohesion: 0.12
-Nodes (149): BetaContainerReference, BetaEasyInputMessage, A message input to the model with a role indicating instruction following     hi, BetaLocalEnvironment, BetaResponseCodeInterpreterToolCall, A tool call to run code., BetaResponseCompactionItemParam, A compaction item generated by the [`v1/responses/compact` API](https://platform (+141 more)
+Cohesion: 0.04
+Nodes (32): CACHE_KEYS, CACHE_TTLS, AirportsController, AirportsService, NearbyAirportsDto, SearchAirportsDto, DuffelEventProcessor, DuffelProcessorHealthService (+24 more)
 
 ### Community 36 - "package.json"
 Cohesion: 0.29
@@ -1449,7 +1332,7 @@ Nodes (6): name, private, scripts, test, test:llm, version
 
 ### Community 37 - "BookingIntentService"
 Cohesion: 0.00
-Nodes (320): apply_filters(), Filter, pygments.filter     ~~~~~~~~~~~~~~~      Module that implements the default filt, Use this method to apply an iterable of filters to     a stream. If lexer is giv, Decorator that converts a function into a filter::          @simplefilter, Default filter. Subclass this class or use the `simplefilter`     decorator to c, simplefilter(), _inherit (+312 more)
+Nodes (379): pygments.lexer     ~~~~~~~~~~~~~~      Base lexer classes.      :copyright: Copy, Indicates a list of literal words that is transformed into an optimized     rege, words, ActionScript3Lexer, MxmlLexer, pygments.lexers.actionscript     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~      Lexers for Ac, For ActionScript 3 source code., For MXML markup.     Nested AS3 in <script> tags is highlighted by the appropria (+371 more)
 
 ### Community 38 - ".eslintrc.json"
 Cohesion: 0.40
@@ -1460,8 +1343,8 @@ Cohesion: 0.11
 Nodes (18): Automated Tests, Constitution Check, Documentation (this feature), Environment Variables, Implementation Phases, Implementation Plan: Cabin Class & Passenger Type Enhancement, Manual Verification, Phase 1: Database Schema Migration (+10 more)
 
 ### Community 41 - "seed-agent-tools.ts"
-Cohesion: 0.05
-Nodes (51): ChatTelemetry, dashboard_alert_contract(), _new_opaque_id(), Any, Logger, Allowlisted, value-free telemetry for the chat rollout.  This module deliberatel, Return the maintained dashboard/alert contract for agent telemetry.      This di, Raised when an event would exceed the chat telemetry contract. (+43 more)
+Cohesion: 0.08
+Nodes (36): ChatTelemetry, dashboard_alert_contract(), _new_opaque_id(), Any, Logger, Allowlisted, value-free telemetry for the chat rollout.  This module deliberat, Return the maintained dashboard/alert contract for agent telemetry.      This, Raised when an event would exceed the chat telemetry contract. (+28 more)
 
 ### Community 42 - "tsconfig.build.json"
 Cohesion: 0.40
@@ -1473,15 +1356,15 @@ Nodes (21): _airport_code(), _function_tool_call(), _is_guardrail_request(), _is
 
 ### Community 47 - "page.tsx"
 Cohesion: 0.01
-Nodes (456): TypedDict, _ModelDumpKwargs, Item, RunsAnnotationQueueRunAddSchemaArray, RunsUuidArray, Variant2, BoxCreateParams, MountConfig (+448 more)
+Nodes (443): TypedDict, _ModelDumpKwargs, Item, RunsAnnotationQueueRunAddSchemaArray, RunsUuidArray, Variant2, BoxCreateParams, MountConfig (+435 more)
 
 ### Community 48 - "utils.ts"
 Cohesion: 0.02
-Nodes (266): tuple, combined, DelegatingLexer, Lexer, A static method which is called for lexer guessing.          It should analyse t, This method should process the text and return an iterable of         ``(index,, This lexer takes two lexer as arguments. A root lexer and     a language lexer., Indicates a state combined from multiple states. (+258 more)
+Nodes (323): tuple, combined, default, DelegatingLexer, Lexer, A static method which is called for lexer guessing.          It should analyse t, This method should process the text and return an iterable of         ``(index,, This lexer takes two lexer as arguments. A root lexer and     a language lexer. (+315 more)
 
 ### Community 51 - "Code Standards"
 Cohesion: 0.05
-Nodes (42): AI Agent Code (LangChain.js), AI Agent Service (FastAPI), Amadeus API Conventions, Audit Logging, Authentication (NextAuth.js), Capability-Local Module Conventions & Anti-Cyclic Architecture, Code Standards, Comments (+34 more)
+Nodes (36): AI Agent Code (LangChain.js), AI Agent Service (FastAPI), Amadeus API Conventions, Audit Logging, Authentication (NextAuth.js), Code Standards, Comments, Component Structure (+28 more)
 
 ### Community 57 - "Quickstart: Agent Tool-Calling & Data Access — Validation Guide"
 Cohesion: 0.09
@@ -1493,19 +1376,19 @@ Nodes (13): BenchmarkStats, calculateStats(), getPercentile(), httpAgent, HttpRe
 
 ### Community 60 - "__init__.py"
 Cohesion: 0.01
-Nodes (287): AudioTranscriptionParam, CallAcceptParams, CallReferParams, CallRejectParams, ClientSecretCreateParams, ExpiresAfter, Configuration for the client secret expiration.      Expiration refers to the ti, Conversation (+279 more)
+Nodes (347): ReprArgs, BaseModel, _extract_field_schema_pv2(), _get_extra_fields_type(), model_dump(), model_dump_json(), ConfigDict, IncEx (+339 more)
 
 ### Community 70 - "auth.spec.ts"
-Cohesion: 0.02
-Nodes (175): AsyncAzureADTokenProvider, AsyncBedrockTokenProvider, AzureADTokenProvider, BedrockEndpoint, TimeoutException, azure_managed_identity_token_provider(), gcp_id_token_provider(), k8s_service_account_token_provider() (+167 more)
+Cohesion: 0.01
+Nodes (224): AsyncAzureADTokenProvider, AsyncBedrockTokenProvider, AsyncWebhooks, AzureADTokenProvider, BedrockEndpoint, TimeoutException, azure_managed_identity_token_provider(), gcp_id_token_provider() (+216 more)
 
 ### Community 71 - "dashboard.spec.ts"
 Cohesion: 0.07
 Nodes (24): Content Quality, Feature Readiness, Notes, Requirement Completeness, Specification Quality Checklist: AI Copilot Landing Page, AI Copilot Landing Page Implementation Plan, Complexity Tracking, Constitution Check (+16 more)
 
 ### Community 72 - "playwright.config.ts"
-Cohesion: 0.10
-Nodes (21): BookingDetail(), BookingDetailProps, currencyFormatter(), BookingProcessingState(), DisruptionAlert(), DisruptionAlertProps, REASON_LABELS, RESOLVED_REASON_LABELS (+13 more)
+Cohesion: 0.04
+Nodes (71): MOCK_BOOKINGS, MockBookingDetailResponse, BookingDetailResponse, Props, BookingCard(), BookingCardBooking, BookingCardProps, formatCurrency() (+63 more)
 
 ### Community 73 - "rate-limit.spec.ts"
 Cohesion: 0.08
@@ -1513,7 +1396,7 @@ Nodes (24): Admin data-quality report, Admin disruption queue, Admin inbox opera
 
 ### Community 79 - "agent"
 Cohesion: 0.01
-Nodes (248): APIKeys, AsyncAPIKeys, AsyncAPIResource, AsyncServiceAccounts, AsyncServiceAccountsWithRawResponse, AsyncServiceAccountsWithStreamingResponse, ServiceAccounts, ServiceAccountsWithRawResponse (+240 more)
+Nodes (212): APIKeys, AsyncAPIKeys, AsyncServiceAccounts, AsyncServiceAccountsWithRawResponse, AsyncServiceAccountsWithStreamingResponse, ServiceAccounts, ServiceAccountsWithRawResponse, ServiceAccountsWithStreamingResponse (+204 more)
 
 ### Community 91 - "Frontend Auth Contract"
 Cohesion: 0.20
@@ -1525,23 +1408,23 @@ Nodes (21): 1. Search Flights, 2. Get User Preferences, 3. List User Bookings, A
 
 ### Community 110 - "User Scenarios & Testing *(mandatory)*"
 Cohesion: 0.11
-Nodes (18): Assumptions, Clarifications, Edge Cases, Feature Specification: Agent Tool-Calling & Data Access, Functional Requirements, Key Entities, Measurable Outcomes, Requirements _(mandatory)_ (+10 more)
+Nodes (18): Assumptions, Clarifications, Edge Cases, Feature Specification: Agent Tool-Calling & Data Access, Functional Requirements, Key Entities, Measurable Outcomes, Requirements *(mandatory)* (+10 more)
 
 ### Community 112 - "User Scenarios & Testing *(mandatory)*"
-Cohesion: 0.02
-Nodes (166): ChatStreamRequest, Request model for the chat stream endpoint., pytest_collection_finish(), pytest_collection_modifyitems(), pytest_runtest_makereport(), Classify tests using the real Redis fixture as integration coverage., CI must prove that the Redis integration group is present and non-empty., Turn an unavailable required Redis service from a skip into a failure. (+158 more)
+Cohesion: 0.10
+Nodes (16): Request, Response, ChatStreamRequest, Request model for the chat stream endpoint., chat_stream(), Request, Return an opaque telemetry identifier, never a request/session identifier., Handle POST /chat/stream requests, performing validation, checking guardrails, (+8 more)
 
 ### Community 115 - "Implementation Plan: LLM Output Guardrails"
 Cohesion: 0.01
-Nodes (180): _as_uuid(), Client, _construct_url(), _convert_stored_attachments_to_attachments_dict(), dump_model(), _ensure_uuid(), _format_feedback_score(), _parse_token_or_url() (+172 more)
+Nodes (213): ge, le, _apply_auth_overrides(), _as_uuid(), Client, _construct_url(), _convert_stored_attachments_to_attachments_dict(), _dataset_examples_path() (+205 more)
 
 ### Community 116 - "Data Model: Agent Tool-Calling & Data Access"
 Cohesion: 0.04
 Nodes (44): 1.1 Fields, 1.2 Relationships, 1.3 Validation Rules, 1.4 PII Handling, 1.5 Prisma Schema Addition, 1. TravelerProfile (NEW — Prisma Model), 2.1 Fields, 2.2 Relationships (+36 more)
 
 ### Community 117 - "Library Docs"
-Cohesion: 0.17
-Nodes (11): Before Using Any Library, Cache Service, Discriminated Outcome Patterns, Duffel API (@duffel/api), LangSmith, Library Docs, Redis (ioredis), Schema Definition & Type Inference Pattern (+3 more)
+Cohesion: 0.05
+Nodes (43): Agent Setup, Allowed Data, Amadeus Self-Service API, Approved Use Cases, Before Using Any Library, Cache Service, class-validator, Client Component (when needed) (+35 more)
 
 ### Community 118 - "Project Overview"
 Cohesion: 0.06
@@ -1576,8 +1459,8 @@ Cohesion: 0.10
 Nodes (19): apps/agent/.env, Complexity Tracking, Constitution Check, Cross-References, Documentation (this feature), Environment Variables (New), Implementation Plan: AI Chatbot Agent Service, Phase 1: Prisma Schema + NestJS ChatModule (Data Layer) (+11 more)
 
 ### Community 126 - "MemoryManager"
-Cohesion: 0.01
-Nodes (172): get_settings(), OutputGuardrailConfig, Settings, MemoryManager, Any, Manager responsible for counting tokens, tracking budget, and triggering     asy, Count tokens in text using tiktoken base encoding, falling back to approximation, Calculate total tokens of messages that slid out of window plus the existing sum (+164 more)
+Cohesion: 0.07
+Nodes (40): get_settings(), _has_exact_keys(), _is_positive_int(), NestJSClient, Any, Calls service-authenticated NestJS access check POST /api/agent-gateway/chat/acc, Return a copied, PII-safe readiness result or ``None`` for malformed data., validate_booking_readiness_response() (+32 more)
 
 ### Community 127 - "amadeus.types.ts"
 Cohesion: 0.22
@@ -1588,8 +1471,8 @@ Cohesion: 0.11
 Nodes (18): Agent Gateway (NestJS Side), Claim Token Minting (Python Agent Side), Claim Token Unit Tests, Closed-World System Prompt, Further Notes, Gateway E2E Tests (NestJS — Jest), Implementation Decisions, LangGraph State Machine (Python Agent Side) (+10 more)
 
 ### Community 129 - "Development Workflow"
-Cohesion: 0.10
-Nodes (19): Checkpoint Summary, Development Workflow, E2E Test Triggers, Rule 1: Tests Are Immutable Once Written, Rule 2: Test Modification Requires Human Approval, Rule 3: Tests Describe Behavior, Not Implementation, Rule 4: All Tests Must Pass Before Task Completion, Step 1: Plan (`/speckit-plan`) (+11 more)
+Cohesion: 0.11
+Nodes (17): Checkpoint Summary, Development Workflow, E2E Test Triggers, Rule 1: Tests Are Immutable Once Written, Rule 2: Test Modification Requires Human Approval, Rule 3: Tests Describe Behavior, Not Implementation, Rule 4: All Tests Must Pass Before Task Completion, Step 1: Specify (`/speckit-specify`) (+9 more)
 
 ### Community 130 - "Tasks: AI Chatbot Agent Service"
 Cohesion: 0.11
@@ -1604,8 +1487,8 @@ Cohesion: 0.12
 Nodes (16): Acceptance, Complexity Tracking, Constitution Check, Dependency Graph, Documentation (this feature), Files, Implementation Plan: LLM Output Guardrails, Phase 0: Research — ✅ Complete (+8 more)
 
 ### Community 133 - "Progress by Feature"
-Cohesion: 0.04
-Nodes (56): [ ] Feature: Ancillary Services — Seat Selection, Baggage & Price Tracker (Feature 15), [ ] Feature: Flight Match Scoring (Feature 022), [ ] Feature: Traveler Profile & Booking Readiness (Feature 16), Progress by Feature, [x] Feature: Agent Gateway & Tool Execution (NestJS/LangGraph), [x] Feature: Agent Tool-Calling & Data Access, [x] Feature: Authenticated Booking Dashboard (Feature 021), [x] Feature: Booking Intent Foundation (Feature 9) (+48 more)
+Cohesion: 0.08
+Nodes (25): [ ] Feature: Ancillary Services — Seat Selection, Baggage & Price Tracker (Feature 15), [ ] Feature: Traveler Profile & Booking Readiness (Feature 16), Progress by Feature, [x] Feature: Agent Gateway & Tool Execution (NestJS/LangGraph), [x] Feature: Agent Tool-Calling & Data Access, [x] Feature: Booking Intent Foundation (Feature 9), [x] Feature: Booking Management & Confirmation (Feature 11), [x] Feature: Cabin Class & Passenger Type Enhancement (Feature 8) (+17 more)
 
 ### Community 134 - "User Scenarios & Testing _(mandatory)_"
 Cohesion: 0.12
@@ -1677,23 +1560,23 @@ Nodes (11): Decision 10: Concurrent Message Handling, Decision 1: Python Framewo
 
 ### Community 151 - "ChunkBuffer"
 Cohesion: 0.01
-Nodes (224): Projects, Usage, Admin, AdminWithRawResponse, AdminWithStreamingResponse, AsyncAdmin, AsyncAdminWithRawResponse, AsyncAdminWithStreamingResponse (+216 more)
+Nodes (182): Projects, Usage, Admin, AdminWithRawResponse, AdminWithStreamingResponse, AsyncAdmin, AsyncAdminWithRawResponse, AsyncAdminWithStreamingResponse (+174 more)
 
 ### Community 152 - "AuditService"
-Cohesion: 0.01
-Nodes (140): CACHE_KEYS, CACHE_TTLS, AirportsController, AirportsModule, AirportsService, NearbyAirportsDto, SearchAirportsDto, AppModule (+132 more)
+Cohesion: 0.04
+Nodes (27): AuthController, AuthenticatedRequest, AuthModule, AuthService, LoginDto, RegisterDto, LockoutService, ActiveUser (+19 more)
 
 ### Community 153 - "Flight Booking System — Architecture Decisions"
 Cohesion: 0.11
 Nodes (18): 1. Prerequisites & Environment Check, 2. Step-by-Step Rollout Operations, 3. Rollback Operations, 4. Monitoring & Telemetry Guidelines, Alerting Thresholds, Checklists, Crucial Log Patterns to Watch, Required Variables (+10 more)
 
 ### Community 154 - "RateLimitMiddleware"
-Cohesion: 0.03
-Nodes (97): format_messages(), get_chat_model(), Any, Initialize and return the LangChain ChatOpenAI instance configured with Mimo end, Format chat session history, summary, and current user message into a list of La, checkout_orchestrator_node(), Call the LLM with Checkout Orchestrator tools bound., general_agent_node() (+89 more)
+Cohesion: 0.08
+Nodes (25): OutputGuardrailConfig, OutputGuardrailBlockedError, OutputGuardrailPipeline, Feeds a token into the pipeline, yielding any safe completed chunks., Raised when an output chunk fails safety validation., Flushes the remaining buffered tokens and validates the final chunk., Orchestrates output safety validation using a layered pipeline., Cancels and cleans up any background validation tasks. (+17 more)
 
 ### Community 155 - "test_output_guardrail_nemo.py"
-Cohesion: 0.12
-Nodes (9): ChunkBuffer, Bounded raw/NFKC holdback buffer used at the public output boundary., Rebuild a bounded map only from retained source text.          The final letter/, Return the retained raw boundary for a normalized scalar boundary., Keep an incrementally mapped raw suffix until it is safe to publish., test_buffer_tracks_normalized_to_raw_offsets(), test_flush_returns_all_pending_raw_text_and_is_idempotent(), test_raw_utf8_pending_limit_is_explicit() (+1 more)
+Cohesion: 0.14
+Nodes (13): ChunkBuffer, Check if the current buffer exceeds the maximum token limit., Force-splits the buffer at max_chunk_tokens.         Returns the prefix of leng, Adds a token to the buffer and checks for a sentence boundary or max token limit, Flushes the remaining buffer. Returns the content if not empty, otherwise None., Finds the first sentence boundary index in self.buffer.         Returns the ind, test_abbreviation_heuristics(), test_basic_sentence_boundaries() (+5 more)
 
 ### Community 156 - "Architecture"
 Cohesion: 0.11
@@ -1704,12 +1587,12 @@ Cohesion: 0.20
 Nodes (9): Decision: Add an authenticated dashboard stub, Decision: Audit auth events without PII, Decision: Bootstrap a minimal monorepo in this feature, Decision: Store auth abuse-control state in Redis, Decision: Use generic credential errors for login and duplicate registration, Decision: Use NestJS for auth endpoints and guards, Decision: Use Prisma migrations over ad hoc schema setup, Decision: Use stateless JWT sessions with 24-hour expiry (+1 more)
 
 ### Community 158 - "Agent Operating Rules"
-Cohesion: 0.10
-Nodes (30): Agent Operating Rules, CI/CD Pipeline & GitHub Actions Runner Inspection, Critical Guidelines, E2E Testing Instructions, Local Development Startup, Read Before Anything Else, Rules That Never Change, This is NOT the Next.js you know (+22 more)
+Cohesion: 0.11
+Nodes (29): Agent Operating Rules, Critical Guidelines, E2E Testing Instructions, Local Development Startup, Read Before Anything Else, Rules That Never Change, This is NOT the Next.js you know, AgentSpanData (+21 more)
 
 ### Community 159 - "chat_stream"
-Cohesion: 0.07
-Nodes (176): BetaResponseApplyPatchToolCall, BetaResponseApplyPatchToolCallOutput, The output emitted by an apply patch tool call., A tool call that applies file diffs by creating, deleting, or updating files., BetaResponseCompactionItem, A compaction item generated by the [`v1/responses/compact` API](https://platform, BetaResponseComputerToolCallOutputItem, Agent (+168 more)
+Cohesion: 0.05
+Nodes (320): BetaContainerReference, BetaEasyInputMessage, A message input to the model with a role indicating instruction following     hi, BetaLocalEnvironment, BetaResponseApplyPatchToolCall, BetaResponseApplyPatchToolCallOutput, The output emitted by an apply patch tool call., A tool call that applies file diffs by creating, deleting, or updating files. (+312 more)
 
 ### Community 160 - "Project: Flight Booking System Monorepo"
 Cohesion: 0.25
@@ -1736,8 +1619,8 @@ Cohesion: 0.15
 Nodes (12): Behavioral Change, Configuration Contract, Contract: Output Guardrail Pipeline, Current Protocol (input), Existing Events (unchanged), Extended Protocol (input + output), Integration Point, Key Behaviors (+4 more)
 
 ### Community 166 - "Decisions"
-Cohesion: 0.17
-Nodes (12): Architecture Diagram, Chatbot Backend Architecture — Grilling Session Decisions, Decision 1: LLM Orchestration Layer, Decision 2: Repo Placement, Decision 3: Communication Pattern, Decision 4: Security Model — Three Layers, Decision 5: Chat Data Persistence, Decision 6: Conversation Memory Management (+4 more)
+Cohesion: 0.11
+Nodes (17): Architecture Diagram, Chatbot Backend Architecture — Grilling Session Decisions, Conversation Compression Threshold, Decision 1: LLM Orchestration Layer, Decision 2: Repo Placement, Decision 3: Communication Pattern, Decision 4: Security Model — Three Layers, Decision 5: Chat Data Persistence (+9 more)
 
 ### Community 167 - "get_settings"
 Cohesion: 0.11
@@ -1760,12 +1643,12 @@ Cohesion: 0.33
 Nodes (5): Content Quality, Feature Readiness, Notes, Requirement Completeness, Specification Quality Checklist: Agent Tool-Calling & Data Access
 
 ### Community 172 - "detect_pii"
-Cohesion: 0.03
-Nodes (162): BaseGenericModel, SyncAPIClient, AsyncHttpxClientWrapper, AsyncPaginator, BaseClient, _DefaultAioHttpClient, _DefaultAsyncHttpxClient, _DefaultHttpxClient (+154 more)
+Cohesion: 0.02
+Nodes (200): BaseGenericModel, _FailedAttachmentReader, _LangSmithHttpAdapter, ListThreadsItem, BytesIO that raises an error when read, for failed attachment downloads., Introduced in python 3.9., Used for optional OTEL tracing., Item returned by :meth:`Client.list_threads`. (+192 more)
 
 ### Community 173 - "chat_stream"
-Cohesion: 0.05
-Nodes (73): addDaysToParsedDate(), buildPassengerResult(), compareParsedDates(), determineScope(), evaluateContactSection(), evaluateCountryField(), evaluateDateOfBirth(), evaluateDocumentType() (+65 more)
+Cohesion: 0.04
+Nodes (77): BookingReadinessConfig, BookingReadinessConfigEnv, clampPassportAdvisoryBufferDays(), parseBookingReadinessConfig(), addDaysToParsedDate(), BookingReadinessEvaluator, buildPassengerResult(), compareParsedDates() (+69 more)
 
 ### Community 244 - "Sketch 001: Chatbot-Search Transition"
 Cohesion: 0.33
@@ -1780,16 +1663,16 @@ Cohesion: 0.15
 Nodes (13): Implementation Phases, Phase 10: Saved Payment Methods, Phase 11: Cron Jobs — Authorization Expiry & Cleanup, Phase 12: E2E Testing & Verification, Phase 1: Database Schema & Enums, Phase 2: Stripe SDK Wrapper & Shared Infrastructure, Phase 3: Payment State Machine, Phase 4: Idempotency Key Service (+5 more)
 
 ### Community 247 - "test_pipeline_parallelism.py"
-Cohesion: 0.03
-Nodes (77): AsyncContent, AsyncContentWithRawResponse, AsyncContentWithStreamingResponse, Content, ContentWithRawResponse, ContentWithStreamingResponse, AsyncContentWithRawResponse, AsyncContentWithStreamingResponse (+69 more)
+Cohesion: 0.52
+Nodes (4): ALLOWED_RETURN_PREFIXES, getSafeReturnTarget(), isAllowedPath(), safeSearch()
 
 ### Community 248 - "Sketch Manifest"
 Cohesion: 0.40
 Nodes (4): Design Direction, Reference Points, Sketch Manifest, Sketches
 
 ### Community 249 - "airports.ts"
-Cohesion: 0.02
-Nodes (149): MessageLike, ChatPromptValue, Chat prompt value.      A type of a prompt value that is built from messages., Get the namespace of the LangChain object.          Returns:             `["lang, AIMessagePromptTemplate, BaseChatPromptTemplate, BaseStringMessagePromptTemplate, ChatMessagePromptTemplate (+141 more)
+Cohesion: 0.01
+Nodes (216): ABC, ImageURL, MessageLike, TypeAlias, Optional caching layer for language models.  Distinct from provider-based [promp, BaseCrossEncoder, Cross Encoder interface., Interface for cross encoder models. (+208 more)
 
 ### Community 250 - "seed.ts"
 Cohesion: 0.10
@@ -1808,24 +1691,24 @@ Cohesion: 0.17
 Nodes (12): Automated Tests, Complexity Tracking, Constitution Check, Documentation (this feature), Environment Variables, Implementation Plan: Stripe Payment System, Manual Verification, Project Structure (+4 more)
 
 ### Community 254 - "scripts"
-Cohesion: 0.03
-Nodes (52): AuthenticatedRequest, DisruptionController, TravellerDisruptionController, DisruptionService, computeItineraryDiff(), ConnectionDiff, ItineraryDiffResult, SegmentDiff (+44 more)
+Cohesion: 0.04
+Nodes (55): AuthenticatedRequest, DisruptionController, TravellerDisruptionController, DisruptionService, computeItineraryDiff(), ConnectionDiff, ItineraryDiffResult, SegmentDiff (+47 more)
 
 ### Community 255 - "devDependencies"
 Cohesion: 0.01
-Nodes (216): Func, ThreadPoolExecutor, ApiKeyAuth, Create a new 'child' span from the provided runnable config.          Requires `, API key authentication for write replicas., Service-to-service JWT authentication for write replicas., ServiceAuth, Run schema when loading from the DB. (+208 more)
+Nodes (222): Func, ThreadPoolExecutor, ApiKeyAuth, API key authentication for write replicas., Service-to-service JWT authentication for write replicas., ServiceAuth, AgentAction, AgentActionMessageLog (+214 more)
 
 ### Community 256 - "plan.md"
-Cohesion: 0.08
-Nodes (34): POST(), POST(), AuthenticatedSession, getAuthenticatedSession(), hasValidSameOriginHeaders(), POST(), PassengersPage(), ChatStreamOptions (+26 more)
+Cohesion: 0.14
+Nodes (20): AuthenticatedSession, getAuthenticatedSession(), hasValidSameOriginHeaders(), POST(), PassengersPage(), isSameOrigin(), BootstrapFetcher, createHandoffRedirectResponse() (+12 more)
 
 ### Community 257 - "scripts"
 Cohesion: 0.12
 Nodes (15): Artifacts Updated, Decisions Made, Full State Machine, Grilling Session #2 — Cancellation & Refund Stress Test, Next Steps, Q10 — User Communication ✅, Q1 — Concurrency Control ✅, Q2 — Duffel Crash Recovery ✅ (+7 more)
 
 ### Community 258 - "package.json"
-Cohesion: 0.06
-Nodes (49): _assert_payload_free_dispatch(), _CapturingModel, LogCaptureFixture, Model-dispatch and non-streamed output boundary contracts for T020., Removing the runner callback policy re-enables raw graph event tracing., Skipping summary validation or callback suppression leaks a generated canary., Logging a raw model exception exposes provider payloads and secrets., Forwarding caller callbacks or raw AIMessage content leaks the output canary. (+41 more)
+Cohesion: 0.03
+Nodes (103): format_messages(), Any, Format chat session history, summary, and current user message into a list of La, evaluate_checkout_gate(), RouteDecision, Evaluates the checkout gate criteria.     Requires: intent=CHECKOUT, confidence, health_check(), Request (+95 more)
 
 ### Community 259 - "amadeus.types.ts"
 Cohesion: 0.08
@@ -1833,7 +1716,7 @@ Nodes (23): Dependencies & Execution Order, Format: `[ID] [P?] [Story] Descripti
 
 ### Community 260 - "index.ts"
 Cohesion: 0.02
-Nodes (207): AnnotationQueueRetrieveQueuesResponse, ItemDeleteAllResponse, MountConfig, NumReviewersPerItem, OnlineEvaluatorType, ProxyConfig, RunCreateByKeyResponse, make_request_options() (+199 more)
+Nodes (205): AnnotationQueueRetrieveQueuesResponse, ItemDeleteAllResponse, MountConfig, NumReviewersPerItem, OnlineEvaluatorType, ProxyConfig, RunCreateByKeyResponse, make_request_options() (+197 more)
 
 ### Community 261 - "MessageQueueManager"
 Cohesion: 0.08
@@ -1857,15 +1740,15 @@ Nodes (10): R0: API Provider Migration (Amadeus → Duffel), R1: DuffelService E
 
 ### Community 267 - "NemoGuardrailService"
 Cohesion: 0.02
-Nodes (138): MessageContentBlock, ToolExceptionHandlerOutput, Mixin for objects that tools can return directly.      If a custom BaseTool is i, Represents an AI's request to call a tool.      Example:         ```python, ToolCall, ToolOutputMixin, BaseTool, BaseToolkit (+130 more)
+Nodes (157): get_checkout_tools(), get_general_tools(), get_tool_by_name(), get_tools(), get_travel_tools(), Get a list of all registered tool instances., Retrieve a registered tool instance by its name., Check if a tool requires confirmation before execution.     In the new topology (+149 more)
 
 ### Community 268 - "JWTAuthMiddleware"
-Cohesion: 0.02
-Nodes (83): ErrorEvent, Occurs when a [run](https://platform.openai.com/docs/api-reference/runs/object), Occurs when a [run](https://platform.openai.com/docs/api-reference/runs/object), Occurs when a [run](https://platform.openai.com/docs/api-reference/runs/object), Occurs when a [run](https://platform.openai.com/docs/api-reference/runs/object), Occurs when a [run](https://platform.openai.com/docs/api-reference/runs/object), Occurs when a [run](https://platform.openai.com/docs/api-reference/runs/object), Occurs when a [run](https://platform.openai.com/docs/api-reference/runs/object) (+75 more)
+Cohesion: 0.08
+Nodes (35): JWTAuthMiddleware, Redis, RateLimitMiddleware, Middleware that enforces two-level rate limiting (burst limit and daily quota), _persist_response(), Persists the user and agent messages as a batch.     Revalidates active fence i, make_token(), Chaos Simulation: RateLimitMiddleware fails closed with 503 CHAT_CONTROL_PLANE_U (+27 more)
 
 ### Community 269 - "RateLimitMiddleware"
-Cohesion: 0.04
-Nodes (46): BaseGenerationOutputParser, BaseLLMOutputParser, BaseOutputParser, Any, T, Base parser for language model outputs., Base class to parse the output of an LLM call.      Output parsers help structur, Return the input type for the parser. (+38 more)
+Cohesion: 0.02
+Nodes (100): InjectedState, Signal that the user wants to checkout a specific flight offer from the latest s, signal_checkout_intent(), _handoff_event_stream(), main(), Exercise browser-shaped trace continuity through FastAPI into real NestJS., OutputParserException, Any (+92 more)
 
 ### Community 270 - "test_output_guardrail_nemo.py"
 Cohesion: 0.13
@@ -1880,8 +1763,8 @@ Cohesion: 0.13
 Nodes (14): Dependencies & Execution Order, Format: `[ID] [P?] [Story] Description`, Implementation for User Story 1, Implementation for User Story 2, Implementation for User Story 3, Phase 1: Setup (Shared Infrastructure), Phase 2: Foundational (Blocking Prerequisites), Phase 3: User Story 1 - Select Cabin Class for Flight Search (Priority: P1) 🎯 MVP (+6 more)
 
 ### Community 273 - "BookingService"
-Cohesion: 0.02
-Nodes (44): _PseudoMatch, A pseudo match object constructed from a string., Split ``text`` into (tokentype, text) pairs.          ``stack`` is the initial s, Split ``text`` into (tokentype, text) pairs.         If ``context`` is given, us, CFamilyLexer, For C family source code.  This is used as a base class to avoid repetitious, Lexer for Snowball source code., SnowballLexer (+36 more)
+Cohesion: 0.01
+Nodes (187): As with lexers, this constructor takes arbitrary optional arguments,         and, BBCodeFormatter, Format tokens with BBcodes. These formatting codes are used by many     bulletin, See the class docstring for explanation of options., r"""         Additional options accepted:          ``fontface``             Name, Format ``tokensource``, an iterable of ``(tokentype, tokenstring)``         tupl, Format tokens as an SVG graphics file.  This formatter is still experimental., SvgFormatter (+179 more)
 
 ### Community 275 - ".aclose"
 Cohesion: 0.14
@@ -1889,11 +1772,11 @@ Nodes (13): API Contract Changes: Cabin Class & Passenger Type Enhancement, Cabi
 
 ### Community 276 - "devDependencies"
 Cohesion: 0.01
-Nodes (207): modules, $schema, thresholds, branches, statements, version, TextIOWrapper, HelpFormatter (+199 more)
+Nodes (188): TextIOWrapper, HelpFormatter, main(), main_inner(), _parse_filters(), _parse_options(), _print_help(), _print_list() (+180 more)
 
 ### Community 277 - "scripts"
-Cohesion: 0.09
-Nodes (14): HasValidHandoffSource(), CanonicalPassengerMetadataConstraint, CanonicalPassengerShapeConstraint, CreateIntentDto, CreateIntentPassengerDto, InlinePassengerSourceDto, LEGACY_PASSENGER_FIELDS, LEGACY_REQUIRED_PASSENGER_FIELDS (+6 more)
+Cohesion: 0.04
+Nodes (36): assertCanonicalCreate(), BookingIntentController, BookingIntentLegacyController, requestContext(), setSafeHeaders(), BookingIntentCron, BookingIntentService, ClaimedHandoffForIntent (+28 more)
 
 ### Community 278 - "Payment System — Grilling Decisions"
 Cohesion: 0.13
@@ -1901,7 +1784,7 @@ Nodes (14): 10. ORM: Prisma, 11. Payment Processor: Stripe, 1. Backend: Node.js 
 
 ### Community 279 - "Feature Specification: Cabin Class & Passenger Type Enhancement"
 Cohesion: 0.15
-Nodes (12): Assumptions, Edge Cases, Feature Specification: Cabin Class & Passenger Type Enhancement, Functional Requirements, Key Entities, Measurable Outcomes, Requirements _(mandatory)_, Success Criteria _(mandatory)_ (+4 more)
+Nodes (12): Assumptions, Edge Cases, Feature Specification: Cabin Class & Passenger Type Enhancement, Functional Requirements, Key Entities, Measurable Outcomes, Requirements *(mandatory)*, Success Criteria *(mandatory)* (+4 more)
 
 ### Community 280 - "test_tools.py"
 Cohesion: 0.13
@@ -1913,7 +1796,7 @@ Nodes (9): R0: Cabin Class — Request-Level vs Post-Filter, R1: Mixed-Cabin Off
 
 ### Community 282 - "Booking Workflow — Grilling Decisions"
 Cohesion: 0.01
-Nodes (579): default, ExtendedRegexLexer, include, Indicates that a state should include rules from another state., Indicates a state or state action (e.g. #pop) to apply.     For example default(, Indicates a list of literal words that is transformed into an optimized     rege, Base for simple stateful regular expression-based lexers.     Simplifies the lex, A RegexLexer that uses a context object to store its state. (+571 more)
+Nodes (212): ExtendedRegexLexer, include, LexerContext, Indicates that a state should include rules from another state., A helper object that holds lexer position data., A RegexLexer that uses a context object to store its state., AdlLexer, AtomsLexer (+204 more)
 
 ### Community 283 - "devDependencies"
 Cohesion: 0.11
@@ -1949,11 +1832,11 @@ Nodes (10): BookingIntent, BookingIntentPassenger, BookingIntentStatus, Data Mod
 
 ### Community 291 - "Feature Specification: Booking Intent Foundation"
 Cohesion: 0.20
-Nodes (10): Deferred Decisions (Documented), Feature Specification: Booking Intent Foundation, In Scope, Non-Functional Requirements, Out of Scope, Scope & Boundaries, User Scenarios & Testing _(mandatory)_, User Story 1 - Create Booking Intent from Flight Offer (Priority: P1) (+2 more)
+Nodes (10): Deferred Decisions (Documented), Feature Specification: Booking Intent Foundation, In Scope, Non-Functional Requirements, Out of Scope, Scope & Boundaries, User Scenarios & Testing *(mandatory)*, User Story 1 - Create Booking Intent from Flight Offer (Priority: P1) (+2 more)
 
 ### Community 292 - "Data Model: LLM Output Guardrails"
-Cohesion: 0.13
-Nodes (15): scripts, build, dev, lint, start, start:debug, start:dev, start:prod (+7 more)
+Cohesion: 0.15
+Nodes (13): scripts, build, dev, lint, start, start:debug, start:dev, start:prod (+5 more)
 
 ### Community 293 - "Findings"
 Cohesion: 0.18
@@ -2013,11 +1896,11 @@ Nodes (9): Database Schema & Types, Format: `[ID] [P?] Description`, Idempotency
 
 ### Community 308 - "PaymentMethodService"
 Cohesion: 0.02
-Nodes (101): ConcurrencyError, Raised when receiving or sending messages concurrently.      WebSocket is a co, build_quoted_string(), build_www_authenticate_basic(), Format ``value`` as a quoted string.      This is the reverse of :func:`parse_, Build a ``WWW-Authenticate`` header for HTTP Basic Auth.      Args:         r, Connection, Any (+93 more)
+Nodes (167): Connection, aiter(), broadcast(), Broadcast a message to several WebSocket connections.      A string (:class:`s, ConcurrencyError, ConnectionClosed, ConnectionClosedError, ConnectionClosedOK (+159 more)
 
 ### Community 309 - "Decision 9: Recovery Points and Dual State Tracking"
-Cohesion: 0.08
-Nodes (23): AuthenticatedRequest, AuthenticatedUser, DashboardController, DashboardService, mockEmptySummary, mockPopulatedSummary, Airport, AirportType (+15 more)
+Cohesion: 0.25
+Nodes (7): LedgerEntryType, Payment, PaymentEventSource, PaymentStatus, RefundResponse, RefundStatus, RefundTriggerType
 
 ### Community 310 - "Findings"
 Cohesion: 0.25
@@ -2041,7 +1924,7 @@ Nodes (12): Accessibility and responsive behavior, ACKNOWLEDGED, Admin disruptio
 
 ### Community 315 - "Decision 7: Webhook Processing — Source of Truth with Two-Tier Handling"
 Cohesion: 0.02
-Nodes (86): degradedResponse(), GET(), getApiUrl(), SocketType, SpawnProcess, style(), asyncio_run(), _cancel_all_tasks() (+78 more)
+Nodes (89): Resolves the original user message from body or graph state., _resolve_user_message(), SocketType, SpawnProcess, AsyncCache, Cache, _deprecated_cache_class_warning(), Prompt caching module for LangSmith SDK.  This module provides thread-safe LRU c (+81 more)
 
 ### Community 316 - "Phase 2: Configuration & PII Detection — Foundation"
 Cohesion: 0.50
@@ -2085,11 +1968,11 @@ Nodes (12): API E2E, Focused automated tests, Frontend Playwright, Install and d
 
 ### Community 326 - "payment-refund.e2e-spec.ts"
 Cohesion: 0.06
-Nodes (55): AgentGatewayModule, AttestedFlightSearchModule, AgentToolAuditModule, AgentAuthModule, AgentBookingReadinessModule, SafeBookingReadModule, TravelerPreferencesModule, AncillariesModule (+47 more)
+Nodes (44): AgentGatewayModule, AirportsModule, AncillariesModule, envSchema, AuditModule, BookingModule, BookingIntentModule, CacheModule (+36 more)
 
 ### Community 327 - "paths"
 Cohesion: 0.02
-Nodes (89): BookingAgentProjectionService, SafeBookingProjectionData, OwnedIntent, AncillaryCatalogService, AuditService, BookingLifecycleService, BookingCompletionResult, BookingPipelineOutcome (+81 more)
+Nodes (61): AuditService, AuthenticatedRequest, BookingController, BookingService, BookingWithRelations, enrichRedactedDuffelOrder(), parseDuffelCancellationQuoteId(), serializeDuffelCancellationQuoteId() (+53 more)
 
 ### Community 328 - "jwt-auth.guard.ts"
 Cohesion: 0.15
@@ -2108,7 +1991,7 @@ Cohesion: 0.17
 Nodes (11): 1. Sentence-Boundary Chunking (not fixed token size), 2. Pipeline Parallelism, 3. Cross-Chunk Sliding Window for Boundary PII, 4. Layered Guardrail Checks (Regex PII + NeMo Output Rail), 5. Hard Stop on Failure, Decisions, Full Pipeline Flow, Open Questions (for implementation phase) (+3 more)
 
 ### Community 332 - "Agent Tool-Calling Architecture — Grilling Session Decisions"
-Cohesion: 0.20
+Cohesion: 0.18
 Nodes (10): Agent Tool-Calling Architecture — Grilling Session Decisions, Decision 1: Agent Action Scope, Decision 2: Agent Gateway (Structural PII Boundary), Decision 3: Tool Inventory (Launch Set), Decision 4: Response Payload Strategy (Two-Tier), Decision 5: Closed-World Prompt Discipline, Decision 6: Gateway Authentication (Signed User Claim Token), Decision 7: Tool Calling Mechanism (+2 more)
 
 ### Community 333 - "Flight Booking System — Architecture Decisions"
@@ -2148,8 +2031,8 @@ Cohesion: 0.10
 Nodes (20): Complexity Tracking, Constitution Check — Post-Design Re-evaluation, Constitution Check — Pre-Design Gate, Dependency and delivery map, Exit criteria, Exit criteria, Feature documentation, Implementation Plan: Disruption & Flight-Change Management (+12 more)
 
 ### Community 342 - "Grilling Session — Feature 14: Disruption & Flight-Change Management"
-Cohesion: 0.06
-Nodes (71): BetaApplyPatchTool, Allows the assistant to create, delete, or update files using unified diffs., BetaComputerTool, A tool that controls a virtual computer.      Learn more about the [computer too, BetaComputerUsePreviewTool, A tool that controls a virtual computer.      Learn more about the [computer too, BetaContainerAuto, BetaContainerNetworkPolicyAllowlist (+63 more)
+Cohesion: 0.10
+Nodes (24): Action, ACTIONS, BookingActionCard(), BookingActionCardProps, FIELD_LABELS, FIELD_NAMES, FieldName, getReasonBanner() (+16 more)
 
 ### Community 343 - "Product Requirements Document: Cancellation & Refund Recovery"
 Cohesion: 0.25
@@ -2157,11 +2040,11 @@ Nodes (8): Further Notes, Implementation Decisions, Out of Scope, Problem Statem
 
 ### Community 344 - "Feature Specification: Disruption & Flight-Change Management"
 Cohesion: 0.12
-Nodes (15): Assumptions, Edge Cases, Feature Specification: Disruption & Flight-Change Management, Functional Requirements, Key Entities, Measurable Outcomes, Requirements _(mandatory)_, Success Criteria _(mandatory)_ (+7 more)
+Nodes (15): Assumptions, Edge Cases, Feature Specification: Disruption & Flight-Change Management, Functional Requirements, Key Entities, Measurable Outcomes, Requirements *(mandatory)*, Success Criteria *(mandatory)* (+7 more)
 
 ### Community 345 - "User Scenarios & Testing *(mandatory)*"
-Cohesion: 0.09
-Nodes (19): Content Quality, Feature Readiness, Notes, Requirement Completeness, Specification Quality Checklist: Traveler Profile & Booking Readiness, Assumptions, Edge Cases, Feature Specification: Traveler Profile & Booking Readiness (+11 more)
+Cohesion: 0.14
+Nodes (14): Assumptions, Edge Cases, Feature Specification: Traveler Profile & Booking Readiness, Functional Requirements, Key Entities, Measurable Outcomes, Requirements *(mandatory)*, Success Criteria *(mandatory)* (+6 more)
 
 ### Community 346 - "Implementation Plan: Cancellation & Refund Recovery"
 Cohesion: 0.29
@@ -2172,20 +2055,20 @@ Cohesion: 0.10
 Nodes (16): classOptions, countryOptions, documentOptions, genderOptions, getMaskedPassport(), initialDraft, phoneCountryOptions, ProfileDraft (+8 more)
 
 ### Community 348 - "Cancellation and Refund Failure Handling"
-Cohesion: 0.07
-Nodes (42): GET(), getAccessToken(), jsonError(), mapProfileError(), PATCH(), ProfilePage(), getFeatureFlags(), isBookingReadinessEnabled() (+34 more)
+Cohesion: 0.06
+Nodes (48): GET(), getAccessToken(), jsonError(), mapProfileError(), PATCH(), ProfilePage(), classOptions, countryOptions (+40 more)
 
 ### Community 349 - "API Contracts: Cancellation & Refund Recovery"
-Cohesion: 0.02
-Nodes (160): Lifecycle operations and safety projections for trusted search snapshots., Project snapshot results into PII/secret-safe LLM view., Project snapshot results into PII/secret-safe browser SSE view., Coordinates lifecycle, selection resolution, and safe projections., Create a lifecycle with one TTL cap for every snapshot it persists., Allocate an owner-scoped version., Load the active, unexpired snapshot for the owner., Create and persist an owner-scoped search snapshot. (+152 more)
+Cohesion: 0.05
+Nodes (44): TrustedSearchResult, TrustedSearchSnapshot, Redis, Atomically replaces the old snapshot and sets the TTL based on expiresAt., Loads the snapshot and verifies owner/session match., Atomically delete the snapshot., TrustedSnapshotRepository, project_snapshot_results() (+36 more)
 
 ### Community 350 - "Data Model: Cancellation & Refund Recovery"
 Cohesion: 0.33
 Nodes (5): Booking changes, Cancellation, Data Model: Cancellation & Refund Recovery, Refund changes, State transitions
 
 ### Community 351 - "Delivery phases and pull requests"
-Cohesion: 0.08
-Nodes (78): BetaResponse, Agent, The agent that owns this multi-agent streaming event., Conversation, BetaResponseConversationParam, The conversation that this response belongs to., Agent, The agent that owns this multi-agent streaming event. (+70 more)
+Cohesion: 0.03
+Nodes (193): AssistantListParams, AssistantToolChoice, AssistantToolChoiceFunction, AssistantToolChoiceFunctionParam, AssistantToolChoiceParam, Specifies a tool the model should use.      Use to force the model to call a spe, Specifies a tool the model should use.      Use to force the model to call a spe, BetaApplyPatchTool (+185 more)
 
 ### Community 352 - "data-quality-backfill.ts"
 Cohesion: 0.40
@@ -2208,20 +2091,20 @@ Cohesion: 0.40
 Nodes (4): Decision: Keep the page server-rendered and link-only, Decision: Test the public behavior, not component internals, Decision: Use a self-contained presentation component, Research: AI Copilot Landing Page
 
 ### Community 357 - "intent-response.dto.ts"
-Cohesion: 0.07
-Nodes (272): ResponseAudioDeltaEvent, ResponseAudioDoneEvent, ResponseAudioTranscriptDeltaEvent, ResponseAudioTranscriptDoneEvent, ResponseCompletedEvent, ResponseContentPartAddedEvent, ResponseContentPartDoneEvent, ResponseCreatedEvent (+264 more)
+Cohesion: 0.12
+Nodes (244): ResponseAudioDeltaEvent, ResponseAudioDoneEvent, ResponseAudioTranscriptDeltaEvent, ResponseAudioTranscriptDoneEvent, ResponseCompletedEvent, ResponseContentPartAddedEvent, ResponseContentPartDoneEvent, ResponseCreatedEvent (+236 more)
 
 ### Community 358 - "route.ts"
-Cohesion: 0.04
-Nodes (73): AsyncGroups, AsyncGroupsWithRawResponse, AsyncGroupsWithStreamingResponse, Groups, GroupsWithRawResponse, GroupsWithStreamingResponse, AsyncGroupsWithRawResponse, AsyncGroupsWithStreamingResponse (+65 more)
+Cohesion: 0.01
+Nodes (160): AsyncPaginator, Headers, NotGiven, Omit, Query, SequenceNotStr, List user actions and configuration changes within this organization.          A, List user actions and configuration changes within this organization.          A (+152 more)
 
 ### Community 359 - "Phase 0 / PR 1 — Baseline reconciliation and protected frontend foundation"
 Cohesion: 0.13
 Nodes (238): BetaResponseAudioDeltaEvent, Emitted when there is a partial audio response., BetaResponseAudioDoneEvent, Emitted when the audio response is complete., BetaResponseAudioTranscriptDeltaEvent, Emitted when there is a partial transcript of audio., BetaResponseAudioTranscriptDoneEvent, Emitted when the full audio transcript is completed. (+230 more)
 
 ### Community 360 - "Phase 1 / PR 2 — Contracts, additive schema, migration, and shared types"
-Cohesion: 0.08
-Nodes (27): _astream_log_implementation(), _get_standardized_inputs(), _get_standardized_outputs(), LogEntry, LogStreamCallbackHandler, Any, Input, Output (+19 more)
+Cohesion: 0.02
+Nodes (151): Run schema when loading from the DB., URL of this run within the app., Alias for prompt_tokens., Alias for completion_tokens., Alias for prompt_token_details., Alias for output_token_details., Run, BaseSerialized (+143 more)
 
 ### Community 361 - "Phase 2 / PR 3 — Pure itinerary normalization, matching, diff, and classification"
 Cohesion: 0.12
@@ -2232,16 +2115,16 @@ Cohesion: 0.12
 Nodes (16): Decision 10: Resolve repeatedly, claim before supplier access, consume once with BookingIntent, Decision 11: Add `ACTION_HANDOFF`; preserve `ACTION_REQUIRED`, Decision 12: Preserve the current guardrail engine in this feature, Decision 13: Encrypt chat content at the application boundary, Decision 1: Preserve three services and assign state by authority, Decision 2: Direct browser-to-agent streaming is an explicit staged migration, Decision 3: Remove LangGraph checkpointing after removing interrupts, Decision 4: Use Redis asyncio as a narrow control plane (+8 more)
 
 ### Community 363 - "Phase 4 / PR 5 — Signed webhook receiver, durable inbox, and processor"
-Cohesion: 0.03
-Nodes (66): _extract_explanations(), _format_duration(), _format_explanation(), _format_flight_block(), _format_price(), _format_stops(), _format_time(), project_flight_search_for_narration() (+58 more)
+Cohesion: 0.17
+Nodes (10): app_module_1, cache_service_1, common_1, duffel_cleanup_service_1, duffel_service_1, http_exception_filter_1, jwt_1, prisma_service_1 (+2 more)
 
 ### Community 364 - "Phase 5 / PR 6 — Budget-aware reconciliation and correct completion lifecycle"
-Cohesion: 0.03
-Nodes (68): close_redis(), get_redis_client(), init_redis(), Redis, health_check(), health_live(), lifespan(), FastAPI (+60 more)
+Cohesion: 0.05
+Nodes (42): close_redis(), get_redis_client(), init_redis(), Redis, lifespan(), Lifespan context manager that initializes NeMo Guardrails configuration,     me, ActiveFence, MessageQueueManager (+34 more)
 
 ### Community 365 - "Phase 6 / PR 7 — Traveller APIs, local read model, and cancellation integration"
-Cohesion: 0.03
-Nodes (84): ActiveWeights, ActiveWeightsSchema, AirlineExplanationParamsSchema, BaggageExplanationParamsSchema, BlacklistedAirlineExplanationParamsSchema, CabinExplanationParamsSchema, ConstraintType, ConstraintTypeSchema (+76 more)
+Cohesion: 0.21
+Nodes (8): Settings, test_output_guardrail_config_custom(), test_output_guardrail_config_defaults(), test_session_lock_timing_defaults_and_override(), test_agent_config_defaults(), test_agent_config_flag_matrix_combinations(), test_agent_config_rejects_legacy_proxy_transport(), BaseSettings
 
 ### Community 366 - "Phase 7 / PR 8 — Traveller booking disruption experience"
 Cohesion: 0.21
@@ -2255,25 +2138,21 @@ Nodes (4): Exit criteria, Phase 8 / PR 9 — Admin operations, observability, re
 Cohesion: 0.04
 Nodes (45): Dependencies & Execution Order, Format and execution rules, GREEN implementation, GREEN implementation, GREEN implementation, GREEN implementation, GREEN implementation, GREEN implementation (+37 more)
 
-### Community 370 - "registration.schema.ts"
-Cohesion: 0.16
-Nodes (15): MockBookingDetailResponse, BookingFailureState(), BookingFailureStateProps, chargeMessage(), failureMessages, RegisterInput, registerSchema, BookingFailureReason (+7 more)
-
 ### Community 372 - "Project Structure"
-Cohesion: 0.01
-Nodes (137): SupplierResult, AgentToolAuditService, assertCanonicalCreate(), AuthenticatedRequest, BookingIntentController, BookingIntentLegacyController, requestContext(), setSafeHeaders() (+129 more)
+Cohesion: 0.03
+Nodes (64): CanonicalPrismaMock, MockAuditService, MockDuffelService, MockEncryptionService, MockPrismaService, TestableService, BookingIntentForValidation, BookingIntentPassengerRecord (+56 more)
 
 ### Community 379 - "booking-intent.service.spec.ts"
 Cohesion: 0.15
 Nodes (15): make_valid_jwt(), Missing or malformed correlation data must not enter downstream telemetry., Strictly formatted opaque trace and correlation headers remain stable downstream, Health check reports degraded status and redis: 'down' when Redis ping fails., OPTIONS /chat/stream from configured origin must return exact CORS headers and a, Request from disallowed origin must be explicitly rejected with 403 ORIGIN_NOT_A, CORS headers must be present on 401 auth errors for allowed origins., CORS headers must be present on 429 rate limit / quota errors for allowed origin (+7 more)
 
 ### Community 380 - "flights.controller.ts"
-Cohesion: 0.07
-Nodes (28): Architecture, Authenticated Booking Dashboard (Feature 021, Phase 6 Finalization), Build and Runtime Output, Containerization, Continuous Integration Pipeline, Deterministic Security Guardrails & Chat Protection (Feature 023, Phase 3 US1), Deterministic Tool Boundary and Handoff Validation (Feature 023, Phase 4 US2), Feature 019 — Architecture Deepening & Safety Rails (+20 more)
+Cohesion: 0.13
+Nodes (12): Architecture, Build and Runtime Output, Containerization, Continuous Integration Pipeline, Invariants, Project Structure (Current), Stack, Current Status (+4 more)
 
 ### Community 381 - "booking-intent.e2e-spec.ts"
-Cohesion: 0.07
-Nodes (30): BaseAsyncPage, BasePage, BaseSyncPage, PageInfo, Stores the necessary information to build the request to retrieve the next page., Defines the core interface for pagination.      Type Args:         ModelT: The p, BaseModel, AsyncCursorPagination (+22 more)
+Cohesion: 0.18
+Nodes (14): POST(), POST(), ChatStreamOptions, createChatStreamRequest(), getAgentStreamEndpoint(), createOpaqueChatId(), isOpaqueChatId(), containsForbiddenKey() (+6 more)
 
 ### Community 382 - "test_guardrail_logging.py"
 Cohesion: 0.09
@@ -2281,11 +2160,11 @@ Nodes (22): 1. Pure evaluator, orchestration outside, 2. Canonical plural contra
 
 ### Community 383 - "paths"
 Cohesion: 0.13
-Nodes (20): detect_pii(), is_luhn_valid(), Validates a credit card number using the Luhn algorithm., Redacts Passport numbers, Credit card numbers (Luhn checked),     email addresse, Detects if the input text contains Passport numbers, Credit card numbers (Luhn c, scrub_pii(), Verify that pii_scrubber detects and scrubs email, phone, passport, and card., test_pii_scrubber_redacts_seeded_corpus() (+12 more)
+Nodes (20): detect_pii(), is_luhn_valid(), Validates a credit card number using the Luhn algorithm., Redacts Passport numbers, Credit card numbers (Luhn checked),     email address, Detects if the input text contains Passport numbers, Credit card numbers (Luhn c, scrub_pii(), Verify that pii_scrubber detects and scrubs email, phone, passport, and card., test_pii_scrubber_redacts_seeded_corpus() (+12 more)
 
 ### Community 384 - "Phase 4 / PR 5 — Signed webhook receiver, durable inbox, and processor"
-Cohesion: 0.08
-Nodes (38): HTTPConnectionState, HTTPConnectionState, ConnectionNotAvailable, enforce_bytes(), enforce_headers(), enforce_stream(), enforce_url(), Origin (+30 more)
+Cohesion: 0.25
+Nodes (7): app_module_1, cache_service_1, common_1, http_exception_filter_1, prisma_service_1, supertest_1, testing_1
 
 ### Community 385 - "Project Structure"
 Cohesion: 0.11
@@ -2293,7 +2172,7 @@ Nodes (18): Completion Evidence, Phase 11C: Rollback Matrix Verification, Chaos 
 
 ### Community 386 - "BookingService"
 Cohesion: 0.02
-Nodes (135): AsyncClient, _exclude_none(), Any, AsyncEvaluatorsResource, AsyncRunsResource, BaseException, datetime, Entry (+127 more)
+Nodes (128): AsyncClient, _exclude_none(), Any, AsyncEvaluatorsResource, AsyncRunsResource, BaseException, datetime, Entry (+120 more)
 
 ### Community 387 - "AncillarySelectionClient.tsx"
 Cohesion: 0.13
@@ -2308,7 +2187,7 @@ Cohesion: 0.07
 Nodes (28): 10. Direct streaming is a staged transport migration, 11. Existing safety pipeline is preserved, not re-platformed, 12. Chat persistence uses application-level authenticated encryption, 1. One graph per turn, durable context restored at entry, 2. Redis is the agent control plane, not conversation storage, 3. Structured stateless router with asymmetric checkout gate, 4. Tool inventories are constructed per agent, not filtered at runtime, 5. Trusted Search Snapshot is separate from display results (+20 more)
 
 ### Community 390 - "Payment System — Grilling Decisions"
-Cohesion: 0.13
+Cohesion: 0.12
 Nodes (15): Blocking Feature 016a preflight, Build and Static Contract Checks, Configuration Under Test, Full Regression, Performance and Concurrency Gates, Phase 14: Checkout Resolve, Claim, and Atomic Consume, Phase 9: Booking Projection Boundary, Phases 10–13: Signal, Credential, Dark API, SSE Action, and Bootstrap (+7 more)
 
 ### Community 391 - "NestJSClient"
@@ -2316,44 +2195,44 @@ Cohesion: 0.02
 Nodes (153): AutoFileChunkingStrategyParam, The default strategy.      This strategy currently uses a `max_chunk_size_tokens, BatchError, Errors, BatchListParams, BatchRequestCounts, The request counts for different statuses within the batch., BatchUsage (+145 more)
 
 ### Community 392 - "Payment System — Grilling Decisions"
-Cohesion: 0.02
-Nodes (188): APIError, main(), Mimo LLM API Connection Diagnostic Tool  Question being answered: Can the user a, ContextOverflowError, ModelAPIError, ModelAuthenticationError, ModelConnectionError, ModelError (+180 more)
+Cohesion: 0.03
+Nodes (154): APIError, ContextOverflowError, ModelAPIError, ModelAuthenticationError, ModelConnectionError, ModelError, ModelInvalidRequestError, ModelNotFoundError (+146 more)
 
 ### Community 393 - "chat.controller.ts"
 Cohesion: 0.02
-Nodes (94): AsyncLangsmithWithRawResponse, LangsmithWithRawResponse, LangsmithWithStreamedResponse, AsyncRunsResourceWithRawResponse, RunsResourceWithRawResponse, RunsResourceWithStreamingResponse, AsyncDatasetsResource, AsyncDatasetsResourceWithRawResponse (+86 more)
+Nodes (85): SyncAPIClient, AsyncLangsmithWithRawResponse, Langsmith, LangsmithWithRawResponse, LangsmithWithStreamedResponse, AsyncRunsResourceWithRawResponse, RunsResource, RunsResourceWithRawResponse (+77 more)
 
 ### Community 394 - "chat.controller.ts"
-Cohesion: 0.05
-Nodes (51): metadata, Action, ACTIONS, BookingActionCard(), BookingActionCardProps, FIELD_LABELS, FIELD_NAMES, FieldName (+43 more)
+Cohesion: 0.06
+Nodes (34): metadata, SafeActionRequiredEvent, ChatWidget(), ChatWidgetInner(), consumeChatStream(), ConsumeChatStreamOptions, consumeSseBlock(), getSafeOfferId() (+26 more)
 
 ### Community 395 - "chat.controller.ts"
 Cohesion: 0.15
 Nodes (13): 6. Incident Playbooks (Step-by-Step Operator Procedures), Playbook A: Database Degradation / Connection Pool Saturation, Playbook B: Redis Cache Loss / Partition Recovery, Playbook C: Corrupted / Tampered AAD Recovery & Snapshot Integrity Failure, Playbook D: Supplier Timeout / Duffel 504 Degradation During Payment Hold, Step-by-Step Resolution:, Step-by-Step Resolution:, Step-by-Step Resolution: (+5 more)
 
 ### Community 396 - "page.tsx"
-Cohesion: 0.04
-Nodes (138): ActionHandoffEvent, ActionHandoffPayload, ActionRequiredEvent, ActionRequiredPayload, DoneEvent, DonePayload, ErrorPayload, FlightResultsEvent (+130 more)
+Cohesion: 0.13
+Nodes (18): ActionRequiredEvent, BaseSSEEvent, ChatMessageEvent, DisplayInfo, HandoffEvent, test_accepts_valid_handoff_event(), test_rejects_handoff_event_extra_fields(), test_rejects_handoff_event_missing_token() (+10 more)
 
 ### Community 397 - "dependencies"
-Cohesion: 0.04
-Nodes (43): RealtimeToolChoiceConfigParam, RealtimeToolsConfigParam, RealtimeTracingConfigParam, RealtimeTruncationParam, HttpxBinaryResponseContent, PathLike, Write the output to the given file.          Accepts a filename or any path-like, Headers (+35 more)
+Cohesion: 0.03
+Nodes (101): AsyncFileBatches, AsyncFileBatchesWithRawResponse, AsyncFileBatchesWithStreamingResponse, FileBatches, FileBatchesWithRawResponse, FileBatchesWithStreamingResponse, AsyncPaginator, File (+93 more)
 
 ### Community 398 - "agent-gateway.service.ts"
-Cohesion: 0.03
-Nodes (93): BadRequestError, _BM, ChatGenerationChunk, `ChatGeneration` chunk.      `ChatGeneration` chunks can be concatenated with ot, is_basemodel_subclass(), Check if the given class is a subclass of Pydantic `BaseModel`.      Check if th, _add_gateway_metadata(), _apply_prompt_cache_breakpoint() (+85 more)
+Cohesion: 0.02
+Nodes (118): BadRequestError, _BM, agenerate_from_stream(), generate_from_stream(), Generate from a stream.      Args:         stream: Iterator of `ChatGenerationCh, Async generate from a stream.      Args:         stream: AsyncIterator of `ChatG, FakeChatModel, FakeListChatModel (+110 more)
 
 ### Community 399 - "dependencies"
 Cohesion: 0.02
-Nodes (65): H1Connection, OSError, RequestResponseCycle, FlowControl, ASGIReceiveCallable, ASGISendCallable, Transport, service_unavailable() (+57 more)
+Nodes (80): Environ, ExcInfo, H1Connection, OSError, RequestResponseCycle, StartResponse, build_environ(), ASGIReceiveCallable (+72 more)
 
 ### Community 400 - "dependencies"
 Cohesion: 0.06
 Nodes (35): 10. Privacy rules and operator closeout, 11. Phase 11A: Production Rollout, Live Health & Operational Verification (2026-08-16), 12.1 Performance & Latency Baselines (Warmed Benchmarks), 12.2 Standardized Metric Counters, 12.3 Automated Alert Verification Drills (`apps/api/test/alert-rules.e2e-spec.ts`), 12.4 Multi-Workspace Verification, 12. Phase 11B Verified Production Telemetry Baselines & Alert Rules, 13.1 Agent Privacy Scanner (`apps/agent/tests/test_negative_privacy_audit.py`) (+27 more)
 
 ### Community 401 - "Code Standards"
-Cohesion: 0.07
-Nodes (22): AgentToolAuditRecord, AgentToolOutcome, AgentApiKeyGuard, AgentBookingReadinessController, AuthenticatedRequest, AgentBookingReadinessService, BookingDetailDto, AgentBookingReadinessIssueDto (+14 more)
+Cohesion: 0.18
+Nodes (11): Validate snapshot and signal before creating handoff., validate_handoff(), mock_nestjs_client(), test_validate_handoff_expired_snapshot(), test_validate_handoff_invalid_offer_index(), test_validate_handoff_invalid_snapshot_missing_version_or_attestation(), test_validate_handoff_missing_signal(), test_validate_handoff_missing_snapshot() (+3 more)
 
 ### Community 402 - "Library Docs"
 Cohesion: 0.31
@@ -2361,39 +2240,39 @@ Nodes (8): make_token(), test_canonical_jwt_valid_claims_accepted(), test_cross_
 
 ### Community 403 - "Code Standards"
 Cohesion: 0.04
-Nodes (34): SelectionAttestationOffer, SelectionAttestationPayload, SelectionAttestationService, AgentChatAccessService, CheckUserAccessDto, AgentChatController, AuthenticatedRequest, AuthenticatedRequest (+26 more)
+Nodes (37): CABIN_KEYWORDS, PASSENGER_KEYWORDS, AgentGatewayController, AuthenticatedRequest, AgentGatewayService, capitalizeCabinClass(), cleanIsoTime(), formatDuffelBaggageAllowance() (+29 more)
 
 ### Community 404 - "Library Docs"
 Cohesion: 0.10
 Nodes (154): ContainerReferenceParam, EasyInputMessageParam, A message input to the model with a role indicating instruction following     hi, LocalEnvironmentParam, LocalSkillParam, A tool call to run code., ResponseCodeInterpreterToolCallParam, A compaction item generated by the [`v1/responses/compact` API](https://platform (+146 more)
 
 ### Community 405 - "OutputGuardrailPipeline"
-Cohesion: 0.05
-Nodes (27): Query parameters to include in the URL when sending requests., Origin, Any, ItemsView, KeysView, Origin, QueryParamTypes, ValuesView (+19 more)
+Cohesion: 0.11
+Nodes (13): Request, Response, BudgetExceededException, ChatBudgetException, ChatBudgetRepository, Redis, Repository for enforcing daily and burst rate limits atomically using a single L, Atomically increment burst and daily budgets.         Returns True if admitted. (+5 more)
 
 ### Community 406 - "Code Standards"
-Cohesion: 0.07
-Nodes (34): _BoundedResponse, _has_exact_keys(), _is_positive_int(), Any, Read decompressed response bytes within a fixed bound before JSON decoding., Return a copied, PII-safe readiness result or ``None`` for malformed data., Raised when an upstream response cannot be safely loaded into memory., Calls service-authenticated NestJS access check POST /api/agent-gateway/chat/acc (+26 more)
+Cohesion: 0.18
+Nodes (10): app_module_1, cache_service_1, client_1, common_1, duffel_service_1, http_exception_filter_1, jwt_1, prisma_service_1 (+2 more)
 
 ### Community 407 - "Library Docs"
-Cohesion: 0.07
-Nodes (57): BlockDeltaFields, CompatBlock, ContentBlockDelta, ContentBlockDeltaData, ContentBlockFinishData, MessageMetadata, UsageInfo, FinalizedContentBlock (+49 more)
+Cohesion: 0.18
+Nodes (9): app_module_1, cache_service_1, common_1, duffel_service_1, http_exception_filter_1, jwt_1, prisma_service_1, supertest_1 (+1 more)
 
 ### Community 408 - "agent-gateway.service.ts"
-Cohesion: 0.06
-Nodes (38): assertRunOptions(), assertSafeLocalReset(), childExitDescription(), createCancelableReadinessClock(), createProcessDefinitions(), createReadinessProbes(), createTransientDiagnostics(), databaseNameFromUrl() (+30 more)
+Cohesion: 0.18
+Nodes (9): app_module_1, cache_service_1, common_1, crypto, duffel_service_1, http_exception_filter_1, prisma_service_1, supertest_1 (+1 more)
 
 ### Community 409 - "Project Overview"
 Cohesion: 0.02
-Nodes (93): AsyncSandbox, Any, BaseException, DownloadContentDisposition, RequestHeaders, Snapshot, AsyncSandbox class for async sandbox operations., Enter async context manager. (+85 more)
+Nodes (106): AsyncSandbox, Any, BaseException, DownloadContentDisposition, RequestHeaders, Snapshot, AsyncSandbox class for async sandbox operations., Create a Sandbox for the same underlying sandbox.          The returned instance (+98 more)
 
 ### Community 410 - "Project Overview"
-Cohesion: 0.01
-Nodes (317): AsyncCalls, AsyncClientSecrets, AsyncClientSecretsWithRawResponse, AsyncClientSecretsWithStreamingResponse, BetaResponseInputItemParam, BetaResponseInputParam, BetaResponseItem, BetaResponsesClientEvent (+309 more)
+Cohesion: 0.03
+Nodes (100): AsyncCalls, AsyncClientSecrets, AsyncClientSecretsWithRawResponse, AsyncClientSecretsWithStreamingResponse, Calls, ClientSecrets, ClientSecretsWithRawResponse, ClientSecretsWithStreamingResponse (+92 more)
 
 ### Community 411 - "ancillary.types.ts"
 Cohesion: 0.03
-Nodes (93): HTTPError, _DigestAuthChallenge, ByteChunker, Handles returning byte content in fixed-size chunks., Handles returning text content in fixed-size chunks., TextChunker, CloseError, ConnectError (+85 more)
+Nodes (101): EnumMeta, HTTPError, Auth, BasicAuth, DigestAuth, _DigestAuthChallenge, FunctionAuth, NetRCAuth (+93 more)
 
 ### Community 412 - "agent-gateway.service.ts"
 Cohesion: 0.20
@@ -2401,31 +2280,27 @@ Nodes (9): Format: `[ID] [P?] [Story] Description`, Notes, Parallel Opportunitie
 
 ### Community 413 - "flights.service.ts"
 Cohesion: 0.03
-Nodes (136): model_dump(), IncEx, assert_is_file_content(), async_read_file_content(), _async_transform_file(), deepcopy_with_paths(), is_base64_file_input(), is_file_content() (+128 more)
+Nodes (144): model_dump(), parse_date(), parse_datetime(), date, datetime, IncEx, StrBytesIntFloat, # TODO: provide an error message here? (+136 more)
 
 ### Community 414 - "Project Overview"
 Cohesion: 0.02
 Nodes (95): AsyncProjection, _AsyncProjectionIterator, AsyncTextProjection, _AsyncTextProjectionIterator, _ChatModelStreamBase, _event_content_block(), _event_delta(), _legacy_block_to_delta() (+87 more)
 
-### Community 415 - "booking-types.ts"
-Cohesion: 0.12
-Nodes (5): The projection rejects malformed source values instead of narrating coerced reco, The detail narration accepts only explicit modelled booleans from upstream., run_config(), test_booking_detail_fail_closed_on_wrong_modelled_boolean_type(), test_booking_summaries_fail_closed_on_wrong_modelled_duration_type()
-
 ### Community 416 - "booking-types.ts"
 Cohesion: 0.03
-Nodes (92): Scope, JSONMode, SyncSession, TaskGroup, TaskResult, TaskStatus, ASGIReceiveCallable, ASGISendCallable (+84 more)
+Nodes (91): Scope, JSONMode, SyncSession, TaskGroup, TaskResult, TaskStatus, Response, aconnect_ws() (+83 more)
 
 ### Community 417 - "Implementation Phases"
 Cohesion: 0.04
-Nodes (106): BaseModel, model_dump_json(), IncEx, Recursively generate a dictionary representation of the model, optionally specif, Generates a JSON string representing this model as it would be received from or, Conversation, ConversationCreatedEvent, ConversationItemContent (+98 more)
+Nodes (98): Conversation, ConversationCreatedEvent, ConversationItemContent, ConversationItemContentParam, ConversationItem, ConversationItemCreateEvent, ConversationItemCreateEventParam, ConversationItemCreatedEvent (+90 more)
 
 ### Community 418 - "test_sse_integration.py"
 Cohesion: 0.31
 Nodes (5): backfillBookingAgentProjections(), prisma, backfillChatMessages(), prisma, prisma
 
 ### Community 419 - "Implementation Phases"
-Cohesion: 0.04
-Nodes (56): AsyncInputItems, AsyncInputItemsWithRawResponse, AsyncInputItemsWithStreamingResponse, InputItems, InputItemsWithRawResponse, InputItemsWithStreamingResponse, AsyncInputItemsWithRawResponse, AsyncInputItemsWithStreamingResponse (+48 more)
+Cohesion: 0.02
+Nodes (88): ResponsesServerEvent, AsyncInputItems, AsyncInputItemsWithRawResponse, AsyncInputItemsWithStreamingResponse, InputItems, InputItemsWithRawResponse, InputItemsWithStreamingResponse, AsyncInputItemsWithRawResponse (+80 more)
 
 ### Community 420 - "MockStreamingLLM"
 Cohesion: 0.25
@@ -2433,39 +2308,39 @@ Nodes (8): Artifacts Updated, Deferred, Disruption Status State Machine, Feature
 
 ### Community 421 - "Implementation Phases"
 Cohesion: 0.03
-Nodes (135): AsyncChatModelStream, ChatModelStream, Synchronous per-message streaming object for a single LLM response.      Returne, Asynchronous per-message streaming object for a single LLM response.      Return, Fan the async pump callback out to every projection.          Used by langgraph', Graph namespace path for this message., Graph node that produced this message., _AgentModule (+127 more)
+Nodes (66): ChatModelStream, Synchronous per-message streaming object for a single LLM response.      Returne, Bind a pump for standalone streaming.          Delegates to `set_request_more`., Set the pull callback on this stream and all its projections.          Used by l, Assembled `AIMessage` — blocks until the stream finishes., Pull all remaining events until done., Graph namespace path for this message., Graph node that produced this message. (+58 more)
 
 ### Community 422 - "ancillary.types.ts"
 Cohesion: 0.02
-Nodes (194): Listener, RunnableWithFallbacksT, Create a `_Matcher` instance for making assertions on the given value., final(), This decorator can be used to indicate to type checkers that         the decora, CallbackManagerForChainRun, Callback manager for chain run., Serialized constructor. (+186 more)
+Nodes (152): run_config(), ContextHandler, RunnableWithFallbacksT, final(), This decorator can be used to indicate to type checkers that         the decora, anext(), adispatch_custom_event(), Callbacks (+144 more)
 
 ### Community 423 - "Implementation Phases"
-Cohesion: 0.02
-Nodes (113): _COMPARISON_OUTPUT, _RUNNABLE_OUTPUT, Resolve the example ID.          Args:             example (Optional[Union[Examp, Evaluate a run.          .. admonition:: Deprecated              There is no rep, Evaluate a run asynchronously.          .. admonition:: Deprecated, ThreadPoolExecutor, Category, comparison_evaluator() (+105 more)
+Cohesion: 0.03
+Nodes (98): _COMPARISON_OUTPUT, _RUNNABLE_OUTPUT, ThreadPoolExecutor, Category, comparison_evaluator(), ComparisonEvaluationResult, DynamicComparisonRunEvaluator, DynamicRunEvaluator (+90 more)
 
 ### Community 424 - "Implementation Plan: Disruption & Flight-Change Management"
 Cohesion: 0.03
-Nodes (107): ImageEditStreamEvent, ImageGenStreamEvent, ImageModel, InputReference, deepcopy_with_paths(), _T, Copy only the containers along the given paths.      Used to guard against mutat, _get_response_format_type() (+99 more)
+Nodes (108): ImageEditStreamEvent, ImageGenStreamEvent, ImageModel, InputReference, assert_is_file_content(), async_read_file_content(), _async_transform_file(), deepcopy_with_paths() (+100 more)
 
 ### Community 425 - "Implementation Phases"
-Cohesion: 0.08
-Nodes (46): SearchPage(), SearchPageProps, FlightMatchBadge(), FlightMatchBadgeProps, LEVEL_LABELS, LEVEL_STYLES, DIMENSION_LABELS, FlightMatchBreakdown() (+38 more)
+Cohesion: 0.04
+Nodes (96): AsyncChatModelStream, Asynchronous per-message streaming object for a single LLM response.      Return, Fan the async pump callback out to every projection.          Used by langgraph', _AgentModule, _event_namespace(), _exact_namespace_params(), _ExtensionProjection, _ExtensionsProjection (+88 more)
 
 ### Community 426 - "Implementation Plan: Disruption & Flight-Change Management"
-Cohesion: 0.03
-Nodes (150): ResponseFormatTextConfigParam, AsyncPaginator, AsyncClient, # TODO: make base page type vars covariant, # TODO: do we have to preprocess params here?, # TODO: untested, # TODO: untested, # TODO: report this error to httpx (+142 more)
+Cohesion: 0.02
+Nodes (85): AzureOpenAI, BetaResponsesServerEvent, OpenAI, AuthenticationError, BadRequestError, ConflictError, ContentFilterFinishReasonError, InternalServerError (+77 more)
 
 ### Community 427 - "Implementation Phases"
 Cohesion: 0.29
 Nodes (6): Approved direction, Disposable boundary, Question, Refinement, SaaS workspace direction, Secure profile UI prototype
 
 ### Community 429 - "booking.service.js"
-Cohesion: 0.04
-Nodes (31): CommandHandle, Write data to the command's stdin., Handle to a running command with streaming output and auto-reconnect.      Itera, Eagerly read the 'started' message to populate command_id and pid.          Bloc, The server-assigned command ID. Available after construction., The process ID on the sandbox. Available after construction., Send a kill signal to the running command (SIGKILL).          The server kills t, Write data to the command's stdin.          Args:             data: String data (+23 more)
+Cohesion: 0.08
+Nodes (20): ProfileResponseContactDto, ProfileResponseDto, ProfileResponseIdentityDto, ProfileResponsePreferencesDto, ProfileResponseTravelDocumentDto, ContactSectionDto, IdentitySectionDto, PreferencesSectionDto (+12 more)
 
 ### Community 430 - "flights.service.ts"
-Cohesion: 0.06
-Nodes (50): cabins, corpusDir, createRecord(), DEFAULT_REVISION, deprecatedHoldoutPath, deprecatedInvariantsPath, destinations, __dirname (+42 more)
+Cohesion: 0.25
+Nodes (5): Content Quality, Feature Readiness, Notes, Requirement Completeness, Specification Quality Checklist: Traveler Profile & Booking Readiness
 
 ### Community 431 - "flights.service.ts"
 Cohesion: 0.29
@@ -2480,24 +2355,24 @@ Cohesion: 0.29
 Nodes (6): Completion report, Entry gate, Implementation workflow, Phase 8C implementation prompt — privacy corpus and full regression, Required review questions, Scope
 
 ### Community 434 - "Tasks: LLM Output Guardrails"
-Cohesion: 0.03
-Nodes (49): HTTPConnection, ConnectionPool, PoolByteStream, PoolRequest, BaseException, Origin, Request, Response (+41 more)
+Cohesion: 0.04
+Nodes (54): ConnectionNotAvailable, enforce_url(), Origin, Any, Represents the URL against which an HTTP request may be made.      The URL may e, Type check for URL parameters., Request, Response (+46 more)
 
 ### Community 435 - "disruption-types.ts"
 Cohesion: 0.29
 Nodes (7): Phase 2: Foundational — Additive Storage and Redis Primitives, Work Package 2A — Redis Lifecycle and Health, Work Package 2B — Atomic Daily/Burst Admission, Work Package 2C — Fenced Session Lease, Work Package 2D — Trusted Snapshot Repository, Work Package 2E — Encrypted/Additive Prisma Foundation, Work Package 2F — Inert Domain Skeletons
 
 ### Community 436 - "Tasks: LLM Output Guardrails"
-Cohesion: 0.02
-Nodes (168): _MultipleMessages, _R_co, _SingleMessage, Messages that correspond to this observation., Any, create_message(), ErrorCode, Any (+160 more)
+Cohesion: 0.01
+Nodes (258): main(), my_tool(), InjectedState, BlockDeltaFields, CompatBlock, ContentBlockDelta, ContentBlockDeltaData, ContentBlockFinishData (+250 more)
 
 ### Community 437 - "page.tsx"
 Cohesion: 0.33
 Nodes (5): name, prisma, seed, private, version
 
 ### Community 438 - "Tasks: LLM Output Guardrails"
-Cohesion: 0.06
-Nodes (75): EventHook, AsyncClient, Client, _is_https_redirect(), Any, Auth, AuthTypes, CertTypes (+67 more)
+Cohesion: 0.05
+Nodes (76): EventHook, AsyncClient, BaseClient, Client, _is_https_redirect(), Any, Auth, AuthTypes (+68 more)
 
 ### Community 439 - "payment.service.js"
 Cohesion: 0.06
@@ -2516,55 +2391,47 @@ Cohesion: 0.33
 Nodes (6): Delivery phases and pull requests, Phase 1 / PR 1 — Quote and cancellation eligibility, Phase 2 / PR 2 — Supplier-first cancellation transaction, Phase 3 / PR 3 — Durable Stripe refund recovery, Phase 4 / PR 4 — Cancellation status experience and operations, Phase 5 / PR 5 — End-to-end resilience verification
 
 ### Community 443 - "ancillary.types.ts"
-Cohesion: 0.06
-Nodes (44): assertCurrency(), calculateAncillaryTotals(), formatCents(), parseCents(), PricingInput, baggage, seats, AncillarySelectionValidationError (+36 more)
+Cohesion: 0.07
+Nodes (28): AncillaryBaggageSelection, AncillaryCabin, AncillaryCabinClass, AncillaryCacheStatus, AncillaryCatalog, AncillaryCatalogResponse, AncillaryErrorCode, AncillaryErrorResponse (+20 more)
 
 ### Community 444 - "checkout.ts"
 Cohesion: 0.33
 Nodes (6): Parallel Examples, US1, US2, US3, US4, US5
 
 ### Community 445 - "Layer 2: Claim Token"
-Cohesion: 0.06
-Nodes (48): _bound_text(), agent.guardrails.layers.injection ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  High-perfor, Safely bounds string to max_bytes in UTF-8 encoding., Scans text against compiled injection signatures.          Returns:, bounded_normalize(), decode_nested_url(), detect_base64_payloads(), is_catastrophic_regex() (+40 more)
+Cohesion: 0.50
+Nodes (3): check_booking_readiness(), Any, Check the booking readiness for a flight offer and passenger set.      This to
 
 ### Community 446 - "Layer 2: Claim Token"
 Cohesion: 0.20
 Nodes (8): app_module_1, common_1, crypto, duffel_service_1, http_exception_filter_1, prisma_service_1, supertest_1, testing_1
 
 ### Community 447 - "Layer 2: Claim Token"
-Cohesion: 0.21
-Nodes (41): AsyncRealtimeConnectionManager, AsyncRealtimeConversationItemResource, AsyncRealtimeConversationResource, AsyncRealtimeInputAudioBufferResource, AsyncRealtimeOutputAudioBufferResource, AsyncRealtimeResponseResource, AsyncRealtimeSessionResource, AsyncRealtimeTranscriptionSessionResource (+33 more)
+Cohesion: 0.06
+Nodes (85): AsyncRealtime, AsyncRealtimeConnection, AsyncRealtimeConnectionManager, AsyncRealtimeConversationItemResource, AsyncRealtimeConversationResource, AsyncRealtimeInputAudioBufferResource, AsyncRealtimeOutputAudioBufferResource, AsyncRealtimeResponseResource (+77 more)
 
 ### Community 448 - "Implementation Decisions"
 Cohesion: 0.40
 Nodes (3): appDirectory, duplicates, routeFiles
-
-### Community 449 - "AI Copilot Landing Page Implementation Plan"
-Cohesion: 0.07
-Nodes (46): apiUrl(), BookingTab, delay(), FetchResult, formatMoneyAmount(), mapAirline(), mapAirport(), mapDetail() (+38 more)
 
 ### Community 450 - "booking-types.ts"
 Cohesion: 0.40
 Nodes (5): Dependencies & Execution Order, Mapping to the Seventeen Plan Slices, Phase Dependencies, User Story Dependencies, Within Each User Story
 
 ### Community 451 - "Implementation Decisions"
-Cohesion: 0.03
-Nodes (101): AsyncSandboxClient, Any, BaseException, DownloadContentDisposition, PathLike, RequestHeaders, SandboxProxyConfig, Snapshot (+93 more)
+Cohesion: 0.04
+Nodes (87): AsyncSandboxClient, DownloadContentDisposition, PathLike, RequestHeaders, SandboxProxyConfig, Snapshot, Capture a snapshot from a running sandbox.          Blocks until the snapshot is, Get a snapshot by ID.          Args:             snapshot_id: Snapshot UUID. (+79 more)
 
 ### Community 452 - "AI Copilot Landing Page Implementation Plan"
-Cohesion: 0.06
-Nodes (33): Self, Initialize tool calls from tool call chunks.          Returns:             The v, Initialize server tool calls.          Parse `server_tool_call_chunks` from, JsonOutputParser, Any, TBaseModel, Return the format instructions for the JSON output.          Returns:, Parse the output of an LLM call to a JSON object.      Probably the most reliabl (+25 more)
+Cohesion: 0.67
+Nodes (3): main(), Exercise the real NestJS handoff boundary without emitting request data., _run()
 
 ### Community 453 - "Implementation Decisions"
-Cohesion: 0.03
-Nodes (49): evaluate_checkout_gate(), _is_snapshot_active(), Any, RouteDecision, Check if snapshot is present and unexpired., Evaluates the checkout gate criteria.     Requires: intent=CHECKOUT, confidence, create_handoff_token(), _extract_display_info() (+41 more)
-
-### Community 454 - "AI Copilot Landing Page Implementation Plan"
-Cohesion: 0.05
-Nodes (42): handler, LandingPage(), authOptions, getAuthCookieConfig(), apiUrl(), failure(), getAccessToken(), getDashboardSummary() (+34 more)
+Cohesion: 0.08
+Nodes (6): Strictly assert no network, Redis, DB, or external API calls happen during tool, TestCheckoutSignalInvalidIndices, TestCheckoutSignalMissingOrEmptySnapshot, TestCheckoutSignalOutOfBounds, TestCheckoutSignalValidCases, TestCheckoutSignalZeroIO
 
 ### Community 455 - "payment-refund.service.js"
-Cohesion: 0.29
+Cohesion: 0.25
 Nodes (6): MOCK_MALICIOUS_NESTED_PII_PAYLOAD, MOCK_MALICIOUS_ROOT_PII_PAYLOAD, MOCK_MALICIOUS_TARGET_MISMATCH_PAYLOAD, MOCK_MULTI_PAYLOAD, MOCK_SINGLE_DOMESTIC_PAYLOAD, MOCK_SINGLE_INTERNATIONAL_PAYLOAD
 
 ### Community 457 - "API Contracts: Stripe Payment System"
@@ -2576,12 +2443,12 @@ Cohesion: 0.50
 Nodes (4): Exit criteria, Phase 1 / PR 2 — Contracts, additive schema, migration, and shared types, Tests, Work
 
 ### Community 459 - "API Contracts: Stripe Payment System"
-Cohesion: 0.05
-Nodes (56): AsyncBoxesResource, AsyncBoxesResourceWithRawResponse, AsyncBoxesResourceWithStreamingResponse, BoxesResource, BoxesResourceWithRawResponse, BoxesResourceWithStreamingResponse, This property can be used as a prefix for any HTTP method call to return, An alternative to `.with_raw_response` that doesn't eagerly read the response bo (+48 more)
+Cohesion: 0.04
+Nodes (62): Select the HTTPX-compatible backend used by this package.  The maintained `httpx, AsyncAPIResource, SyncAPIResource, AsyncBoxesResource, AsyncBoxesResourceWithRawResponse, AsyncBoxesResourceWithStreamingResponse, BoxesResource, BoxesResourceWithRawResponse (+54 more)
 
 ### Community 460 - "dependencies"
-Cohesion: 0.03
-Nodes (106): ContentBlock, Initialize an `AIMessage`.          Specify `content` as positional arg or `cont, Return standard, typed `ContentBlock` dicts from the message.          If the me, Return standard, typed `ContentBlock` dicts from the message., _extract_reasoning_from_additional_kwargs(), ContentBlock, Initialize a `BaseMessage`.          Specify `content` as positional arg or `con, r"""Load content blocks from the message content.          !!! version-added "Ad (+98 more)
+Cohesion: 0.02
+Nodes (128): r"""Load content blocks from the message content.          !!! version-added "Ad, _convert_citation_to_v1(), _convert_to_v1_from_anthropic(), _convert_to_v1_from_anthropic_input(), _non_standard_block(), _populate_extras(), Any, ContentBlock (+120 more)
 
 ### Community 461 - "API Contracts: Disruption & Flight-Change Management"
 Cohesion: 0.50
@@ -2613,11 +2480,11 @@ Nodes (23): Cancellation & Refund with Ancillaries, Complete Booking Flow, Conte
 
 ### Community 469 - "MemoryQueryDto"
 Cohesion: 0.02
-Nodes (116): IntEnum, Auth, BasicAuth, FunctionAuth, Allows the 'auth' argument to be passed as a simple callable function,     that, Allows the 'auth' argument to be passed as a (username, password) pair,     and, Base class for all authentication schemes.      To implement a custom authentica, # TODO: implement auth-int (+108 more)
+Nodes (70): Proxy, HeaderTypes, SSLContext, TimeoutTypes, URL, UnsetType, _obfuscate_sensitive_headers(), _parse_header_links() (+62 more)
 
 ### Community 471 - ".getFlightDetail"
-Cohesion: 0.04
-Nodes (81): IT, random_name(), Generate a random name., _build_comparative_url(), _collect_evaluator_keys(), _default_process_inputs(), _ensure_traceable(), evaluate() (+73 more)
+Cohesion: 0.03
+Nodes (94): IT, _aforward(), __getattr__(), Any, .. deprecated:: 0.5.0.      Importing from langsmith.evaluation is deprecated. U, random_name(), Generate a random name., _build_comparative_url() (+86 more)
 
 ### Community 472 - "Tasks: Duffel Flight Search Service"
 Cohesion: 0.67
@@ -2625,43 +2492,43 @@ Nodes (3): Implementation Strategy, Incremental Delivery, MVP First — US1 Only
 
 ### Community 474 - "Decisions Made"
 Cohesion: 0.02
-Nodes (186): ConnectionOption, ExtensionHeader, ExtensionName, LookupError, UpgradeProtocol, process_exception(), Determine whether a connection error is retryable or fatal.      When reconnec, broadcast() (+178 more)
+Nodes (169): ConnectionOption, ExtensionHeader, ExtensionName, LookupError, UpgradeProtocol, process_exception(), Determine whether a connection error is retryable or fatal.      When reconnec, basic_auth() (+161 more)
 
 ### Community 475 - "package.json"
-Cohesion: 0.07
-Nodes (34): AsyncContent, AsyncContentWithRawResponse, AsyncContentWithStreamingResponse, Content, ContentWithRawResponse, ContentWithStreamingResponse, AsyncContentWithRawResponse, AsyncContentWithStreamingResponse (+26 more)
+Cohesion: 0.03
+Nodes (75): SpeechModel, HttpxBinaryResponseContent, Any, AsyncStream, BaseClient, FinalRequestOptions, PathLike, Response (+67 more)
 
 ### Community 485 - "Quickstart: Agent Tool-Calling & Data Access — Validation Guide"
-Cohesion: 0.04
-Nodes (71): DataSourceConfigCustom, DataSourceConfigLogs, DataSourceConfigStoredCompletions, EvalCreateParams, Deprecated in favor of LogsDataSourceConfig., A text output from the model., An image input block used within EvalItem content arrays., A message input to the model with a role indicating instruction following     hi (+63 more)
+Cohesion: 0.03
+Nodes (109): DataSourceConfigCustom, DataSourceConfigLogs, DataSourceConfigStoredCompletions, EvalCreateParams, Deprecated in favor of LogsDataSourceConfig., A text output from the model., An image input block used within EvalItem content arrays., A message input to the model with a role indicating instruction following     hi (+101 more)
 
 ### Community 488 - "AncillariesService"
 Cohesion: 0.05
-Nodes (26): AncillariesController, AuthenticatedRequest, AncillariesService, CommitAncillarySelectionDto, CommitBaggageDto, CommitSeatDto, JwtAuthGuard, AuthenticatedRequest (+18 more)
+Nodes (32): AncillariesController, AuthenticatedRequest, AncillariesService, OwnedIntent, AncillaryCatalogService, assertCurrency(), calculateAncillaryTotals(), formatCents() (+24 more)
 
 ### Community 489 - "user-bookings.dto.ts"
 Cohesion: 0.02
-Nodes (66): Formatter, This method must return statements or declarations suitable to define         th, This method must format the tokens from the `tokensource` iterable and         w, Converts a token stream to text.      Formatters should have attributes to help, HTML-escape a value and split it by newlines.          ``quote=False`` is intent, BmpImageFormatter, FontManager, FontNotFound (+58 more)
+Nodes (69): Formatter, This method must return statements or declarations suitable to define         th, This method must format the tokens from the `tokensource` iterable and         w, Converts a token stream to text.      Formatters should have attributes to help, GroffFormatter, Format tokens with groff escapes to change their color and font style.      .. v, BmpImageFormatter, FontManager (+61 more)
 
 ### Community 490 - "._astream"
-Cohesion: 0.10
-Nodes (32): Headers, NotGiven, Omit, Query, SequenceNotStr, Get audio speeches usage details for the organization.          Args:, Get audio transcriptions usage details for the organization.          Args:, Get code interpreter sessions usage details for the organization.          Args: (+24 more)
+Cohesion: 0.03
+Nodes (69): ResponseExtensions, AsyncIteratorByteStream, ByteStream, encode_content(), encode_html(), encode_json(), encode_multipart_data(), encode_request() (+61 more)
 
 ### Community 491 - "2. Feature Flags and Rollout Order"
-Cohesion: 0.06
-Nodes (35): AsyncPaginator, datetime, Headers, NotGiven, Omit, Query, Thread, Query threads within a project (session), with cursor-based pagination. (+27 more)
+Cohesion: 0.04
+Nodes (60): AnnotationQueueAnnotationQueuesParams, AnnotationQueueCreateRunStatusParams, AnnotationQueueExportParams, AnnotationQueuePopulateParams, AnnotationQueueRetrieveAnnotationQueuesParams, AnnotationQueueRetrieveResponse, AssignedReviewer, Identity info for an assigned reviewer on an annotation queue. (+52 more)
 
 ### Community 492 - "7. Key and Secret Rotation"
 Cohesion: 0.02
-Nodes (113): Enum, str, Build the JSON body for one `runs` entry of `add_runs_to_annotation_queue`., _serialize_run_key(), _create_usage_metadata(), UsageMetadata, Shared token-usage mapping.  ``_create_usage_metadata`` normalizes an OpenAI-sha, AgentContext (+105 more)
+Nodes (119): Enum, str, BytesIO, DataFrame, Upload a dataframe as individual examples to the LangSmith API.          Args:, Upload a CSV file to the LangSmith API.          Args:             csv_file: The, Build the JSON body for one `runs` entry of `add_runs_to_annotation_queue`., _serialize_run_key() (+111 more)
 
 ### Community 493 - "8. Backfill Governance & Quarantine Management"
 Cohesion: 0.03
-Nodes (91): field_get_default(), field_is_required(), field_outer_type(), GenericModel, get_args(), get_model_config(), get_model_fields(), is_literal_type() (+83 more)
+Nodes (90): field_get_default(), field_is_required(), field_outer_type(), GenericModel, get_args(), get_model_config(), get_model_fields(), is_literal_type() (+82 more)
 
 ### Community 494 - "12. Phase 11B Verified Production Telemetry Baselines & Alert Rules"
-Cohesion: 0.06
-Nodes (29): NotGiven, RealtimeClientEvent, RealtimeClientEventParam, Response, Session, Send this event to truncate a previous assistant message’s audio.          The s, Send this event when you want to retrieve the server's representation of a speci, **WebRTC Only:** Emit to cut off the current audio response.          This will (+21 more)
+Cohesion: 0.03
+Nodes (66): NotGiven, RealtimeClientEvent, RealtimeClientEventParam, Response, Session, Send this event to truncate a previous assistant message’s audio.          The s, Send this event when you want to retrieve the server's representation of a speci, **WebRTC Only:** Emit to cut off the current audio response.          This will (+58 more)
 
 ### Community 495 - "Phase 4 / PR 5 — Signed webhook receiver, durable inbox, and processor"
 Cohesion: 0.50
@@ -2672,8 +2539,8 @@ Cohesion: 0.50
 Nodes (4): Exit criteria, Phase 6 / PR 7 — Traveller APIs, local read model, and cancellation integration, Tests, Work
 
 ### Community 497 - "paths"
-Cohesion: 0.05
-Nodes (51): CodeInterpreterLogs, Text output from the Code Interpreter tool call as part of a run step., CodeInterpreterOutputImage, Image, CodeInterpreter, CodeInterpreterOutputImage, CodeInterpreterOutputImageImage, CodeInterpreterOutputLogs (+43 more)
+Cohesion: 0.03
+Nodes (99): ErrorEvent, Occurs when a [run](https://platform.openai.com/docs/api-reference/runs/object), Occurs when a [run](https://platform.openai.com/docs/api-reference/runs/object), Occurs when a [run](https://platform.openai.com/docs/api-reference/runs/object), Occurs when a [run](https://platform.openai.com/docs/api-reference/runs/object), Occurs when a [run](https://platform.openai.com/docs/api-reference/runs/object), Occurs when a [run](https://platform.openai.com/docs/api-reference/runs/object), Occurs when a [run](https://platform.openai.com/docs/api-reference/runs/object) (+91 more)
 
 ### Community 498 - "Phase 0 / PR 1 — Baseline reconciliation and protected frontend foundation"
 Cohesion: 0.50
@@ -2688,132 +2555,132 @@ Cohesion: 0.50
 Nodes (4): Exit criteria, Phase 7 / PR 8 — Traveller booking disruption experience, Tests, Work
 
 ### Community 502 - "11. Verification & Compliance Sign-Off"
-Cohesion: 0.02
-Nodes (54): AsyncHTTPConnection, AsyncConnectionPool, AsyncPoolRequest, PoolByteStream, BaseException, Origin, Request, Response (+46 more)
+Cohesion: 0.03
+Nodes (52): AsyncHTTPConnection, exponential_backoff(), AsyncConnectionPool, AsyncPoolRequest, PoolByteStream, BaseException, Origin, Request (+44 more)
 
 ### Community 503 - "4. Dashboards and Alert Rules"
 Cohesion: 0.04
 Nodes (100): begin_llm_run_from_assistant_messages(), _bind_hook_to_session(), _get_last_active_tool_run(), _inject_tracing_hooks(), instrument_claude_client(), instrument_sdk_mcp_tool(), _newest_matching_tool_run(), Any (+92 more)
 
 ### Community 504 - "traveler-profile.types.ts"
-Cohesion: 0.07
-Nodes (29): DashboardPage(), baseActions, buildDashboardActions(), DashboardAction, profileAction, buildSearchUrl(), CabinClass, isCabinClass() (+21 more)
+Cohesion: 0.12
+Nodes (16): BookingReadinessResult, MaskedContactSummary, MaskedDocumentSummary, MaskedPassengerSummary, ReadinessFieldResult, ReadinessPassengerResult, ReadinessReasonCode, ReadinessScope (+8 more)
 
 ### Community 505 - "5. Performance and Concurrency Baselines"
 Cohesion: 0.02
-Nodes (88): Addable, AsyncFunctionDef, Attribute, Call, FunctionDef, Lambda, Name, Subscript (+80 more)
+Nodes (76): Addable, AsyncFunctionDef, Attribute, Call, FunctionDef, Lambda, Name, Subscript (+68 more)
 
 ### Community 506 - "9. Privacy & Cryptographic Invariants"
-Cohesion: 0.02
-Nodes (91): FormatOutputType, ImageURL, TypeAlias, get_verbose(), Get the value of the `verbose` global setting.      Returns:         The value o, BaseLanguageModel, _get_langchain_version(), _get_token_ids_default_method() (+83 more)
+Cohesion: 0.03
+Nodes (72): Defs, FormatOutputType, PromptValue, Base abstract class for inputs to any language model.      `PromptValues` can be, Return `True` as this class is serializable., Get the namespace of the LangChain object.          Returns:             `["lang, Return prompt value as string., Return prompt as a list of messages. (+64 more)
 
 ### Community 507 - "booking-intent.types.ts"
-Cohesion: 0.09
-Nodes (20): PromptCacheBreakpoint, Marks the exact end of a reusable prompt prefix.      The breakpoint inherits it, A file input to the model., ResponseInputFileContentParam, A file input to the model., ResponseInputFileContent, PromptCacheBreakpoint, Marks the exact end of a reusable prompt prefix.      The breakpoint inherits it (+12 more)
+Cohesion: 0.04
+Nodes (42): Emitted when an error occurs., ResponseErrorEvent, An event that is emitted when a response fails., ResponseFailedEvent, PromptCacheBreakpoint, Marks the exact end of a reusable prompt prefix.      The breakpoint inherits it, A file input to the model., ResponseInputFileContentParam (+34 more)
 
 ### Community 508 - "Project Structure"
-Cohesion: 0.02
-Nodes (102): RETURN_VAL_TYPE, BaseCache, InMemoryCache, Any, Optional caching layer for language models.  Distinct from provider-based [promp, Async look up based on `prompt` and `llm_string`.          A cache implementatio, Async update cache based on `prompt` and `llm_string`.          The prompt and l, Async clear cache that can take additional keyword arguments. (+94 more)
+Cohesion: 0.04
+Nodes (62): RETURN_VAL_TYPE, BaseCache, InMemoryCache, Any, Async look up based on `prompt` and `llm_string`.          A cache implementatio, Async update cache based on `prompt` and `llm_string`.          The prompt and l, Async clear cache that can take additional keyword arguments., Cache that stores things in memory.      Example:         ```python         from (+54 more)
 
 ### Community 509 - "BaseTransport"
 Cohesion: 0.03
-Nodes (52): AsyncHandler, SyncHandler, Configure write buffer limits.          The high-water limit is defined by ``s, create_ssl_context(), CertTypes, HeaderTypes, SSLContext, URL (+44 more)
+Nodes (56): AsyncHandler, SyncHandler, Configure write buffer limits.          The high-water limit is defined by ``s, CertTypes, Proxy, SSLContext, create_ssl_context(), Limits (+48 more)
 
 ### Community 510 - "utils.py"
-Cohesion: 0.02
-Nodes (110): Retry, UserWarning, convert_langchain_message(), _convert_message(), deepish_copy(), filter_logs(), filter_request_headers(), FilterLangSmithRetry (+102 more)
+Cohesion: 0.03
+Nodes (96): Retry, UserWarning, convert_langchain_message(), _convert_message(), deepish_copy(), filter_logs(), filter_request_headers(), FilterLangSmithRetry (+88 more)
 
 ### Community 511 - "responses.py"
-Cohesion: 0.08
-Nodes (43): _convert_any_typed_dicts_to_pydantic(), _convert_json_schema_to_openai_function(), _convert_pydantic_to_openai_function(), _convert_python_function_to_openai_function(), convert_to_json_schema(), convert_to_openai_function(), convert_to_openai_tool(), _convert_typed_dict_to_openai_function() (+35 more)
+Cohesion: 0.04
+Nodes (61): AsyncInputItems, AsyncInputItemsWithRawResponse, AsyncInputItemsWithStreamingResponse, InputItems, InputItemsWithRawResponse, InputItemsWithStreamingResponse, AsyncInputItemsWithRawResponse, AsyncInputItemsWithStreamingResponse (+53 more)
 
 ### Community 512 - "run_in_executor"
-Cohesion: 0.07
-Nodes (24): BaseStore, InMemoryBaseStore, InMemoryByteStore, InMemoryStore, InvalidKeyException, K, V, **Store** implements the key-value stores and storage helpers.  Module provides (+16 more)
+Cohesion: 0.03
+Nodes (62): Executor, BaseChatMessageHistory, InMemoryChatMessageHistory, Async version of getting messages.          Can over-ride this method to provide, Convenience method for adding a human message string to the store.          !!!, Convenience method for adding an `AIMessage` string to the store.          !!! n, Add a Message object to the store.          Args:             message: A `BaseMe, Add a list of messages.          Implementations should over-ride this method to (+54 more)
 
 ### Community 513 - "beta.py"
-Cohesion: 0.02
-Nodes (98): Assistants, AssistantsWithRawResponse, AssistantsWithStreamingResponse, AsyncAssistants, AsyncAssistantsWithRawResponse, AsyncAssistantsWithStreamingResponse, Build Assistants that can call models and use tools., This property can be used as a prefix for any HTTP method call to return (+90 more)
+Cohesion: 0.03
+Nodes (48): Assistants, AssistantsWithRawResponse, AssistantsWithStreamingResponse, AsyncAssistants, AsyncAssistantsWithRawResponse, AsyncAssistantsWithStreamingResponse, Build Assistants that can call models and use tools., This property can be used as a prefix for any HTTP method call to return (+40 more)
 
 ### Community 514 - "AsyncCompletions"
 Cohesion: 0.03
-Nodes (66): AsyncChat, AsyncChatWithRawResponse, AsyncChatWithStreamingResponse, Chat, ChatWithRawResponse, ChatWithStreamingResponse, AsyncCompletions, AsyncCompletionsWithRawResponse (+58 more)
+Nodes (73): AsyncCompletions, AsyncCompletionsWithRawResponse, AsyncCompletionsWithStreamingResponse, Completions, CompletionsWithRawResponse, CompletionsWithStreamingResponse, AsyncCompletionsWithRawResponse, AsyncCompletionsWithStreamingResponse (+65 more)
 
 ### Community 515 - "client.py"
 Cohesion: 0.03
-Nodes (68): LangsmithOpenAPIClient, SyncLangsmithOpenAPIClient, TracingMode, _attachment_references_filesystem(), _check_feedback_session_id(), close_session(), _default_retry_config(), _get_langsmith_env_var_uncached() (+60 more)
+Nodes (75): LangsmithOpenAPIClient, SyncLangsmithOpenAPIClient, TracingMode, _apply_optional_api_key(), _attachment_references_filesystem(), _check_feedback_session_id(), _close_files(), close_session() (+67 more)
 
 ### Community 516 - "LangSmithError"
-Cohesion: 0.07
-Nodes (16): CommandTimeoutError, Initialize the error., Initialize the error., Initialize the error., Initialize the error., Initialize the error., Initialize the error., Initialize the error. (+8 more)
+Cohesion: 0.03
+Nodes (81): CommandTimeoutError, DataplaneNotConfiguredError, QuotaExceededError, Custom exceptions for the sandbox client.  All sandbox exceptions extend LangSmi, Raised when an operation times out.      Attributes:         resource_type: Type, Initialize the error., Return string representation., Raised when deleting a resource that is still in use.      Attributes:         r (+73 more)
 
 ### Community 517 - "response_create_params.py"
-Cohesion: 0.07
-Nodes (93): BetaResponseConversationParamParam, The conversation that this response belongs to., Agent, CallerDirect, CallerProgram, The agent that produced this item., JSONObject, Default response format. Used to generate text responses. (+85 more)
+Cohesion: 0.09
+Nodes (77): BetaResponseConversationParamParam, The conversation that this response belongs to., JSONObject, Default response format. Used to generate text responses., JSON object response format.      An older method of generating JSON responses., Text, BetaResponseFormatTextJSONSchemaConfigParam, JSON Schema response format.      Used to generate structured JSON responses. (+69 more)
 
 ### Community 518 - ".handshake"
 Cohesion: 0.03
-Nodes (54): Any, LoggerLike, Origin, State, Subprotocol, ClientExtensionFactory, Extension, ExtensionParameter (+46 more)
+Nodes (62): ClientExtensionFactory, Extension, ExtensionParameter, Frame, Process parameters received from the client.          Args:             param, Base class for extensions., Decode an incoming frame.          Args:             frame: Incoming frame., Encode an outgoing frame.          Args:             frame: Outgoing frame. (+54 more)
 
 ### Community 519 - "beta_tool_param.py"
 Cohesion: 0.06
-Nodes (74): AssistantListParams, AssistantToolChoiceFunctionParam, AssistantToolChoiceParam, Specifies a tool the model should use.      Use to force the model to call a spe, BetaApplyPatchToolParam, Allows the assistant to create, delete, or update files using unified diffs., BetaComputerToolParam, A tool that controls a virtual computer.      Learn more about the [computer too (+66 more)
+Nodes (73): BetaApplyPatchToolParam, Allows the assistant to create, delete, or update files using unified diffs., BetaComputerToolParam, A tool that controls a virtual computer.      Learn more about the [computer too, BetaComputerUsePreviewToolParam, A tool that controls a virtual computer.      Learn more about the [computer too, BetaContainerAutoParam, BetaContainerNetworkPolicyAllowlistParam (+65 more)
 
 ### Community 520 - "groups.py"
-Cohesion: 0.07
-Nodes (41): make_jwt(), mock_nestjs_client(), parse_sse(), Missing Authorization header returns 401., Malformed Authorization header format returns 401., JWT signed with untrusted / invalid secret returns 401., Expired JWT token returns 401., JWT missing canonical claims (sub or jti) returns 401. (+33 more)
+Cohesion: 0.04
+Nodes (59): AsyncGroups, AsyncGroupsWithRawResponse, AsyncGroupsWithStreamingResponse, Groups, GroupsWithRawResponse, GroupsWithStreamingResponse, AsyncGroupsWithRawResponse, AsyncGroupsWithStreamingResponse (+51 more)
 
 ### Community 521 - "__init__.py"
-Cohesion: 0.05
-Nodes (54): ChatCompletionAllowedToolChoiceParam, Constrains the tools available to the model to a pre-defined set., ChatCompletionAllowedToolsParam, Constrains the tools available to the model to a pre-defined set., Audio, ChatCompletionAssistantMessageParam, FunctionCall, Data about a previous audio response from the model.     [Learn more](https://pl (+46 more)
+Cohesion: 0.04
+Nodes (63): ChatCompletionAllowedToolChoiceParam, Constrains the tools available to the model to a pre-defined set., ChatCompletionAllowedToolsParam, Constrains the tools available to the model to a pre-defined set., Audio, ChatCompletionAssistantMessageParam, FunctionCall, Data about a previous audio response from the model.     [Learn more](https://pl (+55 more)
 
 ### Community 522 - "annotation_queues.py"
-Cohesion: 0.03
-Nodes (82): _FailedAttachmentReader, _LangSmithHttpAdapter, ListThreadsItem, BytesIO that raises an error when read, for failed attachment downloads., Introduced in python 3.9., Used for optional OTEL tracing., Item returned by :meth:`Client.list_threads`., TracerProvider (+74 more)
+Cohesion: 0.05
+Nodes (46): AnnotationQueuesResource, AnnotationQueuesResourceWithRawResponse, AnnotationQueuesResourceWithStreamingResponse, AsyncAnnotationQueuesResource, AsyncAnnotationQueuesResourceWithRawResponse, AsyncAnnotationQueuesResourceWithStreamingResponse, AsyncRunsResource, AsyncRunsResourceWithRawResponse (+38 more)
 
 ### Community 523 - "response_input_item.py"
-Cohesion: 0.07
-Nodes (178): ContentType, Response, ContainerReference, EasyInputMessage, A message input to the model with a role indicating instruction following     hi, LocalEnvironment, ParsedResponse, ParsedResponseFunctionToolCall (+170 more)
+Cohesion: 0.17
+Nodes (89): ContainerReference, EasyInputMessage, A message input to the model with a role indicating instruction following     hi, LocalEnvironment, A tool call to run code., ResponseCodeInterpreterToolCall, A compaction item generated by the [`v1/responses/compact` API](https://platform, ResponseCompactionItemParam (+81 more)
 
 ### Community 524 - "__init__.py"
 Cohesion: 0.04
-Nodes (68): FileCitation, FileCitationAnnotation, A citation within the message that points to a specific quote from a specific Fi, FileCitation, FileCitationDeltaAnnotation, A citation within the message that points to a specific quote from a specific Fi, FilePath, FilePathAnnotation (+60 more)
+Nodes (59): FileCitation, FileCitationAnnotation, A citation within the message that points to a specific quote from a specific Fi, FileCitation, FileCitationDeltaAnnotation, A citation within the message that points to a specific quote from a specific Fi, FilePath, FilePathAnnotation (+51 more)
 
 ### Community 525 - "GenerationChunk"
-Cohesion: 0.09
-Nodes (29): build_extra_kwargs(), _build_model_kwargs(), check_package_version(), convert_to_secret_str(), from_env(), get_pydantic_field_names(), guard_import(), mock_now() (+21 more)
+Cohesion: 0.03
+Nodes (64): GenerationChunk, Generation output schema., `GenerationChunk`, which can be concatenated with other `Generation` chunks., Concatenate two `GenerationChunk` objects.          Args:             other: Ano, is_pydantic_v1_subclass(), Check if the given class is Pydantic v1-like.      Returns:         `True` if th, build_extra_kwargs(), _build_model_kwargs() (+56 more)
 
 ### Community 526 - "AsyncLangsmith"
 Cohesion: 0.03
-Nodes (33): AsyncAPIClient, AsyncLangsmith, Any, APIStatusError, AsyncClient, AsyncRunsResource, Client, NotGiven (+25 more)
+Nodes (34): AsyncAPIClient, AsyncLangsmith, Any, APIStatusError, AsyncClient, AsyncRunsResource, Client, Headers (+26 more)
 
 ### Community 527 - "Run"
 Cohesion: 0.06
 Nodes (47): Retrieve the tags (if any)., AsyncBaseTracer, BaseTracer, Any, BaseException, RetryCallState, Run, UUID (+39 more)
 
 ### Community 528 - "conversations.py"
-Cohesion: 0.06
-Nodes (36): Manage conversations and conversation items., Manage conversations and conversation items., Manage conversations and conversation items., Manage conversations and conversation items., Manage conversations and conversation items., Manage conversations and conversation items., AsyncConversations, AsyncConversationsWithRawResponse (+28 more)
+Cohesion: 0.05
+Nodes (51): Manage conversations and conversation items., Manage conversations and conversation items., Manage conversations and conversation items., Manage conversations and conversation items., ConversationsProxy, AsyncConversations, AsyncConversationsWithRawResponse, AsyncConversationsWithStreamingResponse (+43 more)
 
 ### Community 529 - "chatkit.py"
-Cohesion: 0.07
-Nodes (40): searchFlightsAction(), selectFlightOfferAction(), apiUrl(), CabinClassSchema, CabinMismatchDetailSchema, createSearchMeta(), delay(), duration() (+32 more)
+Cohesion: 0.05
+Nodes (50): AsyncChatKit, AsyncChatKitWithRawResponse, AsyncChatKitWithStreamingResponse, ChatKit, ChatKitWithRawResponse, ChatKitWithStreamingResponse, AsyncSessions, AsyncSessionsWithRawResponse (+42 more)
 
 ### Community 530 - ".name"
-Cohesion: 0.05
-Nodes (35): BasePlugin, __getattr__(), Any, LangSmith integration for Google ADK Live (Gemini Live voice).  Provides :class:, _AdkLiveTracer, LangSmithGoogleADKLivePlugin, _LiveEventView, Any (+27 more)
+Cohesion: 0.04
+Nodes (46): BasePlugin, RunKind, __getattr__(), Any, LangSmith integration for Google ADK Live (Gemini Live voice).  Provides :class:, _AdkLiveTracer, LangSmithGoogleADKLivePlugin, _LiveEventView (+38 more)
 
 ### Community 531 - "RunTree"
-Cohesion: 0.03
-Nodes (75): _extract_usage(), AuthHeaders, _Baggage, _check_endpoint_env_unset(), _coerce_to_dict(), configure(), _create_current_dotted_order(), _ensure_write_replicas() (+67 more)
+Cohesion: 0.04
+Nodes (61): __getattr__(), Any, _extract_usage(), get_current_run_tree(), _get_parent_run(), _get_project_name(), get_tracing_context(), Context (+53 more)
 
 ### Community 532 - "run_helpers.py"
-Cohesion: 0.04
-Nodes (90): __getattr__(), Any, as_runnable(), _attachment_args(), _attachment_args_helper(), _cached_attachment_args(), _cached_attachment_args_by_signature(), _cleanup_traceback() (+82 more)
+Cohesion: 0.05
+Nodes (64): as_runnable(), _attachment_args(), _attachment_args_helper(), _cached_attachment_args(), _cached_attachment_args_by_signature(), _cleanup_traceback(), _collect_extra(), _container_end() (+56 more)
 
 ### Community 533 - "parsed_response.py"
-Cohesion: 0.11
-Nodes (36): assertResponseShape(), authBearer(), buildBookingIntent(), buildPaymentConfirmationPayload(), buildPaymentPayload(), buildSearchQuery(), buildTravelerProfile(), createUniqueTestActor() (+28 more)
+Cohesion: 0.14
+Nodes (74): GenericModel, Response, ParsedResponse, ParsedResponseFunctionToolCall, ParsedResponseOutputMessage, ParsedResponseOutputText, CallerDirect, CallerProgram (+66 more)
 
 ### Community 534 - "WebSocketCommonProtocol"
 Cohesion: 0.04
@@ -2821,27 +2688,27 @@ Nodes (46): prepare_ctrl(), prepare_data(), BytesLike, DataLike, Convert a strin
 
 ### Community 535 - "Any"
 Cohesion: 0.04
-Nodes (48): AsyncCallbackHandler, Any, BaseException, MessagesData, RetryCallState, UUID, Run when LLM errors.          Args:             error: The error that occurred., Add metadata to the callback manager.          Args:             metadata: The m (+40 more)
+Nodes (46): AsyncCallbackHandler, Any, BaseException, MessagesData, RetryCallState, UUID, Run when LLM errors.          Args:             error: The error that occurred., Add metadata to the callback manager.          Args:             metadata: The m (+38 more)
 
 ### Community 536 - "__init__.py"
-Cohesion: 0.08
-Nodes (40): PayloadTooLargeError, Raised when streaming request body exceeds max allowed bytes., Exception, ExceptionMapping, SocketStream, FrameTooLargeError, Raised when accumulated websocket message bytes exceed `ws_max_size`., SSLContext (+32 more)
+Cohesion: 0.07
+Nodes (43): ByteStream, Exception, ExceptionMapping, SocketStream, FrameTooLargeError, Raised when accumulated websocket message bytes exceed `ws_max_size`., AnyIOStream, Any (+35 more)
 
 ### Community 537 - "Implementation Plan: Ancillary Seat and Baggage Checkout"
 Cohesion: 0.10
 Nodes (20): Complexity Tracking, Constitution Check — Post-Design Re-evaluation, Constitution Check — Pre-Design Gate, Dependency and delivery map, Exit criteria, Exit criteria, Feature documentation, Implementation Plan: Ancillary Seat and Baggage Checkout (+12 more)
 
 ### Community 538 - "WriteReplica"
-Cohesion: 0.03
-Nodes (53): RunKind, is_inbound(), Any, Client, LangSmith tracing for the OpenAI Realtime API (raw WebSocket).  OpenAI Realtime, Normalize a Realtime ``usage`` object into the dict the shared mapper reads., Map a Realtime ``usage`` (object or dict) onto LangSmith ``usage_metadata``., Map a ``response.done`` payload's token ``usage`` onto ``usage_metadata``. (+45 more)
+Cohesion: 0.04
+Nodes (48): Forward tool responses and use them to finish inferred tool spans., is_inbound(), Any, Client, LangSmith tracing for the OpenAI Realtime API (raw WebSocket).  OpenAI Realtime, Normalize a Realtime ``usage`` object into the dict the shared mapper reads., Map a Realtime ``usage`` (object or dict) onto LangSmith ``usage_metadata``., Map a ``response.done`` payload's token ``usage`` onto ``usage_metadata``. (+40 more)
 
 ### Community 539 - "ancillary-selection.ts"
-Cohesion: 0.07
-Nodes (37): AncillarySelectionClient(), BaggageChoice, money(), priceKey(), Props, SeatChoice, SeatMap(), SeatTier (+29 more)
+Cohesion: 0.08
+Nodes (34): AncillarySelectionClient(), BaggageChoice, money(), priceKey(), Props, SeatChoice, SeatMap(), SeatTier (+26 more)
 
 ### Community 540 - "content.py"
-Cohesion: 0.04
-Nodes (65): AudioContentBlock, Citation, create_audio_block(), create_citation(), create_file_block(), create_image_block(), create_non_standard_block(), create_plaintext_block() (+57 more)
+Cohesion: 0.03
+Nodes (80): Self, Initialize tool calls from tool call chunks.          Returns:             The v, Initialize server tool calls.          Parse `server_tool_call_chunks` from, AudioContentBlock, Citation, create_audio_block(), create_citation(), create_file_block() (+72 more)
 
 ### Community 541 - "Tunnel"
 Cohesion: 0.04
@@ -2849,67 +2716,67 @@ Nodes (34): AsyncTunnel, _bridge(), _ensure_websockets(), Any, socket, TCP tunne
 
 ### Community 542 - "Server"
 Cohesion: 0.04
-Nodes (55): Any, Map, Request, Response, Router, Server, ServerConnection, SSLContext (+47 more)
+Nodes (53): Any, Map, Request, Response, Router, Server, ServerConnection, SSLContext (+45 more)
 
 ### Community 543 - "ListOutputParser"
-Cohesion: 0.04
-Nodes (40): Element, CommaSeparatedListOutputParser, droplastn(), ListOutputParser, MarkdownListOutputParser, NumberedListOutputParser, Match, T (+32 more)
+Cohesion: 0.03
+Nodes (47): Element, CommaSeparatedListOutputParser, droplastn(), ListOutputParser, MarkdownListOutputParser, NumberedListOutputParser, Match, T (+39 more)
 
 ### Community 544 - "AsyncThreads"
-Cohesion: 0.03
-Nodes (90): AsyncMessages, AsyncMessagesWithRawResponse, AsyncMessagesWithStreamingResponse, Messages, MessagesWithRawResponse, MessagesWithStreamingResponse, AsyncMessagesWithRawResponse, AsyncMessagesWithStreamingResponse (+82 more)
+Cohesion: 0.04
+Nodes (54): AsyncMessages, AsyncMessagesWithRawResponse, AsyncMessagesWithStreamingResponse, MessagesWithRawResponse, MessagesWithStreamingResponse, AsyncMessagesWithRawResponse, AsyncMessagesWithStreamingResponse, MessagesWithRawResponse (+46 more)
 
 ### Community 545 - "response.py"
 Cohesion: 0.09
-Nodes (62): Conversation, The conversation that this response belongs to., ResponseConversationParam, An error object returned when the model fails to generate a Response., ResponseError, IncompleteDetails, Moderation, ModerationInputError (+54 more)
+Nodes (63): CompactedResponse, Conversation, The conversation that this response belongs to., ResponseConversationParam, An error object returned when the model fails to generate a Response., ResponseError, IncompleteDetails, Moderation (+55 more)
 
 ### Community 546 - "robotframework.py"
-Cohesion: 0.04
-Nodes (32): BaseMakefileLexer, CMakeLexer, MakefileLexer, pygments.lexers.make     ~~~~~~~~~~~~~~~~~~~~      Lexers for Makefiles and simi, Lexer for CMake files., Lexer for BSD and GNU make extensions (lenient enough to handle both in     the, Lexer for simple Makefiles (no preprocessing)., Comment (+24 more)
+Cohesion: 0.05
+Nodes (25): Comment, ForLoop, GherkinTokenizer, ImportSetting, KeywordCall, KeywordSetting, KeywordTable, normalize() (+17 more)
 
 ### Community 547 - "_TracerCore"
-Cohesion: 0.05
-Nodes (44): Base class for exceptions in tracers module., TracerException, _extract_gateway_metadata(), Any, BaseException, RetryCallState, Run, UUID (+36 more)
+Cohesion: 0.06
+Nodes (38): Any, BaseException, RetryCallState, Run, UUID, Add child run to a chain run or tool run., Get the stacktrace of the parent error., Create a chat model run. (+30 more)
 
 ### Community 548 - "runs.py"
-Cohesion: 0.05
-Nodes (53): RunType, AsyncRunsResource, AsyncRunsResourceWithRawResponse, AsyncRunsResourceWithStreamingResponse, AsyncPaginator, AsyncRunsResourceWithRawResponse, AsyncRunsResourceWithStreamingResponse, datetime (+45 more)
+Cohesion: 0.06
+Nodes (44): RunType, AsyncRunsResource, AsyncRunsResourceWithRawResponse, AsyncRunsResourceWithStreamingResponse, AsyncPaginator, AsyncRunsResourceWithRawResponse, AsyncRunsResourceWithStreamingResponse, datetime (+36 more)
 
 ### Community 549 - "VectorStore"
-Cohesion: 0.01
-Nodes (183): Executor, Score pairs' similarity.          Args:             text_pairs: List of pairs of, BaseLoader, TextSplitter, A lazy loader for `Document`.          Yields:             The `Document` object, Interface for document loader.      Implementations should implement the lazy-lo, Load data into `Document` objects.          Returns:             The documents., Load data into `Document` objects.          Returns:             The documents. (+175 more)
+Cohesion: 0.04
+Nodes (43): Score pairs' similarity.          Args:             text_pairs: List of pairs of, Any, Embeddings, Self, Access the query embedding object if available., Add documents to the `VectorStore`.          Args:             documents: Docume, Delete by vector ID or other criteria.          Args:             ids: List of I, Async add documents to the `VectorStore`.          Args:             documents: (+35 more)
 
 ### Community 550 - "SerializedRunOperation"
-Cohesion: 0.03
-Nodes (74): BatchIngestConfig, MultipartPart, ref, _apply_auth_overrides(), _apply_optional_api_key(), _close_files(), _log_tracing_drop(), RUN_TYPE_T (+66 more)
+Cohesion: 0.05
+Nodes (53): BatchIngestConfig, MultipartPart, ref, RUN_TYPE_T, Persist a run to the LangSmith API.          Args:             name (str): The n, Batch ingest/upsert multiple runs in the Langsmith system.          Args:, Batch ingest/upsert multiple runs in the Langsmith system.          Args:, Raise unless every attachment is inline data, or filesystem access is opted in. (+45 more)
 
 ### Community 551 - "AsyncUsers"
-Cohesion: 0.09
-Nodes (35): calculateFileCensus(), computeFindingFingerprint(), DEFAULT_EXTENSIONS, DEFAULT_IGNORED_DIRS, DEFAULT_MIN_COUNTS, DEFAULT_SNAPSHOT_DIR, DEFAULT_STANDARD_RULESETS, DEFAULT_WORKSPACES (+27 more)
+Cohesion: 0.05
+Nodes (48): AsyncRoles, AsyncRolesWithRawResponse, AsyncRolesWithStreamingResponse, AsyncRolesWithRawResponse, AsyncRolesWithStreamingResponse, RolesWithRawResponse, RolesWithStreamingResponse, This property can be used as a prefix for any HTTP method call to return (+40 more)
 
 ### Community 552 - "LilyPondLexer"
-Cohesion: 0.07
-Nodes (20): bygroups(), Callback that yields multiple actions for each group in the match., Callback that processes the match with a different lexer.      The keyword argum, using(), _objdump_lexer_tokens(), Common objdump lexer tokens to wrap an ASM lexer., ElixirLexer, gen_elixir_sigstr_rules() (+12 more)
+Cohesion: 0.04
+Nodes (51): bygroups(), Callback that yields multiple actions for each group in the match., Callback that processes the match with a different lexer.      The keyword argum, using(), _objdump_lexer_tokens(), Common objdump lexer tokens to wrap an ASM lexer., ElixirConsoleLexer, ElixirLexer (+43 more)
 
 ### Community 553 - "_completions.py"
-Cohesion: 0.08
-Nodes (55): FunctionDefinition, FunctionToolParam, ResponsesFunctionToolParam, model_json_schema(), model_parse_json(), get_input_tool_by_name(), has_parseable_input(), has_rich_response_format() (+47 more)
+Cohesion: 0.07
+Nodes (63): Function, FunctionDefinition, FunctionToolParam, ResponsesFunctionToolParam, model_json_schema(), model_parse_json(), get_input_tool_by_name(), has_parseable_input() (+55 more)
 
 ### Community 554 - "tool_param.py"
 Cohesion: 0.09
 Nodes (59): ContainerCreateParams, ExpiresAfter, Container expiration time in seconds relative to the 'anchor' time., ApplyPatchToolParam, Allows the assistant to create, delete, or update files using unified diffs., ComputerToolParam, A tool that controls a virtual computer.      Learn more about the [computer too, ComputerUsePreviewToolParam (+51 more)
 
 ### Community 555 - "LangChainTracer"
-Cohesion: 0.04
-Nodes (59): ContextVar, get_usage_metadata_callback(), Callback Handler that tracks `AIMessage.usage_metadata`., Callback Handler that tracks `AIMessage.usage_metadata`.      Example:         `, Initialize the `UsageMetadataCallbackHandler`., Get usage metadata callback.      Get context manager for tracking usage metadat, UsageMetadataCallbackHandler, get_runtime_environment() (+51 more)
+Cohesion: 0.05
+Nodes (50): langchain, Token, _Baggage, Return the `RunTree` as a dictionary of headers., Baggage header information., Return the Baggage object as a header value., get_runtime_environment(), Utilities for getting information about the runtime environment. (+42 more)
 
 ### Community 556 - ".request"
-Cohesion: 0.04
-Nodes (50): AsyncAPIClient, _merge_mappings(), Any, APIStatusError, AsyncAPIClient, AsyncBinaryTypes, AsyncClient, AsyncPageT (+42 more)
+Cohesion: 0.06
+Nodes (37): APIStatusError, AsyncBinaryTypes, AsyncStream, _AsyncStreamT, BaseException, BinaryTypes, FinalRequestOptions, Headers (+29 more)
 
 ### Community 557 - "WebSocketServerProtocol"
-Cohesion: 0.04
-Nodes (51): HeadersLikeOrCallable, HTTPStatus, Base class for server-side extension factories., ServerExtensionFactory, AbortHandshake, HeadersLike, StatusLike, Raised to abort the handshake on purpose and return an HTTP response.      Thi (+43 more)
+Cohesion: 0.05
+Nodes (44): HeadersLikeOrCallable, HTTPStatus, AbstractEventLoop, Any, BaseException, Headers, HTTPResponse, LoggerLike (+36 more)
 
 ### Community 558 - "ResponsePromptParam"
 Cohesion: 0.13
@@ -2917,127 +2784,127 @@ Nodes (58): InputTokenCountParams, Configuration options for a text response fro
 
 ### Community 559 - "_AstreamEventsCallbackHandler"
 Cohesion: 0.06
-Nodes (51): Send all queued messages over the current connection., Send all queued messages over the current connection., BaseStreamEvent, CustomStreamEvent, EventData, Module contains typedefs that are used with `Runnable` objects., Data associated with a streaming event., A standard stream event that follows LangChain convention for event data. (+43 more)
+Nodes (49): BaseStreamEvent, CustomStreamEvent, EventData, Module contains typedefs that are used with `Runnable` objects., Data associated with a streaming event., A standard stream event that follows LangChain convention for event data., Custom stream event created by the user., Streaming event.      Schema of a streaming event which is produced from the `as (+41 more)
 
 ### Community 560 - "AsyncJobs"
-Cohesion: 0.10
-Nodes (28): AsyncCheckpoints, AsyncCheckpointsWithRawResponse, AsyncCheckpointsWithStreamingResponse, Checkpoints, CheckpointsWithRawResponse, CheckpointsWithStreamingResponse, AsyncCheckpointsWithRawResponse, AsyncCheckpointsWithStreamingResponse (+20 more)
+Cohesion: 0.05
+Nodes (49): AsyncCheckpoints, AsyncCheckpointsWithRawResponse, AsyncCheckpointsWithStreamingResponse, Checkpoints, CheckpointsWithRawResponse, CheckpointsWithStreamingResponse, AsyncCheckpointsWithRawResponse, AsyncCheckpointsWithStreamingResponse (+41 more)
 
 ### Community 561 - "audio.py"
-Cohesion: 0.16
-Nodes (25): AsyncAudio, AsyncAudioWithRawResponse, AsyncAudioWithStreamingResponse, Audio, AudioWithRawResponse, AudioWithStreamingResponse, Turn audio into text or text into audio., Turn audio into text or text into audio. (+17 more)
+Cohesion: 0.08
+Nodes (40): AsyncAudio, AsyncAudioWithRawResponse, AsyncAudioWithStreamingResponse, Audio, AudioWithRawResponse, AudioWithStreamingResponse, Turn audio into text or text into audio., Turn audio into text or text into audio. (+32 more)
 
 ### Community 562 - "AsyncNetworkStream"
-Cohesion: 0.04
-Nodes (32): ByteStream, SOCKET_OPTION, SSLContext, SSLContext, URL, A connection pool for making HTTP requests.          Parameters:             pro, AnyIOBackend, AnyIOStream (+24 more)
+Cohesion: 0.05
+Nodes (24): Proxy, SOCKET_OPTION, SSLContext, A connection pool for making HTTP requests.          Parameters:             ssl, AnyIOBackend, AutoBackend, SOCKET_OPTION, AsyncNetworkBackend (+16 more)
 
 ### Community 563 - "AsyncThreadStream"
-Cohesion: 0.03
-Nodes (63): Stable message identifier., The URL path as a string. Excluding the query string, and URL decoded., AsyncThreadStream, _close_after(), _event_namespace(), _exact_namespace_params(), _is_direct_child(), _is_root_terminal_lifecycle() (+55 more)
+Cohesion: 0.04
+Nodes (31): AsyncThreadStream, _is_root_terminal_lifecycle(), BaseException, Event, Task, Return True for a root-namespace lifecycle event marking run end.      Matches t, Async context manager for one thread's v3 streaming session.      Construct via, Return self as the subscription controller (duck-type compatible with StreamCont (+23 more)
 
 ### Community 564 - "schema.py"
 Cohesion: 0.03
-Nodes (69): Async Store client for LangGraph SDK., Async client for managing threads in LangGraph., Assistant, AssistantBase, AssistantVersion, CheckpointPayload, CheckpointsStreamPart, CheckpointTaskPayload (+61 more)
+Nodes (70): Assistant, AssistantBase, AssistantVersion, _BaseModelLike, CheckpointPayload, CheckpointsStreamPart, CheckpointTaskPayload, Config (+62 more)
 
 ### Community 565 - "WebSocketsSansIOProtocol"
 Cohesion: 0.04
-Nodes (44): __getattr__(), main(), _metavar_from_type(), print_version(), Any, ASGIApplication, Config, Context (+36 more)
+Nodes (33): AbstractEventLoop, Any, Config, AbstractEventLoop, Any, Config, AbstractEventLoop, Any (+25 more)
 
 ### Community 566 - "_Matcher"
 Cohesion: 0.05
 Nodes (38): ContextThreadPoolExecutor, _Expect, _Matcher, _NULL_SENTRY, Any, Client, ID_TYPE, Make approximate assertions as "expectations" on test results.  This module is d (+30 more)
 
 ### Community 567 - "_completions.py"
-Cohesion: 0.09
-Nodes (46): ChatCompletionStreamEvent, ChoiceChunk, ParsedChatCompletionSnapshot, ParsedChoiceSnapshot, AsyncChatCompletionStream, AsyncChatCompletionStreamManager, ChatCompletionStream, ChatCompletionStreamManager (+38 more)
+Cohesion: 0.11
+Nodes (44): ChatCompletionStreamEvent, ChoiceChunk, ParsedChatCompletionSnapshot, ParsedChoiceSnapshot, AsyncChatCompletionStream, AsyncChatCompletionStreamManager, ChatCompletionStream, ChatCompletionStreamManager (+36 more)
 
 ### Community 568 - "AsyncServiceURL"
 Cohesion: 0.05
-Nodes (37): Data, DataResultOrganizationCostsResult, DataResultOrganizationCostsResultAmount, DataResultOrganizationUsageAudioSpeechesResult, DataResultOrganizationUsageAudioTranscriptionsResult, DataResultOrganizationUsageCodeInterpreterSessionsResult, DataResultOrganizationUsageCompletionsResult, DataResultOrganizationUsageEmbeddingsResult (+29 more)
+Nodes (34): AsyncServiceURL, Any, Response, Authenticated URL for accessing an HTTP service running in a sandbox.      Prope, Return the raw JWT, refreshing if near expiry., Return the base URL, refreshing if near expiry., Return the browser auth URL, refreshing if near expiry., Return the ISO 8601 expiration, refreshing if near expiry. (+26 more)
 
 ### Community 569 - "pydantic.py"
-Cohesion: 0.11
-Nodes (13): FewShotPromptWithTemplates, Any, Path, Self, Prompt template that contains few shot examples., Format the prompt with the inputs.          Args:             **kwargs: Any argu, Async format the prompt with the inputs.          Args:             **kwargs: An, Prompt template that contains few shot examples. (+5 more)
+Cohesion: 0.03
+Nodes (41): BaseDocumentCompressor, Callbacks, Base class for document compressors.      This abstraction is primarily used for, Compress retrieved documents given the query context.          Args:, Async compress retrieved documents given the query context.          Args:, LengthBasedExampleSelector, Any, Self (+33 more)
 
 ### Community 570 - "_GeminiLiveTracer"
 Cohesion: 0.05
-Nodes (29): FunctionResponseOrDict, LiveServerContent, LiveServerMessage, _append_transcript(), _GeminiLiveTracer, _GeminiLiveTracingSession, _LiveMessageView, Any (+21 more)
+Nodes (33): FunctionResponseOrDict, LiveServerContent, LiveServerMessage, _append_transcript(), _GeminiLiveTracer, _GeminiLiveTracingSession, _LiveMessageView, Any (+25 more)
 
 ### Community 571 - ".create"
-Cohesion: 0.13
-Nodes (41): ParseableToolParam, ResponseInputParam, ResponsesModel, ServiceTier, _make_tools(), AsyncStream, ContextManagement, Conversation (+33 more)
+Cohesion: 0.10
+Nodes (46): ParseableToolParam, ResponseInputParam, ResponsesModel, ServiceTier, _make_tools(), AsyncResponsesConnectionManager, AsyncStream, AsyncWebSocketConnection (+38 more)
 
 ### Community 572 - "AsyncRuns"
-Cohesion: 0.10
-Nodes (18): ItemCreateParams, ItemCreateResponse, ItemCreateStatusParams, ItemCreateStatusResponse, ItemDeleteAllParams, ItemListParams, ItemListResponse, ItemRetrieveCountParams (+10 more)
+Cohesion: 0.06
+Nodes (43): AsyncRuns, AsyncRunsWithRawResponse, AsyncRunsWithStreamingResponse, AsyncRunsWithRawResponse, AsyncRunsWithStreamingResponse, RunsWithRawResponse, RunsWithStreamingResponse, Build Assistants that can call models and use tools. (+35 more)
 
 ### Community 573 - "_client.py"
 Cohesion: 0.06
 Nodes (60): create_traced_session_context(), _determine_llm_call_type(), _extract_latest_invocation_text(), _extract_text_from_content(), extract_tools_from_llm_request(), _get_ls_provider(), _iter_invocation_events(), Any (+52 more)
 
 ### Community 574 - "Config"
-Cohesion: 0.09
-Nodes (28): Connection, ClientConnection, connect(), connect_http_proxy(), connect_socks_proxy(), Any, BytesLike, Event (+20 more)
+Cohesion: 0.04
+Nodes (41): Config, create_ssl_context(), _normalize_dirs(), AbstractEventLoop, Any, ASGIApplication, HTTPProtocolType, InterfaceType (+33 more)
 
 ### Community 575 - "__init__.py"
-Cohesion: 0.05
-Nodes (50): ComputerScreenshotContent, PromptCacheBreakpoint, Marks the exact end of a reusable prompt prefix.      The breakpoint inherits it, A screenshot of a computer., ConversationCreateParams, ImageGenerationCall, LocalShellCall, LocalShellCallAction (+42 more)
+Cohesion: 0.06
+Nodes (39): ComputerScreenshotContent, PromptCacheBreakpoint, Marks the exact end of a reusable prompt prefix.      The breakpoint inherits it, A screenshot of a computer., ConversationCreateParams, ConversationUpdateParams, ItemCreateParams, ItemListParams (+31 more)
 
 ### Community 576 - "types.py"
 Cohesion: 0.03
 Nodes (67): assistants, AssistantsCreate, AssistantsDelete, AssistantsRead, AssistantsSearch, AssistantsUpdate, create, create_run (+59 more)
 
 ### Community 577 - "_configure"
-Cohesion: 0.09
-Nodes (24): Any, Run, T, pydantic_copy(), pydantic_to_dict(), Compatibility helpers for Pydantic v1/v2 with langsmith `Run` objects.  !!! note, Convert run to dict, compatible with both Pydantic v1 and v2.      Args:, Copy run, compatible with both Pydantic v1 and v2.      Args:         run: The r (+16 more)
+Cohesion: 0.04
+Nodes (56): ContextVar, _configure(), _get_debug(), T, Return a copy the async callback manager., Configure the callback manager.      Args:         callback_manager_cls: The cal, get_usage_metadata_callback(), Callback Handler that tracks `AIMessage.usage_metadata`. (+48 more)
 
 ### Community 578 - "_responses.py"
-Cohesion: 0.08
-Nodes (30): ParsedResponseSnapshot, RawResponseCompletedEvent, RawResponseFunctionCallArgumentsDeltaEvent, RawResponseStreamEvent, RawResponseTextDeltaEvent, RawResponseTextDoneEvent, ResponseCompletedEvent, ResponseFunctionCallArgumentsDeltaEvent (+22 more)
+Cohesion: 0.07
+Nodes (34): ParsedResponseSnapshot, RawResponseCompletedEvent, RawResponseFunctionCallArgumentsDeltaEvent, RawResponseStreamEvent, RawResponseTextDeltaEvent, RawResponseTextDoneEvent, ResponseCompletedEvent, ResponseFunctionCallArgumentsDeltaEvent (+26 more)
 
 ### Community 579 - "aevaluate"
-Cohesion: 0.08
-Nodes (29): aevaluate(), aevaluate_existing(), _aforward(), _aresolve_data(), async_chain_from_iterable(), async_iter_from_list(), _AsyncExperimentManager, _default_process_inputs() (+21 more)
+Cohesion: 0.06
+Nodes (33): aevaluate(), aevaluate_existing(), _aresolve_data(), async_chain_from_iterable(), async_iter_from_list(), _AsyncExperimentManager, AsyncExperimentResults, _default_process_inputs() (+25 more)
 
 ### Community 580 - "_BasePromptCache"
 Cohesion: 0.04
-Nodes (36): _BasePromptCache, CacheEntry, CacheMetrics, configure_global_async_prompt_cache(), configure_global_prompt_cache(), Any, Path, Get cache performance metrics. (+28 more)
+Nodes (40): AsyncPromptCache, _BasePromptCache, CacheEntry, CacheMetrics, configure_global_async_prompt_cache(), configure_global_prompt_cache(), Any, Path (+32 more)
 
 ### Community 581 - "tool.py"
 Cohesion: 0.10
 Nodes (55): ApplyPatchTool, Allows the assistant to create, delete, or update files using unified diffs., ComputerTool, A tool that controls a virtual computer.      Learn more about the [computer too, ComputerUsePreviewTool, A tool that controls a virtual computer.      Learn more about the [computer too, ContainerAuto, ContainerNetworkPolicyAllowlist (+47 more)
 
 ### Community 582 - "Protocol"
-Cohesion: 0.03
-Nodes (61): GuardrailService, Validates the input message.          Args:             message: The raw input m, Checks if the guardrail service is healthy and available.          Returns:, AssertionError, _ensure_websockets(), _ensure_websockets_async(), Return the cached sync websockets symbols, or raise if unavailable., Return the cached async websockets symbols, or raise if unavailable. (+53 more)
+Cohesion: 0.05
+Nodes (39): AssertionError, Dict-like types with ``keys() -> str`` and ``__getitem__(key: str) -> str`` meth, SupportsKeysAndGetItem, InvalidState, Raised when sending a frame is forbidden in the current state.      Specifical, Close, BytesLike, Code and reason for WebSocket close frames.      Attributes:         code: Cl (+31 more)
 
 ### Community 583 - "cli.py"
-Cohesion: 0.04
-Nodes (47): ClientConnection, ClientConnection, connect, connect_http_proxy(), connect_socks_proxy(), HTTPProxyConnection, Any, BaseException (+39 more)
+Cohesion: 0.05
+Nodes (39): ClientConnection, ClientConnection, connect, connect_http_proxy(), connect_socks_proxy(), HTTPProxyConnection, Any, BaseException (+31 more)
 
 ### Community 584 - "run_trees.py"
 Cohesion: 0.05
-Nodes (45): _emit_aggregate(), _p95_ms(), Maintained T098 agent benchmark coverage.  The emitted aggregate deliberately co, Prove Redis Lua admits exactly one of 100 simultaneous daily-limit attempts., Measure 100 Redis Lua quota/rate-limit admission decision overheads (p95 < 10ms), Return an inclusive p95 for the fixed-size benchmark sample., Print the machine-readable, PII-free aggregate required by T098., Use the existing integration convention: skip only when Redis is unavailable. (+37 more)
+Nodes (52): is_uuid_v7(), UUID, UUID helpers backed by uuid-utils., Split a nanosecond timestamp into seconds and remaining nanoseconds., Generate a UUID from a Unix timestamp in nanoseconds and random bits.      UUIDv, Check if a UUID is version 7.      Args:         uuid_obj: The UUID to check., Warn if a UUID is not version 7.      Args:         uuid_obj: The UUID to check., Generate a deterministic UUID7 derived from an original UUID and a key.      Thi (+44 more)
 
 ### Community 585 - "shebang_matches"
-Cohesion: 0.04
-Nodes (19): JuliaConsoleLexer, JuliaLexer, pygments.lexers.julia     ~~~~~~~~~~~~~~~~~~~~~      Lexers for the Julia langua, # FIXME: This escape pattern is not perfect., For Julia console sessions. Modeled after MatlabSessionLexer., For Julia source code., MojoLexer, pygments.lexers.mojo     ~~~~~~~~~~~~~~~~~~~~      Lexers for Mojo and related l (+11 more)
+Cohesion: 0.03
+Nodes (35): JuliaConsoleLexer, JuliaLexer, pygments.lexers.julia     ~~~~~~~~~~~~~~~~~~~~~      Lexers for the Julia langua, # FIXME: This escape pattern is not perfect., For Julia console sessions. Modeled after MatlabSessionLexer., For Julia source code., GroovyLexer, For Groovy source code. (+27 more)
 
 ### Community 586 - "experiment_runs.py"
-Cohesion: 0.18
-Nodes (13): AsyncPaginator, Headers, NotGiven, Omit, Query, RunSelectField, SequenceNotStr, Returns a paginated page of dataset examples with runs from the requested (+5 more)
+Cohesion: 0.08
+Nodes (33): AsyncDatasetsResource, AsyncDatasetsResourceWithRawResponse, AsyncDatasetsResourceWithStreamingResponse, DatasetsResource, DatasetsResourceWithRawResponse, DatasetsResourceWithStreamingResponse, This property can be used as a prefix for any HTTP method call to return, An alternative to `.with_raw_response` that doesn't eagerly read the response bo (+25 more)
 
 ### Community 587 - "Connection"
 Cohesion: 0.05
-Nodes (33): aiter(), Connection, Any, BaseException, Data, DataLike, Event, Exception (+25 more)
+Nodes (32): Connection, Any, BaseException, Data, DataLike, Event, Exception, State (+24 more)
 
 ### Community 588 - "Headers"
-Cohesion: 0.05
-Nodes (26): ResponseExtensions, _normalize_header_key(), _normalize_header_value(), _parse_content_type_charset(), _parse_header_links(), Any, CookieTypes, HeaderTypes (+18 more)
+Cohesion: 0.04
+Nodes (29): Headers, _is_known_encoding(), _normalize_header_key(), _normalize_header_value(), _parse_content_type_charset(), Any, CookieTypes, HeaderTypes (+21 more)
 
 ### Community 589 - "_session.py"
 Cohesion: 0.06
-Nodes (46): _AgentsRealtimeTracer, _clean(), describe_event(), history_item(), history_messages(), _item_text(), _public_fields(), Any (+38 more)
+Nodes (43): _AgentsRealtimeTracer, _clean(), describe_event(), history_item(), history_messages(), _item_text(), _public_fields(), Any (+35 more)
 
 ### Community 590 - "SSRFPolicy"
 Cohesion: 0.06
@@ -3052,56 +2919,56 @@ Cohesion: 0.12
 Nodes (13): app_module_1, client_1, common_1, crypto, duffel_service_1, http_exception_filter_1, computeHash(), sortKeys() (+5 more)
 
 ### Community 593 - "RunnableAssign"
-Cohesion: 0.05
-Nodes (37): 1. Executive Summary, 2.1 Corpus Evaluation Gates, 2.2 SAST Baseline & Exception Controls, 2.3 Clean Software Supply Chain (SCA), 2.4 Test Suite Green Status, 2. Pre-Flight Verification Checklist, 3.1 Guardrail Registry Initialization Contract, 3.2 Regex Pattern Safety & Fail-Closed Layer Initialization (+29 more)
+Cohesion: 0.06
+Nodes (24): Create a `_Matcher` instance for making assertions on the given value., aidentity(), identity(), Any, Other, Implementation of the `RunnablePassthrough`., Create a `RunnablePassthrough`.          Args:             func: Function to be, Return `True` as this class is serializable. (+16 more)
 
 ### Community 594 - "__init__.py"
 Cohesion: 0.07
 Nodes (43): DpoHyperparameters, DpoHyperparametersParam, The hyperparameters used for the DPO fine-tuning job., The hyperparameters used for the DPO fine-tuning job., DpoMethod, DpoMethodParam, Configuration for the DPO fine-tuning method., Configuration for the DPO fine-tuning method. (+35 more)
 
 ### Community 595 - "DecodingError"
-Cohesion: 0.07
-Nodes (21): BrotliDecoder, ContentDecoder, Decompressor, DeflateDecoder, GZipDecoder, IdentityDecoder, MultiDecoder, Handlers for Content-Encoding.  See: https://developer.mozilla.org/en-US/docs/We (+13 more)
+Cohesion: 0.06
+Nodes (26): BrotliDecoder, ContentDecoder, Decompressor, DeflateDecoder, GZipDecoder, IdentityDecoder, LineDecoder, MultiDecoder (+18 more)
 
 ### Community 596 - "__init__.py"
-Cohesion: 0.01
-Nodes (300): ReprArgs, is_typevar(), _extract_field_schema_pv2(), _get_extra_fields_type(), ConfigDict, ModelField, Add a pydantic config for the given type.      Note: this is a no-op on Pydantic, __repr_args__() (+292 more)
+Cohesion: 0.05
+Nodes (37): APIKeyListParams, CertificateActivateResponse, CertificateDetails, Represents an individual certificate configured at the project level., CertificateDeactivateResponse, CertificateDetails, Represents an individual certificate configured at the project level., CertificateListParams (+29 more)
 
 ### Community 597 - "Future"
-Cohesion: 0.12
-Nodes (29): aggregateCoverageFromFiles(), coverageFileRecords(), evaluateCoverage(), evaluateCoverageScopes(), evaluateDast(), evaluateDetectorMetrics(), evaluateInvariants(), evaluateSast() (+21 more)
+Cohesion: 0.04
+Nodes (36): apply_filters(), Use this method to apply an iterable of filters to     a stream. If lexer is giv, _inherit, LexerMeta, ProfilingRegexLexerMeta, _PseudoMatch, Apply preprocessing such as decoding the input, removing BOM and normalizing new, This method is the basic interface of a lexer. It is called by         the `high (+28 more)
 
 ### Community 598 - ".stream"
-Cohesion: 0.04
-Nodes (82): All, Any, BulkCancelRunsStatus, CancelAction, Config, Context, DisconnectMode, Durability (+74 more)
+Cohesion: 0.06
+Nodes (45): Command, LangSmithTracing, Configuration for LangSmith tracing., Defines the parameters for initiating a background run., Represents a part of a stream response., Represents one or more commands to control graph execution flow and state., Metadata for a run creation request., RunCreate (+37 more)
 
 ### Community 599 - "OTELExporter"
-Cohesion: 0.08
-Nodes (26): _get_operation_name(), _import_otel_exporter(), OTELExporter, Any, Context, Span, UUID, OpenTelemetry exporter for LangSmith runs. (+18 more)
+Cohesion: 0.07
+Nodes (33): otel_safe_attribute_value(), Any, Span, Utilities for setting LangSmith OpenTelemetry attributes., Convert a LangSmith metadata value for safe use in application OTel spans., Set a LangSmith metadata span attribute if the value is OTel-safe., set_langsmith_metadata_attribute(), _get_operation_name() (+25 more)
 
 ### Community 600 - "_internal.py"
 Cohesion: 0.07
 Nodes (35): _arun_test(), _create_test_case(), _end_tests(), _get_example_id(), _get_example_id_legacy(), _get_experiment_name(), _get_test_suite(), _LangSmithTestSuite (+27 more)
 
 ### Community 601 - "AsyncRuns"
-Cohesion: 0.03
-Nodes (64): Manage and run evals in the OpenAI platform., Manage and run evals in the OpenAI platform., Manage and run evals in the OpenAI platform., Manage and run evals in the OpenAI platform., Manage and run evals in the OpenAI platform., Manage and run evals in the OpenAI platform., AsyncEvals, AsyncEvalsWithRawResponse (+56 more)
+Cohesion: 0.07
+Nodes (34): AsyncOutputItems, AsyncOutputItemsWithRawResponse, AsyncOutputItemsWithStreamingResponse, OutputItems, OutputItemsWithRawResponse, OutputItemsWithStreamingResponse, Manage and run evals in the OpenAI platform., This property can be used as a prefix for any HTTP method call to return (+26 more)
 
 ### Community 602 - "enforce_headers"
-Cohesion: 0.17
-Nodes (13): Extensions, HeaderTypes, Request, Response, URL, include_request_headers(), URL, Extensions (+5 more)
+Cohesion: 0.06
+Nodes (36): AsyncRequestInterface, Extensions, HeaderTypes, Request, Response, URL, ByteStream, enforce_bytes() (+28 more)
 
 ### Community 603 - "api.py"
-Cohesion: 0.08
-Nodes (18): ResponsesServerEvent, Exception, An infinite-iterator that will continue to yield events until         the connec, Receive the next message from the connection and parses it into a `ResponsesServ, Receive the next message from the connection as raw bytes.          Canceling th, Converts a raw `str` or `bytes` message into a `ResponsesServerEvent` object., Attempt to reconnect after a connection failure.          Returns ``True`` if a, Represents a live WebSocket connection to the Responses API (+10 more)
+Cohesion: 0.06
+Nodes (50): BaseLoader, TextSplitter, A lazy loader for `Document`.          Yields:             The `Document` object, Interface for document loader.      Implementations should implement the lazy-lo, Load data into `Document` objects.          Returns:             The documents., Load data into `Document` objects.          Returns:             The documents., Load `Document` and split into chunks. Chunks are returned as `Document`., A lazy loader for `Document`.          Yields:             The `Document` object (+42 more)
 
 ### Community 604 - "create_model_v2"
-Cohesion: 0.04
-Nodes (70): BaseModelV1, Field, FieldInfoV2, GenerateJsonSchema, JsonSchemaValue, BaseModel, Get the input schema for the prompt.          Args:             config: Configur, _get_schema_field_definition() (+62 more)
+Cohesion: 0.06
+Nodes (45): Field, FieldInfoV2, BaseModel, Get the input schema for the prompt.          Args:             config: Configur, _get_schema_field_definition(), FieldInfo, ModelField, TypeBaseModel (+37 more)
 
 ### Community 605 - "HtmlFormatter"
-Cohesion: 0.08
-Nodes (13): _get_ttype_class(), HtmlFormatter, pygments.formatters.html     ~~~~~~~~~~~~~~~~~~~~~~~~      Formatter for HTML ou, r"""     Format tokens as HTML 4 ``<span>`` tags. By default, the content is enc, Return the css class of this token type prefixed with         the classprefix op, Return the CSS classes of this token type prefixed with the classprefix option., Return the inline CSS styles for this token type., Return CSS style definitions for the classes produced by the current         hig (+5 more)
+Cohesion: 0.05
+Nodes (20): _get_ttype_class(), HtmlFormatter, pygments.formatters.html     ~~~~~~~~~~~~~~~~~~~~~~~~      Formatter for HTML ou, r"""     Format tokens as HTML 4 ``<span>`` tags. By default, the content is enc, Return the css class of this token type prefixed with         the classprefix op, Return the CSS classes of this token type prefixed with the classprefix option., Return the inline CSS styles for this token type., Return CSS style definitions for the classes produced by the current         hig (+12 more)
 
 ### Community 606 - "LiveKitLangSmithSpanProcessor"
 Cohesion: 0.06
@@ -3109,11 +2976,11 @@ Nodes (32): configure_livekit(), Any, Path, LangSmith integration for LiveKit Ag
 
 ### Community 607 - "AsyncHTTP2Connection"
 Cohesion: 0.07
-Nodes (23): AsyncHTTP2Connection, has_body_headers(), HTTP2ConnectionByteStream, BaseException, DataReceived, Event, Origin, RemoteSettingsChanged (+15 more)
+Nodes (24): AsyncHTTP2Connection, has_body_headers(), HTTP2ConnectionByteStream, BaseException, DataReceived, Event, Origin, RemoteSettingsChanged (+16 more)
 
 ### Community 608 - "SyncStreamController"
 Cohesion: 0.06
-Nodes (30): Channel, Namespace, filter_covers(), infer_channel(), is_prefix_match(), matches_subscription(), namespace_matches(), normalize_segment() (+22 more)
+Nodes (34): Channel, Namespace, compute_union_filter(), filter_covers(), infer_channel(), is_prefix_match(), matches_subscription(), namespace_matches() (+26 more)
 
 ### Community 609 - "_anthropic.py"
 Cohesion: 0.06
@@ -3121,19 +2988,19 @@ Nodes (47): ReplacerType, CallableNodeProcessor, create_anonymizer(), create_sec
 
 ### Community 610 - "HTTP2Connection"
 Cohesion: 0.07
-Nodes (24): RemoteProtocolError, has_body_headers(), HTTP2Connection, HTTP2ConnectionByteStream, BaseException, DataReceived, Event, Origin (+16 more)
+Nodes (23): has_body_headers(), HTTP2Connection, HTTP2ConnectionByteStream, BaseException, DataReceived, Event, Origin, RemoteSettingsChanged (+15 more)
 
 ### Community 611 - ".create"
-Cohesion: 0.08
-Nodes (64): ChatCompletionMessageParam, ChatCompletionToolChoiceOptionParam, AsyncStream, ChatCompletionToolUnionParam, ChatModel, Function, FunctionCall, Headers (+56 more)
+Cohesion: 0.11
+Nodes (41): ChatCompletionMessageParam, ChatCompletionToolChoiceOptionParam, AsyncPaginator, AsyncStream, ChatCompletionToolUnionParam, ChatModel, Function, FunctionCall (+33 more)
 
 ### Community 612 - "graph.py"
-Cohesion: 0.03
-Nodes (78): NamedTuple, RunnableType, Branch, CurveStyle, Edge, _first_node(), Graph, is_uuid() (+70 more)
+Cohesion: 0.06
+Nodes (39): RunnableType, CurveStyle, _first_node(), is_uuid(), _last_node(), draw_mermaid(), _generate_mermaid_graph_styles(), Any (+31 more)
 
 ### Community 613 - "Operator"
-Cohesion: 0.09
-Nodes (18): Operator, Enumerator of the operations., CsoundDocumentLexer, CsoundLexer, CsoundOrchestraLexer, CsoundScoreLexer, pygments.lexers.csound     ~~~~~~~~~~~~~~~~~~~~~~      Lexers for Csound languag, For `Csound <https://csound.com>`_ scores. (+10 more)
+Cohesion: 0.05
+Nodes (25): Operator, Enumerator of the operations., This constructor takes arbitrary options as keyword arguments.         Every sub, Add a new stream filter to this lexer., DelphiLexer, PortugolLexer, pygments.lexers.pascal     ~~~~~~~~~~~~~~~~~~~~~~      Lexers for Pascal family, For Portugol, a Pascal dialect with keywords in Portuguese. (+17 more)
 
 ### Community 614 - "Phase 0 Research: Ancillary Seat and Baggage Checkout"
 Cohesion: 0.12
@@ -3161,67 +3028,67 @@ Nodes (27): _ClustersMap, _ClusterWithTraces, _fetch_insights_runs(), InsightsCl
 
 ### Community 620 - "__init__.py"
 Cohesion: 0.07
-Nodes (37): SpeechCreateParams, Details about the input tokens billed for this request., Usage statistics for models billed by token usage., Usage statistics for models billed by audio input duration., A segment of diarized transcript text with speaker metadata., TranscriptionDiarizedSegment, UsageDuration, UsageTokens (+29 more)
+Nodes (38): Custom voice reference., SpeechCreateParams, VoiceID, Details about the input tokens billed for this request., Usage statistics for models billed by token usage., Usage statistics for models billed by audio input duration., Represents a diarized transcription response returned by the model, including th, A segment of diarized transcript text with speaker metadata. (+30 more)
 
 ### Community 621 - "__init__.py"
-Cohesion: 0.05
-Nodes (58): ChatSessionAutomaticThreadTitling, Automatic thread title preferences for the session., ChatSessionChatKitConfiguration, ChatKit configuration for the session., ChatSessionFileUpload, Upload permissions and limits applied to the session., ChatSessionHistory, History retention preferences returned for the session. (+50 more)
+Cohesion: 0.08
+Nodes (38): ChatSessionAutomaticThreadTitling, Automatic thread title preferences for the session., ChatSessionChatKitConfiguration, ChatKit configuration for the session., ChatSessionFileUpload, Upload permissions and limits applied to the session., ChatSessionHistory, History retention preferences returned for the session. (+30 more)
 
 ### Community 622 - "_profiles.py"
-Cohesion: 0.07
-Nodes (44): _dir_lock(), _flock_lock(), _force_remove(), _lock_created_at(), _lock_metadata_lines(), _lock_owner(), _now_iso(), oauth_refresh_lock() (+36 more)
+Cohesion: 0.09
+Nodes (31): _apply_profile_token_response(), _fetch_oauth_metadata(), load_profile_client_config(), _load_profile_state(), _normalize_profile_api_url(), _oauth_discovery_candidates(), _oauth_metadata_urls(), _parse_profile_expires_at() (+23 more)
 
 ### Community 623 - "AzureChatOpenAI"
-Cohesion: 0.04
-Nodes (36): Self, Return the default model profile, or `None` if unavailable.          Override th, Populate `profile` from `_resolve_model_profile` if not provided.          Partn, ModelProfile, Model profile types and utilities., Description of a chat model's capabilities, exposed via `model.profile`.      Se, Warn if `profile` contains keys not declared on `ModelProfile`.      Args:, # TODO: add more detail about formats? (+28 more)
+Cohesion: 0.05
+Nodes (31): ModelProfile, Model profile types and utilities., Description of a chat model's capabilities, exposed via `model.profile`.      Se, Warn if `profile` contains keys not declared on `ModelProfile`.      Args:, # TODO: add more detail about formats?, # TODO: add more detail about formats? e.g. bytes or base64, # TODO: add more detail about formats? e.g. bytes or base64, # TODO: add more detail about formats? e.g. bytes or base64 (+23 more)
 
 ### Community 624 - ".stream"
-Cohesion: 0.17
-Nodes (33): advisoryEntries(), advisoryTimestampFrom(), commandResult(), defaultRepoRoot, __dirname, emptyCounts(), executionError(), extractAdvisoryIdentifiers() (+25 more)
+Cohesion: 0.08
+Nodes (35): All, Any, BulkCancelRunsStatus, CancelAction, Config, Context, DisconnectMode, Durability (+27 more)
 
 ### Community 625 - "EventHandlerRegistry"
-Cohesion: 0.10
-Nodes (9): ASGIReceiveEvent, ASGISendEvent, Exception, Frame, Request, Task, Called by the transport when the write buffer exceeds the high water mark., Called by the transport when the write buffer drops below the low water mark. (+1 more)
+Cohesion: 0.07
+Nodes (21): EventHandler, EventHandlerRegistry, Thread-safe (optional) registry of event handlers., Return a snapshot of handlers for the given event type, removing once-handlers., Move all handlers from this registry into *target*, then clear self., AsyncResponsesConnectionManager, AsyncWebSocketConnection, Headers (+13 more)
 
 ### Community 626 - "_quote_path_param"
-Cohesion: 0.03
-Nodes (83): AssistantsClient, Any, Assistant, AssistantSelectField, AssistantSortBy, Config, Context, Json (+75 more)
+Cohesion: 0.08
+Nodes (33): Get the state history of a thread.          Args:             thread_id: The ID, Checkpoint, Represents a checkpoint in the execution process., Represents the state of a thread., ThreadState, _quote_path_param(), Encode a value for safe interpolation into a request path segment.      Path seg, Any (+25 more)
 
 ### Community 627 - "fine_tuning.py"
-Cohesion: 0.08
-Nodes (32): AsyncCheckpoints, AsyncCheckpointsWithRawResponse, AsyncCheckpointsWithStreamingResponse, Checkpoints, CheckpointsWithRawResponse, CheckpointsWithStreamingResponse, AsyncCheckpointsWithRawResponse, AsyncCheckpointsWithStreamingResponse (+24 more)
+Cohesion: 0.12
+Nodes (24): AsyncCheckpoints, AsyncCheckpointsWithRawResponse, AsyncCheckpointsWithStreamingResponse, Checkpoints, CheckpointsWithRawResponse, CheckpointsWithStreamingResponse, Manage fine-tuning jobs to tailor a model to your specific training data., Manage fine-tuning jobs to tailor a model to your specific training data. (+16 more)
 
 ### Community 628 - "conversation_item.py"
 Cohesion: 0.06
-Nodes (33): Canonical search orchestration, Dependencies & Execution Order, Eligibility and dimension scoring, Format: `[ID] [P?] [Story] Description`, Implementation Strategy, Incremental delivery, Mode and profile vertical slices, MVP first (+25 more)
+Nodes (38): AdditionalTools, ImageGenerationCall, LocalShellCall, LocalShellCallAction, LocalShellCallOutput, McpApprovalRequest, McpApprovalResponse, McpCall (+30 more)
 
 ### Community 629 - "AsyncHTTP11Connection"
-Cohesion: 0.09
-Nodes (33): _parse_data_uri(), ParsedDataUri, Parse a data URI into its components.      If parsing fails, return `None`. If e, _convert_annotation_to_v1(), _convert_from_v03_ai_message(), _convert_from_v1_to_chat_completions(), _convert_openai_format_to_data_block(), convert_to_openai_data_block() (+25 more)
+Cohesion: 0.07
+Nodes (14): AsyncHTTP11Connection, AsyncHTTP11UpgradeStream, HTTP11ConnectionByteStream, Any, BaseException, Event, Origin, PAUSED (+6 more)
 
 ### Community 630 - "Document"
-Cohesion: 0.06
-Nodes (31): 10. Output Contract, 11. New Traveler Profile Fields (Prisma Migration Required), 12. API Response Mode Signal, 1. Deterministic Scoring — No LLM Involvement, 2. Scoring Dimensions (8 Total), 3. Weight Distribution (Developer-Defined, Fixed), 4. Eligibility Gate — Hard Vetoes Separated from Scoring, 5. Two-Pool Weight Redistribution (+23 more)
+Cohesion: 0.08
+Nodes (19): Document, Class for storing a piece of text and associated metadata.      !!! note, Return `True` as this class is serializable., Get the namespace of the LangChain object.          Returns:             `["lang, Override `__str__` to restrict it to page_content and metadata.          Returns, Get documents by their IDs.          The returned documents are expected to have, Async get documents by their IDs.          The returned documents are expected t, InMemoryVectorStore (+11 more)
 
 ### Community 631 - "codes"
-Cohesion: 0.15
-Nodes (25): BinaryIO, Option, _PeerCertRetDictType, __getattr__(), download_response(), format_certificate(), format_request_headers(), format_response_headers() (+17 more)
+Cohesion: 0.07
+Nodes (34): BinaryIO, IntEnum, Option, _PeerCertRetDictType, __getattr__(), download_response(), format_certificate(), format_request_headers() (+26 more)
 
 ### Community 632 - "WSProtocol"
 Cohesion: 0.08
-Nodes (18): BytesMessage, CloseConnection, Ping, Pong, TextMessage, AbstractEventLoop, Any, ASGISendEvent (+10 more)
+Nodes (17): BytesMessage, CloseConnection, Ping, Pong, TextMessage, AbstractEventLoop, Any, ASGISendEvent (+9 more)
 
 ### Community 633 - "realtime_session_create_response.py"
-Cohesion: 0.03
-Nodes (92): AudioTranscription, ClientSecretCreateResponse, Response from creating a session and client secret for the Realtime API., NoiseReduction, Configuration for input audio noise reduction.      This can be set to `null` to, RealtimeAudioConfigInput, Custom voice reference., RealtimeAudioConfigOutput (+84 more)
+Cohesion: 0.09
+Nodes (42): AudioTranscription, NoiseReduction, Configuration for input audio noise reduction.      This can be set to `null` to, RealtimeFunctionTool, Configuration for reasoning-capable Realtime models such as `gpt-realtime-2`., RealtimeReasoning, Audio, AudioInput (+34 more)
 
 ### Community 634 - "ChatCompletionTokenLogprob"
-Cohesion: 0.05
-Nodes (62): Choice, Function, GenericModel, TracingExtra, Waits until the stream has been read to completion and returns         the accum, Blocks until the stream has been consumed., Parse the final completion object.          Note this does not provide any guara, Waits until the stream has been read to completion and returns         the accum (+54 more)
+Cohesion: 0.07
+Nodes (37): Choice, TracingExtra, ChatCompletionAudio, If the audio output modality is requested, this object contains data     about t, Choice, Choice, ChoiceDelta, ChoiceDeltaFunctionCall (+29 more)
 
 ### Community 635 - "__init__.py"
-Cohesion: 0.03
-Nodes (87): ImportError, SpanContext, convert_prompt_to_anthropic_format(), convert_prompt_to_openai_format(), prep_obj_for_push(), Convert a prompt to OpenAI format.      Requires the `langchain_openai` package, Convert a prompt to Anthropic format.      Requires the `langchain_anthropic` pa, Format the object so its Prompt Hub compatible. (+79 more)
+Cohesion: 0.06
+Nodes (31): SpanContext, configure(), _extract_span_id(), get_langsmith_run_url_for_span(), __getattr__(), langsmith_run_id_from_otel_span_id(), Any, Client (+23 more)
 
 ### Community 636 - "_client_utils.py"
 Cohesion: 0.10
@@ -3232,36 +3099,36 @@ Cohesion: 0.06
 Nodes (31): _abbreviate(), _abbreviate_test_name(), _dumps_with_fallback(), _handle_output_args(), LangSmithPlugin, _merge_statuses(), Any, pytest_addoption() (+23 more)
 
 ### Community 638 - "_ws_execute.py"
-Cohesion: 0.06
-Nodes (34): _AsyncWSStreamControl, _build_auth_headers(), _build_ws_url(), connect_deadline(), _env_timeout(), _handshake_server_detail(), open_timeout_for(), Any (+26 more)
+Cohesion: 0.07
+Nodes (29): _AsyncWSStreamControl, _build_auth_headers(), _build_ws_url(), _ensure_websockets(), _ensure_websockets_async(), _env_timeout(), Any, WebSocket-based command execution for long-running commands. (+21 more)
 
 ### Community 639 - "Process"
 Cohesion: 0.09
 Nodes (12): Multiprocess, Process, Config, Event, Server, socket, Replaces each worker, bringing its replacement into service before retiring the, Receives a timeout and returns the worker's startup flag, or None if it does not (+4 more)
 
 ### Community 640 - "ThreadsClient"
-Cohesion: 0.06
-Nodes (31): Booking Management, Contract migration and final gate, Current resume point, Dependencies and Execution Order, Format: [ID] [P?] [Story] Description, Implementation Strategy, Incremental delivery, Notes (+23 more)
+Cohesion: 0.08
+Nodes (28): Any, Json, OnConflictBehavior, PruneStrategy, QueryParamTypes, SortOrder, Thread, ThreadSelectField (+20 more)
 
 ### Community 641 - "looks_like_xml"
 Cohesion: 0.05
 Nodes (6): doctype_matches(), html_doctype_matches(), looks_like_xml(), Check if the doctype matches a regular expression (if present).      Note that t, Check if the file looks like it has a html doctype., Check if a doctype exists or if we have some tags.
 
 ### Community 642 - "StoreClient"
-Cohesion: 0.05
-Nodes (38): Any, Item, QueryParamTypes, Delete an item.          Args:             key: The unique identifier for the it, Client for interacting with the graph's shared storage.      The Store provides, Search for items within a namespace prefix.          Args:             namespace, List namespaces with optional match conditions.          Args:             prefi, Store or update an item.          Args:             namespace: A list of strings (+30 more)
+Cohesion: 0.07
+Nodes (27): Any, Item, QueryParamTypes, Async Store client for LangGraph SDK., Delete an item.          Args:             key: The unique identifier for the it, Client for interacting with the graph's shared storage.      The Store provides, Search for items within a namespace prefix.          Args:             namespace, List namespaces with optional match conditions.          Args:             prefi (+19 more)
 
 ### Community 643 - "StreamController"
-Cohesion: 0.04
-Nodes (45): _close_after(), Any, Event, SubscribeParams, Open a typed subscription against the shared SSE.          Returns an async iter, Tear down the controller, awaiting any pending rotation closes., Allocate a subscription id, create a bounded queue, add to registry., Remove a subscription from the registry. No-op if already absent. (+37 more)
+Cohesion: 0.08
+Nodes (21): _close_after(), Any, Event, SubscribeParams, Open a typed subscription against the shared SSE.          Returns an async iter, Tear down the controller, awaiting any pending rotation closes., Allocate a subscription id, create a bounded queue, add to registry., Remove a subscription from the registry. No-op if already absent. (+13 more)
 
 ### Community 644 - "deprecation.py"
 Cohesion: 0.06
 Nodes (38): DeprecationWarning, PendingDeprecationWarning, beta(), LangChainBetaWarning, T, Helper functions for marking parts of the LangChain API as beta.  This module wa, Context manager to suppress `LangChainDeprecationWarning`., A class for issuing beta warnings for LangChain users. (+30 more)
 
 ### Community 645 - "__init__.py"
-Cohesion: 0.02
-Nodes (212): prisma, EmbeddingModel, MessageContentDelta, TypeAdapter, UnwrapWebhookEvent, field_get_default(), field_is_required(), field_outer_type() (+204 more)
+Cohesion: 0.09
+Nodes (35): Omit, coerce_boolean(), coerce_float(), coerce_integer(), file_from_path(), flatten(), get_async_library(), get_required_header() (+27 more)
 
 ### Community 646 - "aiter.py"
 Cohesion: 0.07
@@ -3272,28 +3139,28 @@ Cohesion: 0.13
 Nodes (9): app_module_1, client_1, common_1, http_exception_filter_1, jwt_1, prisma_service_1, stripe_service_1, supertest_1 (+1 more)
 
 ### Community 648 - "BookingsList.tsx"
-Cohesion: 0.13
-Nodes (17): BookingsPage(), BookingsPageProps, BookingCard(), BookingCardProps, formatCurrency(), formatDate(), BookingsList(), BookingsListProps (+9 more)
+Cohesion: 0.22
+Nodes (8): handler, BookingsPageProps, BookingListItem, BookingsList(), BookingsListProps, BookingsResponse, BookingTab, authOptions
 
 ### Community 649 - "AssistantsClient"
-Cohesion: 0.06
-Nodes (31): Current Status, Decisions Made During Build, Feature 023 — CI regression remediation checkpoint (2026-09-09), Feature 023 — Phase 4 T026 & Review Corrections (2026-09-08), Feature 023 — Phase 4 US2 final atomic closure (2026-09-09), Feature 023 — Phase 4 US2 implementation checkpoint (2026-09-08), Feature 023 — Phase 5 CI Security Pipeline Remediation (2026-09-12, Completed), Feature 023 — Security Systems: Phase 1 Setup (T001–T004 Completed) (2026-09-04) (+23 more)
+Cohesion: 0.08
+Nodes (27): AssistantsClient, Any, Assistant, AssistantSelectField, AssistantSortBy, Config, Context, Json (+19 more)
 
 ### Community 650 - "SyncAssistantsClient"
 Cohesion: 0.08
-Nodes (29): AssistantsSearchResponse, GraphSchema, Defines the structure and properties of a graph., Paginated response for assistant search results., Any, Assistant, AssistantSelectField, AssistantSortBy (+21 more)
+Nodes (27): GraphSchema, Defines the structure and properties of a graph., Any, Assistant, AssistantSelectField, AssistantSortBy, Config, Context (+19 more)
 
 ### Community 651 - "base.py"
-Cohesion: 0.06
-Nodes (30): 1. Executive Summary, 2.1 Python Agent Service Entry Points (`apps/agent`), 2.2 NestJS API Service Entry Points (`apps/api`), 2. Actual Agent & API Route Entry Points, 3.1 `search_flights`, 3.2 `get_user_preferences`, 3.3 `list_user_booking_summaries`, 3.4 `get_booking_detail` (+22 more)
+Cohesion: 0.07
+Nodes (26): _close_after(), Close a handle, optionally after a brief delay. Used to detach     closing the o, AsyncProtocolTransport, build_event_stream_body(), build_websocket_url(), EventStreamHandle, Any, URL (+18 more)
 
 ### Community 652 - "graph_ascii.py"
 Cohesion: 0.08
-Nodes (23): LangEdge, AsciiCanvas, _build_sugiyama_layout(), draw_ascii(), _EdgeViewer, Any, Draws DAG in ASCII.  Adapted from https://github.com/iterative/dvc/blob/main/dvc, Create a line on ASCII canvas.          Args:             x0: x coordinate where (+15 more)
+Nodes (25): LangEdge, AsciiCanvas, _build_sugiyama_layout(), draw_ascii(), _EdgeViewer, Any, Draws DAG in ASCII.  Adapted from https://github.com/iterative/dvc/blob/main/dvc, Create a line on ASCII canvas.          Args:             x0: x coordinate where (+17 more)
 
 ### Community 653 - "AsyncLock"
-Cohesion: 0.06
-Nodes (19): Proxy, SOCKET_OPTION, SSLContext, A connection pool for making HTTP requests.          Parameters:             ssl, PoolTimeout, Proxy, SOCKET_OPTION, SSLContext (+11 more)
+Cohesion: 0.07
+Nodes (16): Proxy, SOCKET_OPTION, SSLContext, A connection pool for making HTTP requests.          Parameters:             ssl, AsyncLock, AsyncSemaphore, AsyncThreadLock, BaseException (+8 more)
 
 ### Community 654 - "FunctionCallbackHandler"
 Cohesion: 0.13
@@ -3301,43 +3168,43 @@ Nodes (22): ConsoleCallbackHandler, elapsed(), FunctionCallbackHandler, Any, Run
 
 ### Community 655 - "utilities.py"
 Cohesion: 0.06
-Nodes (46): get_client(), LangGraphClient, AsyncClient, BaseException, TimeoutTypes, TracebackType, Top-level client for LangGraph API.      Attributes:         assistants: Manages, Enter the async context manager. (+38 more)
+Nodes (33): get_client(), LangGraphClient, AsyncClient, BaseException, TimeoutTypes, TracebackType, Top-level client for LangGraph API.      Attributes:         assistants: Manages, Enter the async context manager. (+25 more)
 
 ### Community 656 - "__init__.py"
 Cohesion: 0.08
 Nodes (26): _BlobDecryptorT, BlobEncryptor, JsonDecryptor, _JsonDecryptorT, JsonEncryptor, _DecryptDecorators, DuplicateHandlerError, _EncryptDecorators (+18 more)
 
 ### Community 657 - "strip_not_given"
-Cohesion: 0.08
-Nodes (33): datetime, Headers, NotGiven, Omit, Query, Run, SequenceNotStr, Returns all runs within the trace identified by the share token.          The sh (+25 more)
+Cohesion: 0.10
+Nodes (29): datetime, Headers, NotGiven, Omit, Query, Run, SequenceNotStr, Returns all runs within the trace identified by the share token.          The sh (+21 more)
 
 ### Community 658 - "AssistantEventHandler"
-Cohesion: 0.13
-Nodes (11): AsyncAssistantEventHandler, AssistantEventHandlerT, AssistantStreamEvent, AsyncAssistantEventHandlerT, AsyncStream, Exception, Stream, Fires when the stream has finished.          This happens if the stream is read (+3 more)
+Cohesion: 0.08
+Nodes (16): AssistantEventHandler, AssistantEventHandlerT, AssistantStreamEvent, AsyncAssistantEventHandlerT, AsyncStream, Exception, Stream, Fires when the stream has finished.          This happens if the stream is read (+8 more)
 
 ### Community 659 - ".create"
 Cohesion: 0.08
 Nodes (23): APIKeys, APIKeysWithRawResponse, APIKeysWithStreamingResponse, AsyncAPIKeys, AsyncAPIKeysWithRawResponse, AsyncAPIKeysWithStreamingResponse, APIKeysWithRawResponse, APIKeysWithStreamingResponse (+15 more)
 
 ### Community 660 - ".create"
-Cohesion: 0.13
-Nodes (17): AutomaticThreadTitling, ChatSessionChatKitConfigurationParam, FileUpload, History, Configuration for automatic thread titling.      When omitted, automatic thread, Configuration for upload enablement and limits.      When omitted, uploads are d, Configuration for chat history retention.      When omitted, history is enabled, Optional per-session configuration settings for ChatKit behavior. (+9 more)
+Cohesion: 0.10
+Nodes (28): ChatSession, Headers, NotGiven, Omit, Query, Cancel an active ChatKit session and return its most recent metadata.          C, Create a ChatKit session.          Args:           user: A free-form string that, Cancel an active ChatKit session and return its most recent metadata.          C (+20 more)
 
 ### Community 661 - "__init__.py"
-Cohesion: 0.04
-Nodes (66): CreateEvalCompletionsRunDataSourceParam, InputMessagesItemReference, InputMessagesTemplate, InputMessagesTemplateTemplateEvalItem, InputMessagesTemplateTemplateEvalItemContentInputImage, InputMessagesTemplateTemplateEvalItemContentOutputText, An image input block used within EvalItem content arrays., A message input to the model with a role indicating instruction following     hi (+58 more)
+Cohesion: 0.09
+Nodes (21): RankingOptions, RankingOptionsHybridSearch, Weights that control how reciprocal rank fusion balances semantic embedding matc, Ranking options for search., JSON Schema response format.      Used to generate structured JSON responses., ResponseFormatTextJSONSchemaConfigParam, ComparisonFilter, A filter used to compare a specified attribute key to a given value using a defi (+13 more)
 
 ### Community 662 - "Tool"
-Cohesion: 0.06
-Nodes (30): 1. Architecture & Scope, 2. Commands & Execution, 3. Environment & Non-Production Secrets, 4. Data Isolation Rules, 5. Timing Budgets, 6. Diagnostics & Troubleshooting, CI Environment Usage, Cleanup Behavior (+22 more)
+Cohesion: 0.07
+Nodes (27): Create a `BaseTool` from a `Runnable`.          `as_tool` will instantiate a `Ba, convert_runnable_to_tool(), _get_description_from_runnable(), _get_schema_from_runnable_and_arg_types(), Any, ArgsSchema, BaseModel, TypeBaseModel (+19 more)
 
 ### Community 663 - "TexLexer"
-Cohesion: 0.02
-Nodes (101): do_insertions(), Helper for lexers which must combine the results of several     sublexers., ArturoLexer, pygments.lexers.arturo     ~~~~~~~~~~~~~~~~~~~~~~      Lexer for the Arturo lang, For Arturo source code.      See `Arturo's Github <https://github.com/arturo-lan, Adds syntax from another languages inside annotated strings          match args:, AgdaLexer, CryptolLexer (+93 more)
+Cohesion: 0.09
+Nodes (28): AgdaLexer, CryptolLexer, HaskellLexer, HspecLexer, IdrisLexer, KokaLexer, LiterateAgdaLexer, LiterateCryptolLexer (+20 more)
 
 ### Community 664 - "completion_create_params.py"
-Cohesion: 0.09
-Nodes (20): Any, Headers, LoggerLike, Origin, Pattern, Request, Response, State (+12 more)
+Cohesion: 0.14
+Nodes (31): ChatCompletionAudioParam, Custom voice reference., Parameters for audio output.      Required when audio output is requested with, VoiceID, ChatCompletionFunctionCallOptionParam, Specifying a particular function via `{"name": "my_function"}` forces the model, ChatCompletionPredictionContentParam, Static predicted output content, such as the content of a text file that is (+23 more)
 
 ### Community 665 - "Blob"
 Cohesion: 0.06
@@ -3352,16 +3219,16 @@ Cohesion: 0.09
 Nodes (23): SpanExporter, SpanExportResult, create_langsmith_exporter(), LangSmithSpanExporter, Any, ReadableSpan, Transform Strands OTEL spans into LangSmith-compatible formats.  This module wra, Flatten span events into prompt/completion attributes.          Strands attaches (+15 more)
 
 ### Community 668 - "_VectorStoreExampleSelector"
-Cohesion: 0.03
-Nodes (60): ABC, LazyProxy, T, Implements data methods to pretend that an instance is another instance.      Th, Helper method that returns the current proxy, typed as the loaded object, Any, A proxy for the `langsmith._openapi_client.resources` module.      This is used, ResourcesProxy (+52 more)
+Cohesion: 0.11
+Nodes (22): MaxMarginalRelevanceExampleSelector, Any, Embeddings, VectorStore, Example selector that selects examples based on SemanticSimilarity., Select examples based on semantic similarity., Select examples based on semantic similarity.          Args:             input_v, Asynchronously select examples based on semantic similarity.          Args: (+14 more)
 
 ### Community 669 - "payment-refund.e2e-spec.js"
 Cohesion: 0.14
-Nodes (26): _assert_absent(), _assistant_messages(), _collect_pipeline(), _fixture_ref(), _make_client(), _make_queue(), _make_runner(), BaseException (+18 more)
+Nodes (9): app_module_1, client_1, common_1, http_exception_filter_1, jwt_1, prisma_service_1, stripe_service_1, supertest_1 (+1 more)
 
 ### Community 670 - ".update"
-Cohesion: 0.05
-Nodes (56): CronClient, All, Any, Config, Context, CronSelectField, CronSortBy, datetime (+48 more)
+Cohesion: 0.10
+Nodes (27): CronClient, All, Any, Config, Context, CronSelectField, CronSortBy, datetime (+19 more)
 
 ### Community 671 - "Tee"
 Cohesion: 0.08
@@ -3372,20 +3239,24 @@ Cohesion: 0.11
 Nodes (22): AHO, Handler, _ActionHandler, _AssistantsOn, Auth, _CronsOn, _On, T (+14 more)
 
 ### Community 673 - "warn_deprecated"
-Cohesion: 0.06
-Nodes (46): AllowedObject, InitValidator, Display a standardized deprecation.      Args:         since: The release at whi, warn_deprecated(), _block_jinja2_templates(), _compute_allowed_class_paths(), default_init_validator(), _get_default_allowed_class_paths() (+38 more)
+Cohesion: 0.09
+Nodes (28): AllowedObject, InitValidator, Display a standardized deprecation.      Args:         since: The release at whi, warn_deprecated(), _block_jinja2_templates(), _compute_allowed_class_paths(), default_init_validator(), _get_default_allowed_class_paths() (+20 more)
 
 ### Community 674 - "_transform.py"
-Cohesion: 0.08
-Nodes (27): baggageOptions, classOptions, countryOptions, documentOptions, draftToPayload(), genderOptions, getMaskedPassport(), hourOptions (+19 more)
+Cohesion: 0.14
+Nodes (32): get_args(), get_origin(), async_transform(), _async_transform_recursive(), _async_transform_typeddict(), _get_annotated_type(), get_type_hints(), _maybe_transform_key() (+24 more)
 
 ### Community 675 - "StreamingStdOutCallbackHandler"
 Cohesion: 0.09
 Nodes (19): Any, BaseException, Callback Handler streams to stdout on new llm token., Run when the tool starts running.          Args:             serialized: The ser, Run on agent action.          Args:             action: The agent action., Run when tool ends running.          Args:             output: The output of the, Run when tool errors.          Args:             error: The error that occurred., Run on an arbitrary text.          Args:             text: The text to print. (+11 more)
 
+### Community 676 - "javascript.py"
+Cohesion: 0.06
+Nodes (26): CoffeeScriptLexer, DartLexer, EarlGreyLexer, JuttleLexer, KalLexer, LiveScriptLexer, MaskLexer, NodeConsoleLexer (+18 more)
+
 ### Community 677 - "PngDrawer"
-Cohesion: 0.07
-Nodes (29): 1.1 Source Control & Environment, 1. Feature Execution Baseline (Task T001), 2.1 Shared Package (`packages/shared/`), 2.2 Backend API Service (`apps/api/`), 2.3 Frontend Web Application (`apps/web/`), 2.4 Context & Specification Documentation, 2. Affected-File Tracking Checklist, 3.1 Direct Prisma Read Model (+21 more)
+Cohesion: 0.09
+Nodes (21): NamedTuple, Attachment, Annotated type that will be stored as an attachment if used.      Examples:, Branch, LabelsDict, PngDrawer, Any, Helper class to draw a state graph into a PNG file. (+13 more)
 
 ### Community 678 - "_helpers.py"
 Cohesion: 0.12
@@ -3396,92 +3267,92 @@ Cohesion: 0.08
 Nodes (18): Assembler, Any, Data, Frame, T, Read the next message.          :meth:`get` returns a single :class:`str` or :, Stream the next message.          Iterating the return value of :meth:`get_ite, Simplified version of :class:`asyncio.Queue`.      Provides only the subset of (+10 more)
 
 ### Community 680 - "structured_query.py"
-Cohesion: 0.17
-Nodes (12): Comparator, Expr, Internal representation of a structured query language., Enumerator of the comparison operators., Defines interface for IR translation using a visitor pattern., Translate a StructuredQuery.          Args:             structured_query: Struct, Convert a name into snake_case., Base class for all expressions. (+4 more)
+Cohesion: 0.10
+Nodes (24): Comparator, Comparison, Expr, FilterDirective, Operation, Any, Internal representation of a structured query language., Enumerator of the comparison operators. (+16 more)
 
 ### Community 681 - "memory_stream.py"
 Cohesion: 0.09
 Nodes (22): _close_loop_quietly(), _get_or_create_loop(), _MemoryStream, AbstractEventLoop, Any, Queue, T, Module implements a memory stream for communication between two co-routines.  Th (+14 more)
 
 ### Community 682 - ".update"
-Cohesion: 0.07
-Nodes (29): files, holdout_input.jsonl, holdout_output.jsonl, holdout_tool.jsonl, invariant_manifest.jsonl, bytes, license, recordCount (+21 more)
+Cohesion: 0.11
+Nodes (25): All, Any, Config, Context, CronSelectField, CronSortBy, datetime, Durability (+17 more)
 
 ### Community 683 - "SecurityError"
-Cohesion: 0.09
-Nodes (19): d(), parse_headers(), parse_line(), Headers, Parse a WebSocket handshake request.          This is a generator-based corout, Parse a WebSocket handshake response.          This is a generator-based corou, Parse a single line.      CRLF is stripped from the return value.      Args:, Parse HTTP headers.      Non-ASCII characters are represented with surrogate e (+11 more)
+Cohesion: 0.11
+Nodes (26): StreamReader, Raised when a handshake request or response breaks a security rule.      Secur, SecurityError, d(), parse_headers(), parse_line(), Headers, Parse a WebSocket handshake request.          This is a generator-based corout (+18 more)
 
 ### Community 684 - "langsmith.py"
-Cohesion: 0.18
-Nodes (16): get_query_backend(), _load_nested_traces_v2(), _load_traces_v2(), Any, Client, datetime, Run, UUID (+8 more)
+Cohesion: 0.10
+Nodes (27): get_query_backend(), _load_nested_traces_v2(), _load_traces_v2(), Any, Client, datetime, Run, UUID (+19 more)
 
 ### Community 685 - "AsyncAssistantEventHandler"
 Cohesion: 0.11
-Nodes (12): Callback that is fired for every Server-Sent-Event, Callback that is fired when a run step is created, Callback that is fired whenever a run step delta is returned from the API, Callback that is fired when a run step is completed, Callback that is fired when a tool call is created, Callback that is fired when a tool call delta is encountered, Callback that is fired when a message is created, Callback that is fired when a message is completed (+4 more)
+Nodes (14): AsyncAssistantEventHandler, Callback that is fired for every Server-Sent-Event, Callback that is fired when a run step is created, Callback that is fired whenever a run step delta is returned from the API, Callback that is fired when a run step is completed, Callback that is fired when a tool call is created, Callback that is fired when a tool call delta is encountered, Callback that is fired when a message is created (+6 more)
 
 ### Community 686 - "sql.py"
-Cohesion: 0.11
-Nodes (26): ALLOWED_LOOPBACK_HOSTS, ALLOWED_PORTS, buildZapDockerArgs(), COMPOSE_PORTS, defaultOutputPath, defaultRawReportPath, defaultToolchainPath, defaultZapDir (+18 more)
+Cohesion: 0.07
+Nodes (27): GoogleSqlLexer, MySqlLexer, PlPgsqlLexer, PostgresBase, PostgresConsoleLexer, PostgresExplainLexer, PostgresLexer, PsqlRegexLexer (+19 more)
 
 ### Community 687 - "ImportError"
-Cohesion: 0.07
-Nodes (27): 1.1 Safety Rules & Invariants, 1.2 Required Rollout Sequence, 1.3 Environment & Migration Status Check, 1.4 Backfill Execution (`CancellationRefundObligation`), 1.5 Preflight Verification SQL Queries, 1.6 Gate 1 Automated Test Verification, 1. Preflight Checks & Prerequisites, 2.1 Abort Triggers (+19 more)
+Cohesion: 0.10
+Nodes (28): ImportError, convert_prompt_to_anthropic_format(), convert_prompt_to_openai_format(), prep_obj_for_push(), Convert a prompt to OpenAI format.      Requires the `langchain_openai` package, Convert a prompt to Anthropic format.      Requires the `langchain_anthropic` pa, Format the object so its Prompt Hub compatible., cl100k_base() (+20 more)
 
 ### Community 688 - "FileCallbackHandler"
 Cohesion: 0.09
 Nodes (18): FileCallbackHandler, Any, BaseException, Self, Callback handler that writes to a file., Exit the context manager and close the file.          Args:             exc_type, Destructor to cleanup when done., Close the file if it's open.          This method is safe to call multiple times (+10 more)
 
 ### Community 689 - "base.py"
-Cohesion: 0.10
-Nodes (20): ge, le, _dataset_examples_path(), BufferedReader, Update examples using multipart.          .. deprecated:: 0.3.9              Use, Update examples using multipart.          Args:             dataset_id (Union[UU, Upload examples using multipart.          .. deprecated:: 0.3.9              Use, Estimate the size of an example in bytes for batching purposes. (+12 more)
+Cohesion: 0.08
+Nodes (19): DeleteResponse, Any, Base classes for indexing., A generic response for upsert operations.      The upsert response will be used, A generic response for delete operation.      The fields in this response are op, Upsert documents into the index.          The upsert functionality should utiliz, Add or update documents in the `VectorStore`. Async version of `upsert`., Delete by IDs or other criteria.          Calling delete without any input param (+11 more)
 
 ### Community 690 - "loading.py"
-Cohesion: 0.07
-Nodes (33): String output parser., `StrOutputParser` is serializable.          Returns:             `True`, Get the namespace of the LangChain object.          Returns:             `["lang, Return the output parser type for serialization., Returns the input text with no changes., Extract text content from model outputs as a string.      Converts model outputs, StrOutputParser, _load_chat_prompt() (+25 more)
+Cohesion: 0.11
+Nodes (25): String output parser., `StrOutputParser` is serializable.          Returns:             `True`, Get the namespace of the LangChain object.          Returns:             `["lang, Return the output parser type for serialization., Returns the input text with no changes., Extract text content from model outputs as a string.      Converts model outputs, StrOutputParser, _load_examples() (+17 more)
 
 ### Community 691 - "_ChatOpenAICodex"
 Cohesion: 0.10
-Nodes (19): _ChatOpenAICodex, _default_originator(), _flatten_system_message_content(), _is_instruction_message(), _maybe_has_system_messages(), Any, LanguageModelInput, `_ChatOpenAICodex`: experimental OAuth-backed chat model.  Wraps `ChatOpenAI` to (+11 more)
+Nodes (18): _ChatOpenAICodex, _default_originator(), _flatten_system_message_content(), _maybe_has_system_messages(), Any, LanguageModelInput, `_ChatOpenAICodex`: experimental OAuth-backed chat model.  Wraps `ChatOpenAI` to, Join system/developer message content into a single `instructions` string. (+10 more)
 
 ### Community 692 - "_ChatGPTToken"
-Cohesion: 0.12
-Nodes (17): _ChatGPTToken, _deserialize_token(), _file_lock(), _FileChatGPTOAuthTokenProvider, Return `True` if the token is past (or within `skew` of) expiry., Best-effort cross-platform file lock around refresh + write.      On POSIX this, File-backed `_ChatGPTOAuthTokenProvider`.      Stores tokens at `path` (defaults, Construct a provider with all defaults (path, client ID, etc.).          Equival (+9 more)
+Cohesion: 0.13
+Nodes (17): _ChatGPTToken, _deserialize_token(), _FileChatGPTOAuthTokenProvider, Any, Return `True` if the token is past (or within `skew` of) expiry., Build a `_ChatGPTToken` from an OAuth token-endpoint response., File-backed `_ChatGPTOAuthTokenProvider`.      Stores tokens at `path` (defaults, Construct a provider with all defaults (path, client ID, etc.).          Equival (+9 more)
 
 ### Community 693 - "SyncHttpClient"
-Cohesion: 0.06
-Nodes (39): _raise_for_status_typed(), aiter_lines_raw(), BytesLineDecoder, iter_lines_raw(), BytesLike, Response, Adapted from httpx_sse to split lines on \n, \r, \r\n per the SSE spec., # NOTE: as per the SSE spec, do not reset last_event_id. (+31 more)
+Cohesion: 0.15
+Nodes (19): _raise_for_status_typed(), Return the last event identifier that was seen., SSEDecoder, _decode_json(), _encode_json(), Any, Client, QueryParamTypes (+11 more)
 
 ### Community 694 - "_mysql_builtins.py"
 Cohesion: 0.09
 Nodes (27): FancyURLopener, parse_item_create_functions(), parse_lex_functions(), parse_lex_keywords(), parse_lex_optimizer_hints(), pygments.lexers._mysql_builtins     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~      Self-up, Parse keywords in lex.h., Parse optimizer hints in lex.h. (+19 more)
 
 ### Community 695 - "payment.e2e-spec.js"
-Cohesion: 0.07
-Nodes (27): Agent communication and authorization, Confirmed booking happy path, Cross-service health contracts, Dependencies & Execution Order, Dependency-free harness utilities, Flight search and cache, Implementation Strategy, Incremental delivery (+19 more)
+Cohesion: 0.15
+Nodes (9): app_module_1, client_1, common_1, http_exception_filter_1, jwt_1, prisma_service_1, stripe_service_1, supertest_1 (+1 more)
 
 ### Community 696 - ".complete"
-Cohesion: 0.04
-Nodes (57): Use Uploads to upload large files in multiple parts., Use Uploads to upload large files in multiple parts., Use Uploads to upload large files in multiple parts., Use Uploads to upload large files in multiple parts., Use Uploads to upload large files in multiple parts., Use Uploads to upload large files in multiple parts., AsyncParts, AsyncPartsWithRawResponse (+49 more)
+Cohesion: 0.14
+Nodes (22): ExpiresAfter, FilePurpose, Headers, NotGiven, Omit, PathLike, Query, SequenceNotStr (+14 more)
 
 ### Community 697 - "jvm.py"
 Cohesion: 0.07
-Nodes (28): API and Contract Implementation for User Story 1, Dependencies & Execution Order, Format: `[ID] [P?] [Story] Description`, Implementation for User Story 2, Implementation for User Story 3, Implementation Strategy, Incremental Delivery, MVP First (+20 more)
+Nodes (26): AspectJLexer, CeylonLexer, ClojureLexer, ClojureScriptLexer, GoloLexer, GosuLexer, GosuTemplateLexer, IokeLexer (+18 more)
 
 ### Community 698 - "Considered Options & Decisions"
 Cohesion: 0.15
 Nodes (12): 1. Schema: 10 new nullable fields on `TravelerProfile`, 2. Passenger Source: discriminated union per passenger, 3. Passenger Snapshot: full snapshot at intent creation, passport as atomic unit, 4. Three-layer validation with shared evaluator, 5. Readiness Scopes: DOMESTIC vs INTERNATIONAL, 6. Document Validation Model: hard / advisory / deferred, 7. PII trust boundary, 8. Module boundaries (+4 more)
 
 ### Community 700 - ".create"
-Cohesion: 0.13
-Nodes (19): airport(), CABIN_CLASSES, createOffer(), createOfferRequest(), expectCabinClass(), expectExactKeys(), expectIntegerAtLeast(), expectIsoDateTime() (+11 more)
+Cohesion: 0.11
+Nodes (19): BetaResponseInputParam, BetaResponsesClientEvent, BetaResponsesClientEventParam, BetaServiceTier, BetaToolParam, ResponseCreateContextManagement, ResponseCreateConversation, ResponseCreateModeration (+11 more)
 
 ### Community 701 - "BaseLangSmithSpanProcessor"
 Cohesion: 0.09
 Nodes (16): SpanProcessor, BaseLangSmithSpanProcessor, Any, Context, ReadableSpan, Span, Classify the span and rewrite its attributes on the draft.          Returns True, Forward the translated span downstream.          Builds a fresh ``ReadableSpan`` (+8 more)
 
 ### Community 702 - "DynamicRunnable"
-Cohesion: 0.05
-Nodes (33): Get the config specs of the `Runnable`.          Returns:             The config, Get the config specs of the `Runnable`.          Returns:             The config, List configurable fields for this `Runnable`., merge_configs(), Merge multiple configs into one.      Args:         *configs: The configs to mer, DynamicRunnable, make_options_spec(), prefix_config_spec() (+25 more)
+Cohesion: 0.18
+Nodes (9): DynamicRunnable, Any, Input, Output, TypeBaseModel, Prepare the `Runnable` for invocation.          Args:             config: The co, Serializable `Runnable` that can be dynamically configured.      A `DynamicRunna, Return `True` as this class is serializable. (+1 more)
 
 ### Community 703 - "AiohttpTransport"
 Cohesion: 0.11
@@ -3496,16 +3367,16 @@ Cohesion: 0.10
 Nodes (13): AbstractEventLoop, BaseException, TracebackType, Is timeout expired during execution?, Reject scheduled timeout if any., Advance timeout on delay seconds.          The delay can be negative., Set deadline to absolute value.          deadline argument points on the time, timeout context manager.      Useful in cases when you want to apply timeout l (+5 more)
 
 ### Community 706 - "RecordManager"
-Cohesion: 0.09
-Nodes (25): Defs, BaseModel, Get the input schema for the prompt.          Args:             config: The runn, check_valid_template(), _create_model_recursive(), _get_jinja2_variables_from_template(), is_subsequence(), jinja2_formatter() (+17 more)
+Cohesion: 0.07
+Nodes (15): Upsert records into the database.          Args:             keys: A list of rec, Asynchronously upsert records into the database.          Args:             keys, Check if the provided keys exist in the database.          Args:             key, Asynchronously check if the provided keys exist in the database.          Args:, List records in the database based on the provided filters.          Args:, Asynchronously list records in the database based on the provided filters., Delete specified records from the database.          Args:             keys: A l, Asynchronously delete specified records from the database.          Args: (+7 more)
 
 ### Community 707 - "InvalidURL"
 Cohesion: 0.12
 Nodes (22): extract_sub_links(), find_all_links(), Pattern, Utilities for working with HTML., Extract all links from a raw HTML string.      Args:         raw_html: original, Extract all links from a raw HTML string and convert into absolute paths.      A, InvalidURL, URL is improperly formed or cannot be parsed. (+14 more)
 
 ### Community 708 - ".create"
-Cohesion: 0.13
-Nodes (13): FakeAsyncRedis, Response, In-memory Async Redis mock for fast and isolated repository tests., Emulate the issued/accepted-version replacement, allocation, and delete scripts., StreamedResponse, test_nestjs_client_post_gateway_flights_search_v2(), test_nestjs_client_post_gateway_flights_search_v2_handles_400_error(), test_nestjs_client_search_flights_v2_alias() (+5 more)
+Cohesion: 0.11
+Nodes (23): BetaResponseStreamEvent, AsyncStream, BetaResponseIncludable, ContextManagement, Conversation, Moderation, PromptCacheOptions, Reasoning (+15 more)
 
 ### Community 709 - "mustache.py"
 Cohesion: 0.11
@@ -3532,16 +3403,16 @@ Cohesion: 0.10
 Nodes (13): InMemoryRecordManager, An in-memory record manager for testing purposes., Initialize the in-memory record manager.          Args:             namespace: T, In-memory schema creation is simply ensuring the structure is initialized., In-memory schema creation is simply ensuring the structure is initialized., Upsert records into the database.          Args:             keys: A list of rec, Async upsert records into the database.          Args:             keys: A list, Check if the provided keys exist in the database.          Args:             key (+5 more)
 
 ### Community 715 - "DataField"
-Cohesion: 0.09
-Nodes (15): DataField, FileField, _format_form_param(), _guess_content_type(), MultipartStream, FileTypes, RequestData, RequestFiles (+7 more)
+Cohesion: 0.11
+Nodes (12): DataField, FileField, _format_form_param(), _guess_content_type(), FileTypes, RequestData, RequestFiles, A single file field item, within a multipart form field. (+4 more)
 
 ### Community 716 - "OpenAIEmbeddings"
 Cohesion: 0.13
 Nodes (15): OpenAIEmbeddings, _process_batched_chunked_embeddings(), Any, Base classes for OpenAI embeddings., # TODO: Move to AzureOpenAIEmbeddings., Build extra kwargs from additional params that were passed in., Check that sync client is available, raise error if not., Tokenize and batch input texts.          Splits texts based on `embedding_ctx_le (+7 more)
 
 ### Community 717 - "HttpClient"
-Cohesion: 0.08
-Nodes (25): 10. Conclusion & Phase 6 Sign-Off, 1. Executive Summary, 1. Input Gateway Pipeline (`holdout_input.jsonl`), 2. Dual-Run Verification Table, 2. Tool Output Guardrail Pipeline (`holdout_tool.jsonl`), 3. Holdout Detector Evaluation (SEC19, SEC28), 3. Output Stream Partitioning Pipeline (`holdout_output.jsonl`), 4. 25-Record Invariant Suite Evaluation (+17 more)
+Cohesion: 0.20
+Nodes (17): _adecode_json(), _aencode_json(), HttpClient, Any, AsyncClient, QueryParamTypes, Response, HTTP client for async operations. (+9 more)
 
 ### Community 718 - "errors.py"
 Cohesion: 0.18
@@ -3549,43 +3420,43 @@ Nodes (20): _adecode_error_body(), APIConnectionError, APIError, APIResponseVali
 
 ### Community 719 - "Any"
 Cohesion: 0.08
-Nodes (24): Backfill and validate, BookingPipelineOutcome, Cancellation fulfillment projection, CancellationRefundObligation, Chat turn models, ChatTurnCommand, ChatTurnEvent, Contract (+16 more)
-
-### Community 720 - "HTTPConnection"
-Cohesion: 0.20
-Nodes (7): exponential_backoff(), Origin, Request, Response, SOCKET_OPTION, SSLContext, Generate a geometric sequence that has a ratio of 2 and starts with 0.      For
-
-### Community 721 - "RunnableWithMessageHistory"
-Cohesion: 0.12
-Nodes (14): GetSessionHistoryCallable, LanguageModelLike, MessagesOrDictWithMessages, _get_parameter_names(), Any, BaseModel, Output, Run (+6 more)
-
-### Community 722 - "sse.py"
-Cohesion: 0.08
-Nodes (24): Airline (base weight 0.15, personalized), Arrival and departure windows (base weights 0.15 and 0.10, personalized), Baggage (base weight 0.10, personalized), Cabin (base weight 0.10, personalized), Decision 10: Use additive strict contracts and a two-step rollout, Decision 11: Render explanations from allowlisted keys, Decision 12: Let the LLM narrate only safe precomputed facts, Decision 13: No new third-party dependency (+16 more)
-
-### Community 723 - "decoders.py"
-Cohesion: 0.15
-Nodes (9): _event_namespace(), _is_direct_child(), _message_event_id(), _message_route_key(), _parse_namespace_segment(), Any, SubgraphStatus, Return the routing key for a message-channel event in `active`.      Keys on `me (+1 more)
-
-### Community 724 - ".create"
-Cohesion: 0.13
-Nodes (25): ChunkingStrategy, TranscriptionCreateResponse, TranscriptionInclude, TranscriptionStreamEvent, _get_response_format_type(), AsyncStream, AudioModel, AudioResponseFormat (+17 more)
-
-### Community 725 - ".create"
-Cohesion: 0.08
 Nodes (13): Any, Adds the handler to the end of the handlers list for the given event type., Remove a previously registered event handler., Register a one-time event handler.          Automatically removed after first in, Register an event handler before the connection is established.          Handler, Remove a previously registered event handler., Register a one-time event handler before the connection is established., Adds the handler to the end of the handlers list for the given event type. (+5 more)
 
-### Community 726 - "beta_response_custom_tool_call_output_param.py"
+### Community 720 - "HTTPConnection"
+Cohesion: 0.10
+Nodes (10): exponential_backoff(), HTTPConnection, BaseException, Origin, Request, Response, SOCKET_OPTION, SSLContext (+2 more)
+
+### Community 721 - "RunnableWithMessageHistory"
+Cohesion: 0.13
+Nodes (13): GetSessionHistoryCallable, LanguageModelLike, MessagesOrDictWithMessages, _get_parameter_names(), Any, BaseModel, Output, Run (+5 more)
+
+### Community 722 - "sse.py"
+Cohesion: 0.13
+Nodes (14): aiter_lines_raw(), BytesLineDecoder, iter_lines_raw(), BytesLike, Response, Adapted from httpx_sse to split lines on \n, \r, \r\n per the SSE spec., # NOTE: as per the SSE spec, do not reset last_event_id., Handles incrementally reading lines from text.      Has the same behaviour as th (+6 more)
+
+### Community 723 - "decoders.py"
 Cohesion: 0.14
-Nodes (9): DigestAuth, NetRCAuth, Request, Response, Use a 'netrc' file to lookup basic auth credentials based on the url host., Returns a challenge from a Digest WWW-Authenticate header.         These take th, Execute the authentication flow.          To dispatch a request, `yield` it:, Execute the authentication flow synchronously.          By default, this defers (+1 more)
+Nodes (12): _event_namespace(), _is_direct_child(), _message_event_id(), _message_route_key(), _parse_namespace_segment(), Any, SubgraphStatus, Per-channel event → items state machines.  Used both by the projection iterators (+4 more)
+
+### Community 724 - ".create"
+Cohesion: 0.14
+Nodes (21): ChunkingStrategy, TranscriptionCreateResponse, TranscriptionInclude, TranscriptionStreamEvent, _get_response_format_type(), AsyncStream, AudioModel, AudioResponseFormat (+13 more)
+
+### Community 725 - ".create"
+Cohesion: 0.16
+Nodes (17): NetworkPolicy, AsyncPaginator, ExpiresAfter, Headers, NotGiven, Omit, Query, SequenceNotStr (+9 more)
+
+### Community 726 - "beta_response_custom_tool_call_output_param.py"
+Cohesion: 0.19
+Nodes (16): Agent, CallerDirect, CallerProgram, The agent that produced this item., BetaResponseInputFileParam, PromptCacheBreakpoint, Marks the exact end of a reusable prompt prefix.      The breakpoint inherits it, A file input to the model. (+8 more)
 
 ### Community 727 - "_compat.py"
-Cohesion: 0.12
-Nodes (21): assertLegacyRefundBookingIdColumn(), backfillCancellationRefundObligations(), BackfillLogger, BackfillOptions, BackfillStats, BackfillTelemetry, BookingWithRelations, DATA_QUALITY_OR_INVARIANT_QUARANTINE_REASONS (+13 more)
+Cohesion: 0.15
+Nodes (21): is_literal_type(), is_typeddict(), is_union(), parse_date(), parse_datetime(), Any, date, datetime (+13 more)
 
 ### Community 728 - ".handle_request"
-Cohesion: 0.07
-Nodes (13): HTTP11Connection, HTTP11ConnectionByteStream, Any, BaseException, Event, Origin, PAUSED, Request (+5 more)
+Cohesion: 0.12
+Nodes (8): HTTP11UpgradeStream, Any, Event, Origin, PAUSED, Request, Response, SSLContext
 
 ### Community 729 - "core.py"
 Cohesion: 0.15
@@ -3608,32 +3479,32 @@ Cohesion: 0.10
 Nodes (14): ``BaseLangSmithSpanProcessor`` — Track A's shared OTel span processor.  The fram, Private shared machinery for the voice tracing integrations.  Two independent ba, Set the LangSmith thread id for the current (async) context.      Call this once, Return the thread id set by :func:`set_thread_id` for this context., set_thread_id(), thread_id_from_context(), _clean_token_details(), Any (+6 more)
 
 ### Community 734 - "_client.py"
-Cohesion: 0.03
-Nodes (68): Create a SandboxClient with the same configuration.          The returned client, Create a Sandbox for the same underlying sandbox.          The returned instance, _get_default_api_endpoint(), _get_default_api_key(), _make_docker_context_tar(), _make_dockerfile_build_command(), Any, BaseException (+60 more)
+Cohesion: 0.11
+Nodes (16): _get_default_api_endpoint(), _get_default_api_key(), _make_docker_context_tar(), _make_dockerfile_build_command(), Any, BaseException, Path, PathLike (+8 more)
 
 ### Community 735 - "route"
-Cohesion: 0.08
-Nodes (22): Architecture and Enforcement Order, Complexity Tracking, Constitution Check, Convergence Contract, Implementation and Penetration Plan: Security Systems, Penetration Test Execution Design, Phase Plan, Project Structure (+14 more)
+Cohesion: 0.16
+Nodes (15): Any, Map, Request, Response, Router, Server, ServerConnection, SSLContext (+7 more)
 
 ### Community 736 - ".deactivate"
-Cohesion: 0.14
-Nodes (20): AsyncPaginator, CertificateActivateResponse, CertificateDeactivateResponse, CertificateListResponse, Headers, NotGiven, Omit, Query (+12 more)
+Cohesion: 0.17
+Nodes (16): AsyncPaginator, CertificateActivateResponse, CertificateDeactivateResponse, CertificateListResponse, Headers, NotGiven, Omit, Query (+8 more)
 
 ### Community 737 - "AsyncSocks5Connection"
-Cohesion: 0.11
-Nodes (19): ChatCompletionAudio, If the audio output modality is requested, this object contains data     about t, ChatCompletionContentPartImage, ImageURL, PromptCacheBreakpoint, Marks the exact end of a reusable prompt prefix.      The breakpoint inherits it, Learn about [image inputs](https://platform.openai.com/docs/guides/vision)., ChatCompletionContentPartText (+11 more)
+Cohesion: 0.12
+Nodes (8): AsyncSocks5Connection, _init_socks5_connection(), Origin, Request, Response, SSLContext, URL, A connection pool for making HTTP requests.          Parameters:             pro
 
 ### Community 738 - "AzureOpenAI"
 Cohesion: 0.11
 Nodes (11): AzureOpenAI, Any, Self, Get the namespace of the LangChain object.          Returns:             `["lang, Mapping of secret keys to environment variables., Return whether this model can be serialized by LangChain., Set package version in metadata., Validate that api key and python package exists in environment. (+3 more)
 
 ### Community 739 - "_proxy_config.py"
-Cohesion: 0.05
-Nodes (79): SandboxMount, SandboxMountAuth, SandboxProxyRule, AWSMountAuthConfig, BucketMountSpecBase, context_hub_mount(), ContextHubMountConfig, ContextHubMountConfigRequired (+71 more)
+Cohesion: 0.19
+Nodes (19): SandboxProxyRule, aws_auth(), gcp_auth(), _normalize_proxy_rules(), opaque_secret(), proxy_config(), Any, SandboxProxyConfig (+11 more)
 
 ### Community 740 - "_orjson.py"
-Cohesion: 0.12
-Nodes (14): Fragment, Stubs for orjson operations, compatible with PyPy via a json fallback., HTTP/SSE transport for the v3 thread-centric protocol.  Direct port of `libs/sdk, _cookie_header(), _decode_frame(), ProtocolWebSocketTransport, Any, AsyncClient (+6 more)
+Cohesion: 0.13
+Nodes (13): Fragment, Stubs for orjson operations, compatible with PyPy via a json fallback., _cookie_header(), _decode_frame(), ProtocolWebSocketTransport, Any, AsyncClient, BaseException (+5 more)
 
 ### Community 741 - "Encoding"
 Cohesion: 0.11
@@ -3644,8 +3515,8 @@ Cohesion: 0.16
 Nodes (12): bpe_encode(), bpe_train(), This is an educational implementation of the byte pair encoding algorithm., Creates an Encoding object., Encodes a string into tokens.          >>> enc.encode("hello world"), Decodes a list of tokens into bytes.          >>> enc.decode_bytes([388, 372]), Decodes a list of tokens into a string.          Decoded bytes are not guarant, Decodes a list of tokens into a list of bytes.          Useful for visualising (+4 more)
 
 ### Community 743 - "ParsedChatCompletion"
-Cohesion: 0.09
-Nodes (22): 1.1 Capability Module Architecture, 1.2 Supporting Modules & Chat Ownership, 1.3 Preflight Test Suite Verification, 1. Preflight Checks & Prerequisites, 2.1 HMAC Selection Attestation Verification, 2.2 Negative-Privacy Audit Telemetry Validation, 2.3 Safe Booking Reference Validation & Tenant Isolation, 2.4 Tracking Deprecation of Legacy `/users/bookings` (+14 more)
+Cohesion: 0.13
+Nodes (11): Waits until the stream has been consumed, Self, Blocks until the stream has been consumed., Waits until the stream has been read to completion and returns         the accum, Blocks until the stream has been consumed., Parse the final completion object.          Note this does not provide any guara, Waits until the stream has been read to completion and returns         the accum, ParsedChatCompletion (+3 more)
 
 ### Community 744 - "beta_response_output_message_param.py"
 Cohesion: 0.12
@@ -3656,16 +3527,16 @@ Cohesion: 0.12
 Nodes (15): A refusal from the model., ResponseOutputRefusalParam, AnnotationContainerFileCitation, AnnotationFileCitation, AnnotationFilePath, AnnotationURLCitation, Logprob, LogprobTopLogprob (+7 more)
 
 ### Community 746 - "get_msg_title_repr"
-Cohesion: 0.09
-Nodes (14): get_msg_title_repr(), Get a pretty representation of the message.          Args:             html: Whe, Print a pretty representation of the message.          Example:             ```p, Get a title representation for a message.      Args:         title: The title., Human-readable representation.          Args:             html: Whether to forma, Human-readable representation.          Args:             html: Whether to forma, Human-readable representation.          Args:             html: Whether to forma, Human-readable representation.          Args:             html: Whether to forma (+6 more)
+Cohesion: 0.11
+Nodes (12): get_msg_title_repr(), Get a pretty representation of the message.          Args:             html: Whe, Print a pretty representation of the message.          Example:             ```p, Get a title representation for a message.      Args:         title: The title., Human-readable representation.          Args:             html: Whether to forma, Human-readable representation.          Args:             html: Whether to forma, Human-readable representation.          Args:             html: Whether to forma, Human-readable representation.          Args:             html: Whether to forma (+4 more)
 
 ### Community 747 - "MIMELexer"
-Cohesion: 0.09
-Nodes (22): 1.1 Architecture & Role, 1.2 Required Configuration & Timeouts, 1.3 Preflight Test Suite Verification, 1. Preflight Checks & Prerequisites, 2.1 Fenced Lease Validation (`X-Fencing-Token`), 2.2 Deterministic Causal Cleanup Execution Order, 2.3 Client Disconnect Handling, 2.4 Lifespan Shutdown & Redis Lock Draining (+14 more)
+Cohesion: 0.13
+Nodes (8): EmailHeaderLexer, EmailLexer, pygments.lexers.email     ~~~~~~~~~~~~~~~~~~~~~      Lexer for the raw E-mail., Lexer for raw E-mail.      Additional options accepted:      `highlight-X-header, Sub-lexer for raw E-mail. This lexer only process header part of e-mail.      .., MIMELexer, pygments.lexers.mime     ~~~~~~~~~~~~~~~~~~~~      Lexer for Multipurpose Intern, Lexer for Multipurpose Internet Mail Extensions (MIME) data. This lexer is     d
 
 ### Community 748 - "style.py"
 Cohesion: 0.10
-Nodes (13): pygments.style     ~~~~~~~~~~~~~~      Basic style object.      :copyright: Copy, AlgolStyle, Algol_NuStyle, pygments.styles.algol_nu     ~~~~~~~~~~~~~~~~~~~~~~~~      Algol publication sty, pygments.styles.algol     ~~~~~~~~~~~~~~~~~~~~~      Algol publication style., BlackWhiteStyle, pygments.styles.bw     ~~~~~~~~~~~~~~~~~~      Simple black/white only style., DraculaStyle (+5 more)
+Nodes (13): pygments.style     ~~~~~~~~~~~~~~      Basic style object.      :copyright: Copy, AbapStyle, pygments.styles.abap     ~~~~~~~~~~~~~~~~~~~~      ABAP workbench like style., AlgolStyle, pygments.styles.algol     ~~~~~~~~~~~~~~~~~~~~~      Algol publication style., BlackWhiteStyle, pygments.styles.bw     ~~~~~~~~~~~~~~~~~~      Simple black/white only style., InkPotStyle (+5 more)
 
 ### Community 749 - "prd.md"
 Cohesion: 0.19
@@ -3684,16 +3555,16 @@ Cohesion: 0.15
 Nodes (16): _as_int(), build_completion_message(), extract_llm_usage(), iso_to_ns(), parse_llm_messages(), Any, Small pure helpers for the Pipecat → LangSmith span processor., Parse a Pipecat ``llm`` span's ``input`` (a JSON message list) to dicts. (+8 more)
 
 ### Community 753 - "component"
-Cohesion: 0.08
-Nodes (23): bomFormat, author, bom-ref, components, description, externalReferences, licenses, name (+15 more)
+Cohesion: 0.11
+Nodes (13): author, bom-ref, components, description, externalReferences, licenses, name, purl (+5 more)
 
 ### Community 754 - "RouterRunnable"
 Cohesion: 0.22
 Nodes (9): Any, Output, `Runnable` that routes to a set of `Runnable` objects., `Runnable` that routes to a set of `Runnable` based on `Input['key']`.      Retu, Create a `RouterRunnable`.          Args:             runnables: A mapping of ke, Return `True` as this class is serializable., Get the namespace of the LangChain object.          Returns:             `["lang, RouterInput (+1 more)
 
 ### Community 755 - "chatgpt_oauth.py"
-Cohesion: 0.08
-Nodes (46): RuntimeError, _apost_form(), _atomic_write_private_json(), _b64url_decode_segment(), _build_authorize_url(), _CallbackHandler, _ChatGPTOAuthRefreshError, _chmod_warn() (+38 more)
+Cohesion: 0.15
+Nodes (16): _b64url_decode_segment(), _CallbackHandler, _ChatGPTOAuthRefreshError, decode_jwt_claims(), _expires_at_from_response(), _extract_chatgpt_claims(), _oauth_error_html(), _oauth_result_html() (+8 more)
 
 ### Community 756 - "UL4Lexer"
 Cohesion: 0.16
@@ -3704,20 +3575,20 @@ Cohesion: 0.13
 Nodes (11): EndOfText, pygments.scanner     ~~~~~~~~~~~~~~~~      This library implements a regex based, Raise if end of text is reached and the user     tried to call a match function., Simple scanner      All method patterns are regular expression strings (not, :param text:    The text which should be scanned         :param flags:   default, `True` if the scanner reached the end of text., Apply `pattern` on the current position and return         the match object. (Do, Apply a pattern on the current position and check         if it patches. Doesn't (+3 more)
 
 ### Community 758 - "LazyProxy"
-Cohesion: 0.09
-Nodes (22): 1.1 Redis 3-Key Snapshot Protocol, 1.2 Redis Server Prerequisites, 1.3 Preflight Test Suite Verification, 1. Preflight Checks & Prerequisites, 2.1 Atomic Lua CAS Version Checks, 2.2 TTL Drift Alerts & Bounds, 2.3 Eviction and Failover Handling, 2.4 Negative Privacy Protection (+14 more)
+Cohesion: 0.18
+Nodes (7): LazyProxy, T, Implements data methods to pretend that an instance is another instance.      Th, Helper method that returns the current proxy, typed as the loaded object, Any, A proxy for the `langsmith._openapi_client.resources` module.      This is used, ResourcesProxy
 
 ### Community 759 - "_transport.py"
-Cohesion: 0.12
-Nodes (16): _get_default_api_endpoint(), _get_default_api_key(), Get the default sandbox API endpoint from environment.      Derives the endpoint, Get the default API key from environment., Initialize the AsyncSandboxClient.          Args:             api_endpoint: Full, AsyncRetryTransport, _compute_backoff(), _parse_retry_after() (+8 more)
+Cohesion: 0.17
+Nodes (11): AsyncRetryTransport, _compute_backoff(), _parse_retry_after(), Request, Response, Custom httpx transports with retry logic for the sandbox client.  Provides Retry, Async httpx transport that retries on transient errors.      Async equivalent of, Parse Retry-After header value, defaulting to 1.0 second. (+3 more)
 
 ### Community 760 - "LazyProxy"
-Cohesion: 0.10
-Nodes (16): format_instructions(), MissingDependencyError, has_numpy(), NumpyProxy, Any, PandasProxy, Any, Any (+8 more)
+Cohesion: 0.18
+Nodes (7): LazyProxy, T, Implements data methods to pretend that an instance is another instance.      Th, Helper method that returns the current proxy, typed as the loaded object, Any, A proxy for the `openai.resources` module.      This is used so that we can lazi, ResourcesProxy
 
 ### Community 761 - "PoolRequest"
-Cohesion: 0.09
-Nodes (22): 1.1 Architecture & Boundaries, 1.2 Private `API_URL` Network Topology & Configuration, 1.3 Preflight Characterization & Test Verification, 1. Preflight Checks & Prerequisites, 2.1 Same-Origin Route Handler Caching Headers, 2.2 Server-Side Timeout & Retry Policies, 2.3 Client Token Static Audit Commands, 2. Mismatch Abort Conditions & Safeguards (+14 more)
+Cohesion: 0.15
+Nodes (7): PoolRequest, Request, Response, Send an HTTP request, and return an HTTP response.          This is the core imp, Manage the state of the connection pool, assigning incoming         requests to, Event, Detect if we're running under 'asyncio' or 'trio' and create         a lock with
 
 ### Community 762 - "FakeListLLM"
 Cohesion: 0.15
@@ -3732,72 +3603,72 @@ Cohesion: 0.16
 Nodes (12): ArgumentParser, _build_parser(), _convert_one(), _iter_stdin(), _looks_like_alabel(), main(), IO, Command-line interface for the :mod:`idna` package.  Invoked via ``python -m idn (+4 more)
 
 ### Community 765 - ".update"
-Cohesion: 0.19
-Nodes (15): CodeInterpreter, FileSearch, ImageGeneration, Mcp, Headers, NotGiven, Omit, Query (+7 more)
+Cohesion: 0.21
+Nodes (13): CodeInterpreter, FileSearch, ImageGeneration, Mcp, Headers, NotGiven, Omit, Query (+5 more)
 
 ### Community 766 - "ci-workflow.contract.test.mjs"
-Cohesion: 0.07
-Nodes (19): DETECTION_OUTPUTS, DOMAIN_OUTPUTS, evaluateCiStatus(), fail(), getConclusion(), getDetectionOutput(), SERVICE_CHAINS, assertChangeAwareSharedJobPredicate() (+11 more)
+Cohesion: 0.15
+Nodes (10): DETECTION_OUTPUTS, evaluateCiStatus(), fail(), getConclusion(), getDetectionOutput(), SERVICE_CHAINS, evaluatorPath, jobIds (+2 more)
 
 ### Community 767 - "validate_type"
-Cohesion: 0.09
-Nodes (22): FlightSegmentSnapshot, AcceptDisruptionResponseDto, AcknowledgeDisruptionResponseDto, AdminClearAttentionRequestDto, AdminDataQualityReportDto, AdminDisruptionDto, AdminDuffelWebhookEventDto, AdminResolveDisruptionRequestDto (+14 more)
+Cohesion: 0.15
+Nodes (14): TypeAdapter, model_parse(), parse_obj(), _ModelT, _create_pydantic_model(), _EagerIterable, CoreSchema, GetCoreSchemaHandler (+6 more)
 
 ### Community 768 - "_serde.py"
-Cohesion: 0.13
-Nodes (20): Decimal, dumps_json(), _elide_surrogates(), _normalize_json_keys(), Any, _pydantic_json_dump(), Serialize a Pydantic v2 model with its low level core serializer.      `model_du, # IMPORTANT: This function is used from Rust code in `langsmith-pyo3` serializat (+12 more)
+Cohesion: 0.24
+Nodes (15): dumps_json(), _elide_surrogates(), _normalize_json_keys(), Any, _pydantic_json_dump(), Serialize a Pydantic v2 model with its low level core serializer.      `model_du, # IMPORTANT: This function is used from Rust code in `langsmith-pyo3` serializat, Recursively stringify dict keys that orjson will reject.      Walks ``dict``, `` (+7 more)
 
 ### Community 769 - "LangSmith Sandbox"
 Cohesion: 0.12
 Nodes (16): Async Sandbox Creation, Async Streaming, Async Support, AWS Auth Proxy, Configuration, Error Handling, File Operations, GCP Auth Proxy (+8 more)
 
 ### Community 770 - "MissingDependencyError"
-Cohesion: 0.12
-Nodes (11): startMock(), auditForbiddenKeywords, createMockServer(), hasMalformedPercentEscape(), isFormEncoded(), isJson(), parseFormBody(), parseJsonBody() (+3 more)
+Cohesion: 0.23
+Nodes (9): format_instructions(), MissingDependencyError, has_numpy(), NumpyProxy, Any, PandasProxy, Any, Any (+1 more)
 
 ### Community 771 - ".recv"
-Cohesion: 0.10
-Nodes (15): AsyncRealtimeConnection, BaseException, RealtimeServerEvent, TracebackType, Represents a live websocket connection to the Realtime API, An infinite-iterator that will continue to yield events until         the connec, Receive the next message from the connection and parses it into a `RealtimeServe, Receive the next message from the connection as raw bytes.          Canceling th (+7 more)
+Cohesion: 0.15
+Nodes (9): RealtimeServerEvent, An infinite-iterator that will continue to yield events until         the connec, Receive the next message from the connection and parses it into a `RealtimeServe, Receive the next message from the connection as raw bytes.          Canceling th, Converts a raw `str` or `bytes` message into a `RealtimeServerEvent` object., An infinite-iterator that will continue to yield events until         the connec, Receive the next message from the connection and parses it into a `RealtimeServe, Receive the next message from the connection as raw bytes.          Canceling th (+1 more)
 
 ### Community 772 - "response_computer_tool_call.py"
-Cohesion: 0.09
-Nodes (21): 1.1 Architectural Invariants, 1.2 Environment & Build Verification, 1.3 Independent Module Test Verification, 1. Preflight Checks & Prerequisites, 2.1 Static Import Cycle Guards, 2.2 Transaction Boundary Safeguards, 2.3 Fallback Recovery Triggers, 2. Mismatch Abort Conditions & Safeguards (+13 more)
+Cohesion: 0.12
+Nodes (16): ActionClick, ActionDoubleClick, ActionDrag, ActionDragPath, ActionKeypress, ActionMove, ActionScreenshot, ActionScroll (+8 more)
 
 ### Community 773 - "Socks5Connection"
-Cohesion: 0.14
-Nodes (14): Environ, ExcInfo, StartResponse, build_environ(), ASGIReceiveCallable, ASGIReceiveEvent, ASGISendCallable, BytesIO (+6 more)
+Cohesion: 0.15
+Nodes (5): Origin, SSLContext, URL, A connection pool for making HTTP requests.          Parameters:             pro, Socks5Connection
 
 ### Community 774 - "_validation.py"
-Cohesion: 0.11
-Nodes (24): _dumpd(), _get_langchain_dumpd(), log_outputs(), Log run outputs from within a pytest test run.      Should only be used in pytes, Serialize LangChain Serializable objects., dumpd(), Return a dict representation of an object.      Note:         Plain dicts contai, _escape_dict() (+16 more)
+Cohesion: 0.19
+Nodes (16): _escape_dict(), _get_secret_keys(), _is_escaped_dict(), _needs_escaping(), Any, Validation utilities for LangChain serialization.  Provides escape-based protect, Return the merged set of constructor kwarg names declared as secrets.      Mirro, Serialize a `Serializable` object with escaping of user data in kwargs.      Arg (+8 more)
 
 ### Community 775 - "Style"
-Cohesion: 0.14
-Nodes (10): Style, AbapStyle, pygments.styles.abap     ~~~~~~~~~~~~~~~~~~~~      ABAP workbench like style., ArduinoStyle, pygments.styles.arduino     ~~~~~~~~~~~~~~~~~~~~~~~      Arduino® Syntax highlig, The Arduino® language style. This style is designed to highlight the     Arduino, InkPotStyle, pygments.styles.inkpot     ~~~~~~~~~~~~~~~~~~~~~~      A highlighting style for (+2 more)
+Cohesion: 0.12
+Nodes (12): Style, Algol_NuStyle, pygments.styles.algol_nu     ~~~~~~~~~~~~~~~~~~~~~~~~      Algol publication sty, ArduinoStyle, pygments.styles.arduino     ~~~~~~~~~~~~~~~~~~~~~~~      Arduino® Syntax highlig, The Arduino® language style. This style is designed to highlight the     Arduino, DraculaStyle, pygments.styles.dracula     ~~~~~~~~~~~~~~~~~~~~~~~      Pygments version of `Dr (+4 more)
 
 ### Community 776 - ".__init__"
-Cohesion: 0.10
-Nodes (20): 10. External API Mocking, 11. Test Data Isolation, 12. Trigger Scope, 13. Test Reporting, 14. Integration Tests with Real APIs (Future, Separate Layer), 1. No CD Pipeline Yet, 2. Smoke vs. Sanity — Definitions, 3. Smoke Test Checklist (8 Checks) (+12 more)
+Cohesion: 0.14
+Nodes (12): get_sync_client(), BaseException, Client, TimeoutTypes, TracebackType, Sync LangGraph client., Enter the sync context manager., Exit the sync context manager. (+4 more)
 
 ### Community 777 - "User Scenarios & Testing"
-Cohesion: 0.11
+Cohesion: 0.12
 Nodes (14): Assumptions, Edge Cases, Feature Specification: Chatbot Backend Infrastructure and Booking Handoff, Functional Requirements, Key Entities, Measurable Outcomes, Requirements, Success Criteria (+6 more)
 
 ### Community 778 - ".create"
-Cohesion: 0.16
-Nodes (18): deepSanitize(), calculateConfidenceInterval(), deepRedactStrings(), DEFAULT_TOOL_VERSIONS, defaultToolchainPath, __dirname, __filename, FORBIDDEN_KEY_NAMES (+10 more)
+Cohesion: 0.24
+Nodes (12): _get_response_format_type(), AudioModel, AudioResponseFormat, FileTypes, Headers, NotGiven, Omit, Query (+4 more)
 
 ### Community 779 - "__init__.py"
-Cohesion: 0.10
-Nodes (21): 1. Overview & Purpose, 2.1 CSS Semantic Variable Registry, 2.2 Fallback Strategy for Non-Backdrop Browsers, 2.3 Strict Prohibitions, 2. Tokenization-First Strategy, 3. Removed Prototype Mock Elements, 4.1 Quick Search Form Contract, 4.2 Quick Actions Matrix (+13 more)
+Cohesion: 0.17
+Nodes (9): PermissionCreateParams, PermissionCreateResponse, The `checkpoint.permission` object represents a permission for a fine-tuned mode, PermissionDeleteResponse, PermissionListParams, PermissionListResponse, The `checkpoint.permission` object represents a permission for a fine-tuned mode, PermissionRetrieveParams (+1 more)
 
 ### Community 780 - "business.py"
-Cohesion: 0.16
-Nodes (14): applyContractMigration(), assertContractMigrationRecorded(), assertContractSchemaAtMigrationHead(), CONTRACT_MIGRATION_PATH, executeSqlScript(), expectPreflightAbort(), Fixture, hasBookingIdColumn() (+6 more)
+Cohesion: 0.13
+Nodes (14): ABAPLexer, CobolFreeformatLexer, CobolLexer, GoodDataCLLexer, MaqlLexer, OpenEdgeLexer, pygments.lexers.business     ~~~~~~~~~~~~~~~~~~~~~~~~      Lexers for "business-, Lexer for Free format OpenCOBOL code. (+6 more)
 
 ### Community 781 - "graphics.py"
-Cohesion: 0.15
-Nodes (10): BoxCreateSnapshotParams, BoxGenerateServiceURLParams, BoxListParams, RegistryCreateParams, RegistryListParams, RegistryListResponse, RegistryUpdateParams, SnapshotCreateParams (+2 more)
+Cohesion: 0.13
+Nodes (14): GLShaderLexer, GnuplotLexer, HLSLShaderLexer, PostScriptLexer, PovrayLexer, pygments.lexers.graphics     ~~~~~~~~~~~~~~~~~~~~~~~~      Lexers for computer g, HLSL (Microsoft Direct3D Shader) lexer., GLSL (OpenGL Shader) lexer. (+6 more)
 
 ### Community 782 - "get_tools"
 Cohesion: 0.20
@@ -3812,16 +3683,16 @@ Cohesion: 0.13
 Nodes (14): 10. Provider isolation, 11. Line endings and images, 12. Static validation and rollout, 13. Performance and rollback, 1. Change detection and a stable required check, 2. Immutable action and tool registry, 3. Node and pnpm compatibility, 4. Fresh runner boundaries (+6 more)
 
 ### Community 785 - ".aevaluate"
-Cohesion: 0.20
-Nodes (10): AEVALUATOR_T, ATARGET_T, COMPARATIVE_EVALUATOR_T, DATA_T, EVALUATOR_T, EXPERIMENT_T, SUMMARY_EVALUATOR_T, TARGET_T (+2 more)
+Cohesion: 0.15
+Nodes (12): AEVALUATOR_T, ATARGET_T, COMPARATIVE_EVALUATOR_T, DATA_T, EVALUATOR_T, EXPERIMENT_T, ExperimentResults, SUMMARY_EVALUATOR_T (+4 more)
 
 ### Community 786 - ".list"
 Cohesion: 0.23
 Nodes (10): AsyncPaginator, Headers, NotGiven, Omit, Query, **Beta:** This endpoint is in active development and may change without notice., **Beta:** This endpoint is in active development and may change without notice., **Beta:** This endpoint is in active development and may change without notice. (+2 more)
 
 ### Community 787 - "_mounts.py"
-Cohesion: 0.14
-Nodes (13): mapOutcomeToResponse(), POST(), mapOutcomeToResponse(), POST(), GET(), mapOutcomeToResponse(), mapOutcomeToResponse(), POST() (+5 more)
+Cohesion: 0.22
+Nodes (14): context_hub_mount(), ContextHubMountSpec, _copy_git_ref(), git_mount(), GitMountRefSpec, GitMountSpec, Helpers and type definitions for sandbox mount configurations., Read-only Context Hub-backed sandbox mount specification. (+6 more)
 
 ### Community 788 - "booking.e2e-spec.js"
 Cohesion: 0.20
@@ -3832,12 +3703,12 @@ Cohesion: 0.17
 Nodes (13): AsyncStream, Headers, NotGiven, Omit, Query, SequenceNotStr, Stream, Creates a completion for the provided prompt and parameters.          Returns a (+5 more)
 
 ### Community 790 - "MatlabLexer"
-Cohesion: 0.20
-Nodes (7): MatlabLexer, MatlabSessionLexer, pygments.lexers.matlab     ~~~~~~~~~~~~~~~~~~~~~~      Lexers for Matlab and rel, For Matlab sessions.  Modeled after PythonConsoleLexer.     Contributed by Ken S, For Scilab source code., For Matlab source code., ScilabLexer
+Cohesion: 0.14
+Nodes (10): MatlabLexer, MatlabSessionLexer, OctaveLexer, pygments.lexers.matlab     ~~~~~~~~~~~~~~~~~~~~~~      Lexers for Matlab and rel, For Matlab sessions.  Modeled after PythonConsoleLexer.     Contributed by Ken S, For GNU Octave source code., Octave is quite hard to spot, and it looks like Matlab as well., For Scilab source code. (+2 more)
 
 ### Community 791 - "SMLLexer"
-Cohesion: 0.11
-Nodes (15): 2026-09-09 final Python fix pass, API baseline failure and authorized retry, API empty-string encryption correction, Baseline and environment, Commands and results, E2E and regression evidence, Feature 023 Phase 4 Tool Boundary Validation, Independent security invariants and scope (+7 more)
+Cohesion: 0.13
+Nodes (10): FStarLexer, OcamlLexer, OpaLexer, pygments.lexers.ml     ~~~~~~~~~~~~~~~~~~      Lexers for ML family languages., For the Standard ML language., For the OCaml language., Lexer for the Opa language., For the ReasonML language. (+2 more)
 
 ### Community 792 - "cache.py"
 Cohesion: 0.18
@@ -3856,24 +3727,24 @@ Cohesion: 0.14
 Nodes (13): Architecture Review — Module Deepening Decisions, Candidate #3 — Flight Search Server Seam, Candidate #7 — Agent Gateway Tool-Local Modules, Candidate #8 — Web Booking Management Server Seam, Candidate #9 — Narrow the Duffel Provider Interface (Deferred), Decision 1 — Refund Settlement Deep Module (Candidate #1), Decision 2 — Booking Lifecycle Deep Module (Candidates #4 + #6-Lifecycle), Decision 3 — Booking Three-Module Split (Candidate #6) (+5 more)
 
 ### Community 796 - "Message"
-Cohesion: 0.18
-Nodes (5): Message, Callback that is fired when a message is created, Callback that is fired whenever a message delta is returned from the API, Callback that is fired when a message is completed, Callback that is fired whenever a message delta is returned from the API
+Cohesion: 0.14
+Nodes (8): MessageContentDelta, accumulate_event(), Message, Wait for the stream to finish and returns the messages emitted in this run, Callback that is fired when a message is created, Callback that is fired whenever a message delta is returned from the API, Callback that is fired when a message is completed, Returns a tuple of message snapshot and newly created text message deltas
 
 ### Community 797 - "processor.py"
-Cohesion: 0.11
-Nodes (18): 1. Overview, 2. Pinned Toolchain Matrix, 3.1 Semgrep (SAST), 3.2 OWASP ZAP (DAST), 3.3 Gitleaks (Secret Detection), 3.4 pip-audit (Python Dependency SCA), 3.5 pnpm audit (Node.js Dependency SCA), 3.6 pytest-cov (Guardrail Test Coverage) (+10 more)
+Cohesion: 0.19
+Nodes (10): BatchSpanProcessor, OTLPSpanExporter, OpenTelemetry span processor and exporter for LangSmith., Mock otlp span exporter class., Mock batch span processor class., get_otlp_tracer_provider(), _import_otel_client(), Client configuration for OpenTelemetry integration with LangSmith. (+2 more)
 
 ### Community 798 - "_oauth_refresh_lock.py"
-Cohesion: 0.11
-Nodes (19): Complexity Tracking, Constitution Check, Data Flow, Design Decisions and Reconciliation, Documentation (this feature), Implementation Phases, Implementation Plan: Authenticated Booking Dashboard, Phase 0 - Contract and deterministic query foundation (+11 more)
+Cohesion: 0.29
+Nodes (13): _dir_lock(), _flock_lock(), _force_remove(), _lock_created_at(), _lock_metadata_lines(), _lock_owner(), _now_iso(), oauth_refresh_lock() (+5 more)
 
 ### Community 799 - ".stringify_items"
 Cohesion: 0.23
 Nodes (8): Options, ArrayFormat, Data, NestedFormat, NotGiven, Options, Params, PrimitiveData
 
 ### Community 800 - "SandboxProxySecret"
-Cohesion: 0.11
-Nodes (17): 1. Executive Summary & Provisional SC-004 Targets, 2. Core Invariants, 3. Test Environment & Hardware Specification, 4.1 Cold vs. Warm Initialization, 4.2 Hostile & Near-Limit Input Payloads, 4.3 Hostile & Near-Limit Tool Output Payloads, 4.4 Pathological Regex & ReDoS Resistance, 4.5 Stream Chunk Fragmentation Stress (+9 more)
+Cohesion: 0.16
+Nodes (14): AWSMountAuthConfig, ContextHubMountConfig, ContextHubMountConfigRequired, GCPMountAuthConfig, GCSMountConfig, GCSMountConfigRequired, Required Context Hub configuration for a sandbox mount., Context Hub configuration for a sandbox mount. (+6 more)
 
 ### Community 801 - "core.py"
 Cohesion: 0.30
@@ -3884,12 +3755,12 @@ Cohesion: 0.15
 Nodes (7): Encodes text corresponding to a single token to its token value.          NOTE, Decodes a list of tokens into bytes.          ```         >>> enc.decode_byte, Decodes a list of tokens into a string.          WARNING: the default behaviou, Encodes text corresponding to bytes without a regex split.          NOTE: this, Encodes a string into tokens, but do regex splitting in Python., Encodes a string into tokens, ignoring special tokens.          This is equiva, Encodes a string into tokens.          Special tokens are artificial tokens us
 
 ### Community 803 - ".stringify_items"
-Cohesion: 0.11
-Nodes (17): 1. Pinned Taxonomy Edition, 2. Corpus Provenance & Licensing, 3. Holdout Set Rules & Dataset Isolation, 4. Separate Invariant Suite (`invariant_manifest.jsonl`), 5. Deduplication & Split Isolation Procedure, 6. Stage-Local Delivery Fixtures & Deterministic Oracles, 7. SEC28 Compliance: Upstream Rejection & Stage Reachability, 8. Corpus JSONL Record Schema (+9 more)
+Cohesion: 0.23
+Nodes (8): Options, ArrayFormat, Data, NestedFormat, NotGiven, Options, Params, PrimitiveData
 
 ### Community 804 - ".list"
-Cohesion: 0.11
-Nodes (17): host, port, url, host, port, url, description, routes (+9 more)
+Cohesion: 0.24
+Nodes (10): AsyncPaginator, Headers, NotGiven, Query, Retrieves a model instance, providing basic information about the model such as, Lists the currently available models, and provides basic information about each, Retrieves a model instance, providing basic information about the model such as, Lists the currently available models, and provides basic information about each (+2 more)
 
 ### Community 805 - "MultiCursorBuffer"
 Cohesion: 0.23
@@ -3904,8 +3775,8 @@ Cohesion: 0.24
 Nodes (7): ModuleSpec, ModuleType, _alias(), alias_httpx(), _AliasFinder, _AliasLoader, Make `import httpx` resolve to `httpx2`, and `import httpcore` to `httpcore2`, p
 
 ### Community 808 - "login_chatgpt"
-Cohesion: 0.12
-Nodes (9): HttpLexer, NotmuchLexer, pygments.lexers.textfmts     ~~~~~~~~~~~~~~~~~~~~~~~~      Lexers for various te, Lexer for HTTP sessions., Reset the content-type state., Lexer for Todo.txt todo list format., # TODO: Make date regex more ISO 8601 compliant, For Notmuch email text format.      Additional options accepted:      `body_lexe (+1 more)
+Cohesion: 0.19
+Nodes (13): RuntimeError, _build_authorize_url(), _generate_pkce_pair(), login_chatgpt(), login_chatgpt_device(), _post_form(), POST a form payload and return the parsed JSON body., Return a `(code_verifier, code_challenge)` pair using S256. (+5 more)
 
 ### Community 809 - "Workflow Design"
 Cohesion: 0.15
@@ -3920,36 +3791,36 @@ Cohesion: 0.19
 Nodes (7): PathLike, A byte-iterator over the decoded response content.          This automatically h, A byte-iterator over the decoded response content.          This automatically h, Write the output to the given file.          Accepts a filename or any path-like, Write the output to the given file.          Accepts a filename or any path-like, Streams the output to the given file.          Accepts a filename or any path-li, Streams the output to the given file.          Accepts a filename or any path-li
 
 ### Community 812 - "MountCacheConfig"
-Cohesion: 0.25
-Nodes (15): CONSTANT_COPY, containsForbiddenPrivacyPattern(), FORBIDDEN_PRIVACY_PATTERNS, formatExplanation(), formatScheduleWindow(), isFiniteNumber(), isNonEmptyString(), isRuntimeParams() (+7 more)
+Cohesion: 0.19
+Nodes (13): BucketMountSpecBase, _copy_cache_config(), gcs_mount(), GCSMountSpec, MountCacheConfig, Optional per-mount cache configuration supported by bucket mounts., Build an S3-backed sandbox mount specification., Optional fields applied per bucket-backed sandbox mount. (+5 more)
 
 ### Community 813 - "RunStep"
-Cohesion: 0.18
-Nodes (6): accumulate_run_step(), Callback that is fired when a run step is created, Callback that is fired whenever a run step delta is returned from the API, Callback that is fired when a run step is completed, Represents a step in execution of a run., RunStep
+Cohesion: 0.15
+Nodes (7): accumulate_run_step(), Wait for the stream to finish and returns the steps taken in this run, Callback that is fired when a run step is created, Callback that is fired whenever a run step delta is returned from the API, Callback that is fired when a run step is completed, Represents a step in execution of a run., RunStep
 
 ### Community 814 - ".until_done"
 Cohesion: 0.17
-Nodes (6): Wait for the stream to finish and returns the steps taken in this run, Wait for the stream to finish and returns the messages emitted in this run, Waits until the stream has been consumed, Wait for the stream to finish and returns the completed Run object, Wait for the stream to finish and returns the steps taken in this run, Wait for the stream to finish and returns the messages emitted in this run
+Nodes (6): Run, Wait for the stream to finish and returns the completed Run object, Waits until the stream has been consumed, Wait for the stream to finish and returns the completed Run object, Wait for the stream to finish and returns the steps taken in this run, Wait for the stream to finish and returns the messages emitted in this run
 
 ### Community 815 - ".iter_bytes"
 Cohesion: 0.19
 Nodes (7): PathLike, A byte-iterator over the decoded response content.          This automatically h, A byte-iterator over the decoded response content.          This automatically h, Write the output to the given file.          Accepts a filename or any path-like, Write the output to the given file.          Accepts a filename or any path-like, Streams the output to the given file.          Accepts a filename or any path-li, Streams the output to the given file.          Accepts a filename or any path-li
 
 ### Community 816 - "beta_response_function_call_output_item_list_param.py"
-Cohesion: 0.40
-Nodes (4): BetaResponseInputFileContentParam, PromptCacheBreakpoint, Marks the exact end of a reusable prompt prefix.      The breakpoint inherits it, A file input to the model.
+Cohesion: 0.21
+Nodes (8): BetaResponseInputFileContentParam, PromptCacheBreakpoint, Marks the exact end of a reusable prompt prefix.      The breakpoint inherits it, A file input to the model., PromptCacheBreakpoint, Marks the exact end of a reusable prompt prefix.      The breakpoint inherits it, PromptCacheBreakpoint, Marks the exact end of a reusable prompt prefix.      The breakpoint inherits it
 
 ### Community 817 - "PrologLexer"
 Cohesion: 0.15
 Nodes (9): CplintLexer, pygments.lexers.cplint     ~~~~~~~~~~~~~~~~~~~~~~      Lexer for the cplint lang, Lexer for cplint files, including CP-logic, Logic Programs with Annotated     Di, LogtalkLexer, PrologLexer, pygments.lexers.prolog     ~~~~~~~~~~~~~~~~~~~~~~      Lexers for Prolog and Pro, Lexer for Prolog files., Competes with IDL and Visual Prolog on *.pro (+1 more)
 
 ### Community 818 - "CSharpAspxLexer"
-Cohesion: 0.12
-Nodes (12): CSharpAspxLexer, GenericAspxLexer, NemerleLexer, pygments.lexers.dotnet     ~~~~~~~~~~~~~~~~~~~~~~      Lexers for .net languages, For Nemerle source code.      Additional options accepted:      `unicodelevel`, Nemerle is quite similar to Python, but @if is relatively uncommon         elsew, For Visual Basic.NET source code.     Also LibreOffice Basic, OpenOffice Basic,, Lexer for ASP.NET pages. (+4 more)
+Cohesion: 0.17
+Nodes (8): CSharpAspxLexer, GenericAspxLexer, For Visual Basic.NET source code.     Also LibreOffice Basic, OpenOffice Basic,, Lexer for ASP.NET pages., Lexer for highlighting C# within ASP.NET pages., Lexer for highlighting Visual Basic.net within ASP.NET pages., VbNetAspxLexer, VbNetLexer
 
 ### Community 819 - "BugsLexer"
-Cohesion: 0.18
-Nodes (9): createTransport(), authenticateUsers(), composeFile, createRunPlan(), dockerEnvironment(), main(), origins, root (+1 more)
+Cohesion: 0.15
+Nodes (9): BugsLexer, JagsLexer, ModelicaLexer, pygments.lexers.modeling     ~~~~~~~~~~~~~~~~~~~~~~~~      Lexers for modeling l, Pygments Lexer for OpenBugs and WinBugs     models., Pygments Lexer for JAGS., For Modelica source code., Pygments Lexer for Stan models.      The Stan modeling language is specified in (+1 more)
 
 ### Community 820 - "PygmentsDoc"
 Cohesion: 0.24
@@ -3960,20 +3831,20 @@ Cohesion: 0.20
 Nodes (11): _interpolate(), Any, _quote_fragment_part(), _quote_path_segment_part(), _quote_query_part(), Percent-encode `value` for use in a URI path segment.      Considers characters, Percent-encode `value` for use in a URI query string.      Considers &, = and ch, Percent-encode `value` for use in a URI fragment.      Considers characters not (+3 more)
 
 ### Community 822 - "ruff.cyclonedx.json"
-Cohesion: 0.12
-Nodes (17): description, minLength, type, description, minLength, type, curatedAt, curatedBy (+9 more)
+Cohesion: 0.17
+Nodes (11): bomFormat, components, dependencies, metadata, authors, properties, timestamp, tools (+3 more)
 
 ### Community 823 - ".__aexit__"
 Cohesion: 0.20
 Nodes (5): Any, BaseException, Logger, Request, TracebackType
 
 ### Community 824 - "BaseChatLoader"
-Cohesion: 0.14
-Nodes (10): LengthBasedExampleSelector, Any, Self, Select examples based on length., Async select which examples to use based on the input lengths.          Args:, r"""Select examples based on length.      Example:         ```python         fro, Add new example to list.          Args:             example: A dictionary with k, Async add new example to list.          Args:             example: A dictionary (+2 more)
+Cohesion: 0.21
+Nodes (8): BaseChatLoader, ChatSession, Base class for chat loaders., Lazy load the chat sessions.          Returns:             An iterator of chat s, Eagerly load the chat sessions into memory.          Returns:             A list, ChatSession, **Chat Sessions** are a collection of messages and function calls., Chat Session.      Chat Session represents a single conversation, channel, or ot
 
 ### Community 825 - "Embeddings"
 Cohesion: 0.17
-Nodes (7): applyMigration(), assertContractMigrationRecorded(), CONTRACT_MIGRATION_PATH, executeSqlScript(), MIGRATION_PATH, restoreContractMigrationHead(), restoreLegacyContractSurface()
+Nodes (7): Embeddings, **Embeddings** interface., Embed search docs.          Args:             texts: List of text to embed., Embed query text.          Args:             text: Text to embed.          Retur, Asynchronous Embed search docs.          Args:             texts: List of text t, Asynchronous Embed query text.          Args:             text: Text to embed., Interface for embedding models.      This is an interface meant for implementing
 
 ### Community 826 - ".pipe"
 Cohesion: 0.21
@@ -3988,12 +3859,12 @@ Cohesion: 0.18
 Nodes (11): nameprep(), Any, Compatibility shim for :rfc:`3490` ``ToUnicode``.      Delegates to :func:`idna., Stub for :rfc:`3491` Nameprep, which is not used by IDNA 2008.      IDNA 2008 (:, Compatibility shim for :rfc:`3490` ``ToASCII``.      Delegates to :func:`idna.en, ToASCII(), ToUnicode(), decode() (+3 more)
 
 ### Community 829 - "scripts"
-Cohesion: 0.15
-Nodes (12): name, private, scripts, build, check:routes, dev, lint, start (+4 more)
+Cohesion: 0.18
+Nodes (10): name, private, scripts, build, check:routes, dev, lint, start (+2 more)
 
 ### Community 830 - ".list"
-Cohesion: 0.40
-Nodes (15): mapOutcomeToResponse(), POST(), acceptDisruption(), acknowledgeDisruption(), cancelBooking(), fetchWithRetry(), getAccessToken(), getBookingDetail() (+7 more)
+Cohesion: 0.27
+Nodes (9): BetaResponseItem, AsyncPaginator, BetaResponseIncludable, Headers, NotGiven, Omit, Query, Returns a list of input items for a given response.          Args:           aft (+1 more)
 
 ### Community 831 - ".create"
 Cohesion: 0.29
@@ -4004,8 +3875,8 @@ Cohesion: 0.27
 Nodes (9): ResponseItem, AsyncPaginator, Headers, NotGiven, Omit, Query, ResponseIncludable, Returns a list of input items for a given response.          Args:           aft (+1 more)
 
 ### Community 833 - "mount_config"
-Cohesion: 0.12
-Nodes (14): __dirname, __filename, getServerSession, nextAuthPath, serverOnlyPath, testRequire, TestSession, upstreamOffer (+6 more)
+Cohesion: 0.24
+Nodes (11): SandboxMount, SandboxMountAuth, _copy_mount_secret(), mount_config(), _normalize_mount_auth(), _normalize_mounts(), Any, Provider auth blocks for sandbox mounts. (+3 more)
 
 ### Community 834 - "User Stories"
 Cohesion: 0.18
@@ -4028,8 +3899,8 @@ Cohesion: 0.29
 Nodes (9): ClientSecret, Headers, InputAudioNoiseReduction, InputAudioTranscription, NotGiven, Query, TurnDetection, Create an ephemeral API token for use in client-side applications with the (+1 more)
 
 ### Community 839 - "response_function_shell_tool_call.py"
-Cohesion: 0.12
-Nodes (12): dashboardLibPath, defaultPopulatedOutcome, __dirname, __filename, getDashboardSummary, getServerSession, nextAuthPath, nextNavigationPath (+4 more)
+Cohesion: 0.33
+Nodes (8): Represents a container created with /v1/containers., ResponseContainerReference, Action, CallerDirect, CallerProgram, The shell commands and limits that describe how to run the tool call., Represents the use of a local environment to perform shell actions., ResponseLocalEnvironment
 
 ### Community 840 - "intranges_contain"
 Cohesion: 0.24
@@ -4040,16 +3911,16 @@ Cohesion: 0.22
 Nodes (8): pygments.lexers.vip     ~~~~~~~~~~~~~~~~~~~      Lexers for Visual Prolog & Gram, Competes with IDL and Prolog on *.pro; div. lisps on*.cl and SwigLexer on *.i, Lexer for VisualProlog grammar, No competditors (currently), Lexer for VisualProlog, VisualPrologBaseLexer, VisualPrologGrammarLexer, VisualPrologLexer
 
 ### Community 842 - "ProtocolSseTransport"
-Cohesion: 0.12
-Nodes (16): 1. Dedicated Endpoint vs. Composed Client Calls, 2. Stat Card Definitions & Domain Naming, 3. Direct PostgreSQL Queries (No Redis Caching), 4. Decoupling vs. Duplication & Domain Guardrails, 5. Recent Bookings Feed Scope, 6. Profile Completeness Banner (Omitted), 7. Homepage & Authentication Routing, 8. Clean Separation of Data Plumbing & UI (+8 more)
+Cohesion: 0.22
+Nodes (7): ProtocolSseTransport, Any, AsyncClient, Cancel any open event streams and mark the transport closed. Idempotent., v3 protocol transport bound to a single `thread_id`.      Commands go to `POST /, POST a command. Returns the response JSON, or `None` for 202/204.          Raise, Open an independent filtered SSE event stream.          Posts `params` as a Subs
 
 ### Community 843 - "devDependencies"
 Cohesion: 0.20
 Nodes (10): devDependencies, eslint, eslint-config-next, @playwright/test, @prisma/client, @types/geojson, @types/node, @types/react (+2 more)
 
 ### Community 844 - ".create"
-Cohesion: 0.12
-Nodes (16): description, minLength, type, description, minLength, type, additionalProperties, properties (+8 more)
+Cohesion: 0.31
+Nodes (8): EmbeddingModel, Headers, NotGiven, Omit, Query, SequenceNotStr, Creates an embedding vector representing the input text.          Args:, Creates an embedding vector representing the input text.          Args:
 
 ### Community 845 - "LifespanOn"
 Cohesion: 0.22
@@ -4076,12 +3947,12 @@ Cohesion: 0.20
 Nodes (6): __dir__(), __getattr__(), Helper functions for managing the LangChain API.  This module is only relevant f, Dynamically import and return an attribute from a submodule.      This function, Return a list of available attributes for this module.      Returns:         Lis, __getattr__()
 
 ### Community 851 - "graph_mermaid.py"
-Cohesion: 0.12
-Nodes (16): description, enum, type, description, type, additionalProperties, properties, required (+8 more)
+Cohesion: 0.24
+Nodes (9): draw_mermaid_png(), Mermaid graph drawing utilities., Convert a string into a Mermaid-compatible node id.      Keep [a-zA-Z0-9_-] char, Draws a Mermaid graph as PNG using provided syntax.      Args:         mermaid_s, Renders Mermaid graph using Pyppeteer., Renders Mermaid graph using the Mermaid.INK API., _render_mermaid_using_api(), _render_mermaid_using_pyppeteer() (+1 more)
 
 ### Community 852 - "_streaming.py"
-Cohesion: 0.21
-Nodes (9): T, UUID, Internal tracers used for `stream_log` and `astream` events implementations., Types for streaming callback handlers.      This is a common mixin that the call, Used for internal astream_log and astream events implementations., Used for internal astream_log and astream events implementations., Marker base class for handlers that consume `on_stream_event` (v2).      A handl, _StreamingCallbackHandler (+1 more)
+Cohesion: 0.22
+Nodes (7): T, UUID, Internal tracers used for `stream_log` and `astream` events implementations., Used for internal astream_log and astream events implementations., Used for internal astream_log and astream events implementations., Marker base class for handlers that consume `on_stream_event` (v2).      A handl, _V2StreamingCallbackHandler
 
 ### Community 853 - "strings.py"
 Cohesion: 0.27
@@ -4096,12 +3967,12 @@ Cohesion: 0.22
 Nodes (7): pygments.lexers.r     ~~~~~~~~~~~~~~~~~      Lexers for the R/S languages., Pygments Lexer for R documentation (Rd) files      This is a very minimal implem, For R console transcripts or R CMD BATCH output files., For S, S-plus, and R source code., RConsoleLexer, RdLexer, SLexer
 
 ### Community 856 - "conftest.py"
-Cohesion: 0.01
-Nodes (303): Call the LLM with Travel Assistant tools bound., travel_assistant_node(), ChatTurnCommand, Immutable parameters encapsulating a single user chat turn.     Decouples execut, ChatController, Any, ChatTurnEvent, Thin delegator orchestrating chat turns.     Enforces mandatory security gateway (+295 more)
+Cohesion: 0.22
+Nodes (7): mock_session_lock_repo(), pytest_collection_finish(), pytest_collection_modifyitems(), pytest_runtest_makereport(), Classify tests using the real Redis fixture as integration coverage., CI must prove that the Redis integration group is present and non-empty., Turn an unavailable required Redis service from a skip into a failure.
 
 ### Community 857 - "Decimal"
-Cohesion: 0.17
-Nodes (10): RoleCreateParams, Confirmation payload returned after unassigning a role., RoleDeleteResponse, RoleListParams, AssignmentSource, Detailed information about a role assignment entry returned when listing assignm, RoleListResponse, AssignmentSource (+2 more)
+Cohesion: 0.22
+Nodes (5): Decimal, Alias for prompt_cost., Alias for completion_cost., Alias for prompt_cost_details., Alias for completion_cost_details.
 
 ### Community 858 - "Quickstart: Validate and Roll Out the PR CI Pipeline"
 Cohesion: 0.22
@@ -4116,24 +3987,24 @@ Cohesion: 0.22
 Nodes (9): API Reference, CommandHandle, ExecutionResult, OutputChunk, ResourceStatus, Sandbox, SandboxClient, ServiceURL (+1 more)
 
 ### Community 861 - "dumpd"
-Cohesion: 0.07
-Nodes (16): Agent, The agent that produced this item., AnnotationContainerFileCitation, AnnotationFileCitation, AnnotationURLCitation, Logprob, LogprobTopLogprob, The log probability of a token. (+8 more)
+Cohesion: 0.25
+Nodes (8): _dumpd(), _get_langchain_dumpd(), log_outputs(), Log run outputs from within a pytest test run.      Should only be used in pytes, Serialize LangChain Serializable objects., dumpd(), Return a dict representation of an object.      Note:         Plain dicts contai, Dump the vector store to a file.          Args:             path: The path to du
 
 ### Community 862 - "asyncify"
-Cohesion: 0.17
-Nodes (6): FakeChatModel, FakeListChatModel, Any, Fake Chat Model wrapper for testing purposes., Fake chat model for testing purposes., Return the next response in the list.          Cycle back to the start if at the
+Cohesion: 0.28
+Nodes (7): asyncify(), args, kwargs, T_ParamSpec, T_Retval, Take a blocking function and create an async one that receives the same     posi, to_thread()
 
 ### Community 863 - "response_apply_patch_tool_call.py"
-Cohesion: 0.13
-Nodes (15): Codebase Reconciliation, Complexity Tracking, Constitution Check, Documentation, Environment Contract, File-by-File Change Plan, Implementation Plan: Whole-Stack Smoke and Sanity CI, Phase 1 Design Completion (+7 more)
+Cohesion: 0.22
+Nodes (8): CallerDirect, CallerProgram, OperationCreateFile, OperationDeleteFile, OperationUpdateFile, Instruction describing how to create a file via the apply_patch tool., Instruction describing how to delete a file via the apply_patch tool., Instruction describing how to update a file via the apply_patch tool.
 
 ### Community 864 - "response_function_web_search.py"
-Cohesion: 0.13
-Nodes (14): ConstraintViolation, Data Model: Flight Match Scoring, DimensionScore, EligibilityResult, Ephemeral domain models, FlightMatchInput, FlightMatchPolicy, FlightMatchResult (+6 more)
+Cohesion: 0.22
+Nodes (8): ActionFind, ActionOpenPage, ActionSearch, ActionSearchSource, A source used in the search., Action type "search" - Performs a web search query., Action type "open_page" - Opens a specific URL from search results., Action type "find_in_page": Searches for a pattern within a loaded page.
 
 ### Community 865 - "BaseDocumentTransformer"
-Cohesion: 0.21
-Nodes (14): _consolidate_calls(), _convert_annotation_from_v1(), _convert_from_v1_to_chat_completions(), _convert_from_v1_to_responses(), _implode_reasoning_blocks(), Any, ContentBlock, ToolCall (+6 more)
+Cohesion: 0.25
+Nodes (6): BaseDocumentTransformer, Any, Document transformers., Abstract base class for document transformation.      A document transformation, Transform a list of documents.          Args:             documents: A sequence, Asynchronously transform a list of documents.          Args:             documen
 
 ### Community 866 - "import_attr"
 Cohesion: 0.22
@@ -4173,35 +4044,31 @@ Nodes (4): BaseException, TracebackType, Close the response and release the conn
 
 ### Community 875 - ".__aexit__"
 Cohesion: 0.25
-Nodes (5): Roles(), RolesGuard, BackfillOptionsDto, PassportExpiryBackfillController, BackfillResult
+Nodes (5): Any, BaseException, Close the async HTTP client., Best-effort cleanup of the async HTTP client on garbage collection.          If, Exit async context manager.
 
 ### Community 876 - ".close"
 Cohesion: 0.32
 Nodes (4): BaseException, TracebackType, Close the response and release the connection.          Automatically called whe, Close the response and release the connection.          Automatically called whe
 
 ### Community 877 - ".close"
-Cohesion: 0.14
-Nodes (12): app_module_1, audit_service_1, booking_intent_cron_1, client_1, common_1, duffel_service_1, encryption_service_1, http_exception_filter_1 (+4 more)
+Cohesion: 0.32
+Nodes (4): BaseException, TracebackType, Close the response and release the connection.          Automatically called if, Close the response and release the connection.          Automatically called if
 
 ### Community 878 - ".close"
-Cohesion: 0.14
-Nodes (13): Phase 0 Research: Deepen Codebase Architecture, R10. Agent Gateway capability ownership, R11. Verification and rollout discipline, R12. Dependencies, R1. Scope and delivery model, R2. Refund obligation and transaction migration, R3. Refund reservation concurrency, R4. Refund Settlement contract and state projections (+5 more)
+Cohesion: 0.32
+Nodes (4): BaseException, TracebackType, Close the response and release the connection.          Automatically called if, Close the response and release the connection.          Automatically called if
 
 ### Community 879 - "request"
 Cohesion: 0.36
 Nodes (8): Extensions, HeaderTypes, Response, URL, Sends an HTTP request, returning the response.      ```     response = httpcore2, Sends an HTTP request, returning the response within a content manager.      ```, request(), stream()
 
-### Community 880 - "_SSELineDecoder"
-Cohesion: 0.16
-Nodes (5): Bound the total bytes buffered for the in-progress event, including         a tr, ServerSentEvent, _SSEEventDecoder, _SSELineDecoder, _SSEParser
-
 ### Community 881 - "_raise_for_oauth_response"
-Cohesion: 0.14
-Nodes (14): Decision 10: Orchestrate application processes in a Node script, Decision 11: Preserve loopback-only networking and no-LLM execution, Decision 12: Isolate CI and local data differently, Decision 1: Preserve the ADR's outcome, reconcile its assumed wire shapes, Decision 2: Assert the existing API readiness contract, Decision 3: Separate web serving from web-to-API readiness, Decision 4: Test both real cross-service directions without inventing `X-Service-Auth`, Decision 5: Add production-default-neutral provider URL seams (+6 more)
+Cohesion: 0.32
+Nodes (8): _apost_form(), _parse_oauth_error(), _post_device_poll_form(), Response, _raise_for_oauth_response(), Return `(error_code, body_excerpt)` from an OAuth error response., POST a device-code poll and return expected pending error payloads., POST a form payload asynchronously and return the parsed JSON body.
 
 ### Community 882 - "FortranFixedLexer"
-Cohesion: 0.21
-Nodes (12): AsyncPaginator, Headers, NotGiven, Omit, Query, SequenceNotStr, List user actions and configuration changes within this organization.          A, List user actions and configuration changes within this organization.          A (+4 more)
+Cohesion: 0.29
+Nodes (6): FortranFixedLexer, FortranLexer, pygments.lexers.fortran     ~~~~~~~~~~~~~~~~~~~~~~~      Lexers for Fortran lang, Lexer for fixed format Fortran., Lex a line just as free form fortran without line break., Lexer for FORTRAN 90 code.
 
 ### Community 883 - "_lua_builtins.py"
 Cohesion: 0.43
@@ -4224,8 +4091,8 @@ Cohesion: 0.38
 Nodes (6): Py_ssize_t, PyMODINIT_FUNC, PyObject, apply_mask(), _PyBytesLike_AsStringAndSize(), PyInit_speedups()
 
 ### Community 888 - "Text"
-Cohesion: 0.08
-Nodes (13): Text, AssistantEventHandler, Run, Waits until the stream has been consumed, Wait for the stream to finish and returns the completed Run object, Fires when the stream has finished.          This happens if the stream is read, Callback that is fired for every Server-Sent-Event, Fired whenever an exception happens during streaming (+5 more)
+Cohesion: 0.29
+Nodes (4): Text, Callback that is fired when a text content block is created, Callback that is fired whenever a text content delta is returned         by the, Callback that is fired when a text content block is finished
 
 ### Community 889 - ".__init__"
 Cohesion: 0.29
@@ -4244,28 +4111,28 @@ Cohesion: 0.29
 Nodes (7): Auto-Reconnect, Callbacks, Killing a Running Command, No Timeout (`timeout=0`), Sending Stdin Input, Streaming Output, Streaming with CommandHandle
 
 ### Community 893 - "is_base64_file_input"
-Cohesion: 0.19
-Nodes (8): RoleCreateParams, RoleListParams, AssignmentSource, Detailed information about a role assignment entry returned when listing assignm, RoleListResponse, AssignmentSource, Detailed information about a role assignment entry returned when listing assignm, RoleRetrieveResponse
+Cohesion: 0.33
+Nodes (6): is_base64_file_input(), Base64FileInput, TypeGuard, _async_format_data(), _format_data(), PropertyFormat
 
 ### Community 894 - "chat.e2e-spec.js"
 Cohesion: 0.22
 Nodes (8): app_module_1, client_1, common_1, http_exception_filter_1, jwt_1, prisma_service_1, supertest_1, testing_1
 
 ### Community 895 - ".__init__"
-Cohesion: 0.15
-Nodes (9): BCLexer, GAPConsoleLexer, GAPLexer, MathematicaLexer, MuPADLexer, pygments.lexers.algebra     ~~~~~~~~~~~~~~~~~~~~~~~      Lexers for computer alg, Lexer for Mathematica source code., A MuPAD lexer.     Contributed by Christopher Creutzig <christopher@creutzig.de> (+1 more)
+Cohesion: 0.29
+Nodes (6): Any, AsyncStream, BaseClient, FinalRequestOptions, Response, Stream
 
 ### Community 896 - "beta_response_code_interpreter_tool_call_param.py"
-Cohesion: 0.33
-Nodes (5): format_sse_wire_event(), parse_sse_wire_chunk(), Format an event and payload dict to standard SSE wire format., Parse raw SSE formatted text line into event name and decoded json payload., TestAuthoritativeSSEWireEvents
+Cohesion: 0.29
+Nodes (6): Agent, OutputImage, OutputLogs, The logs output from the code interpreter., The image output from the code interpreter., The agent that produced this item.
 
 ### Community 897 - "OutputItemListResponse"
-Cohesion: 0.15
-Nodes (13): Amendment: Resource and Telemetry Contract Alignment (2026-09-04), Context, Decision 10: Unified Observability & Security Metrics, Decision 1: GuardrailGateway Architecture (Unified Facade), Decision 2: ChatController Layer & Decoupled Transports, Decision 3: Runner Owns Enforcement Points (Lifecycle Control), Decision 4: Closed Plugin Registry for Layer Composition, Decision 5: Deterministic-Only Guardrails (No LLM Judge) (+5 more)
+Cohesion: 0.33
+Nodes (5): OutputItemListParams, OutputItemListResponse, A schema representing an evaluation run output item., OutputItemRetrieveResponse, A schema representing an evaluation run output item.
 
 ### Community 898 - "_atomic_write_private_json"
-Cohesion: 0.15
-Nodes (12): Assumptions, Edge Cases, Feature Specification: Whole-Stack Smoke and Sanity CI, Functional Requirements, Key Entities, Measurable Outcomes, Requirements, Success Criteria (+4 more)
+Cohesion: 0.33
+Nodes (7): _atomic_write_private_json(), _chmod_warn(), _file_lock(), Path, Best-effort `chmod` that logs (but does not raise) on failure.      On filesyste, Write `data` as JSON to `path` with 0600 perms (where supported)., Best-effort cross-platform file lock around refresh + write.      On POSIX this
 
 ### Community 899 - "custom_tool.py"
 Cohesion: 0.38
@@ -4280,8 +4147,8 @@ Cohesion: 0.29
 Nodes (5): NixLexer, pygments.lexers.nix     ~~~~~~~~~~~~~~~~~~~      Lexers for the NixOS Nix langua, # TODO: we should probably escape also here ''${ \${, # TODO: let/in, For the Nix language.
 
 ### Community 902 - "ComponentPascalLexer"
-Cohesion: 0.15
-Nodes (13): 1. Overview & Purpose, 3.1 Prohibited Data Categories, 3.2 Security Conformance Checklist, 3. Zero-Leakage Privacy & Security Invariants, 4.1 Type Definitions, 4.2 Failure Reason Mapping Table, 4.3 Web Outcome Conformance Checklist, 4. Web Boundary Result Contract (`DashboardOutcome`) (+5 more)
+Cohesion: 0.29
+Nodes (5): ComponentPascalLexer, pygments.lexers.oberon     ~~~~~~~~~~~~~~~~~~~~~~      Lexers for Oberon family, The only other lexer using .cp is the C++ one, so we check if for         a few, For Component Pascal source code., # TODO: nested comments (* (* ... *) ... (* ... *) *) not supported!
 
 ### Community 903 - "solarized.py"
 Cohesion: 0.33
@@ -4296,12 +4163,12 @@ Cohesion: 0.29
 Nodes (6): Any, VCreate, VDelete, VRead, VSearch, VUpdate
 
 ### Community 907 - "_IgnoreUnserializable"
-Cohesion: 0.15
-Nodes (13): 2.1 `DashboardStats` Schema & Derivation Rules, 2.2 `DashboardRecentBooking` Schema & Field Constraints, 2.3 `DashboardSummary` Aggregate Schema, 2. Component Schema Validation Requirements, Defensive Snapshot Projection Rules, Ordering and Limits, Query Derivation & Canonical Status Mappings, Recent Booking Conformance Checklist (+5 more)
+Cohesion: 0.33
+Nodes (5): GenerateJsonSchema, JsonSchemaValue, _IgnoreUnserializable, CoreSchema, A JSON schema generator that ignores unknown types.      https://docs.pydantic.d
 
 ### Community 908 - ".__init__"
-Cohesion: 0.15
-Nodes (13): Assumptions, Edge Cases, Feature Specification: Authenticated Booking Dashboard, Functional Requirements, Key Entities, Measurable Outcomes, Out of Scope, Requirements (+5 more)
+Cohesion: 0.33
+Nodes (4): Listener, AsyncListener, Initialize the tracer.          Args:             config: The runnable config., Initialize the tracer.          Args:             config: The runnable config.
 
 ### Community 909 - "CI Workflow Contract"
 Cohesion: 0.33
@@ -4316,44 +4183,40 @@ Cohesion: 0.33
 Nodes (4): _AudioRecord, OTel → LangSmith bridge for Pipecat.  Rewrites Pipecat's ``conversation`` / ``tu, Append PCM (truncating at ``limit_bytes``) and refresh the WAV params., Merged PCM accumulated for one conversation, plus its WAV parameters.      Pipec
 
 ### Community 912 - "_raise_for_invalid_handshake"
-Cohesion: 0.15
-Nodes (12): Boundary Contracts, Bounded streaming detection, Capability sealing after routing, Convergence Decisions (Cycle 1), Evidence, Interfaces, Memory, generated summaries and model callbacks, Pre-Parse and Memory Boundaries (+4 more)
+Cohesion: 0.40
+Nodes (5): _handshake_server_detail(), Exception, _raise_for_invalid_handshake(), Return bounded, user-facing detail from a rejected handshake., Raise a clear error when the WebSocket upgrade handshake fails.      Covers both
 
 ### Community 913 - "_async_client.py"
-Cohesion: 0.15
-Nodes (13): description, pattern, type, description, enum, type, description, enum (+5 more)
+Cohesion: 0.33
+Nodes (5): _get_default_api_endpoint(), _get_default_api_key(), Async SandboxClient class for interacting with the sandbox server API., Get the default sandbox API endpoint from environment.      Derives the endpoint, Get the default API key from environment.
 
 ### Community 914 - ".decode_tokens_bytes"
 Cohesion: 0.33
 Nodes (3): Decodes a token into bytes.          NOTE: this will decode all special tokens, Decodes a list of tokens into a list of bytes.          Useful for visualising, Decodes a list of tokens into a string and a list of offsets.          Each of
 
-### Community 916 - ".__aexit__"
-Cohesion: 0.17
-Nodes (10): __dirname, __filename, getServerSession, mockUpstreamBookingDetail, mockUpstreamBookingListItem, mockUpstreamSegment, nextAuthPath, serverOnlyPath (+2 more)
-
 ### Community 917 - "_logs.py"
-Cohesion: 0.20
-Nodes (11): buildOpenApiSpec(), convertPathToOpenApi(), __dirname, __filename, getMockExample(), openapiSecuritySchemes, openapiServers, outputPath (+3 more)
+Cohesion: 0.40
+Nodes (4): _basic_config(), LogRecord, SensitiveHeadersFilter, setup_logging()
 
 ### Community 918 - "assert_signatures_in_sync"
-Cohesion: 0.17
-Nodes (8): Guarantees, Preconditions, Public in-process operation, Refund Settlement Contract, Reservation operation, Boundary rule, Guarantees, Trusted Search Snapshot Lifecycle Contract
+Cohesion: 0.40
+Nodes (5): assert_signatures_in_sync(), function_has_argument(), Any, Ensure that the signature of the second function matches the first., Returns whether or not the given function has a specific parameter
 
 ### Community 919 - "as_import_path"
 Cohesion: 0.47
 Nodes (5): as_import_path(), get_relative_path(), Path, Get the path of the file as a relative path to the package directory.      Args:, Path of the file as a LangChain import exclude langchain top namespace.      Arg
 
 ### Community 920 - "fallbacks.py"
-Cohesion: 0.04
-Nodes (53): ContextHandler, _configure(), _get_debug(), Callbacks, T, Configure the callback manager.          Args:             inheritable_callbacks, Configure the async callback manager.          Args:             inheritable_cal, Configure the callback manager.      Args:         callback_manager_cls: The cal (+45 more)
+Cohesion: 0.40
+Nodes (4): _is_runnable_type(), `Runnable` that can fallback to other `Runnable` objects if it fails., Get an attribute from the wrapped `Runnable` and its fallbacks.          Returns, _returns_runnable()
 
 ### Community 921 - "Tasks: Restoring the Checkout Foundation (Phase 0 / PR 1)"
 Cohesion: 0.22
 Nodes (8): Phase 1: Setup, Phase 2: Foundational (Next.js Protected Shells), Phase 3: User Story 1 — Search Entry & Navigation (US1), Phase 4: User Story 2 — Passenger Details Collection (US2), Phase 5: User Story 3 — Ancillary Placeholder & Checkout Verification (US3), Phase 6: Polish & E2E Validation, Phase 7: Phase 1 / PR 2 — Shared Contracts, State Repair, Additive Schema, and Migration, Tasks: Restoring the Checkout Foundation (Phase 0 / PR 1)
 
 ### Community 922 - "get_chat_model"
-Cohesion: 0.17
-Nodes (12): Delivery and Counts, Dependencies and Parallel Execution, Phase 1: Setup, Phase 2: Foundation, Phase 3: US1 — Protect Every Chat Turn (P1, integration MVP), Phase 4: US2 — Constrain Tool Authority and Results (P1), Phase 5: US3 — Enforce Static Security Checks (P1), Phase 6: US4 — Execute Runtime Penetration Coverage (P1) (+4 more)
+Cohesion: 0.33
+Nodes (4): Protocol for objects that can be converted to a string., Add an edge to the graph and return it.          Args:             source: The s, Convert the object to a string., Stringifiable
 
 ### Community 923 - "sys_info.py"
 Cohesion: 0.40
@@ -4368,16 +4231,16 @@ Cohesion: 0.33
 Nodes (5): SecretStr, Resolve sync and async API key values.      Because OpenAI and AsyncOpenAI clien, _resolve_sync_and_async_api_keys(), Self, Validate that api key and python package exists in environment.
 
 ### Community 926 - "AzureOpenAIEmbeddings"
-Cohesion: 0.10
-Nodes (14): OpenAI, Resolve the `httpx` library matching the installed `openai` SDK.  `openai>=3` is, Whether the installed `openai` SDK defaults to `httpx2` (openai>=3)., _sdk_uses_httpx2(), AzureOpenAIEmbeddings, Self, Azure OpenAI embeddings wrapper., # TODO: Remove OPENAI_API_KEY support to avoid possible conflict when using (+6 more)
+Cohesion: 0.33
+Nodes (4): AzureOpenAIEmbeddings, Self, Validate that api key and python package exists in environment., AzureOpenAI embedding model integration.      Setup:         To access AzureOpen
 
 ### Community 927 - "ForthLexer"
-Cohesion: 0.30
-Nodes (12): StreamReader, d(), Headers, Read HTTP headers from ``stream``.      Non-ASCII characters are represented w, Decode a bytestring for interpolating into an error message., Read a single line from ``stream``.      CRLF is stripped from the return valu, Read an HTTP/1.1 GET request and return ``(path, headers)``.      ``path`` isn, Read an HTTP/1.1 response and return ``(status_code, reason, headers)``. (+4 more)
+Cohesion: 0.33
+Nodes (4): ForthLexer, pygments.lexers.forth     ~~~~~~~~~~~~~~~~~~~~~      Lexer for the Forth languag, Forth uses : COMMAND ; quite a lot in a single line, so we're trying         to, Lexer for Forth files.
 
 ### Community 928 - "LimboLexer"
-Cohesion: 0.23
-Nodes (5): AccessFormatter, ColourizedFormatter, DefaultFormatter, LogRecord, A custom log formatter class that:      * Outputs the LOG_LEVEL with an appropri
+Cohesion: 0.33
+Nodes (4): LimboLexer, pygments.lexers.inferno     ~~~~~~~~~~~~~~~~~~~~~~~      Lexers for Inferno os a, Lexer for Limbo programming language      TODO:         - maybe implement better, # TODO:
 
 ### Community 929 - "_php_builtins.py"
 Cohesion: 0.53
@@ -4388,8 +4251,8 @@ Cohesion: 0.33
 Nodes (4): pygments.lexers.scdoc     ~~~~~~~~~~~~~~~~~~~~~      Lexer for scdoc, a simple m, `scdoc` is a simple man page generator for POSIX systems written in C99., We checks for bold and underline text with * and _. Also         every scdoc fil, ScdocLexer
 
 ### Community 931 - "SuperColliderLexer"
-Cohesion: 0.17
-Nodes (6): AsyncRealtime, AsyncRealtimeWithRawResponse, AsyncRealtimeWithStreamingResponse, AsyncSessions, This property can be used as a prefix for any HTTP method call to return, An alternative to `.with_raw_response` that doesn't eagerly read the response bo
+Cohesion: 0.33
+Nodes (4): pygments.lexers.supercollider     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~      Lexer for S, For SuperCollider source code., We're searching for a common function and a unique keyword here., SuperColliderLexer
 
 ### Community 932 - "gruvbox.py"
 Cohesion: 0.33
@@ -4408,12 +4271,12 @@ Cohesion: 0.40
 Nodes (4): configure_pipecat(), Any, LangSmith integration for Pipecat., Enable LangSmith tracing for a Pipecat pipeline.      Installs Pipecat's OTel ``
 
 ### Community 936 - "audit-log.e2e-spec.js"
-Cohesion: 0.26
-Nodes (8): AsyncRealtimeConnectionManager, Headers, OpenAI, Query, RealtimeConnectionManager, WebsocketConnectionOptions, The Realtime API enables you to build low-latency, multi-modal conversational ex, The Realtime API enables you to build low-latency, multi-modal conversational ex
+Cohesion: 0.25
+Nodes (7): app_module_1, common_1, crypto, http_exception_filter_1, prisma_service_1, supertest_1, testing_1
 
 ### Community 937 - "auth.e2e-spec.js"
-Cohesion: 0.25
-Nodes (7): app_module_1, common_1, http_exception_filter_1, jwt_1, prisma_service_1, supertest_1, testing_1
+Cohesion: 0.12
+Nodes (14): app_module_1, common_1, http_exception_filter_1, jwt_1, prisma_service_1, supertest_1, testing_1, app_module_1 (+6 more)
 
 ### Community 938 - "disruption-phase1.e2e-spec.js"
 Cohesion: 0.40
@@ -4424,36 +4287,36 @@ Cohesion: 0.40
 Nodes (5): Combining Lifecycle Options, Command Lifecycle & TTL, Idle Timeout (running commands), Kill on Disconnect, Session TTL (finished commands)
 
 ### Community 940 - ".local_address"
-Cohesion: 0.26
-Nodes (7): HeadersAsMapping, HeadersAsSequence, Origin, SOCKET_OPTION, SSLContext, URL, A connection pool for making HTTP requests.          Parameters:             pro
+Cohesion: 0.40
+Nodes (3): Any, Local address of the connection.          For IPv4 connections, this is a ``(h, Remote address of the connection.          For IPv4 connections, this is a ``(
 
 ### Community 941 - "ancillary-recovery.ts"
-Cohesion: 0.18
-Nodes (11): 4A. Make event models authoritative, 4B. Extract runner in causal-cleanup order, 4C. Thin transport and shutdown, 5A. Narrow shared contracts, 5B. Flight Search, 5C. Booking Management, Implementation Strategy, Slice 0 — Baseline characterization and safety rails (+3 more)
+Cohesion: 0.27
+Nodes (7): AncillaryRecoveryInput, ancillaryRecoveryKey(), AncillaryRecoveryRecord, RecoveryBaggage, RecoverySeat, StorageWriter, writeAncillaryRecovery()
 
 ### Community 942 - ".__exit__"
-Cohesion: 0.18
-Nodes (11): Complexity Tracking, Constitution Check, Cross-Slice Test Matrix, Documentation and Operational Updates, Documentation (this feature), Implementation Plan: Deepen Codebase Architecture, Project Structure, Risks and Mitigations (+3 more)
+Cohesion: 0.40
+Nodes (3): BaseException, TracebackType, See :meth:`socketserver.BaseServer.shutdown`.
 
 ### Community 943 - "core.py"
-Cohesion: 0.18
-Nodes (10): Contract: Flight Match Scoring Policy v1, Dimensions and base weights, Eligibility, Explanation allowlist, MATCHED, Pure service boundary, RANKED, Score and level (+2 more)
+Cohesion: 0.40
+Nodes (4): _extract_gateway_metadata(), Utilities for the root listener., # TODO: Figure out how to expose kwargs here, Extract LangSmith gateway metadata from a model response.      When a request is
 
 ### Community 944 - "__init__.py"
 Cohesion: 0.40
 Nodes (4): __dir__(), __getattr__(), Dynamically import and return an attribute from a submodule.      This function, Return a list of available attributes for this module.      Returns:         Lis
 
 ### Community 945 - "AscLexer"
-Cohesion: 0.25
-Nodes (9): AsyncPaginator, Headers, NotGiven, Omit, Query, List checkpoints for a fine-tuning job.          Args:           after: Identifi, List checkpoints for a fine-tuning job.          Args:           after: Identifi, FineTuningJobCheckpoint (+1 more)
+Cohesion: 0.40
+Nodes (3): AscLexer, pygments.lexers.asc     ~~~~~~~~~~~~~~~~~~~      Lexer for various ASCII armored, Lexer for ASCII armored files, containing `-----BEGIN/END ...-----` wrapped
 
 ### Community 946 - "BddLexer"
-Cohesion: 0.20
-Nodes (5): AsyncResponsesConnectionManager, AsyncWebSocketConnection, URL, WebSocketConnection, Connect to a persistent Responses API WebSocket.          Send `response.create`
+Cohesion: 0.40
+Nodes (3): BddLexer, pygments.lexers.bdd     ~~~~~~~~~~~~~~~~~~~      Lexer for BDD(Behavior-driven d, Lexer for BDD(Behavior-driven development), which highlights not only     keywor
 
 ### Community 947 - "DnsZoneLexer"
-Cohesion: 0.18
-Nodes (10): Agent, CallerDirect, CallerProgram, OperationCreateFile, OperationDeleteFile, OperationUpdateFile, Instruction describing how to create a file via the apply_patch tool., Instruction describing how to delete a file via the apply_patch tool. (+2 more)
+Cohesion: 0.40
+Nodes (3): DnsZoneLexer, pygments.lexers.dns     ~~~~~~~~~~~~~~~~~~~      Pygments lexers for DNS      :c, Lexer for DNS zone file
 
 ### Community 948 - "FreeFemLexer"
 Cohesion: 0.40
@@ -4479,21 +4342,13 @@ Nodes (3): @shared/types, @shared/types, Type aliases and constants.
 Cohesion: 0.50
 Nodes (3): Chatbot Booking Orchestration, Flight Booking System, Language
 
-### Community 955 - ".registries"
-Cohesion: 0.18
-Nodes (10): Agent, CallerDirect, CallerProgram, Output, OutputOutcomeExit, OutputOutcomeTimeout, Indicates that the shell call exceeded its configured time limit., Indicates that the shell commands finished and returned an exit code. (+2 more)
-
-### Community 956 - ".registries"
-Cohesion: 0.20
-Nodes (9): ChatCompletionCustomToolParam, Custom, CustomFormatGrammar, CustomFormatGrammarGrammar, CustomFormatText, Unconstrained free-form text., A grammar defined by the user., Properties of the custom tool. (+1 more)
-
 ### Community 957 - "GitMountConfigRequired"
-Cohesion: 0.20
-Nodes (10): Build required artifacts, CI-equivalent final gates, Cleanup, Failure validation, Prepare infrastructure and isolated database, Prerequisites, Quickstart: Validate Whole-Stack Smoke and Sanity CI, Run suites against an already-running stack (+2 more)
+Cohesion: 0.50
+Nodes (4): GitMountConfig, GitMountConfigRequired, Required Git configuration for a sandbox mount., Git configuration for a sandbox mount.
 
 ### Community 958 - "S3MountConfigRequired"
-Cohesion: 0.20
-Nodes (10): Decision 1: Use a dedicated dashboard aggregate endpoint, Decision 2: Query PostgreSQL directly with no Redis cache, Decision 3: Keep booking-only metrics, Decision 4: Return five PII-safe recent booking projections, Decision 5: Use a shared Zod contract as the only response definition, Decision 6: Preserve prototype hierarchy through semantic production tokens, Decision 7: Keep the server/client credential boundary, Decision 8: Make root authentication routing server-side (+2 more)
+Cohesion: 0.50
+Nodes (4): Required S3 configuration for a sandbox mount., S3 configuration for a sandbox mount., S3MountConfig, S3MountConfigRequired
 
 ### Community 959 - "Snapshots"
 Cohesion: 0.50
@@ -4508,16 +4363,8 @@ Cohesion: 0.50
 Nodes (3): InputItems, InputTokens, Responses
 
 ### Community 962 - "response_retrieve_params.py"
-Cohesion: 0.38
-Nodes (4): InputItemListParams, ResponseRetrieveParamsBase, ResponseRetrieveParamsNonStreaming, ResponseRetrieveParamsStreaming
-
-### Community 963 - ".is_closed"
-Cohesion: 0.20
-Nodes (8): Assumptions, Feature Specification: Flight Match Scoring, Functional Requirements, Key Entities, Measurable Outcomes, Out of Scope, Requirements, Success Criteria
-
-### Community 965 - "chat_history.py"
-Cohesion: 0.07
-Nodes (19): BaseChatMessageHistory, InMemoryChatMessageHistory, Chat message history stores a history of the message interactions in a chat., Async version of getting messages.          Can over-ride this method to provide, Convenience method for adding a human message string to the store.          !!!, Convenience method for adding an `AIMessage` string to the store.          !!! n, Add a Message object to the store.          Args:             message: A `BaseMe, Add a list of messages.          Implementations should over-ride this method to (+11 more)
+Cohesion: 0.83
+Nodes (3): ResponseRetrieveParamsBase, ResponseRetrieveParamsNonStreaming, ResponseRetrieveParamsStreaming
 
 ### Community 969 - "API Contract: Ancillary Seat and Baggage Checkout"
 Cohesion: 0.25
@@ -4528,12 +4375,12 @@ Cohesion: 0.25
 Nodes (8): Further Notes, Implementation Decisions, Out of Scope, Problem Statement, Product Requirements Document: Ancillary Seat and Baggage Checkout, Solution, Testing Decisions, User Stories
 
 ### Community 971 - "TypedDict"
-Cohesion: 0.13
-Nodes (16): Runtime, OpenAIModerationError, OpenAIModerationMiddleware, Any, Moderation, ModerationModel, OpenAI, Moderate model output after the model is called.          Args:             stat (+8 more)
+Cohesion: 0.05
+Nodes (52): get_chat_model(), Initialize and return the LangChain ChatOpenAI instance configured with Mimo end, checkout_orchestrator_node(), Call the LLM with Checkout Orchestrator tools bound., general_agent_node(), Call the LLM without tools bound., Call the LLM with Travel Assistant tools bound., travel_assistant_node() (+44 more)
 
 ### Community 982 - "concurrency.e2e-spec.js"
-Cohesion: 0.20
-Nodes (10): Complexity Tracking, Constitution Check, Decision-completeness gate, Dependencies and Delivery Order, Implementation Plan: Flight Match Scoring, Observability Deliverables, Post-design re-check, Requirement Traceability (+2 more)
+Cohesion: 0.50
+Nodes (3): __getattr__(), Any, Utilities for image processing.
 
 ### Community 985 - "check_bidi"
 Cohesion: 0.50
@@ -4543,37 +4390,37 @@ Nodes (4): check_bidi(), IDNABidiError, Exception when bidirectional requirement
 Cohesion: 0.50
 Nodes (3): Reject negative constructor values; fall back to the env-driven default., _float_env(), Read a float env var with graceful fallback + discoverable warning.      See `_i
 
-### Community 987 - ".aget_token"
-Cohesion: 0.20
-Nodes (9): 1. Start dependencies and apply the additive migration, 2. Run pure policy and shared-contract tests, 3. Run profile and search API tests, 4. Run web server-boundary and browser tests, 5. Run agent projection tests, 6. Run static and build gates, 7. Verify performance and non-persistence invariants, Prerequisites (+1 more)
-
 ### Community 988 - "CapnProtoLexer"
-Cohesion: 0.31
-Nodes (8): SpeechModel, Headers, NotGiven, Omit, Query, Generates audio from the input text.          Returns the audio file content, or, Generates audio from the input text.          Returns the audio file content, or, Voice
+Cohesion: 0.50
+Nodes (3): CapnProtoLexer, pygments.lexers.capnproto     ~~~~~~~~~~~~~~~~~~~~~~~~~      Lexers for the Cap', For Cap'n Proto source.
 
 ### Community 989 - "FiftLexer"
-Cohesion: 0.27
-Nodes (6): BaseHandler, BookingHandler, Safe dynamic imports fixture: uses static explicit registry mapping and factorie, Resolve handler through explicit static registry lookup., resolve_handler(), SearchHandler
+Cohesion: 0.50
+Nodes (3): FiftLexer, pygments.lexers.fift     ~~~~~~~~~~~~~~~~~~~~      Lexers for fift.      :copyri, For Fift source code.
 
 ### Community 990 - "graphviz.py"
-Cohesion: 0.27
-Nodes (6): Any, Safe tool execution fixture: routes all tool dispatch strictly through security, Agent runner mediating all tool execution through the central gateway., Mandatory security gateway enforcing admission and capabilities., SafeAgentRunner, SecurityGateway
+Cohesion: 0.50
+Nodes (3): GraphvizLexer, pygments.lexers.graphviz     ~~~~~~~~~~~~~~~~~~~~~~~~      Lexer for the DOT lan, For graphviz DOT graph description language.
 
 ### Community 991 - "HexdumpLexer"
-Cohesion: 0.20
-Nodes (10): cacheTtlSeconds, maxAdvisoryAgeHours, cliVersion, freshness, license, maxAdvisoryAgeHours, name, outputFormat (+2 more)
+Cohesion: 0.50
+Nodes (3): HexdumpLexer, pygments.lexers.hexdump     ~~~~~~~~~~~~~~~~~~~~~~~      Lexers for hexadecimal, For typical hex dump output formats by the UNIX and GNU/Linux tools ``hexdump``,
 
-### Community 992 - "NimrodLexer"
-Cohesion: 0.28
-Nodes (7): MOCK_BOOKINGS, BookingDetailPage(), Props, BookingConfirmationBanner(), BookingConfirmationBannerProps, mapBookingDetail(), BookingDetailView
+### Community 993 - "PureScriptLexer"
+Cohesion: 0.50
+Nodes (3): PureScriptLexer, pygments.lexers.purescript     ~~~~~~~~~~~~~~~~~~~~~~~~~~      Lexer for the Pur, A lexer for the PureScript language.
+
+### Community 994 - "rnc.py"
+Cohesion: 0.50
+Nodes (3): pygments.lexers.rnc     ~~~~~~~~~~~~~~~~~~~      Lexer for Relax-NG Compact synt, For RelaxNG-compact syntax., RNCCompactLexer
 
 ### Community 995 - "SaviLexer"
-Cohesion: 0.22
-Nodes (9): Full regression gate, Gate 1: Refund data migration and settlement, Gate 2: Booking module split, Gate 3: Trusted Search Snapshot lifecycle, Gate 4: Chat Turn Runner, Gate 5: Flight Search and Booking Management server seams, Gate 6: Agent Gateway capability modules, Prerequisites (+1 more)
+Cohesion: 0.50
+Nodes (3): pygments.lexers.savi     ~~~~~~~~~~~~~~~~~~~~      Lexer for Savi.      :copyrig, For Savi source code.      .. versionadded: 2.10, SaviLexer
 
 ### Community 996 - "snobol.py"
-Cohesion: 0.22
-Nodes (9): MockRouteContract, Operational Model: Whole-Stack Smoke and Sanity CI, Persistence and cleanup, Relationships, SearchObservation, ServiceProbe, StackRun, State transitions (+1 more)
+Cohesion: 0.50
+Nodes (3): pygments.lexers.snobol     ~~~~~~~~~~~~~~~~~~~~~~      Lexers for the SNOBOL lan, Lexer for the SNOBOL4 programming language.      Recognizes the common ASCII equ, SnobolLexer
 
 ### Community 997 - "autumn.py"
 Cohesion: 0.50
@@ -4723,385 +4570,17 @@ Nodes (4): Type for thread read parameters., Type for assistant read parameters.
 Cohesion: 0.50
 Nodes (4): Type for thread update parameters., Type for assistant update parameters., Type for cron update parameters., update
 
-### Community 1038 - ".subprotocol"
-Cohesion: 0.22
-Nodes (8): additionalProperties, allOf, description, $id, required, $schema, title, type
-
-### Community 1039 - "._make_sse_decoder"
-Cohesion: 0.22
-Nodes (9): liveRegistryQuery, networkOnline, auditLevel, cliVersion, freshness, license, name, outputFormat (+1 more)
-
-### Community 1040 - ".completions"
-Cohesion: 0.22
-Nodes (9): license, name, outputFormat, targetModules, thresholds, version, pytestCov, branchCoverageMin (+1 more)
-
-### Community 1041 - ".files"
-Cohesion: 0.22
-Nodes (9): zap, alertThreshold, containerDigest, containerImage, failSeverity, license, name, outputFormat (+1 more)
-
-### Community 1042 - ".completions"
-Cohesion: 0.25
-Nodes (6): Comparison, Any, Comparison to a value., Create a Comparison.          Args:             comparator: The comparator to us, Translate an Operation.          Args:             operation: Operation to trans, Translate a Comparison.          Args:             comparison: Comparison to tra
-
-### Community 1043 - ".files"
-Cohesion: 0.22
-Nodes (7): DarcsPatchLexer, DiffLexer, pygments.lexers.diff     ~~~~~~~~~~~~~~~~~~~~      Lexers for diff/patch formats, A wdiff lexer.      Note that:      * It only works with normal output (without, Lexer for unified or context-style diffs or patches., DarcsPatchLexer is a lexer for the various versions of the darcs patch     forma, WDiffLexer
-
-### Community 1044 - ".completions"
-Cohesion: 0.22
-Nodes (7): pygments.lexers.rdf     ~~~~~~~~~~~~~~~~~~~      Lexers for semantic web and RDF, Lexer for Turtle data language., Lexer for SPARQL query language., Lexer for ShExC shape expressions language syntax., ShExCLexer, SparqlLexer, TurtleLexer
-
-### Community 1045 - ".files"
-Cohesion: 0.25
-Nodes (7): app_module_1, client_1, common_1, config_1, crypto, prisma_service_1, testing_1
-
-### Community 1046 - ".completions"
-Cohesion: 0.29
-Nodes (5): DashboardPrototype(), DashboardPrototypeProps, DashboardVariant, variants, PageProps
-
-### Community 1047 - ".files"
-Cohesion: 0.25
-Nodes (7): Assumptions, Feature Specification: Deepen Codebase Architecture, Functional Requirements, Key Entities, Measurable Outcomes, Requirements, Success Criteria
-
-### Community 1048 - ".elapsed"
-Cohesion: 0.25
-Nodes (8): Edge Cases, User Scenarios & Testing, User Story 1 - Settle every verified refund consistently (Priority: P1), User Story 2 - Isolate booking lifecycle, reads, and cancellation (Priority: P2), User Story 3 - Centralize trusted search snapshot integrity (Priority: P3), User Story 4 - Separate chat turn lifecycle from SSE transport (Priority: P4), User Story 5 - Keep transport and credentials out of rendering (Priority: P5), User Story 6 - Give each agent tool a local capability boundary (Priority: P6)
-
-### Community 1050 - ".with_raw_response"
-Cohesion: 0.25
-Nodes (8): 1. Existing `FlightsModule` is the ADR's flight-search boundary, 2. Profile scoring projection is internal and flag-independent, 3. Query cabin intent overrides stored class for that search, 4. Canonical set and slice semantics, 5. Exact policy and degenerate sets, 6. Stable nullable wire shape, 7. Additive rollout without a new runtime flag, Design Decisions and Codebase Reconciliation
-
-### Community 1051 - ".with_streaming_response"
-Cohesion: 0.25
-Nodes (7): Evidence and Release, Existing Regression Commands, New Security Gate Commands (T003–T041 implement these interfaces), Prerequisites, Reviewed Execution Details, Scenario Proofs, Security Validation Quickstart
-
-### Community 1052 - ".with_raw_response"
-Cohesion: 0.39
-Nodes (6): booking_detail(), Any, Unsafe tool execution fixture: directly invokes tool functions bypassing securit, Agent node or runner invoking tool directly without security gateway checks., search_flights(), UnsafeAgentRunner
-
-### Community 1053 - ".with_streaming_response"
-Cohesion: 0.25
-Nodes (8): semgrep, cliVersion, failSeverity, includePaths, license, name, outputFormat, rulesets
-
-### Community 1055 - ".http_request"
-Cohesion: 0.29
-Nodes (5): exponential_backoff(), Origin, Request, Response, Generate a geometric sequence that has a ratio of 2 and starts with 0.      For
-
-### Community 1056 - ".url"
-Cohesion: 0.32
-Nodes (6): FilterDirective, Operation, Filtering expression., Logical operation over other directives., Create an Operation.          Args:             operator: The operator to use., Create a StructuredQuery.          Args:             query: The query string.
-
 ### Community 1057 - "seed-agent-tools.js"
 Cohesion: 0.40
 Nodes (3): bcrypt, client_1, prisma
-
-### Community 1058 - ".build"
-Cohesion: 0.25
-Nodes (5): Lean3Lexer, Lean4Lexer, pygments.lexers.lean     ~~~~~~~~~~~~~~~~~~~~      Lexers for the Lean theorem p, For the Lean 4 theorem prover., For the Lean 3 theorem prover.
-
-### Community 1063 - ".output_parsed"
-Cohesion: 0.25
-Nodes (7): pygments.lexers.typoscript     ~~~~~~~~~~~~~~~~~~~~~~~~~~      Lexers for TypoSc, Lexer for TypoScript code., Lexer that highlights markers, constants and registers within css blocks., Lexer that highlights markers, constants and registers within html tags., TypoScriptCssDataLexer, TypoScriptHtmlDataLexer, TypoScriptLexer
-
-### Community 1076 - ".transcriptions"
-Cohesion: 0.29
-Nodes (5): pygments.lexers.varnish     ~~~~~~~~~~~~~~~~~~~~~~~      Lexers for Varnish conf, For Varnish Configuration Language snippets., For Varnish Configuration Language (VCL)., VCLLexer, VCLSnippetLexer
-
-### Community 1077 - ".speech"
-Cohesion: 0.29
-Nodes (6): app_module_1, common_1, http_exception_filter_1, prisma_service_1, supertest_1, testing_1
-
-### Community 1078 - ".transcriptions"
-Cohesion: 0.29
-Nodes (6): 1. Executive Summary & Policy Context, 2. Upstream Blocker Rationale (Next.js 14 -> 15 Deferral), 3. Compensating Controls & Defense-in-Depth, 4. Complete Inventory of Deferred Advisories, 5. Review Cadence & Sunsetting Policy, Dependency Security Advisories & Upstream Deferral Register
-
-### Community 1079 - ".speech"
-Cohesion: 0.20
-Nodes (5): Turn audio into text or text into audio., Turn audio into text or text into audio., This property can be used as a prefix for any HTTP method call to return, An alternative to `.with_raw_response` that doesn't eagerly read the response bo, Speech
-
-### Community 1080 - ".transcriptions"
-Cohesion: 0.20
-Nodes (5): Turn audio into text or text into audio., Turn audio into text or text into audio., This property can be used as a prefix for any HTTP method call to return, An alternative to `.with_raw_response` that doesn't eagerly read the response bo, Transcriptions
-
-### Community 1086 - ".with_raw_response"
-Cohesion: 0.20
-Nodes (5): Turn audio into text or text into audio., AsyncSpeech, Turn audio into text or text into audio., This property can be used as a prefix for any HTTP method call to return, An alternative to `.with_raw_response` that doesn't eagerly read the response bo
-
-### Community 1087 - ".with_raw_response"
-Cohesion: 0.29
-Nodes (7): CI aggregate status, Commands, Environment, Mock control API, Readiness probes, Smoke/Sanity Harness Contract, Test ordering
-
-### Community 1088 - ".with_streaming_response"
-Cohesion: 0.29
-Nodes (7): 1. Provider mock and configuration, 2. Health and service boundaries, 3. Harness helpers, 4. Smoke suite, 5. Sanity suite, 6. Process orchestration and cleanup, Runtime Design
-
-### Community 1089 - ".with_raw_response"
-Cohesion: 0.20
-Nodes (5): Turn audio into text or text into audio., AsyncTranscriptions, Turn audio into text or text into audio., This property can be used as a prefix for any HTTP method call to return, An alternative to `.with_raw_response` that doesn't eagerly read the response bo
-
-### Community 1090 - ".with_streaming_response"
-Cohesion: 0.29
-Nodes (7): Aggregate: DashboardSummary, Data Model: Authenticated Booking Dashboard, Existing Source Entity: Booking, Read Projection: DashboardRecentBooking, Read Projection: DashboardStats, State Transitions, Web Boundary: DashboardOutcome
-
-### Community 1091 - ".with_raw_response"
-Cohesion: 0.20
-Nodes (5): Turn audio into text or text into audio., Turn audio into text or text into audio., This property can be used as a prefix for any HTTP method call to return, An alternative to `.with_raw_response` that doesn't eagerly read the response bo, Translations
-
-### Community 1092 - ".with_streaming_response"
-Cohesion: 0.29
-Nodes (7): 1. Start dependencies and prepare Prisma, 2. Run shared contract and API tests, 3. Run web boundary and UI tests, 4. Run static and production gates, 5. Manual acceptance walkthrough, Prerequisites, Quickstart: Validate the Authenticated Booking Dashboard
-
-### Community 1094 - "AcknowledgedSafetyCheck"
-Cohesion: 0.29
-Nodes (7): Implementation Phases, Phase 1: Shared contracts and additive profile foundation, Phase 2: Pure policy, eligibility, scorer, and category ranker, Phase 3: Canonical flight-search orchestration and API response, Phase 4: Transparent profile and search UI, Phase 5: Agent gateway delegation and safe narration, Phase 6: Observability, regression, and documentation
-
-### Community 1095 - "Output"
-Cohesion: 0.29
-Nodes (3): Unsafe guardrail fixture: invokes an LLM inside a guardrail validation check., Guardrail layer that improperly delegates classification to an LLM., UnsafeModelGuardrail
-
-### Community 1096 - "OutputOutcomeExit"
-Cohesion: 0.29
-Nodes (7): action, configFile, license, name, outputFormat, version, gitleaks
-
-### Community 1097 - "OutputOutcomeTimeout"
-Cohesion: 0.29
-Nodes (5): automationPath, __dirname, __filename, repoRoot, routesPath
 
 ### Community 1130 - "User Scenarios & Testing"
 Cohesion: 0.40
 Nodes (5): Edge Cases, User Scenarios & Testing, User Story 1 - Select Seats Per Passenger and Segment (Priority: P1), User Story 2 - Add Segment- or Journey-Scoped Baggage (Priority: P2), User Story 3 - Review an Instant, Authoritative Total (Priority: P3)
 
 ### Community 1168 - "SearchFormClient.tsx"
-Cohesion: 0.08
-Nodes (29): AncillariesPage(), Props, PaymentPage(), Props, Props, ReviewPage(), PassengerPageFlightDetail, Props (+21 more)
-
-### Community 1178 - "normalize_gemini_usage_metadata"
-Cohesion: 0.38
-Nodes (6): _audio_tokens(), normalize_gemini_usage_metadata(), Any, Shared token-usage normalization for Gemini integrations., Map a Gemini usage object onto LangSmith's canonical token metadata.      Gemini, Sum the audio token count from a Gemini modality-details sequence.
-
-### Community 1179 - ".encoding"
-Cohesion: 0.29
-Nodes (5): _is_known_encoding(), Header encoding is mandated as ascii, but we allow fallbacks to utf-8         or, Return `True` if `encoding` is a known codec., Return an encoding to use for decoding the byte content into text.         The p, Set the encoding to use for decoding the byte content into text.          If the
-
-### Community 1180 - "UrbiscriptLexer"
-Cohesion: 0.29
-Nodes (4): pygments.lexers.urbi     ~~~~~~~~~~~~~~~~~~~~      Lexers for UrbiScript languag, This is fairly similar to C and others, but freezeif and         waituntil are u, For UrbiScript source code., UrbiscriptLexer
-
-### Community 1181 - "Prototype: Wayfinder Dashboard (Glassmorphic SaaS MVP)"
-Cohesion: 0.33
-Nodes (5): Prototype: Wayfinder Dashboard (Glassmorphic SaaS MVP), Question, Stitch MCP Screen, Variants, Visual Architecture & Tokens
-
-### Community 1183 - "Booking Module Contracts"
-Cohesion: 0.33
-Nodes (5): Booking Lifecycle, Booking Management, Booking Module Contracts, Cancellation, Dependency rule
-
-### Community 1184 - "Chat Turn Runner and Event Contract"
-Cohesion: 0.33
-Nodes (5): Chat Turn Runner and Event Contract, Event union, Failure ordering, Runner, Transport adapter
-
-### Community 1185 - "Web Server Seam Contracts"
-Cohesion: 0.33
-Nodes (5): Booking Management outcomes, Booking transport, Flight Search operations, Shared Flight Search outcomes, Web Server Seam Contracts
-
-### Community 1186 - "7. Verification & Audit Checklist Tables"
-Cohesion: 0.33
-Nodes (6): 7. Verification & Audit Checklist Tables, Phase 1: Design Tokens & CSS Standards Audit, Phase 2: Mock Element Removal Audit, Phase 3: Route Integration & Handoff Audit, Phase 4: Responsive & Viewport Layout Audit, Phase 5: Accessibility (WCAG 2.1 AA) Audit
-
-### Community 1187 - "Verification Strategy"
-Cohesion: 0.33
-Nodes (6): API/integration, Performance/non-persistence, TDD order, Unit/invariant, Verification Strategy, Web/agent/privacy
-
-### Community 1188 - "User Scenarios & Testing"
-Cohesion: 0.33
-Nodes (6): Edge Cases, User Scenarios & Testing, User Story 1 - Receive deterministic personalized matches (Priority: P1), User Story 2 - Receive honest cold-start ranking (Priority: P2), User Story 3 - Understand and configure flight matching (Priority: P3), User Story 4 - Keep agent and search-page recommendations consistent (Priority: P4)
-
-### Community 1189 - "Research and Planning Decisions"
-Cohesion: 0.33
-Nodes (5): Code Evidence, Deferred, Research and Planning Decisions, Resolved Decisions, Tool Sources Checked 2026-09-04
-
-### Community 1190 - "Feature 023 Plan Review Convergence"
-Cohesion: 0.33
-Nodes (5): Cycle 1, Cycle 2, Cycle-2 Artifact Snapshot (Historical), Feature 023 Plan Review Convergence, PR Review Follow-up: Resource/Telemetry Alignment and ZAP Ownership
-
-### Community 1191 - "SafeDeterministicGuardrail"
-Cohesion: 0.33
-Nodes (3): Safe guardrail fixture: uses pure deterministic regex and algorithmic parsing., Guardrail layer using deterministic compiled regex checks without any model., SafeDeterministicGuardrail
-
-### Community 1192 - "scanners"
-Cohesion: 0.33
-Nodes (5): name, scanners, $schema, updatedAt, version
-
-### Community 1193 - ".__str__"
-Cohesion: 0.33
-Nodes (3): Return string representation., Return string representation., Return string representation.
-
-### Community 1194 - ".update"
-Cohesion: 0.40
-Nodes (3): HeadersLike, Update from a :class:`Headers` instance and/or keyword arguments., Return an iterator of all values as ``(name, value)`` pairs.
-
-### Community 1195 - "uvloop.py"
-Cohesion: 0.40
-Nodes (4): auto_loop_factory(), AbstractEventLoop, AbstractEventLoop, uvloop_loop_factory()
-
-### Community 1197 - "beta_response_custom_tool_call.py"
-Cohesion: 0.33
-Nodes (4): Agent, CallerDirect, CallerProgram, The agent that produced this item.
-
-### Community 1199 - "ECLLexer"
-Cohesion: 0.33
-Nodes (4): ECLLexer, pygments.lexers.ecl     ~~~~~~~~~~~~~~~~~~~      Lexers for the ECL language., This is very difficult to guess relative to other business languages.         ->, Lexer for the declarative big-data ECL language.
-
-### Community 1200 - "FantomLexer"
-Cohesion: 0.33
-Nodes (4): FantomLexer, pygments.lexers.fantom     ~~~~~~~~~~~~~~~~~~~~~~      Lexer for the Fantom lang, For Fantom source code., # TODO: highlight references in fandocs
-
-### Community 1201 - "GDScriptLexer"
-Cohesion: 0.33
-Nodes (3): GDScriptLexer, pygments.lexers.gdscript     ~~~~~~~~~~~~~~~~~~~~~~~~      Lexer for GDScript., For GDScript source code.
-
-### Community 1202 - "HaxeLexer"
-Cohesion: 0.33
-Nodes (3): HaxeLexer, pygments.lexers.haxe     ~~~~~~~~~~~~~~~~~~~~      Lexers for Haxe and related s, For Haxe source code.
-
-### Community 1203 - "VerilogLexer"
-Cohesion: 0.33
-Nodes (4): pygments.lexers.hdl     ~~~~~~~~~~~~~~~~~~~      Lexers for hardware descriptor, Verilog code will use one of reg/wire/assign for sure, and that         is not c, For verilog source code with preprocessor directives., VerilogLexer
-
-### Community 1204 - "IDLLexer"
-Cohesion: 0.33
-Nodes (4): IDLLexer, pygments.lexers.idl     ~~~~~~~~~~~~~~~~~~~      Lexers for IDL.      :copyright, Pygments Lexer for IDL (Interactive Data Language)., endelse seems to be unique to IDL, endswitch is rare at least.
-
-### Community 1205 - "PrqlLexer"
-Cohesion: 0.33
-Nodes (3): PrqlLexer, pygments.lexers.prql     ~~~~~~~~~~~~~~~~~~~~      Lexer for the PRQL query lang, For PRQL source code.      grammar: https://github.com/PRQL/prql/tree/main/gramm
-
-### Community 1206 - "Amadeus Self-Service API"
-Cohesion: 0.40
-Nodes (5): Amadeus Self-Service API, Create Order (PNR), Flight Search, Price Confirmation, Service Setup
-
-### Community 1207 - "Open Questions (Not Yet Decided)"
-Cohesion: 0.40
-Nodes (5): Conversation Compression Threshold, LLM Provider, Multi-Agent Topology, Open Questions (Not Yet Decided), Python Framework
-
-### Community 1208 - "Agent Gateway Capability Contracts"
-Cohesion: 0.40
-Nodes (4): Agent Gateway Capability Contracts, Audit contract, Compatibility contract, Module dependency rule
-
-### Community 1209 - "Slice 1 — Refund obligation, transaction reservation, and settlement"
-Cohesion: 0.40
-Nodes (5): 1A. Expand schema, 1B. Add reservation and settlement modules, 1C. Convert trigger paths, 1D. Contract schema, Slice 1 — Refund obligation, transaction reservation, and settlement
-
-### Community 1210 - "Slice 2 — Booking Lifecycle, Management, and Cancellation"
-Cohesion: 0.40
-Nodes (5): 2A. Extract provider-blind lifecycle core, 2B. Extract Booking Management, 2C. Extract Cancellation, 2D. Rewire and remove facade, Slice 2 — Booking Lifecycle, Management, and Cancellation
-
-### Community 1211 - "Slice 6 — Agent Gateway capability-local modules"
-Cohesion: 0.40
-Nodes (5): 6A. Shared authentication and safe audit, 6B. Extract one capability at a time, 6C. Move chat ownership, 6D. Delete broad service, Slice 6 — Agent Gateway capability-local modules
-
-### Community 1212 - "File-by-File Change Index"
-Cohesion: 0.40
-Nodes (5): Agent, Agent Gateway, API — Refund and booking, File-by-File Change Index, Web/shared
-
-### Community 1214 - "CI Job Design"
-Cohesion: 0.40
-Nodes (5): Aggregate result, Change detection, CI Job Design, Dependency predicate, Job sequence
-
-### Community 1215 - "chat_completion_message_custom_tool_call.py"
-Cohesion: 0.40
-Nodes (4): ChatCompletionMessageCustomToolCall, Custom, The custom tool that the model called., A call to a custom tool created by the model.
-
-### Community 1216 - "ActionScript3Lexer"
-Cohesion: 0.40
-Nodes (3): ActionScript3Lexer, pygments.lexers.actionscript     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~      Lexers for Ac, For ActionScript 3 source code.
-
-### Community 1218 - "FloScriptLexer"
-Cohesion: 0.40
-Nodes (3): FloScriptLexer, pygments.lexers.floscript     ~~~~~~~~~~~~~~~~~~~~~~~~~      Lexer for FloScript, For FloScript configuration language source code.
-
-### Community 1219 - "ldap.py"
-Cohesion: 0.40
-Nodes (4): LdaprcLexer, LdifLexer, pygments.lexers.ldap     ~~~~~~~~~~~~~~~~~~~~      Pygments lexers for LDAP., Lexer for OpenLDAP configuration files.
-
-### Community 1220 - "booking-response.dto.ts"
-Cohesion: 0.67
-Nodes (3): BookingDetailResponseDto, BookingListItemResponseDto, BookingListResponseDto
-
-### Community 1221 - "page.tsx"
-Cohesion: 0.67
-Nodes (3): CheckoutPage(), isLocalOfferId(), Props
-
-### Community 1222 - "paths"
-Cohesion: 0.50
-Nodes (4): paths, @/*, @shared/*, @shared/types
-
-### Community 1223 - "Python Redis (redis.asyncio)"
-Cohesion: 0.50
-Nodes (4): Allowed Data, Approved Use Cases, Client Lifecycle, Python Redis (redis.asyncio)
-
-### Community 1224 - "NestJS (Framework Patterns)"
-Cohesion: 0.50
-Nodes (4): Controller Pattern, Module Structure, NestJS (Framework Patterns), Service Pattern
-
-### Community 1225 - "Stripe"
-Cohesion: 0.50
-Nodes (4): Create Payment Intent, Service Setup & Provider Override, Stripe, Webhook Verification
-
-### Community 1226 - "Python LangGraph"
-Cohesion: 0.50
-Nodes (4): Deterministic Nodes, Graph Architecture, Python LangGraph, Routing and Agents
-
-### Community 1227 - "NextAuth.js (Auth.js)"
-Cohesion: 0.50
-Nodes (4): JWT Strategy (@nestjs/passport), NestJS JWT Guard, NextAuth.js (Auth.js), Route Handler
-
-### Community 1228 - "expectedLayerFamily"
-Cohesion: 0.50
-Nodes (4): description, minLength, type, expectedLayerFamily
-
-### Community 1229 - "id"
-Cohesion: 0.50
-Nodes (4): description, pattern, type, id
-
-### Community 1230 - "license"
-Cohesion: 0.50
-Nodes (4): description, minLength, type, license
-
-### Community 1231 - "payload"
-Cohesion: 0.50
-Nodes (4): description, minLength, type, payload
-
-### Community 1232 - "revision"
-Cohesion: 0.50
-Nodes (4): revision, description, minLength, type
-
-### Community 1233 - "split"
-Cohesion: 0.50
-Nodes (4): split, description, enum, type
-
-### Community 1234 - "suiteKind"
-Cohesion: 0.50
-Nodes (4): suiteKind, description, enum, type
-
-### Community 1235 - "taxonomyCode"
-Cohesion: 0.50
-Nodes (4): taxonomyCode, description, minLength, type
-
-### Community 1236 - "variantGroup"
-Cohesion: 0.50
-Nodes (4): variantGroup, description, minLength, type
-
-### Community 1237 - "exceptions.json"
-Cohesion: 0.50
-Nodes (3): exceptions, $schema, version
-
-### Community 1239 - "baseline.json"
-Cohesion: 0.50
-Nodes (3): findings, $schema, version
-
-### Community 1240 - "payload-logging.unsafe.py"
-Cohesion: 0.50
-Nodes (3): process_chat_message_unsafe(), Any, Unsafe logging fixture: logs raw user prompt, message, or unredacted tool payloa
+Cohesion: 0.09
+Nodes (27): AncillariesPage(), Props, PaymentPage(), Props, Props, ReviewPage(), PassengerPageFlightDetail, Props (+19 more)
 
 ### Community 1242 - "Phase 1 / PR 2 — Shared contracts, state repair, additive schema, and migration"
 Cohesion: 0.50
@@ -5128,51 +4607,23 @@ Cohesion: 0.50
 Nodes (4): Exit criteria, Final verification matrix, Phase 7 / PR 8 — End-to-end resilience, observability, rollout, and documentation sync, Work
 
 ### Community 1250 - "airports.ts"
-Cohesion: 0.50
-Nodes (3): Agent, The agent that produced this item., Result
-
-### Community 1253 - ".__init__"
-Cohesion: 0.50
-Nodes (3): Any, ContentBlock, Specify `content` as positional arg or `content_blocks` for typing.
-
-### Community 1257 - "LangChain.js + Mimo"
-Cohesion: 0.67
-Nodes (3): Agent Setup, LangChain.js + Mimo, Tool Calling Pattern
-
-### Community 1258 - "class-validator"
-Cohesion: 0.67
-Nodes (3): class-validator, DTO Pattern, Global Validation Pipe
-
-### Community 1259 - "Next.js App Router"
-Cohesion: 0.67
-Nodes (3): Client Component (when needed), Data Fetching (Server Components), Next.js App Router
-
-### Community 1260 - "Pydantic v2 (Agent Wire Models & State Snapshots)"
-Cohesion: 0.67
-Nodes (3): Configuration and Strictness (`extra="forbid"`), Discriminated Union Parsing & Serialization, Pydantic v2 (Agent Wire Models & State Snapshots)
-
-### Community 1261 - "Prisma"
-Cohesion: 0.67
-Nodes (3): Prisma, Query Patterns, Service Setup (NestJS)
-
-### Community 1263 - "Project Structure"
-Cohesion: 0.67
-Nodes (3): Documentation, Project Structure, Source code
+Cohesion: 0.12
+Nodes (12): prisma, _interpolate(), Any, _quote_fragment_part(), _quote_path_segment_part(), _quote_query_part(), Percent-encode `value` for use in a URI path segment.      Considers characters, Percent-encode `value` for use in a URI query string.      Considers &, = and ch (+4 more)
 
 ## Knowledge Gaps
-- **4599 isolated node(s):** `root`, `parser`, `plugins`, `extends`, `node` (+4594 more)
+- **3095 isolated node(s):** `root`, `parser`, `plugins`, `extends`, `node` (+3090 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **292 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **283 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Body` connect `test_tools.py` to `index.ts`, `chat.controller.ts`, `__init__.py`, `dependencies`, `.run`, `page.tsx`, `strip_not_given`, `.list`, `.create`, `.create`, `ChunkBuffer`, `Project Overview`, `runs.py`, `Implementation Plan: Disruption & Flight-Change Management`, `.create`, `.request`, `page.tsx`, `AscLexer`, `.complete`, `.create`, `AsyncRuns`, `.create`, `.list`, `.create`, `experiment_runs.py`, `API Contracts: Stripe Payment System`, `.create`, `.list`, `CapnProtoLexer`, `.deactivate`, `.create`, `route.ts`, `._astream`, `2. Feature Flags and Rollout Order`, `FortranFixedLexer`, `test_pipeline_parallelism.py`, `.update`?**
-  _High betweenness centrality (0.019) - this node is a cross-community bridge._
-- **Why does `LegacyAPIResponse` connect `chat.controller.ts` to `Implementation Phases`, `Implementation Plan: Disruption & Flight-Change Management`?**
-  _High betweenness centrality (0.018) - this node is a cross-community bridge._
-- **Why does `make_request_options()` connect `test_tools.py` to `chat.controller.ts`, `__init__.py`, `dependencies`, `.run`, `page.tsx`, `.create`, `.create`, `ChunkBuffer`, `Project Overview`, `AsyncThreads`, `Implementation Plan: Disruption & Flight-Change Management`, `Implementation Plan: Disruption & Flight-Change Management`, `.create`, `AscLexer`, `.complete`, `.create`, `.create`, `.list`, `.create`, `agent`, `.create`, `CapnProtoLexer`, `.deactivate`, `.create`, `route.ts`, `._astream`, `FortranFixedLexer`, `test_pipeline_parallelism.py`, `.update`?**
-  _High betweenness centrality (0.017) - this node is a cross-community bridge._
+- **Why does `Body` connect `test_tools.py` to `AsyncCompletions`, `index.ts`, `chat.controller.ts`, `groups.py`, `.create`, `dependencies`, `.run`, `conversations.py`, `strip_not_given`, `.list`, `.create`, `.create`, `.create`, `runs.py`, `.list`, `AsyncUsers`, `Implementation Plan: Disruption & Flight-Change Management`, `.create`, `detect_pii`, `.request`, `page.tsx`, `AsyncJobs`, `.complete`, `.create`, `AsyncRuns`, `.list`, `.create`, `.list`, `.create`, `.create`, `experiment_runs.py`, `.create`, `.create`, `.create`, `package.json`, `.list`, `.deactivate`, `.create`, `route.ts`, `8. Backfill Governance & Quarantine Management`, `.update`?**
+  _High betweenness centrality (0.026) - this node is a cross-community bridge._
+- **Why does `make_request_options()` connect `test_tools.py` to `AsyncCompletions`, `chat.controller.ts`, `groups.py`, `.create`, `dependencies`, `.run`, `conversations.py`, `page.tsx`, `.create`, `.create`, `.create`, `.list`, `AsyncUsers`, `Implementation Plan: Disruption & Flight-Change Management`, `.create`, `AsyncJobs`, `.complete`, `.create`, `AsyncRuns`, `.list`, `.create`, `.list`, `.create`, `.create`, `.create`, `agent`, `.create`, `.create`, `package.json`, `.deactivate`, `.create`, `route.ts`, `.update`, `responses.py`?**
+  _High betweenness centrality (0.025) - this node is a cross-community bridge._
+- **Why does `RunnableConfig` connect `ancillary.types.ts` to `run_in_executor`, `package.json`, `Payment System — Grilling Decisions`, `NemoGuardrailService`, `.__init__`, `get_nestjs_client`, `agent-gateway.service.ts`, `RateLimitMiddleware`, `Code Standards`, `RunTree`, `Tool`, `ListOutputParser`, `booking-types.ts`, `LangChainTracer`, `page.tsx`, `_AstreamEventsCallbackHandler`, `Layer 2: Claim Token`, `DynamicRunnable`, `TypedDict`, `RunnableWithMessageHistory`, `RunnableAssign`, `RunnableRetry`, `create_model_v2`, `API Contracts: Cancellation & Refund Recovery`, `FakeListLLM`, `Phase 1 / PR 2 — Contracts, additive schema, migration, and shared types`, `RouterRunnable`, `airports.ts`, `9. Privacy & Cryptographic Invariants`, `Project Structure`, `MemoryManager`, `devDependencies`?**
+  _High betweenness centrality (0.020) - this node is a cross-community bridge._
 - **Are the 48 inferred relationships involving `BaseModel` (e.g. with `_AmbiguousModuleClientUsageError` and `_AzureModuleClient`) actually correct?**
   _`BaseModel` has 48 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 16 inferred relationships involving `Timeout` (e.g. with `._build_headers()` and `timeout()`) actually correct?**
@@ -5180,4 +4631,4 @@ _Questions this graph is uniquely positioned to answer:_
 - **Are the 2 inferred relationships involving `Body` (e.g. with `._build_request()` and `._build_request()`) actually correct?**
   _`Body` has 2 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `root`, `parser`, `plugins` to the rest of the system?**
-  _15708 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _13721 weakly-connected nodes found - possible documentation gaps or missing edges._
