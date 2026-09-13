@@ -132,6 +132,13 @@ async def chat_stream(
 
         return EventSourceResponse(pii_error_generator())
 
+    gateway = getattr(request.app.state, "guardrail_gateway", None)
+    if gateway is None or not isinstance(gateway, GuardrailGateway) or not gateway.is_healthy():
+        raise HTTPException(
+            status_code=503,
+            detail="GUARDRAIL_GATEWAY_UNAVAILABLE: Guardrail gateway is uninitialized or degraded",
+        )
+
     quota_started = time.perf_counter()
     try:
         redis_client = get_redis_client()
@@ -209,12 +216,6 @@ async def chat_stream(
     )
 
     queue_manager = getattr(request.app.state, "message_queue", None)
-    gateway = getattr(request.app.state, "guardrail_gateway", None)
-    if gateway is None or not isinstance(gateway, GuardrailGateway) or not gateway.is_healthy():
-        raise HTTPException(
-            status_code=503,
-            detail="GUARDRAIL_GATEWAY_UNAVAILABLE: Guardrail gateway is uninitialized or degraded",
-        )
 
     runner = ChatTurnRunner(
         settings=settings,

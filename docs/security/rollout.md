@@ -114,7 +114,7 @@ Promotion to the next stage requires meeting **all** of the following telemetry 
 - **Lease Contention**: Redis distributed lock acquisition failure rate $< 0.01\%$.
 - **Zero Security Crashes**: Zero unhandled exceptions in `GuardrailGateway` or `OutputGuardrailPipeline`.
 
-If any telemetry gate is breached, traffic shifting immediately pauses, and the system executes an automated traffic drain back to the previous stable revision.
+If any telemetry gate is breached, operators must immediately pause traffic shifting and run the traffic drain commands below to return traffic to the previous stable revision.
 
 ### 5.3 Traffic Shift & Drain Commands
 Traffic allocation is controlled at the ingress load balancer or reverse proxy:

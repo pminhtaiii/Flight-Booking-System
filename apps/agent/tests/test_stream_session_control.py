@@ -8,6 +8,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
 from agent.config import get_settings
+from agent.guardrails.gateway import GuardrailGateway
+from agent.guardrails.registry import create_production_registry
 from agent.middleware.auth import JWTAuthMiddleware
 from agent.queue.message_queue import MessageQueueManager
 from agent.repositories.session_lock_repository import SessionLockRepository
@@ -20,6 +22,7 @@ ISSUER = getattr(settings, "JWT_ISSUER", "booking-systems-api")
 AUDIENCE = getattr(settings, "JWT_AUDIENCE", "booking-systems-clients")
 
 app = FastAPI()
+app.state.guardrail_gateway = GuardrailGateway(create_production_registry())
 app.add_middleware(JWTAuthMiddleware, secret=SECRET, exclude_paths=["/health"])
 app.include_router(streaming_router)
 

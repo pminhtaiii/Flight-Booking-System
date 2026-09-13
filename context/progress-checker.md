@@ -1,13 +1,14 @@
 # Progress Tracker
 
-### Feature 023 — Security Systems: Phase 7 US5 Slice 3 T047 Rollout Hardening & Operational Runbook Completed (2026-09-13)
+### Feature 023 — Security Systems: Phase 7 US5 Slice 3 T047 Rollout Hardening, Review Remediation & Full Suite Alignment Completed (2026-09-13)
 
 - **T047 Fail-Closed Startup, Rollout, Rollback & Health Hardening (`apps/agent/tests/security/test_rollout.py`, `docs/security/rollout.md`)**:
-  - Implemented and verified complete Slice 3 hardening across startup, ingress, health probes, and emergency rollback (15/15 tests passing):
+  - Implemented and verified complete Slice 3 hardening across startup, ingress, health probes, and emergency rollback (16/16 tests passing):
     - **Startup & Ingress Fail-Closed Validation**:
       - `AGENT_SERVICE_API_KEY`, `JWT_SECRET`, and `CLAIM_TOKEN_SECRET` fail-fast validation in Pydantic `Settings`. Empty keys abort startup immediately.
       - `GuardrailGateway.is_healthy()` contract enforcing valid `GuardrailRegistry` and compulsory production layers.
       - POST `/chat/stream` ingress fail-closed guard: returns HTTP 503 (`GUARDRAIL_GATEWAY_UNAVAILABLE`) if `guardrail_gateway` is None or degraded, with zero runner invocations.
+      - **Zero Quota Consumption on Gateway Failures**: Guardrail gateway readiness is evaluated *before* Redis quota admission in `/chat/stream`, ensuring 503 gateway errors never consume user daily or burst quotas (`test_gateway_failure_does_not_consume_quota`).
     - **Health Probe Key & Subsystem Verification**:
       - `/health/live`: Lightweight probe guaranteed HTTP 200 with zero model inference, zero guardrail checks, zero Redis/external I/O (< 10ms).
       - `/health`: Deep probe monitoring `guardrails: deterministic`, `redis`, and `nestjsApi`. Degrades status to `degraded` with `guardrails: {"status": "down"}` if gateway is None/degraded or if `AGENT_SERVICE_API_KEY`, `JWT_SECRET`, or `CLAIM_TOKEN_SECRET` are missing.
@@ -17,9 +18,10 @@
     - **Operational Runbook & Documentation (`docs/security/rollout.md`)**:
       - Codified Pre-Flight Verification Checklist (Corpus gates: 200 malicious, 500 benign, TPR >= 95%, FPR <= 2%, zero false negatives; SAST baseline; Clean SCA reports; Test suite green status).
       - Codified Canary Rollout Steps (Stage 0: 1%, Stage 1: 5%, Stage 2: 25%, Stage 3: 100%, traffic drain commands, telemetry gates).
+      - Codified Operator Manual Rollback Procedure: Clarified that operators immediately pause traffic shifting and run manual kubectl ingress drain commands upon any telemetry gate breach.
       - Codified Key Rotation Procedures (Multi-key secret rings `jwt_secret_ring` and `claim_token_secret_ring`, 3-phase zero-downtime rotation, rolling restart commands).
       - Codified Emergency Rollback Procedures (flag deprecation, traffic drain, session namespace purge, post-mortem incident triage).
-    - **Verification**: 15/15 tests passing in `apps/agent/tests/security/test_rollout.py` (6.42s); `ruff check` and `ruff format` 100% clean across all 4 touched files.
+    - **Verification**: 16/16 tests passing in `apps/agent/tests/security/test_rollout.py` (6.85s); 1,002/1,002 tests passing across full non-Redis agent test suite; `ruff check` and `ruff format` 100% clean across all files.
 
 ### Feature 023 — Security Systems: Phase 7 US5 Slice 2 Dual-Axis Code Review Remediation Completed (2026-09-13)
 

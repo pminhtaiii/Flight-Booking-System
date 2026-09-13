@@ -285,6 +285,55 @@ def test_chat_stream_rejected_when_guardrail_gateway_uninitialized_or_degraded()
             mock_runner.assert_not_called()
 
 
+def test_gateway_failure_does_not_consume_quota() -> None:
+    """Assert that when app.state.guardrail_gateway is None or degraded, sending /chat/stream returns HTTP 503 and ChatBudgetRepository.admit_request is NOT called (0 calls)."""
+    from agent.config import get_settings
+    from agent.tools.nestjs_client import NestJSClient
+
+    client = TestClient(app)
+    app_settings = get_settings()
+    valid_token = generate_valid_jwt(secret=app_settings.JWT_SECRET)
+
+    mock_nestjs = MagicMock(spec=NestJSClient)
+    mock_nestjs.check_user_access = AsyncMock(return_value={"allowed": True})
+
+    with (
+        patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs),
+        patch(
+            "agent.repositories.chat_budget_repository.ChatBudgetRepository.admit_request",
+            new_callable=AsyncMock,
+        ) as mock_admit,
+    ):
+        with patch.object(app.state, "guardrail_gateway", None, create=True):
+            resp1 = client.post(
+                "/chat/stream",
+                json={"message": "hello", "sessionId": "sess-1"},
+                headers={
+                    "Authorization": f"Bearer {valid_token}",
+                    "Origin": "http://localhost:3000",
+                },
+            )
+            assert resp1.status_code == 503
+            assert "GUARDRAIL_GATEWAY_UNAVAILABLE" in resp1.json().get("detail", "")
+            assert mock_admit.call_count == 0
+            mock_admit.assert_not_called()
+
+        degraded_gateway = DegradedGateway()
+        with patch.object(app.state, "guardrail_gateway", degraded_gateway, create=True):
+            resp2 = client.post(
+                "/chat/stream",
+                json={"message": "hello", "sessionId": "sess-1"},
+                headers={
+                    "Authorization": f"Bearer {valid_token}",
+                    "Origin": "http://localhost:3000",
+                },
+            )
+            assert resp2.status_code == 503
+            assert "GUARDRAIL_GATEWAY_UNAVAILABLE" in resp2.json().get("detail", "")
+            assert mock_admit.call_count == 0
+            mock_admit.assert_not_called()
+
+
 @pytest.mark.asyncio
 async def test_zero_fail_open_bypass_invariant_input_validation() -> None:
     """Under NO condition (crash, unhandled exception, invalid context) does gateway fail open on input."""
