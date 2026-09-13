@@ -66,7 +66,7 @@ All metrics, telemetry events, and log emissions must strictly adhere to three c
 
 ### 1.2 Metric Definitions and Schemas
 
-Aligned with [`tests/security/observability-contract.json`](file:///c:/Booking%20Systems/tests/security/observability-contract.json), the runtime exports three standardized Prometheus metrics:
+Aligned with [`tests/security/observability-contract.json`](file:///c:/Booking%20Systems/tests/security/observability-contract.json), the runtime exports four standardized Prometheus metrics:
 
 #### 1. `security_guardrail_decisions_total`
 - **Type**: Counter
@@ -74,6 +74,7 @@ Aligned with [`tests/security/observability-contract.json`](file:///c:/Booking%2
 - **Labels**: `stage`, `decision`, `layer_key`
 - **Allowed Stages**: `input`, `tool`, `output`
 - **Allowed Decisions**: `PASS`, `BLOCK`, `SKIP`
+- **Allowed Layer Keys**: `input.length`, `input.pii`, `input.injection`, `input.topic`, `output.pii`, `tool.size_structure`, `tool.schema`, `tool.pii`, `tool.untrusted_content_injection`
 - **Cardinality Bound**: $\le 90$ total time series.
 
 #### 2. `security_guardrail_latency_ms`
@@ -83,13 +84,20 @@ Aligned with [`tests/security/observability-contract.json`](file:///c:/Booking%2
 - **Buckets**: `[0.5, 1, 2, 5, 10, 25, 50, 100, 250]`
 - **Unit**: Milliseconds (`ms`)
 
-#### 3. `security_emitter_errors_total`
+#### 3. `security_guardrail_turn_latency_ms`
+- **Type**: Histogram
+- **Description**: Aggregate active CPU guardrail compute latency per complete chat turn in milliseconds.
+- **Labels**: None (turn-level aggregate)
+- **Buckets**: `[0.5, 1, 2, 5, 10, 20, 50, 100]`
+- **Unit**: Milliseconds (`ms`)
+
+#### 4. `security_emitter_errors_total`
 - **Type**: Counter
 - **Description**: Count of failed telemetry emission attempts to background sinks.
 - **Labels**: `sink`, `error_type`
 - **Allowed Sinks**: `security_audit_log`, `prometheus`, `redis`
-- **Allowed Error Types**: `connection_timeout`, `buffer_overflow`, `io_error`, `serialization_failure`
-- **Cardinality Bound**: $\le 15$ total time series.
+- **Allowed Error Types**: `connection_timeout`, `buffer_overflow`, `io_error`, `serialization_failure`, `sink_unreachable`, `authentication_failure`
+- **Cardinality Bound**: $\le 18$ total time series.
 
 ---
 
@@ -105,8 +113,8 @@ Emitted to `security_audit_log` on every deterministic guardrail evaluation acro
 {
   "event_type": "security_guardrail_eval",
   "timestamp_utc": "2026-09-13T12:00:00.000Z",
-  "trace_id": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
-  "subject_ref": "hmac_sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "trace_id": "<trace_uuid_v4>",
+  "subject_ref": "hmac_sha256:<sha256_pseudonym_digest>",
   "stage": "input",
   "layer_key": "input.injection",
   "decision": "BLOCK",
@@ -137,7 +145,7 @@ Emitted when an asynchronous or bounded ring-buffer telemetry emission fails:
 {
   "event_type": "security_emitter_error",
   "timestamp_utc": "2026-09-13T12:00:00.000Z",
-  "trace_id": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+  "trace_id": "<trace_uuid_v4>",
   "sink": "security_audit_log",
   "error_type": "connection_timeout",
   "details": "Connection timed out after 500ms writing to audit sink"
@@ -251,10 +259,11 @@ To ensure rapid incident response, four real-time dashboards are specified for d
    histogram_quantile(0.99, sum by (le, stage, layer_key) (rate(security_guardrail_latency_ms_bucket[5m])))
    ```
 
-4. **Aggregate Turn Compute Latency Estimate ($p95 \le 10.0\text{ ms}$)**:
+4. **Aggregate Turn Compute Latency ($p95 \le 10.0\text{ ms}$)**:
    ```promql
-   sum by (stage) (histogram_quantile(0.95, sum by (le, stage) (rate(security_guardrail_latency_ms_bucket[5m]))))
+   histogram_quantile(0.95, sum(rate(security_guardrail_turn_latency_ms_bucket[5m])) by (le))
    ```
+   *Note: Quantile of sums across layers is not the sum of quantiles; the dedicated per-turn histogram (`security_guardrail_turn_latency_ms`) is required for evaluating the SC-004 $p95 \le 10\text{ ms}$ turn budget.*
 
 5. **Near-Limit Latency Outliers ($p99 \le 50.0\text{ ms}$)**:
    ```promql
@@ -287,8 +296,9 @@ To ensure rapid incident response, four real-time dashboards are specified for d
    ```promql
    (sum(rate(security_emitter_errors_total[5m]))
      /
-    (sum(rate(security_guardrail_decisions_total[5m])) + sum(rate(security_emitter_errors_total[5m])))) * 100
+    sum(rate(security_guardrail_decisions_total[5m]))) * 100
    ```
+   *Note: Decisions (`security_guardrail_decisions_total`) are the authoritative denominator for drop rate calculation, avoiding error percentage dilution.*
 
 2. **Emitter Errors by Sink and Error Type**:
    ```promql
@@ -371,17 +381,17 @@ Evaluation is conducted against the 700-case holdout corpus defined in [`tests/s
 When a customer or support agent reports that a benign chat turn was unexpectedly blocked:
 
 ```
-+-------------------------------------------------------------------------------+
-|                      False Positive Triage Workflow                           |
-+-------------------------------------------------------------------------------+
-| 1. Incident Intake       --> Extract trace_id and user timestamp              |
-| 2. Trace Correlation     --> Lookup audit record using subject_ref & trace_id |
-| 3. Offline Replay        --> Reproduce failure in local test harness          |
-| 4. Corpus Expansion      --> Add minimal reproducible benign case to holdout  |
-| 5. Layer Rule Tuning     --> Refine guardrail pattern without lowering TPR    |
-| 6. Invariant Regression  --> Run full 700-case suite + 25 invariants (0 fail) |
-| 7. Canary Rollout        --> Deploy via verified canary progression           |
-+-------------------------------------------------------------------------------+
++-----------------------------------------------------------------------------------+
+|                         False Positive Triage Workflow                            |
++-----------------------------------------------------------------------------------+
+| 1. Incident Intake          --> Extract trace_id and user timestamp               |
+| 2. Trace Correlation        --> Lookup audit record using subject_ref & trace_id  |
+| 3. Offline Replay           --> Reproduce failure in local test harness           |
+| 4. Regression Corpus Expansion --> Add reproducible benign case to dev regression |
+| 5. Layer Rule Tuning        --> Refine guardrail pattern without lowering TPR     |
+| 6. Invariant Regression     --> Run full 700-case suite + 25 invariants (0 fail)  |
+| 7. Canary Rollout           --> Deploy via verified canary progression            |
++-----------------------------------------------------------------------------------+
 ```
 
 #### Step 1: Intake and Trace Correlation
@@ -398,12 +408,12 @@ When a customer or support agent reports that a benign chat turn was unexpectedl
    ```
 3. Confirm whether the layer decision is indeed a False Positive ($FP$) or an actual policy violation (e.g. user inadvertently pasted an API key or unescaped injection syntax).
 
-#### Step 3: Holdout Corpus Expansion
-1. If verified as a legitimate user workflow, sanitize and normalize the turn into a minimal reproducing case.
-2. Append the case into the corresponding stage development and holdout manifests:
-   - For input friction: `tests/security/corpus/holdout_input.jsonl`
-   - Mark `expectedDecision: "PASS"` and assign category (e.g. `LLM01-benign-conversational`).
-3. Re-generate SHA-256 canonical hash in `tests/security/corpus/manifest.json`.
+#### Step 3: Regression Corpus Expansion & Holdout Isolation
+1. **Holdout Corpus Isolation Guarantee**:
+   The 700-case holdout dataset (`holdout_input.jsonl`, `holdout_tool.jsonl`, `holdout_output.jsonl`, `manifest.json`) is strictly frozen and immutable to guarantee unbiased out-of-sample evaluation.
+2. **Development Regression Expansion**:
+   Incident-derived friction cases must be added into the development regression corpus (e.g. `tests/security/corpus/regression_manifest.jsonl` or `dev_input.jsonl`) for rule tuning and continuous regression testing, never into the frozen holdout corpus.
+3. If verified as a legitimate user workflow, sanitize and normalize the turn into a minimal reproducing case in the regression corpus, mark `expectedDecision: "PASS"`, and assign an appropriate category (e.g. `LLM01-benign-conversational`).
 
 #### Step 4: Layer Rule Tuning
 1. Refine regex boundaries or classification rules in the offending layer (e.g. adjusting token boundaries in `InputInjectionBoundary` or `TopicBoundary`).
@@ -601,9 +611,9 @@ Where:
   ```promql
   (sum(rate(security_emitter_errors_total[5m]))
     /
-   (sum(rate(security_guardrail_decisions_total[5m])) + sum(rate(security_emitter_errors_total[5m])))) * 100 > 1.0
+   sum(rate(security_guardrail_decisions_total[5m]))) * 100 > 1.0
   ```
-- **Description**: Telemetry event emitter drop rate exceeds 1.0% of total emitted security events over a 5-minute evaluation window.
+- **Description**: Telemetry event emitter drop rate exceeds 1.0% of total security decisions over a 5-minute evaluation window. *(Note: Guardrail decisions are the authoritative denominator for drop rate calculation, avoiding error percentage dilution.)*
 - **SLA**: Acknowledge within **5 minutes**; initiate recovery within **15 minutes**.
 
 #### Initial Response:
