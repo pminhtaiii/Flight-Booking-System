@@ -8,7 +8,8 @@ topic adherence.
 """
 
 import re
-from typing import Any, ClassVar, Literal
+import unicodedata
+from typing import Any, ClassVar, Final, Literal
 
 from agent.guardrails.base import (
     GUARDRAIL_INPUT_INJECTION,
@@ -22,7 +23,10 @@ from agent.guardrails.base import (
     ValidatedInput,
 )
 from agent.guardrails.layers.injection import InjectionSignatureEngine
-from agent.guardrails.normalization import safe_regex_match
+from agent.guardrails.normalization import (
+    is_catastrophic_regex,
+    safe_regex_match,
+)
 from agent.sanitization.pii_scrubber import (
     CARD_REGEX,
     EMAIL_REGEX,
@@ -61,7 +65,6 @@ class LengthValidator(BaseGuardrailLayer):
     ) -> PipelineDecision[ValidatedInput]:
         content = data if isinstance(data, str) else getattr(data, "content", str(data))
 
-        # Unicode scalar count
         if len(content) > self.max_characters:
             return PipelineDecision(
                 status="BLOCK",
@@ -70,7 +73,6 @@ class LengthValidator(BaseGuardrailLayer):
                 validated_data=None,
             )
 
-        # UTF-8 encoded byte count
         if len(content.encode("utf-8")) > self.max_bytes:
             return PipelineDecision(
                 status="BLOCK",
@@ -96,33 +98,34 @@ def _contains_sensitive_pii(text: str) -> bool:
     if not text:
         return False
 
-    # 0. Social Security Numbers
-    if _SSN_PATTERN.search(text):
-        return True
+    has_digits = any(c.isdigit() for c in text)
+    has_at = "@" in text
 
-    # 1. Credit card numbers with Luhn validation
-    for match in CARD_REGEX.finditer(text):
-        if is_luhn_valid(match.group(0)):
+    if not has_digits and not has_at:
+        return False
+
+    if has_digits:
+        if _SSN_PATTERN.search(text):
             return True
 
-    # 2. Email addresses
-    if EMAIL_REGEX.search(text):
-        return True
+        for match in CARD_REGEX.finditer(text):
+            if is_luhn_valid(match.group(0)):
+                return True
 
-    # 3. Phone numbers
-    if PHONE_REGEX.search(text):
-        return True
+        if PHONE_REGEX.search(text):
+            return True
 
-    # 4. Passport numbers ([A-Z]{1,2}\d{6,9})
-    # Travel Exception: flight numbers (e.g. VN123456 preceded by flight/flt) are allowed
-    for match in PASSPORT_REGEX.finditer(text):
-        start = match.start()
-        prefix = text[:start].rstrip().lower()
-        if any(
-            prefix.endswith(p)
-            for p in ("flight", "flight no", "flight no.", "flight number", "flt", "flt.")
-        ):
-            continue
+        for match in PASSPORT_REGEX.finditer(text):
+            start = match.start()
+            prefix = text[:start].rstrip().lower()
+            if any(
+                prefix.endswith(p)
+                for p in ("flight", "flight no", "flight no.", "flight number", "flt", "flt.")
+            ):
+                continue
+            return True
+
+    if has_at and EMAIL_REGEX.search(text):
         return True
 
     return False
@@ -259,6 +262,58 @@ OUT_OF_DOMAIN_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"\bmalware\s+script\b", re.IGNORECASE),
 )
 
+_OUT_OF_DOMAIN_TRIGGERS: Final[frozenset[str]] = frozenset(
+    {
+        "python",
+        "code",
+        "script",
+        "typescript",
+        "javascript",
+        "program",
+        "algorithm",
+        "debug",
+        "function",
+        "essay",
+        "story",
+        "poem",
+        "lyrics",
+        "song",
+        "write",
+        "medical",
+        "medicine",
+        "diagnose",
+        "prescribe",
+        "diagnosis",
+        "cancer",
+        "treatment",
+        "legal",
+        "counsel",
+        "sue",
+        "lawsuit",
+        "financial",
+        "bitcoin",
+        "crypto",
+        "stocks",
+        "stock",
+        "forex",
+        "hack",
+        "ddos",
+        "exploit",
+        "password",
+        "virus",
+        "malware",
+    }
+)
+
+_OUT_OF_DOMAIN_TRIGGER_PATTERN: Final[re.Pattern[str]] = re.compile(
+    r"(?i)\b(?:" + "|".join(sorted(_OUT_OF_DOMAIN_TRIGGERS)) + r")\b"
+)
+
+_DEFAULT_COMBINED_OUT_OF_DOMAIN: Final[re.Pattern[str]] = re.compile(
+    "|".join(f"(?:{p.pattern})" for p in OUT_OF_DOMAIN_PATTERNS),
+    re.IGNORECASE,
+)
+
 
 class TopicBoundary(BaseGuardrailLayer):
     """
@@ -273,11 +328,23 @@ class TopicBoundary(BaseGuardrailLayer):
 
     def __init__(
         self,
+        patterns: tuple[re.Pattern[str], ...] | list[re.Pattern[str] | str] | None = None,
         key: str | None = None,
         stage: Literal["input", "tool", "output"] | None = None,
         prerequisites: tuple[str, ...] | None = None,
     ) -> None:
         super().__init__(key=key, stage=stage, prerequisites=prerequisites)
+        if patterns is None:
+            self.patterns: tuple[re.Pattern[str], ...] = OUT_OF_DOMAIN_PATTERNS
+        else:
+            compiled: list[re.Pattern[str]] = []
+            for pat in patterns:
+                pat_str = pat.pattern if isinstance(pat, re.Pattern) else str(pat)
+                if is_catastrophic_regex(pat_str):
+                    raise ValueError(f"Catastrophic ReDoS regex pattern rejected: {pat_str}")
+                compiled_pat = pat if isinstance(pat, re.Pattern) else re.compile(pat_str)
+                compiled.append(compiled_pat)
+            self.patterns = tuple(compiled)
 
     async def check(
         self,
@@ -286,7 +353,31 @@ class TopicBoundary(BaseGuardrailLayer):
     ) -> PipelineDecision[ValidatedInput]:
         content = data if isinstance(data, str) else getattr(data, "content", str(data))
 
-        for pattern in OUT_OF_DOMAIN_PATTERNS:
+        if self.patterns is OUT_OF_DOMAIN_PATTERNS or self.patterns == OUT_OF_DOMAIN_PATTERNS:
+            norm_check = (
+                unicodedata.normalize("NFKC", content) if not content.isascii() else content
+            )
+            if not _OUT_OF_DOMAIN_TRIGGER_PATTERN.search(norm_check):
+                return PipelineDecision(
+                    status="PASS",
+                    validated_data=ValidatedInput(content=content),
+                )
+            if safe_regex_match(_DEFAULT_COMBINED_OUT_OF_DOMAIN, content, known_safe=True):
+                return PipelineDecision(
+                    status="BLOCK",
+                    response_key=GUARDRAIL_INPUT_TOPIC,
+                    reason=(
+                        "Your message appears to be outside our flight booking scope. "
+                        "How can I help with your flights, baggage, or airline reservations?"
+                    ),
+                    validated_data=None,
+                )
+            return PipelineDecision(
+                status="PASS",
+                validated_data=ValidatedInput(content=content),
+            )
+
+        for pattern in self.patterns:
             if safe_regex_match(pattern, content, known_safe=True):
                 return PipelineDecision(
                     status="BLOCK",

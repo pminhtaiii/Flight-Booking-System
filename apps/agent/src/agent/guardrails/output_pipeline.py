@@ -65,27 +65,43 @@ def _is_itinerary_or_date(match: re.Match[str], text: str) -> bool:
     return False
 
 
+_CREDENTIAL_KEYWORDS: tuple[str, ...] = ("api_key", "access_token", "secret", "bearer")
+
+
 def deterministic_pii_match(text: str, *, include_credentials: bool = True) -> re.Match[str] | None:
-    matches = (
-        list(_PASSPORT.finditer(text))
-        + list(_PASSPORT_ADJACENT.finditer(text))
-        + [m for m in _CARD.finditer(text) if is_luhn_valid(m.group(0))]
-        + [
-            m
-            for m in _PHONE.finditer(text)
-            if sum(char.isdigit() for char in m.group(0)) >= 10
-            and not _is_itinerary_or_date(m, text)
-        ]
-        + list(_EMAIL.finditer(text))
-        + (list(_CREDENTIAL.finditer(text)) if include_credentials else [])
+    has_digits = any(c.isdigit() for c in text)
+    has_at = "@" in text
+    lower_text = text.lower() if include_credentials else ""
+    has_cred = include_credentials and any(
+        keyword in lower_text for keyword in _CREDENTIAL_KEYWORDS
     )
-    # Any non-ASCII or overlong email-like identifier is unsupported and must
-    # fail closed rather than being released as a near-miss.
-    matches += [
-        match
-        for match in _EMAIL_LIKE.finditer(text)
-        if not match.group(0).isascii() or len(match.group(0)) > 254
-    ]
+
+    if not (has_digits or has_at or has_cred):
+        return None
+
+    matches: list[re.Match[str]] = []
+    if has_digits:
+        matches.extend(_PASSPORT.finditer(text))
+        matches.extend(_PASSPORT_ADJACENT.finditer(text))
+        matches.extend(
+            card_match for card_match in _CARD.finditer(text) if is_luhn_valid(card_match.group(0))
+        )
+        matches.extend(
+            phone_match
+            for phone_match in _PHONE.finditer(text)
+            if sum(char.isdigit() for char in phone_match.group(0)) >= 10
+            and not _is_itinerary_or_date(phone_match, text)
+        )
+    if has_at:
+        matches.extend(_EMAIL.finditer(text))
+        matches.extend(
+            match
+            for match in _EMAIL_LIKE.finditer(text)
+            if not match.group(0).isascii() or len(match.group(0)) > 254
+        )
+    if has_cred:
+        matches.extend(_CREDENTIAL.finditer(text))
+
     return min(matches, key=lambda match: match.start()) if matches else None
 
 
@@ -169,17 +185,31 @@ class OutputGuardrailPipeline:
         Whitespace is not a release boundary: it can precede an identifier in
         a later chunk. Only text before an actual detector prefix is approved.
         """
-        starts = []
-        for pattern in (
-            _CREDENTIAL_PREFIX,
-            _PASSPORT_PREFIX,
-            _CARD_PREFIX,
-            _PHONE_PREFIX,
-            _EMAIL_PREFIX,
-        ):
-            match = pattern.search(normalized)
-            if match:
-                starts.append(match.start())
+        starts: list[int] = []
+        has_digits = any(c.isdigit() for c in normalized)
+        has_upper = any(c.isupper() for c in normalized)
+        lower_norm = normalized.lower()
+
+        if any(keyword in lower_norm for keyword in _CREDENTIAL_KEYWORDS):
+            prefix_match = _CREDENTIAL_PREFIX.search(normalized)
+            if prefix_match:
+                starts.append(prefix_match.start())
+
+        if has_upper:
+            prefix_match = _PASSPORT_PREFIX.search(normalized)
+            if prefix_match:
+                starts.append(prefix_match.start())
+
+        if has_digits:
+            for pattern in (_CARD_PREFIX, _PHONE_PREFIX):
+                prefix_match = pattern.search(normalized)
+                if prefix_match:
+                    starts.append(prefix_match.start())
+
+        prefix_match = _EMAIL_PREFIX.search(normalized)
+        if prefix_match:
+            starts.append(prefix_match.start())
+
         return min(starts) if starts else None
 
     def _release(self) -> str:

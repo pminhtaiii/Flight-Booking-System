@@ -127,11 +127,13 @@ def _contains_sensitive_value(value: Any) -> bool:
     while stack:
         current = stack.pop()
         if isinstance(current, str):
-            if (
-                detect_pii(current)
-                or _SSN_PATTERN.search(current)
-                or _TOKEN_PATTERN.search(current)
+            has_digits = any(c.isdigit() for c in current)
+            has_at = "@" in current
+            if (has_digits or has_at) and (
+                detect_pii(current) or (has_digits and _SSN_PATTERN.search(current))
             ):
+                return True
+            if ("=" in current or ":" in current) and _TOKEN_PATTERN.search(current):
                 return True
         elif isinstance(current, dict):
             for key, nested_value in current.items():
@@ -149,13 +151,22 @@ def _contains_sensitive_value(value: Any) -> bool:
     return False
 
 
-def _contains_untrusted_directive(value: Any) -> bool:
-    engine = InjectionSignatureEngine()
-    for text in _string_values(value):
-        detected, _ = engine.scan(text)
-        if detected or _INDIRECT_DIRECTIVE_PATTERN.search(text):
-            return True
-    return False
+def _contains_untrusted_directive(
+    value: Any,
+    engine: InjectionSignatureEngine | None = None,
+) -> bool:
+    strings = _string_values(value)
+    if not strings:
+        return False
+    meaningful = list(dict.fromkeys(s for s in strings if len(s) >= 6))
+    if not meaningful:
+        return False
+    joined = "\n".join(meaningful)
+    if _INDIRECT_DIRECTIVE_PATTERN.search(joined):
+        return True
+    active_engine = engine or InjectionSignatureEngine()
+    detected, _ = active_engine.scan(joined)
+    return detected
 
 
 def _project_search_result(raw_value: Any) -> Any:
@@ -346,10 +357,8 @@ class UntrustedContentInjectionDetector(BaseGuardrailLayer):
 
     async def check(self, context: TurnCapabilities, data: Any) -> PipelineDecision[Any]:
         value = data.raw_data if isinstance(data, ToolOutput) else data
-        for text in _string_values(value):
-            detected, _ = self.engine.scan(text)
-            if detected or _INDIRECT_DIRECTIVE_PATTERN.search(text):
-                return _block_schema("Tool result contains an untrusted instruction")
+        if _contains_untrusted_directive(value, engine=self.engine):
+            return _block_schema("Tool result contains an untrusted instruction")
         return PipelineDecision(status="PASS", validated_data=data)
 
 

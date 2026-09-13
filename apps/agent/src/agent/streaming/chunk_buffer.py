@@ -29,6 +29,14 @@ class ChunkBuffer:
         suffix: a later chunk may still change its NFKC representation.
         Discarded raw text is never consulted for a mapping decision.
         """
+        if self.raw.isascii():
+            self._normalized = self.raw
+            self._normalized_to_raw = list(range(len(self.raw) + 1))
+            self._stable_raw_end = len(self.raw)
+            if self.raw and self.raw[-1].isalnum():
+                self._stable_raw_end = len(self.raw) - 1
+            return
+
         self._normalized = unicodedata.normalize("NFKC", self.raw)
         self._normalized_to_raw = [0]
         raw_end = 0
