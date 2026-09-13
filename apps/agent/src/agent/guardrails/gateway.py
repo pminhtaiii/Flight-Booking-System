@@ -12,7 +12,10 @@ from agent.guardrails.base import (
     ValidatedInput,
     ValidatedToolResult,
 )
-from agent.guardrails.registry import GuardrailRegistry
+from agent.guardrails.registry import (
+    GuardrailRegistry,
+    RegistryContractError,
+)
 from agent.guardrails.tool_output_pipeline import ToolOutputGuardrailPipeline
 
 
@@ -23,6 +26,10 @@ class GuardrailGateway:
     """
 
     def __init__(self, registry: GuardrailRegistry) -> None:
+        if not isinstance(registry, GuardrailRegistry):
+            raise RegistryContractError(
+                "GuardrailGateway requires a valid GuardrailRegistry instance."
+            )
         self.registry = registry
 
     async def validate_input(

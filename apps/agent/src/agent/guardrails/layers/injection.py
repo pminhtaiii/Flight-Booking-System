@@ -14,7 +14,6 @@ from typing import Final
 from agent.guardrails.normalization import (
     bounded_normalize,
     detect_base64_payloads,
-    safe_regex_match,
 )
 
 # ---------------------------------------------------------------------------
@@ -340,6 +339,14 @@ INJECTION_SIGNATURES: Final[tuple[re.Pattern[str], ...]] = tuple(
 INJECTION_SIGNATURE_MAP: Final[dict[str, re.Pattern[str]]] = dict(NAMED_INJECTION_SIGNATURES)
 
 
+_COMBINED_INJECTION_PATTERN: Final[re.Pattern[str]] = re.compile(
+    "|".join(
+        f"(?:{pat[4:] if pat.startswith('(?i)') else pat})" for _, pat in _SIGNATURE_DEFINITIONS
+    ),
+    re.IGNORECASE | re.ASCII,
+)
+
+
 def _bound_text(s: str, max_bytes: int) -> str:
     """Safely bounds string to max_bytes in UTF-8 encoding."""
     encoded = s.encode("utf-8")
@@ -369,42 +376,40 @@ class InjectionSignatureEngine:
         Returns:
             (is_injection, reason_or_signature_name)
         """
-        # Truncate input to maximum permitted expansion limit
         bounded_input = _bound_text(text, self.max_expansion_bytes)
 
-        # Generate candidates through bounded unmasking rounds
-        candidates: list[str] = [bounded_input]
-        normalized_input = bounded_normalize(bounded_input, max_rounds=self.max_rounds)
-        bounded_norm = _bound_text(normalized_input, self.max_expansion_bytes)
-        if bounded_norm not in candidates:
-            candidates.append(bounded_norm)
+        if bounded_input.isascii() and "%" not in bounded_input:
+            bounded_norm = bounded_input
+        else:
+            normalized_input = bounded_normalize(bounded_input, max_rounds=self.max_rounds)
+            bounded_norm = _bound_text(normalized_input, self.max_expansion_bytes)
 
-        # Perform bounded base64 extraction up to max_rounds
-        current_layer_texts = [bounded_input, normalized_input]
+        bounded_candidate = bounded_norm[:16384]
+        if _COMBINED_INJECTION_PATTERN.search(bounded_candidate):
+            for name, pattern in NAMED_INJECTION_SIGNATURES:
+                if pattern.search(bounded_candidate):
+                    return True, name
+
+        current_layer_texts = (
+            [bounded_input] if bounded_norm == bounded_input else [bounded_input, bounded_norm]
+        )
         for _ in range(self.max_rounds):
             next_layer_texts: list[str] = []
             for candidate in current_layer_texts:
                 for payload in detect_base64_payloads(candidate):
                     bounded_payload = _bound_text(payload, self.max_expansion_bytes)
-                    if bounded_payload not in candidates:
-                        candidates.append(bounded_payload)
-                        next_layer_texts.append(bounded_payload)
-
                     norm_payload = bounded_normalize(bounded_payload, max_rounds=self.max_rounds)
-                    bounded_norm = _bound_text(norm_payload, self.max_expansion_bytes)
-                    if bounded_norm not in candidates:
-                        candidates.append(bounded_norm)
-                        next_layer_texts.append(bounded_norm)
+                    bounded_norm_payload = _bound_text(norm_payload, self.max_expansion_bytes)
+                    bounded_norm_candidate = bounded_norm_payload[:16384]
+                    if _COMBINED_INJECTION_PATTERN.search(bounded_norm_candidate):
+                        for name, pattern in NAMED_INJECTION_SIGNATURES:
+                            if pattern.search(bounded_norm_candidate):
+                                return True, name
+                    next_layer_texts.append(bounded_norm_payload)
 
             if not next_layer_texts:
                 break
             current_layer_texts = next_layer_texts
-
-        # Scan candidates against compiled signatures
-        for candidate in candidates:
-            for name, pattern in NAMED_INJECTION_SIGNATURES:
-                if safe_regex_match(pattern, candidate, known_safe=True):
-                    return True, name
 
         return False, None
 

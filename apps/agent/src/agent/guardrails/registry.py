@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from typing import Any, ClassVar, Literal
 
 from agent.guardrails.base import (
@@ -198,8 +199,12 @@ class GuardrailRegistry:
 
 
 def create_production_registry(
-    disabled_keys: set[str] | None = None,
+    disabled_keys: Iterable[str] | None = None,
 ) -> GuardrailRegistry:
+    if disabled_keys is not None and (
+        isinstance(disabled_keys, (str, bytes)) or not isinstance(disabled_keys, Iterable)
+    ):
+        raise RegistryContractError("disabled_keys must be an iterable of strings.")
     effective_disabled = set(disabled_keys) if disabled_keys is not None else set()
     disabled_compulsory = effective_disabled.intersection(COMPULSORY_PRODUCTION_LAYERS)
     if disabled_compulsory:

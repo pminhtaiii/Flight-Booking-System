@@ -1202,3 +1202,32 @@ CI review follow-up (2026-09-11): application and shared-package changes route b
      - Maximum 30-day lifetime from creation date (`expiresAt - createdAt <= 30 days`).
      - Immediate fail-closed rejection on expired exceptions (`expiresAt < currentDate`).
      - Non-bypassable hard rules: `no-llm-in-guardrails`, `no-unshielded-tool-execution`, and any Critical, High, or Error severity findings can NEVER be suppressed by baseline or exceptions.
+
+### Phase 7 US5 — Performance Benchmarks, Resource Validation & Fail-Closed Rollout Architecture
+
+1. **Hostile Near-Limit Performance Benchmarks (`apps/agent/tests/security/test_security_performance.py`)**:
+   - **Timing Decomposition**: Active CPU compute latency is strictly decoupled from token stream arrival rate and 512-scalar buffer holdback wait time in `OutputGuardrailPipeline` and `ChunkBuffer`.
+   - **Provisional SC-004 Target Compliance**:
+     - Layer compute (warm): $0.03\text{ ms} - 0.69\text{ ms}$ $p95$ ($\le 1.0\text{ ms}$ target).
+     - Turn compute: $1.33\text{ ms} - 5.60\text{ ms}$ $p95$ ($\le 10.0\text{ ms}$ target).
+     - Hostile near-limit inputs ($8\text{ KiB}$ boundaries, CJK, Cyrillic homoglyphs, diacritics): $2.70\text{ ms} - 4.71\text{ ms}$ $p95$ ($\le 50.0\text{ ms}$ target).
+     - Hostile tool outputs ($451$ nodes, structural depth $>5$ rejection): $0.07\text{ ms} - 12.89\text{ ms}$ $p95$ ($\le 50.0\text{ ms}$ target).
+     - Pathological ReDoS stress: $1.28\text{ ms} - 5.02\text{ ms}$ $p95$ ($\le 50.0\text{ ms}$ target); static AST detection of catastrophic exponential backtracking patterns.
+     - Single-character stream fragmentation ($158$ $1$-char tokens): $7.31\text{ ms}$ $p95$ ($\le 50.0\text{ ms}$ target) with $100\%$ reconstruction integrity and ASCII fast path in `ChunkBuffer._rebuild_mapping`.
+     - Memory and concurrency: $50$ concurrent streams in $142.38\text{ ms}$ $p95$ ($336.7\text{ streams/s}$), peak memory delta $140.27\text{ KiB}$ ($\le 15.0\text{ MiB}$ ceiling).
+   - **Synthetic Privacy**: Zero real customer PII or raw customer identifiers used in benchmark fixtures or emitted payloads.
+
+2. **Fail-Closed Rollout, Rollback & Health Probe Guarantees (`apps/agent/tests/security/test_rollout.py`, `docs/security/rollout.md`)**:
+   - **Fail-Closed Startup Verification**:
+     - `GuardrailGateway` requires an instance of `GuardrailRegistry`; invalid configurations raise `RegistryContractError`.
+     - `create_production_registry` enforces all $9$ compulsory layers; attempts to disable compulsory layers raise `RegistryContractError`.
+     - Corrupted or invalid regex rules fail closed at startup with `ValueError`.
+     - Missing `JWT_SECRET` or `CLAIM_TOKEN_SECRET` halts boot via Pydantic `ValidationError`. Unauthenticated ingress returns 401; unauthorized origins return 403; requests never reach the runner or tools.
+     - Zero Fail-Open Bypass Invariant: All unexpected failures in input, tool execution, or tool batching return `status == 'BLOCK'`.
+   - **Feature Flag Rollout & Rollback Rehearsals**:
+     - $3$-phase rehearsal cycle (rollout $\to$ rollback $\to$ re-rollout) verified for `FEATURE_FLAG_CHAT_MULTI_AGENT`, `FEATURE_FLAG_CHAT_HANDOFF_ISSUE` / `NEXT_PUBLIC_FEATURE_FLAG_CHAT_HANDOFF`, and `NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS`.
+     - Rollback strips unauthorized tool capabilities, suppresses backend mutations, and preserves safe error states with zero sensitive context leakage.
+   - **Operational Runbook & Health Probes**:
+     - `/health/live`: Lightweight probe ($<1\text{ ms}$) performing zero model inference, guardrail compute, or network I/O.
+     - `/health`: Comprehensive probe validating `nestjsApi`, `redis`, and deterministic `guardrails`.
+     - `docs/security/rollout.md` Section 5 establishes the step-by-step emergency rollback playbook and operator command runbook.

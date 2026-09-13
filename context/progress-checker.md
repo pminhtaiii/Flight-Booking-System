@@ -1,5 +1,73 @@
 # Progress Tracker
 
+### Feature 023 — Security Systems: Phase 7 US5 Slice 2 Dual-Axis Code Review Remediation Completed (2026-09-13)
+
+- **Remediated Standards Violations & Performance Bottlenecks across Tasks T043, T046, T047**:
+  - **Standards remediations**:
+    - `apps/agent/src/agent/guardrails/layers/input.py`: Removed inline "what" comments in `_contains_sensitive_pii` and `LengthValidator`; moved deferred import `is_catastrophic_regex` in `TopicBoundary.__init__` to top-level.
+    - `apps/agent/src/agent/guardrails/layers/injection.py`: Removed inline "what" comments; eliminated false-negative risk from keyword pre-filter by matching candidate text directly against `_COMBINED_INJECTION_PATTERN` with `re.IGNORECASE | re.ASCII`.
+    - `apps/agent/tests/security/test_rollout.py`: Replaced hardcoded test secrets with dynamic tokens generated via `secrets.token_hex(32)`.
+    - `apps/agent/src/agent/guardrails/output_pipeline.py`: Renamed single-letter variables `k` and `m` to descriptive names (`keyword`, `prefix_match`, `card_match`, `phone_match`).
+    - `apps/agent/src/agent/guardrails/layers/tool_output.py`: Deduplicated logic between `_contains_untrusted_directive` and `UntrustedContentInjectionDetector.check` into a single shared helper.
+    - `apps/agent/src/agent/guardrails/registry.py`: Updated `create_production_registry` to accept any non-str/bytes `Iterable` for `disabled_keys`.
+  - **Spec & performance remediations**:
+    - `apps/agent/src/agent/streaming/chunk_buffer.py`: Added ASCII fast-path in `_rebuild_mapping` using `raw.isascii()`, avoiding $O(N^2)$ `unicodedata.normalize` calls during 1-character token streaming.
+    - `apps/agent/tests/security/test_security_performance.py`: Added warmup iteration to `test_stream_chunk_fragmentation_stress`; recorded full `p50`, `p95`, `p99` metrics for individual layers in `test_cold_initialization_vs_warm_execution` (p95 <= 1.0 ms); recorded `p50`, `p95`, `p99` stream latencies in `test_memory_growth_and_concurrency_stress`.
+    - `docs/security/rollout.md`: Added Section 5 with step-by-step operator commands for emergency feature flag rollback, health verification commands, and safe chat disabled fallback.
+    - `docs/security/performance-validation.md`: Synced evidence tables and distributions with updated benchmark harness measurements.
+  - **Verification**: All 19 tests in `test_security_performance.py` and `test_rollout.py` passing in 12.20s; `ruff check` and `ruff format` 100% clean.
+
+### Feature 023 — Security Systems: Phase 7 US5 Hostile Near-Limit Performance Benchmarks (Task T043 Completed) (2026-09-13)
+
+- **T043 Hostile Near-Limit Performance Benchmarks (`apps/agent/tests/security/test_security_performance.py`)**:
+  - Full reproducible benchmark test suite (7 tests passing with `pytestmark = pytest.mark.security`):
+    - **Cold vs. Warm Benchmarks (`test_cold_initialization_vs_warm_execution`)**:
+      - Measured cold initialization overhead (fresh regex compile, registry creation, compulsory layer instantiations) vs. warm execution across 50 iterations.
+      - Cold init: p95 = 0.20 ms (well below 250.0 ms ceiling).
+      - Warm layers: input.length (0.16 ms), input.pii (0.13 ms), input.injection (0.69 ms), input.topic (0.19 ms), tool.pii (0.16 ms), tool.schema (0.24 ms), tool.size_structure (0.15 ms), tool.untrusted_content_injection (0.03 ms) (all <= 1.0 ms p95).
+      - Turn compute: p50 = 1.50 ms, p95 = 5.60 ms (well below <= 10.0 ms p95 turn target).
+    - **Hostile & Near-Limit Input Payloads (`test_hostile_near_limit_input_payloads`)**:
+      - Evaluated multi-byte CJK (8,400 bytes, p95 = 4.71 ms), Cyrillic homoglyph multi-round unmasking (p95 = 3.46 ms), 1,500 combining diacritics (p95 = 2.70 ms), and exact 8,192-byte boundary (p95 = 4.39 ms) (all <= 50.0 ms p95).
+    - **Hostile & Near-Limit Tool Outputs (`test_hostile_near_limit_tool_output_payloads`)**:
+      - Validated 45 flight offers (451 structural nodes near 500-node ceiling) in 12.89 ms p95 (ceiling <= 50.0 ms).
+      - Structural depth rejection (> 5 levels) fast BLOCK in 0.07 ms p95 (ceiling <= 10.0 ms).
+    - **Pathological Regex & ReDoS Resistance (`test_pathological_regex_and_redos_resistance`)**:
+      - Verified ReDoS AST classifier detects catastrophic patterns (`(a+)+$`, `(a|a)+$`, `(.*a){10}`, `(a+)*b`).
+      - Verified PII regexes against 10,000-character repetitive sequences (spaces, 'A's, digits, prefix stress): passport (1.28 ms), card (2.15 ms), phone (3.08 ms), email (5.02 ms), credential (1.58 ms) (all <= 50.0 ms p95).
+    - **Stream Chunk Fragmentation Stress (`test_stream_chunk_fragmentation_stress`)**:
+      - Tested 158 single-character token chunks through `OutputGuardrailPipeline` and `ChunkBuffer`; clean reconstruction without data corruption in 9.59 ms p95 (ceiling <= 50.0 ms).
+    - **Metric Decomposition (`test_metric_decomposition_compute_vs_holdback_wait`)**:
+      - Strictly isolated active CPU compute latency from 512-scalar buffering holdback wait time.
+      - Active token compute: p50 = 0.04 ms, p95 = 0.09 ms (target <= 1.0 ms).
+      - Total turn compute: p50 = 1.06 ms, p95 = 1.57 ms (target <= 10.0 ms).
+      - Buffering holdback inspection span: p95 = 1.5 scalars (bounded to <= 512 scalars).
+      - Holdback wait: p95 = 20.0 ms.
+    - **Memory Growth & Concurrency (`test_memory_growth_and_concurrency_stress`)**:
+      - Monitored peak heap memory using `tracemalloc` across 50 concurrent SSE streams in `asyncio.gather`.
+      - Peak memory delta: 140.27 KiB (0.137 MiB, target <= 15 MiB).
+      - Throughput: 213 streams/second in 234 ms.
+    - Emits structured JSON `[BENCHMARK_REPORT]` audit payload with CPU/OS hardware metadata and zero customer PII.
+
+### Feature 023 — Security Systems: Phase 7 US5 Fail-Closed Rollout, Rollback & Startup Verification (Task T047 Completed) (2026-09-13)
+
+- **T047 Fail-Closed Rollout, Rollback & Startup Tests (`apps/agent/tests/security/test_rollout.py`, `docs/security/rollout.md`)**:
+  - Codebase verification suite in `apps/agent/tests/security/test_rollout.py` (12 tests passing with `pytestmark = pytest.mark.security`):
+    - **Fail-Closed Startup Verification**:
+      - Validated `GuardrailGateway(registry)` requires an instance of `GuardrailRegistry`, raising `RegistryContractError` on `None` or invalid configuration.
+      - Validated `create_production_registry()` enforces compulsory layers (`input.length`, `input.pii`, `input.injection`, `input.topic`, `output.pii`, `tool.size_structure`, `tool.schema`, `tool.pii`, `tool.untrusted_content_injection`), raising `RegistryContractError` when any compulsory layer is disabled or config is malformed.
+      - Tested corrupted and catastrophic regex patterns during layer initialization (`TopicBoundary(patterns=[...])`), verifying fail-closed error handling and zero pass-through bypasses.
+      - Tested startup and ingress authentication fail-closed semantics: missing `JWT_SECRET` or `CLAIM_TOKEN_SECRET` fails startup via Pydantic `ValidationError`; unauthenticated requests return 401, forged JWT tokens return 401, and unauthorized origins return 403, preventing unauthorized execution from reaching the runner or tools.
+      - Invariant verification: under zero conditions (gateway exception, layer check() failure, invalid context) does the system fail open (all paths return `status == 'BLOCK'`).
+    - **Rollout & Rollback Rehearsal**:
+      - Verified complete 3-phase rollout cycles (enabled -> disabled/rollback -> re-enabled) across feature flags:
+        - `FEATURE_FLAG_CHAT_MULTI_AGENT`: on rollback, reverts to single-agent routing with travel tools only, stripping `signal_checkout_intent` authority.
+        - `FEATURE_FLAG_CHAT_HANDOFF_ISSUE` (with `NEXT_PUBLIC_FEATURE_FLAG_CHAT_HANDOFF`): on rollback, returns clean error `{"action": {"error": "Chat handoff issuance is disabled."}}` with zero NestJS calls or snapshot disclosures.
+        - `NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS`: on rollback or failure, fails cleanly without leaking passenger PII.
+    - **Health Verification Probes**:
+      - Verified `/health/live` probe succeeds with `{"status": "ok"}` with zero LLM model inference, zero guardrail classification overhead, and zero external I/O or Redis calls.
+      - Verified `/health` dependency reporting accurately monitors `guardrails: {"status": "deterministic"}`, `redis`, and `nestjsApi`, reporting `status: "ok"` when healthy and `status: "degraded"` on dependency downtime.
+  - Documented complete operational runbook and verification evidence in `docs/security/rollout.md`.
+
 ### Feature 023 — Security Systems: Phase 6 US4 Runtime Penetration Coverage (Final Slice: Tasks T040 & T041 Completed — Phase 6 Complete) (2026-09-12)
 
 - **T040 Conventional HTTP/Browser Security Checks & Scoped ZAP Runner Verification**:
