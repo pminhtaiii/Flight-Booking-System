@@ -5,6 +5,10 @@ title = "Flight Booking System Gitleaks Configuration"
 description = "Allowlist generated graphify metadata and AST hashes"
 paths = [
   '''^graphify-out/''',
+  '''node_modules''',
+  '''\.next''',
+  '''\.venv''',
+  '''\.t093-uv-cache''',
 ]
 
 # Synthetic values are allowlisted only where they are intentionally used by

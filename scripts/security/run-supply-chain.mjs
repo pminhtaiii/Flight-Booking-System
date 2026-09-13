@@ -722,10 +722,13 @@ function normaliseGitleaks(raw, options = {}) {
 
 function commandResult(execFn, command, args, rootDir) {
   try {
+    const isCmd =
+      process.platform === 'win32' &&
+      (command === 'pnpm' || command.endsWith('.cmd') || command.endsWith('.bat'));
     const result = execFn(command, args, {
       cwd: rootDir,
       encoding: 'utf8',
-      shell: process.platform === 'win32',
+      shell: isCmd,
       maxBuffer: 64 * 1024 * 1024,
     });
     if (!result || typeof result !== 'object') {
@@ -991,7 +994,14 @@ function runSecretScan(options = {}) {
       const result = commandResult(execFn, 'gitleaks', definition.args, rootDir);
       // Gitleaks writes a JSON file, while logs remain on stdout/stderr. Read,
       // normalize, and delete the redacted intermediate immediately.
-      const raw = readReportFile(definition.reportPath) || result.stdout;
+      const reportContent = readReportFile(definition.reportPath);
+      const cleanReport = reportContent && reportContent.trim() !== 'null' ? reportContent : '';
+      const hasJsonStdout = Boolean(
+        result.stdout &&
+          (result.stdout.trim().startsWith('[') || result.stdout.trim().startsWith('{')),
+      );
+      const raw =
+        cleanReport || (result.status === 0 && !hasJsonStdout ? '[]' : result.stdout);
       const parsed = normaliseGitleaks(raw, { checkedAt, mode: definition.mode });
       const hasEvidence = parsed.valid && (raw.trim() !== '' || result.status === 0);
       if (!hasEvidence) {

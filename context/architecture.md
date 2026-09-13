@@ -1271,3 +1271,45 @@ CI review follow-up (2026-09-11): application and shared-package changes route b
      - Codifies real-time Grafana dashboard panels for guardrail decisions, P50/P95/P99 latency decomposition, and telemetry emitter error rates.
      - Establishes Standard Operating Procedures (SOP) for false-positive tracking derived from offline labeled holdout evaluations and triage, not raw block counts.
      - Codifies operational alert runbooks and incident response playbooks for `InjectionBlockRateSpike`, `GuardrailLatencyP95Breach`, and `TelemetryEmitterDropRateHigh`.
+
+### Phase 8 — Closure, Release Gates, Findings Ledger & Context Synchronization
+
+1. **Deterministic Three-Stage Guardrail Architecture**:
+   - **Input Pipeline** (`agent.guardrails.input_pipeline`):
+     - `LengthValidator`: Evaluates strict raw byte ceiling and UTF-8 scalar boundaries before parsing or decoding. Rejects overlong payloads with `LENGTH_EXCEEDED` without LLM consumption.
+     - `PIIDetector`: Scans for high-entropy secrets, passport IDs, credit cards, emails, and phone numbers with regexes and Luhn checks; allows valid flight numbers (`AA123`, `FL-456`), timestamps, and prices.
+     - `InjectionDetector`: Normalizes Unicode (NFKC), strips control characters, unmasks Cyrillic/homoglyph obfuscations, and evaluates bounded regexes against >=50 direct prompt injection signatures.
+     - `TopicBoundary`: Deterministic allowlist/denial matching flight booking domain boundaries. Redirects off-topic queries statically without invoking LLM judge.
+   - **Tool Pipeline** (`agent.guardrails.tool_output_pipeline`):
+     - `SizeStructureValidator`: Enforces bounded payload size (<=64 KiB) and maximum AST/JSON nesting depth (<=5 levels, <=500 structural nodes). Fast-rejects oversized or malformed payloads in <0.1 ms.
+     - `SchemaValidator`: Enforces exact Pydantic schema contracts against 6 allowed tool output signatures. Prohibits unexpected extra properties and forged action signals.
+     - `PIIScanner`: Inspects tool outputs recursively for nested synthetic PII canaries and customer credentials, masking sensitive values before state persistence.
+     - `UntrustedContentInjectionDetector`: Scans tool output payloads for indirect prompt injection directives and delimiter manipulation before constructing `ToolMessage`.
+   - **Output Pipeline** (`agent.guardrails.output_pipeline`):
+     - `ChunkBuffer`: Implements a bounded FIFO ring buffer withholding trailing tokens (sliding 512-scalar holdback window) to eliminate split-token leakage across chunk boundaries.
+     - `Output PIIScanner`: Evaluates multi-chunk assembled spans for PII and credit card numbers; redacts or halts emission prior to client SSE delivery and assistant history persistence.
+
+2. **Tool Capability Sealing & Authority Invariants**:
+   - **Cryptographically Sealed Turn Capabilities**: Following intent classification and routing, `TurnCapabilities` seals an immutable allowlist of authorized tools for the turn (`sealed_tools`).
+   - **Zero Authority Pre-Routing**: During input checking and early routing, agent operates under zero tool authority (`sealed_tools = set()`). Tool dispatch without explicitly sealed authority fails closed.
+   - **Post-Gate Sealing**: In `apps/agent/src/agent/graph/checkout_gate.py`, sensitive financial/booking mutations require explicit confirmation gates. Passing the gate yields an unforgeable attestation token that grants single-use capability.
+
+3. **Fail-Closed Gateway Lifecycle & Ingress Guarantees**:
+   - **Compulsory 9-Layer Production Registry**: `GuardrailGateway` requires `create_production_registry` with all 9 compulsory layers active. Disabling or skipping any compulsory layer raises `RegistryContractError` during startup.
+   - **Ingress Availability Guard (`/chat/stream`)**: Gateway status is evaluated *prior* to Redis quota admission. If `guardrail_gateway` is None or degraded, returns HTTP 503 `GUARDRAIL_GATEWAY_UNAVAILABLE` immediately without consuming user daily/burst quotas or invoking LLM runners.
+   - **Zero Fail-Open Bypass**: Unexpected exceptions in input parsing, layer evaluation, or tool execution default to `PipelineDecision(status="BLOCK")` and safe user-facing fallbacks.
+
+4. **Pre-Parse ASGI Request Limits (`BodyLimitMiddleware`)**:
+   - Implemented as raw ASGI middleware in `apps/agent/src/agent/middleware/body_limit.py`.
+   - Enforces a 16 KiB ceiling on raw POST request bodies and a 64 KiB decompression expansion limit.
+   - Streams and counts incoming body chunks directly from ASGI `receive()`, terminating with HTTP 413 `Payload Too Large` before JSON parsing, pydantic deserialization, or heap allocation.
+
+5. **HMAC Pseudonymization & Privacy-Safe Telemetry**:
+   - `subjectRef` in telemetry records (`security_guardrail_eval`) formatted strictly as HMAC-SHA256 digest (`^hmac_sha256:[a-f0-9]{64}$`).
+   - Governed by multi-key ring with daily rotation, 30-day retention, and cryptographic shredding SOP.
+   - Strictly zero plaintext user IDs, session IDs, prompts, model outputs, or customer PII in Prometheus metric labels or event payloads.
+
+6. **DAST Holdout Verification & Invariant Testing Contracts**:
+   - **700-Case Immutable Holdout Corpus** (`tests/security/corpus/`): 200 adversarial attack cases and 500 benign customer requests frozen in versioned JSONL manifests.
+   - **Stage Reachability Markers**: Upstream blocks mark evaluation runs incomplete, preventing false downstream true-positive attribution.
+   - **Invariant Test Suites**: 25 high-criticality invariants verified via independent DAST and adversarial suites (`tests/security/dast/test_adversarial.py`, `test_ownership.py`).
