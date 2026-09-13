@@ -343,7 +343,7 @@ _COMBINED_INJECTION_PATTERN: Final[re.Pattern[str]] = re.compile(
     "|".join(
         f"(?:{pat[4:] if pat.startswith('(?i)') else pat})" for _, pat in _SIGNATURE_DEFINITIONS
     ),
-    re.IGNORECASE | re.ASCII,
+    re.IGNORECASE,
 )
 
 

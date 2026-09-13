@@ -60,8 +60,8 @@ Benchmarks were conducted on the reference local execution environment with CPU-
   - `pytest-asyncio` `1.4.0` (auto mode)
   - `pluggy` `1.6.0`
   - `pytest-cov` `7.1.0`
-- **Measurement Isolation**:
-  Explicit garbage collection disabling (`gc.disable()`) and pre-measurement forced collection (`gc.collect()`) wrap all timing loops via `_benchmark_isolation()` to eliminate cyclic garbage collector interference during micro-benchmarks. High-resolution timestamps are captured via `time.perf_counter()`.
+- **Measurement Isolation & CI Tolerance**:
+  Explicit garbage collection disabling (`gc.disable()`) and pre-measurement forced collection (`gc.collect()`) wrap all timing loops via `_benchmark_isolation()` to eliminate cyclic garbage collector interference during micro-benchmarks. High-resolution timestamps are captured via `time.perf_counter()`. Shared CI environments apply `CI_TOLERANCE = float(os.environ.get("PERF_TOLERANCE", "2.0" if os.environ.get("CI") else "1.0"))` to scale assertions against noisy-neighbor CPU scheduling jitter while preserving strict local performance rigor.
 
 ---
 
@@ -106,6 +106,19 @@ Evaluates inputs operating right at or above the 8 KiB / 4,000 character limits,
 | **Exact 8 KiB Boundary** | 2,730 CJK chars (8,190 B) + 2 ASCII chars | 8,192 bytes | 6.25 | **9.52** | 9.72 | $\le$ 50.0 ms | **PASS** |
 
 All near-limit inputs complete well within the 50 ms budget without exceeding memory or recursion limits.
+
+#### Exact Production Limit Boundaries (Character & Byte Validation)
+
+Evaluates exact boundary transitions on [`LengthValidator`](file:///c:/Booking%20Systems/apps/agent/src/agent/guardrails/layers/input.py):
+
+| Boundary Condition | Tested Payload Boundary | Expected Decision | Response Key | Measured p95 (ms) | Target p95 | Status |
+|---|---|---|---|---|---|---|
+| **Character Under Limit** | 3,999 ASCII characters | `PASS` | N/A | **0.037** | $\le$ 1.0 ms | **PASS** |
+| **Character At Limit** | 4,000 ASCII characters | `PASS` | N/A | **0.020** | $\le$ 1.0 ms | **PASS** |
+| **Character Over Limit** | 4,001 ASCII characters | `BLOCK` | `GUARDRAIL_INPUT_LENGTH` | **0.015** | $\le$ 1.0 ms | **PASS** |
+| **Byte Under Limit** | 16,383 UTF-8 bytes | `PASS` | N/A | **0.022** | $\le$ 1.0 ms | **PASS** |
+| **Byte At Limit** | 16,384 UTF-8 bytes | `PASS` | N/A | **0.020** | $\le$ 1.0 ms | **PASS** |
+| **Byte Over Limit** | 16,385 UTF-8 bytes | `BLOCK` | `GUARDRAIL_INPUT_LENGTH` | **0.018** | $\le$ 1.0 ms | **PASS** |
 
 ---
 

@@ -98,9 +98,18 @@ def test_startup_fails_closed_on_missing_or_corrupted_registry() -> None:
     with pytest.raises(RegistryContractError):
         GuardrailGateway("not-a-registry")  # type: ignore[arg-type]
 
-    # 2. create_production_registry with invalid config type must fail fast
+    # 2. create_production_registry with invalid config type or non-string elements must fail fast
     with pytest.raises(RegistryContractError):
         create_production_registry(disabled_keys=12345)  # type: ignore[arg-type]
+
+    with pytest.raises(RegistryContractError):
+        create_production_registry(disabled_keys=[123])  # type: ignore[list-item]
+
+    with pytest.raises(RegistryContractError):
+        create_production_registry(disabled_keys=["input.injection", 456])  # type: ignore[list-item]
+
+    with pytest.raises(RegistryContractError):
+        create_production_registry(disabled_keys="invalid-string-not-iterable-of-keys")  # type: ignore[arg-type]
 
     # 3. Disabling any compulsory layer in create_production_registry must fail fast
     with pytest.raises(RegistryContractError):
@@ -498,9 +507,10 @@ async def test_rollout_rollback_rehearsal_handoff_cycle() -> None:
 @pytest.mark.asyncio
 async def test_rollout_rollback_rehearsal_booking_readiness_cycle() -> None:
     """
-    Rehearses booking readiness flag rollout & rollback: NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS.
+    Rehearses booking readiness flag rollout & rollback: FEATURE_FLAG_BOOKING_READINESS.
     When disabled, readiness checks fall back safely without executing unauthorized mutations or leaking PII.
     """
+    from agent.config import get_settings
     from agent.guardrails.schemas.tools import PassengerToolInput
     from agent.tools.check_booking_readiness import check_booking_readiness
 
@@ -512,7 +522,6 @@ async def test_rollout_rollback_rehearsal_booking_readiness_cycle() -> None:
         )
     ]
 
-    # Phase 1: Enabled -> readiness executes NestJS client check
     mock_client = MagicMock()
     mock_client.check_booking_readiness = AsyncMock(
         return_value={
@@ -530,29 +539,37 @@ async def test_rollout_rollback_rehearsal_booking_readiness_cycle() -> None:
     )
     config = RunnableConfig(configurable={"nestjs_client": mock_client})
 
-    res = await check_booking_readiness.ainvoke(
-        {"flight_offer_id": "off_123", "passengers": passengers},
-        config=config,
-    )
-    assert res.get("ready") is True
-    mock_client.check_booking_readiness.assert_called_once()
+    # Phase 1: Enabled -> readiness executes NestJS client check
+    with patch.object(get_settings(), "FEATURE_FLAG_BOOKING_READINESS", True):
+        res1 = await check_booking_readiness.ainvoke(
+            {"flight_offer_id": "off_123", "passengers": passengers},
+            config=config,
+        )
+        assert res1.get("ready") is True
+        mock_client.check_booking_readiness.assert_called_once()
 
-    # Phase 2: Outage / Failure during rollback -> handles gracefully, no PII leakage
-    mock_client_err = MagicMock()
-    mock_client_err.check_booking_readiness = AsyncMock(
-        side_effect=RuntimeError("Gateway unavailable")
-    )
-    config_err = RunnableConfig(configurable={"nestjs_client": mock_client_err})
+    # Phase 2: Rollback / Disabled -> patch FEATURE_FLAG_BOOKING_READINESS = False
+    mock_client.check_booking_readiness.reset_mock()
+    with patch.object(get_settings(), "FEATURE_FLAG_BOOKING_READINESS", False):
+        res2 = await check_booking_readiness.ainvoke(
+            {"flight_offer_id": "off_123", "passengers": passengers},
+            config=config,
+        )
+        mock_client.check_booking_readiness.assert_not_called()
+        assert res2 == {"error": "Booking readiness feature is currently disabled."}
+        # Confirm passengers or PII are not echoed back in error
+        assert "Alice" not in str(res2)
+        assert "Smith" not in str(res2)
 
-    res_err = await check_booking_readiness.ainvoke(
-        {"flight_offer_id": "off_123", "passengers": passengers},
-        config=config_err,
-    )
-    assert "error" in res_err
-    assert "Failed to check booking readiness safely" in res_err["error"]
-    # Confirm passengers or PII are not echoed back in error
-    assert "Alice" not in str(res_err)
-    assert "Smith" not in str(res_err)
+    # Phase 3: Re-enabled -> toggle back to True
+    mock_client.check_booking_readiness.reset_mock()
+    with patch.object(get_settings(), "FEATURE_FLAG_BOOKING_READINESS", True):
+        res3 = await check_booking_readiness.ainvoke(
+            {"flight_offer_id": "off_123", "passengers": passengers},
+            config=config,
+        )
+        assert res3.get("ready") is True
+        mock_client.check_booking_readiness.assert_called_once()
 
 
 # ---------------------------------------------------------------------------

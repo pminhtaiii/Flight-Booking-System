@@ -201,11 +201,15 @@ class GuardrailRegistry:
 def create_production_registry(
     disabled_keys: Iterable[str] | None = None,
 ) -> GuardrailRegistry:
-    if disabled_keys is not None and (
-        isinstance(disabled_keys, (str, bytes)) or not isinstance(disabled_keys, Iterable)
-    ):
-        raise RegistryContractError("disabled_keys must be an iterable of strings.")
-    effective_disabled = set(disabled_keys) if disabled_keys is not None else set()
+    if disabled_keys is not None:
+        if isinstance(disabled_keys, (str, bytes)) or not isinstance(disabled_keys, Iterable):
+            raise RegistryContractError("disabled_keys must be an iterable of strings.")
+        disabled_list = list(disabled_keys)
+        if not all(isinstance(k, str) for k in disabled_list):
+            raise RegistryContractError("disabled_keys must contain only string keys.")
+        effective_disabled = set(disabled_list)
+    else:
+        effective_disabled = set()
     disabled_compulsory = effective_disabled.intersection(COMPULSORY_PRODUCTION_LAYERS)
     if disabled_compulsory:
         raise RegistryContractError(

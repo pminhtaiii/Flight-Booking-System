@@ -83,36 +83,68 @@ Each feature flag was verified through a complete 3-phase rehearsal cycle:
 
 ## 5. Emergency Rollback & Operator Runbook
 
-In the event of an operational anomaly, security alert, or service degradation, operators must follow this step-by-step procedure to execute an immediate, zero-downtime rollback or safe fallback.
+In the event of an operational anomaly, security alert, or service degradation, operators must follow this step-by-step procedure to execute an immediate, safe rollback or fallback.
 
-### 5.1 Emergency Feature Flag Rollback (Immediate Mitigation)
-To immediately suppress active agent features without restarting containers or dropping active user sessions, update environment variables or feature flag configuration:
+> [!IMPORTANT]
+> **Configuration Lifecycle Constraints**:
+> 1. **Python Agent Tier**: Pydantic `Settings` is a cached in-memory singleton (`get_settings()` in `apps/agent/src/agent/config.py`). Modifying environment variables (`.env` or shell environment) has no effect on running processes; an explicit service process restart (`systemctl restart flight-agent`, `uvicorn` restart, or container restart) is required to reload settings.
+> 2. **Next.js Web Tier**: `NEXT_PUBLIC_` variables (`NEXT_PUBLIC_FEATURE_FLAG_CHAT_HANDOFF`, `NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS`) are statically inlined and baked into client JavaScript bundles at `next build` time. Toggling web flags requires rebuilding and redeploying the web tier (`pnpm --filter @web/frontend build`).
+> 3. **Containerized Deployments**: Under active incidents, never rebuild container images from source. Roll back immediately to previously pinned image digests or stable tags (e.g. via `kubectl rollout undo` or pinning to a known good image digest).
 
-```powershell
-# 1. Disable chat handoff issuance (blocks checkout intent redirect)
-$env:FEATURE_FLAG_CHAT_HANDOFF_ISSUE = "false"
-$env:NEXT_PUBLIC_FEATURE_FLAG_CHAT_HANDOFF = "false"
+### 5.1 Emergency Feature Flag Rollback (Agent & Backend Service)
+To suppress active agent capabilities (e.g., multi-agent delegation, handoff token issuance, or booking readiness inspection):
 
-# 2. Revert multi-agent routing to single-agent safe mode
-$env:FEATURE_FLAG_CHAT_MULTI_AGENT = "false"
+#### A. Host / Systemd Deployment
+Update configuration in `/etc/flight-system/agent.env` or the deployment environment:
+```bash
+# Set flags to fail-closed defaults
+FEATURE_FLAG_CHAT_HANDOFF_ISSUE=false
+FEATURE_FLAG_CHAT_MULTI_AGENT=false
+FEATURE_FLAG_BOOKING_READINESS=false
+```
+Apply changes by restarting the service process (mandatory due to singleton caching):
+```bash
+# Restart systemd agent service
+sudo systemctl restart flight-agent
 
-# 3. Disable booking readiness document inspection fallback
-$env:NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS = "false"
-$env:FEATURE_FLAG_BOOKING_READINESS = "false"
+# Or restart local uvicorn process
+pkill -f "uvicorn agent.main:app" && uv run uvicorn agent.main:app --port 3002 --app-dir apps/agent/src
+```
+
+#### B. Containerized Deployment (Kubernetes / Docker Compose)
+Roll back to a known-stable image digest rather than rebuilding from source:
+```bash
+# Kubernetes: Roll back to previous pinned deployment revision
+kubectl rollout undo deployment/flight-agent -n flight-production
+
+# Docker Compose: Roll back to pinned image digest and recreate container
+docker compose -f docker-compose.prod.yml down agent
+docker compose -f docker-compose.prod.yml up -d agent
 ```
 
 *Guarantees*: All in-flight or subsequent requests fail closed or route cleanly to the single travel agent. `signal_checkout_intent` is completely unsealed from tool capabilities; zero checkout authority is exposed.
 
-### 5.2 Safe Chat Disabled Fallback (Total Isolation)
-If the Python agent service is unreachable or compromised, immediately isolate the frontend chat interface:
+### 5.2 Emergency Web Tier Mitigation & Rebuild
+When disabling client-facing features:
 
 ```powershell
-# 1. Set chat feature toggle to disabled on the web tier
+# 1. Update web tier environment variables
 $env:NEXT_PUBLIC_FEATURE_FLAG_CHAT_HANDOFF = "false"
+$env:NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS = "false"
 
-# 2. Redirect chat endpoints to safe static maintenance notice
-# Return HTTP 503 with Retry-After: 300 and payload:
-# {"error": "Assistant is temporarily undergoing scheduled maintenance. Please use direct booking search."}
+# 2. Rebuild and restart web tier (mandatory because NEXT_PUBLIC_* are inlined at build time)
+pnpm --filter @web/frontend build
+# Restart web service or container
+pm2 restart flight-web # or docker compose restart web
+```
+
+If the Python agent service is unreachable or compromised, immediately isolate the frontend chat interface:
+```http
+HTTP/1.1 503 Service Unavailable
+Retry-After: 300
+Content-Type: application/json
+
+{"error": "Assistant is temporarily undergoing scheduled maintenance. Please use direct booking search."}
 ```
 
 *Guarantees*: Frontend stops polling and SSE streaming; users are guided to direct search with zero leaked context or credentials.

@@ -158,7 +158,7 @@ def _contains_untrusted_directive(
     strings = _string_values(value)
     if not strings:
         return False
-    meaningful = [s for s in strings if len(s) >= 6]
+    meaningful = list(dict.fromkeys(s for s in strings if len(s) >= 6))
     if not meaningful:
         return False
     joined = "\n".join(meaningful)

@@ -1,6 +1,7 @@
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 
+from agent.config import get_settings
 from agent.guardrails.schemas.tools import (
     CheckBookingReadinessToolInput,
     CheckBookingReadinessToolResult,
@@ -25,6 +26,8 @@ async def check_booking_readiness(
             - passengerOrdinal: integer (1-indexed based on the offer sequence)
             - sourceType: "traveler_profile" or "inline"
     """
+    if not get_settings().FEATURE_FLAG_BOOKING_READINESS:
+        return {"error": "Booking readiness feature is currently disabled."}
     try:
         if (
             config is None

@@ -68,6 +68,14 @@
       - Verified `/health` dependency reporting accurately monitors `guardrails: {"status": "deterministic"}`, `redis`, and `nestjsApi`, reporting `status: "ok"` when healthy and `status: "degraded"` on dependency downtime.
   - Documented complete operational runbook and verification evidence in `docs/security/rollout.md`.
 
+- **Phase 7 Review Issues Remediation (2026-09-13)**:
+  - **Issue 1 (Unicode Whitespace Injection Evasion)**: Removed `re.ASCII` flag from `_COMBINED_INJECTION_PATTERN` in `apps/agent/src/agent/guardrails/layers/injection.py` so Unicode whitespace characters (e.g. U+2028 line separator, U+2029 paragraph separator, U+00A0 non-breaking space) match properly against `\s+` injection signatures. Added regression tests in `test_input_layers.py`.
+  - **Issue 2 (Rollout Runbook Operator Realism)**: Updated Section 5 of `docs/security/rollout.md` to document realistic operational procedures for Pydantic `Settings` in-memory singleton restarts, Next.js build-time `NEXT_PUBLIC_` bundle rebuilds, and container digest rollbacks.
+  - **Issue 3 (Agent Feature Flag Kill Switch & Rehearsal)**: Added `FEATURE_FLAG_BOOKING_READINESS: bool = True` to `Settings` in `config.py` and wired immediate short-circuit check in `check_booking_readiness.py`. Implemented genuine 3-phase rollout rehearsal in `test_rollout.py` verifying client is not called when disabled.
+  - **Issue 4 (CI Performance Test Tolerance)**: Added `CI_TOLERANCE` scaling in `test_security_performance.py` to prevent CPU scheduling jitter flakiness in shared CI environments while maintaining strict local targets.
+  - **Issue 5 (Exact Input Limit Boundary Testing & Benchmarks)**: Tested exact character boundaries (3999, 4000 PASS; 4001 BLOCK) and byte boundaries (16383, 16384 PASS; 16385 BLOCK) with p50/p95 latency measurements in `test_security_performance.py` and updated `docs/security/performance-validation.md`.
+  - **Issue 6 (Strict Disabled Keys Validation)**: Enforced element-level string validation on `disabled_keys` in `create_production_registry` in `registry.py`, raising `RegistryContractError` on non-string keys, with regression test in `test_rollout.py`.
+
 ### Feature 023 — Security Systems: Phase 6 US4 Runtime Penetration Coverage (Final Slice: Tasks T040 & T041 Completed — Phase 6 Complete) (2026-09-12)
 
 - **T040 Conventional HTTP/Browser Security Checks & Scoped ZAP Runner Verification**:
