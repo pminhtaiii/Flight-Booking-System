@@ -71,7 +71,7 @@
 - **Phase 7 Review Issues Remediation (2026-09-13)**:
   - **Issue 1 (Unicode Whitespace Injection Evasion)**: Removed `re.ASCII` flag from `_COMBINED_INJECTION_PATTERN` in `apps/agent/src/agent/guardrails/layers/injection.py` so Unicode whitespace characters (e.g. U+2028 line separator, U+2029 paragraph separator, U+00A0 non-breaking space) match properly against `\s+` injection signatures. Added regression tests in `test_input_layers.py`.
   - **Issue 2 (Rollout Runbook Operator Realism)**: Updated Section 5 of `docs/security/rollout.md` to document realistic operational procedures for Pydantic `Settings` in-memory singleton restarts, Next.js build-time `NEXT_PUBLIC_` bundle rebuilds, and container digest rollbacks.
-  - **Issue 3 (Agent Feature Flag Kill Switch & Rehearsal)**: Added `FEATURE_FLAG_BOOKING_READINESS: bool = True` to `Settings` in `config.py` and wired immediate short-circuit check in `check_booking_readiness.py`. Implemented genuine 3-phase rollout rehearsal in `test_rollout.py` verifying client is not called when disabled.
+  - **Issue 3 (Agent Feature Flag Kill Switch & Rehearsal)**: Added `FEATURE_FLAG_BOOKING_READINESS: bool = False` to `Settings` in `config.py` (default False, aligned with NestJS API) and wired immediate short-circuit check in `check_booking_readiness.py`. Implemented genuine 3-phase rollout rehearsal in `test_rollout.py` verifying client is not called when disabled.
   - **Issue 4 (CI Performance Test Tolerance)**: Added `CI_TOLERANCE` scaling in `test_security_performance.py` to prevent CPU scheduling jitter flakiness in shared CI environments while maintaining strict local targets.
   - **Issue 5 (Exact Input Limit Boundary Testing & Benchmarks)**: Tested exact character boundaries (3999, 4000 PASS; 4001 BLOCK) and byte boundaries (16383, 16384 PASS; 16385 BLOCK) with p50/p95 latency measurements in `test_security_performance.py` and updated `docs/security/performance-validation.md`.
   - **Issue 6 (Strict Disabled Keys Validation)**: Enforced element-level string validation on `disabled_keys` in `create_production_registry` in `registry.py`, raising `RegistryContractError` on non-string keys, with regression test in `test_rollout.py`.
@@ -269,10 +269,10 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Current Status
 
-**Feature:** Security Systems (Feature 023) — Phase 5 US3 Static Security Checks Complete
-**Last completed:** T033–T035 supply-chain & secret scanning, CI security jobs/evaluator, and workflow contract verification.
-**In progress:** Phase 5 complete.
-**Next:** Phase 6 US4 — Execute Runtime Penetration Coverage (T036–T041).
+- **Feature:** Security Systems (Feature 023) — Phase 7 US5 Slice 2 (T043, T046, T047) Complete; Phase 6 US4 (T036–T041) Complete
+- **Last completed:** T043 hostile near-limit performance benchmarks, T046 resource validation & evidence report, T047 fail-closed rollout/rollback rehearsals & operational runbook, and dual-axis code review remediations.
+- **In progress:** Phase 7 Slice 1 (Security Events & Observability: T042, T044, T045) / Phase 8 Closure.
+- **Next:** Phase 7 Slice 1 (T042, T044, T045) — SecurityEventEmitter, observability dashboards, and alert runbook.
 
 ### Feature 023 — CI regression remediation checkpoint (2026-09-09)
 
