@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -228,6 +229,16 @@ test('defines strict event schema with pseudonymized subject ref and zero raw pa
   }
 });
 
+const RFC3339_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+
+function generateTestTraceId() {
+  return crypto.randomUUID();
+}
+
+function generateTestSubjectRef() {
+  return `hmac_sha256:${crypto.createHash('sha256').update('test-salt').digest('hex')}`;
+}
+
 function validateEventAgainstSchema(event) {
   const errors = [];
   if (typeof event !== 'object' || event === null || Array.isArray(event)) {
@@ -275,12 +286,12 @@ function validateEventAgainstSchema(event) {
       if (propDef.maxLength !== undefined && val.length > propDef.maxLength) {
         errors.push(`${propName} length ${val.length} exceeds maxLength ${propDef.maxLength}`);
       }
-      if (propDef.format === 'date-time' && Number.isNaN(Date.parse(val))) {
-        errors.push(`${propName} is not a valid date-time string`);
+      if (propDef.format === 'date-time' && (!RFC3339_REGEX.test(val) || Number.isNaN(Date.parse(val)))) {
+        errors.push(`${propName} is not a valid RFC3339 date-time string`);
       }
     } else if (propDef.type === 'number') {
-      if (typeof val !== 'number' || Number.isNaN(val)) {
-        errors.push(`${propName} must be a number`);
+      if (typeof val !== 'number' || !Number.isFinite(val) || Number.isNaN(val)) {
+        errors.push(`${propName} must be a finite number`);
         continue;
       }
       if (propDef.minimum !== undefined && val < propDef.minimum) {
@@ -296,8 +307,8 @@ test('validates event schema: representative positive events pass validation', (
   const validEvalEvent = {
     event_type: 'security_guardrail_eval',
     timestamp_utc: '2026-09-13T12:00:00.000Z',
-    trace_id: '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d',
-    subject_ref: 'hmac_sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    trace_id: generateTestTraceId(),
+    subject_ref: generateTestSubjectRef(),
     stage: 'input',
     layer_key: 'input.injection',
     decision: 'BLOCK',
@@ -311,7 +322,7 @@ test('validates event schema: representative positive events pass validation', (
   const validErrorEvent = {
     event_type: 'security_emitter_error',
     timestamp_utc: '2026-09-13T12:00:00.000Z',
-    trace_id: '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d',
+    trace_id: generateTestTraceId(),
     sink: 'security_audit_log',
     error_type: 'connection_timeout',
     details: 'Connection timed out after 500ms writing to audit sink'
@@ -325,8 +336,8 @@ test('validates event schema: negative tests reject unbounded fields and forbidd
   const baseEval = {
     event_type: 'security_guardrail_eval',
     timestamp_utc: '2026-09-13T12:00:00.000Z',
-    trace_id: '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d',
-    subject_ref: 'hmac_sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    trace_id: generateTestTraceId(),
+    subject_ref: generateTestSubjectRef(),
     stage: 'input',
     layer_key: 'input.injection',
     decision: 'BLOCK',
@@ -337,7 +348,7 @@ test('validates event schema: negative tests reject unbounded fields and forbidd
   const baseError = {
     event_type: 'security_emitter_error',
     timestamp_utc: '2026-09-13T12:00:00.000Z',
-    trace_id: '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d',
+    trace_id: generateTestTraceId(),
     sink: 'security_audit_log',
     error_type: 'connection_timeout',
     details: 'Connection timed out after 500ms writing to audit sink'
@@ -396,6 +407,20 @@ test('validates event schema: negative tests reject unbounded fields and forbidd
     });
     assert.ok(forbiddenErrors.some((e) => e.includes(`Forbidden property: ${forbiddenProp}`)));
   }
+
+  // 8. Date-only timestamp rejected for timestamp_utc
+  const dateOnlyErrors = validateEventAgainstSchema({
+    ...baseEval,
+    timestamp_utc: '2026-09-13'
+  });
+  assert.ok(dateOnlyErrors.some((e) => e.includes('timestamp_utc') && e.includes('RFC3339 date-time')));
+
+  // 9. Infinity rejected for latency_ms
+  const infinityLatencyErrors = validateEventAgainstSchema({
+    ...baseEval,
+    latency_ms: Infinity
+  });
+  assert.ok(infinityLatencyErrors.some((e) => e.includes('latency_ms') && e.includes('finite number')));
 });
 
 test('defines required alert rules with operational thresholds', () => {
