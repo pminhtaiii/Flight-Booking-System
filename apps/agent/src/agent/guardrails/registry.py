@@ -120,6 +120,13 @@ class GuardrailRegistry:
     def keys(self) -> set[str]:
         return set(self._layers.keys())
 
+    def is_healthy(self) -> bool:
+        if self.production:
+            for layer_name in COMPULSORY_PRODUCTION_LAYERS:
+                if layer_name not in self._layers:
+                    return False
+        return True
+
     def inject_for_test(self, layer: Any) -> None:
         if self.production:
             raise RegistryContractError("inject_for_test is strictly forbidden in production mode.")

@@ -27,9 +27,10 @@ Covers:
      redis, nestjsApi).
 """
 
+import asyncio
 import secrets
 import time
-from typing import Any, ClassVar, Literal
+from typing import Any, ClassVar, Literal, Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
@@ -39,6 +40,7 @@ import pytest
 from fastapi.testclient import TestClient
 from langchain_core.runnables import RunnableConfig
 
+from agent.chat_turn import ChatTurnCommand, ChatTurnRunner, TokenEvent
 from agent.config import Settings
 from agent.graph.graph import router_node
 from agent.graph.nodes import create_handoff_token
@@ -61,6 +63,9 @@ from agent.guardrails.registry import (
 )
 from agent.main import app
 from agent.models.requests import RouteDecision
+from agent.queue.message_queue import MessageQueueManager
+from agent.repositories.session_lock_repository import SessionLockRepository
+from agent.tools.nestjs_client import NestJSClient
 
 pytestmark = pytest.mark.security
 
@@ -84,6 +89,14 @@ def generate_valid_jwt(
     return jwt.encode(payload, secret, algorithm="HS256")
 
 
+class DegradedGateway(GuardrailGateway):
+    def __init__(self) -> None:
+        super().__init__(GuardrailRegistry())
+
+    def is_healthy(self) -> bool:
+        return False
+
+
 # ---------------------------------------------------------------------------
 # Area A: Fail-Closed Startup Verification
 # ---------------------------------------------------------------------------
@@ -91,14 +104,12 @@ def generate_valid_jwt(
 
 def test_startup_fails_closed_on_missing_or_corrupted_registry() -> None:
     """Initializing GuardrailGateway with invalid registry or calling create_production_registry() with invalid config must raise RegistryContractError."""
-    # 1. None or non-registry instance must fail fast with RegistryContractError
     with pytest.raises(RegistryContractError):
         GuardrailGateway(None)  # type: ignore[arg-type]
 
     with pytest.raises(RegistryContractError):
         GuardrailGateway("not-a-registry")  # type: ignore[arg-type]
 
-    # 2. create_production_registry with invalid config type or non-string elements must fail fast
     with pytest.raises(RegistryContractError):
         create_production_registry(disabled_keys=12345)  # type: ignore[arg-type]
 
@@ -111,7 +122,6 @@ def test_startup_fails_closed_on_missing_or_corrupted_registry() -> None:
     with pytest.raises(RegistryContractError):
         create_production_registry(disabled_keys="invalid-string-not-iterable-of-keys")  # type: ignore[arg-type]
 
-    # 3. Disabling any compulsory layer in create_production_registry must fail fast
     with pytest.raises(RegistryContractError):
         create_production_registry(disabled_keys={"input.injection"})
 
@@ -121,12 +131,10 @@ def test_startup_fails_closed_on_missing_or_corrupted_registry() -> None:
 
 def test_startup_fails_closed_on_disabled_compulsory_layers() -> None:
     """Disabling any compulsory production layer in create_production_registry must raise RegistryContractError."""
-    # Verify every single compulsory production layer cannot be disabled
     for compulsory_layer in COMPULSORY_PRODUCTION_LAYERS:
         with pytest.raises(RegistryContractError):
             create_production_registry(disabled_keys={compulsory_layer})
 
-    # Legitimate creation without disabling compulsory layers succeeds
     valid_registry = create_production_registry()
     gateway = GuardrailGateway(valid_registry)
     assert gateway.registry is valid_registry
@@ -134,16 +142,13 @@ def test_startup_fails_closed_on_disabled_compulsory_layers() -> None:
 
 def test_corrupted_or_invalid_regex_rules_fail_closed_at_startup() -> None:
     """Corrupted, malformed, or catastrophic regex rules must fail closed at initialization and never pass through."""
-    # 1. Malformed regex syntax in TopicBoundary initialization must raise and fail fast
     with pytest.raises((ValueError, Exception)):
         TopicBoundary(patterns=[r"[unclosed-regex-bracket("])
 
-    # 2. Catastrophic / ReDoS pattern in TopicBoundary initialization must fail fast
     catastrophic_pattern = r"(a+)+$"
     with pytest.raises(ValueError):
         TopicBoundary(patterns=[catastrophic_pattern])
 
-    # 3. Verify that under NO circumstance does a corrupted rule fall back to permissive pass-through
     valid_boundary = TopicBoundary()
     decision = valid_boundary.check(
         AdmissionContext(
@@ -155,7 +160,6 @@ def test_corrupted_or_invalid_regex_rules_fail_closed_at_startup() -> None:
         ),
         "write python script to exploit vulnerability",
     )
-    # Must block out-of-domain / attack query, never pass through
     import asyncio
 
     res = asyncio.run(decision)
@@ -164,7 +168,6 @@ def test_corrupted_or_invalid_regex_rules_fail_closed_at_startup() -> None:
 
 def test_missing_or_forged_hmac_keys_fail_closed() -> None:
     """Missing HMAC secrets in settings or forged JWT/claims must fail closed with 401/403 and never reach runner."""
-    # 1. Missing or empty JWT_SECRET / CLAIM_TOKEN_SECRET fails fast at startup (Pydantic validation)
     with pytest.raises(pydantic.ValidationError):
         Settings(
             JWT_SECRET="",
@@ -181,9 +184,16 @@ def test_missing_or_forged_hmac_keys_fail_closed() -> None:
             NESTJS_API_URL="http://localhost:3001",
         )
 
+    with pytest.raises(pydantic.ValidationError):
+        Settings(
+            JWT_SECRET=TEST_JWT_SECRET,
+            CLAIM_TOKEN_SECRET=TEST_CLAIM_SECRET,
+            AGENT_SERVICE_API_KEY="",
+            NESTJS_API_URL="http://localhost:3001",
+        )
+
     client = TestClient(app)
 
-    # 2. Unauthenticated request without Authorization header returns 401
     resp_no_auth = client.post(
         "/chat/stream",
         json={"message": "hello", "sessionId": "sess-1"},
@@ -192,7 +202,6 @@ def test_missing_or_forged_hmac_keys_fail_closed() -> None:
     assert resp_no_auth.status_code == 401
     assert "authorization" in resp_no_auth.json().get("detail", "").lower()
 
-    # 3. Forged JWT signed with wrong secret returns 401
     forged_token = generate_valid_jwt(secret="wrong_unauthorized_hmac_secret_key_32b")
     resp_forged = client.post(
         "/chat/stream",
@@ -205,7 +214,6 @@ def test_missing_or_forged_hmac_keys_fail_closed() -> None:
     assert resp_forged.status_code == 401
     assert "invalid token" in resp_forged.json().get("detail", "").lower()
 
-    # 4. Unauthorized Origin returns 403
     valid_token = generate_valid_jwt(secret=TEST_JWT_SECRET)
     with patch("agent.main.settings") as mock_settings:
         mock_settings.FRONTEND_URL = "http://localhost:3000"
@@ -223,13 +231,115 @@ def test_missing_or_forged_hmac_keys_fail_closed() -> None:
         assert resp_bad_origin.json() == {"detail": "ORIGIN_NOT_ALLOWED"}
 
 
+def test_chat_stream_rejected_when_guardrail_gateway_uninitialized_or_degraded() -> None:
+    """Fail-closed check: when guardrail_gateway is None or degraded (is_healthy returns False), POST /chat/stream returns 503 with zero runner/model turns."""
+    from agent.config import get_settings
+    from agent.tools.nestjs_client import NestJSClient
+
+    client = TestClient(app)
+    app_settings = get_settings()
+    valid_token = generate_valid_jwt(secret=app_settings.JWT_SECRET)
+
+    mock_nestjs = MagicMock(spec=NestJSClient)
+    mock_nestjs.check_user_access = AsyncMock(return_value={"allowed": True})
+
+    mock_redis = MagicMock()
+    mock_budget_repo = MagicMock()
+    mock_budget_repo.admit_request = AsyncMock(return_value=True)
+
+    with (
+        patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs),
+        patch("agent.streaming.sse.get_redis_client", return_value=mock_redis),
+        patch("agent.streaming.sse.ChatBudgetRepository", return_value=mock_budget_repo),
+        patch(
+            "agent.streaming.sse.chat_budget_repository.ChatBudgetRepository",
+            return_value=mock_budget_repo,
+        ),
+        patch("agent.streaming.sse.ChatTurnRunner") as mock_runner,
+    ):
+        with patch.object(app.state, "guardrail_gateway", None, create=True):
+            resp1 = client.post(
+                "/chat/stream",
+                json={"message": "hello", "sessionId": "sess-1"},
+                headers={
+                    "Authorization": f"Bearer {valid_token}",
+                    "Origin": "http://localhost:3000",
+                },
+            )
+            assert resp1.status_code == 503
+            assert "GUARDRAIL_GATEWAY_UNAVAILABLE" in resp1.json().get("detail", "")
+            mock_runner.assert_not_called()
+
+        degraded_gateway = DegradedGateway()
+        with patch.object(app.state, "guardrail_gateway", degraded_gateway, create=True):
+            resp2 = client.post(
+                "/chat/stream",
+                json={"message": "hello", "sessionId": "sess-1"},
+                headers={
+                    "Authorization": f"Bearer {valid_token}",
+                    "Origin": "http://localhost:3000",
+                },
+            )
+            assert resp2.status_code == 503
+            assert "GUARDRAIL_GATEWAY_UNAVAILABLE" in resp2.json().get("detail", "")
+            mock_runner.assert_not_called()
+
+
+def test_gateway_failure_does_not_consume_quota() -> None:
+    """Assert that when app.state.guardrail_gateway is None or degraded, sending /chat/stream returns HTTP 503 and ChatBudgetRepository.admit_request is NOT called (0 calls)."""
+    from agent.config import get_settings
+    from agent.tools.nestjs_client import NestJSClient
+
+    client = TestClient(app)
+    app_settings = get_settings()
+    valid_token = generate_valid_jwt(secret=app_settings.JWT_SECRET)
+
+    mock_nestjs = MagicMock(spec=NestJSClient)
+    mock_nestjs.check_user_access = AsyncMock(return_value={"allowed": True})
+
+    with (
+        patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs),
+        patch(
+            "agent.repositories.chat_budget_repository.ChatBudgetRepository.admit_request",
+            new_callable=AsyncMock,
+        ) as mock_admit,
+    ):
+        with patch.object(app.state, "guardrail_gateway", None, create=True):
+            resp1 = client.post(
+                "/chat/stream",
+                json={"message": "hello", "sessionId": "sess-1"},
+                headers={
+                    "Authorization": f"Bearer {valid_token}",
+                    "Origin": "http://localhost:3000",
+                },
+            )
+            assert resp1.status_code == 503
+            assert "GUARDRAIL_GATEWAY_UNAVAILABLE" in resp1.json().get("detail", "")
+            assert mock_admit.call_count == 0
+            mock_admit.assert_not_called()
+
+        degraded_gateway = DegradedGateway()
+        with patch.object(app.state, "guardrail_gateway", degraded_gateway, create=True):
+            resp2 = client.post(
+                "/chat/stream",
+                json={"message": "hello", "sessionId": "sess-1"},
+                headers={
+                    "Authorization": f"Bearer {valid_token}",
+                    "Origin": "http://localhost:3000",
+                },
+            )
+            assert resp2.status_code == 503
+            assert "GUARDRAIL_GATEWAY_UNAVAILABLE" in resp2.json().get("detail", "")
+            assert mock_admit.call_count == 0
+            mock_admit.assert_not_called()
+
+
 @pytest.mark.asyncio
 async def test_zero_fail_open_bypass_invariant_input_validation() -> None:
     """Under NO condition (crash, unhandled exception, invalid context) does gateway fail open on input."""
     registry = create_production_registry()
     gateway = GuardrailGateway(registry)
 
-    # 1. Invalid context -> must return status == 'BLOCK'
     d1 = await gateway.validate_input(None, "Search flights to Tokyo")  # type: ignore[arg-type]
     assert d1.status == "BLOCK"
     assert d1.response_key == GUARDRAIL_INPUT_INJECTION
@@ -237,7 +347,6 @@ async def test_zero_fail_open_bypass_invariant_input_validation() -> None:
     d2 = await gateway.validate_input("not-context", "Search flights")  # type: ignore[arg-type]
     assert d2.status == "BLOCK"
 
-    # 2. Chaos crash inside a layer check() -> must return status == 'BLOCK', never pass-through
     class ExplodingLayer(BaseGuardrailLayer):
         key: ClassVar[str] = "input.exploding"
         stage: ClassVar[Literal["input"]] = "input"
@@ -274,7 +383,6 @@ async def test_zero_fail_open_bypass_invariant_tool_execution() -> None:
         sealed_tools=("search_flights",),
     )
 
-    # 1. Invalid TurnCapabilities context -> BLOCK
     res_bad_context = await gateway.execute_tool(
         None,  # type: ignore[arg-type]
         {"name": "search_flights"},
@@ -283,7 +391,6 @@ async def test_zero_fail_open_bypass_invariant_tool_execution() -> None:
     assert res_bad_context.status == "BLOCK"
     assert res_bad_context.response_key == GUARDRAIL_TOOL_SCHEMA
 
-    # 2. Unauthorized tool not in sealed_tools -> BLOCK and invoke is NEVER executed
     invoke_spy = AsyncMock(return_value={"unauthorized": "mutation"})
     res_unauthorized = await gateway.execute_tool(
         caps,
@@ -294,7 +401,6 @@ async def test_zero_fail_open_bypass_invariant_tool_execution() -> None:
     assert "not in sealed capabilities" in (res_unauthorized.reason or "")
     invoke_spy.assert_not_called()
 
-    # 3. Tool invocation raises unexpected exception -> fails closed with BLOCK
     failing_invoke = AsyncMock(side_effect=RuntimeError("Database connection lost"))
     res_crash = await gateway.execute_tool(
         caps,
@@ -318,9 +424,8 @@ async def test_zero_fail_open_bypass_invariant_tool_batch_and_result() -> None:
         sealed_tools=("search_flights", "get_user_preferences"),
     )
 
-    # 1. Batch contains mixed authorized and unauthorized calls -> whole batch rejected, zero calls executed
     call1 = {"name": "search_flights"}
-    call2 = {"name": "signal_checkout_intent"}  # unauthorized
+    call2 = {"name": "signal_checkout_intent"}
     spy1 = AsyncMock(return_value={"flights": []})
     spy2 = AsyncMock(return_value={"intent": "checkout"})
 
@@ -333,7 +438,6 @@ async def test_zero_fail_open_bypass_invariant_tool_batch_and_result() -> None:
     spy1.assert_not_called()
     spy2.assert_not_called()
 
-    # 2. validate_tool_result without sealed capability -> BLOCK
     res_unsealed = await gateway.validate_tool_result(
         caps,
         "signal_checkout_intent",
@@ -572,6 +676,175 @@ async def test_rollout_rollback_rehearsal_booking_readiness_cycle() -> None:
         mock_client.check_booking_readiness.assert_called_once()
 
 
+@pytest.mark.asyncio
+async def test_emergency_rollback_mid_stream_terminates_cleanly_and_purges_locks() -> None:
+    """
+    Simulate active streaming turn holding distributed session lease in MessageQueueManager.
+    Trigger emergency mid-stream rollback/cancellation (e.g. generator close / server shutdown).
+    Assert:
+    1. Active turn terminates cleanly without hanging.
+    2. Session lease/lock is purged/released via queue_manager.release so no orphan lock remains in Redis/manager.
+    3. Zero unauthenticated mutations occur on NestJSClient (no booking creation or unauthorized message creation with invalid fence).
+    """
+    user_id = "usr-rollout-emer"
+    session_id = "sess-rollout-emer"
+
+    redis_store: dict[str, dict[str, str]] = {}
+
+    async def mock_eval(script: str, numkeys: int, *args: Any) -> int:
+        if "HSET" in script:  # acquire_lock
+            lock_key = str(args[0])
+            req_id = str(args[2])
+            redis_store[lock_key] = {"req_id": req_id, "fence": "1"}
+            return 1
+        if "DEL" in script:  # release_lock
+            lock_key = str(args[0])
+            req_id = str(args[1])
+            fence = str(args[2])
+            entry = redis_store.get(lock_key)
+            if entry and entry.get("req_id") == req_id and entry.get("fence") == fence:
+                redis_store.pop(lock_key, None)
+                return 1
+            return 0
+        return 1
+
+    async def mock_hget(key: str, field: str) -> Optional[str]:
+        return redis_store.get(key, {}).get(field)
+
+    mock_redis = MagicMock()
+    mock_redis.eval = AsyncMock(side_effect=mock_eval)
+    mock_redis.hget = AsyncMock(side_effect=mock_hget)
+
+    mock_client = MagicMock(spec=NestJSClient)
+    mock_client.get_memory = AsyncMock(
+        return_value={"recentMessages": [], "summary": None, "totalMessageCount": 0}
+    )
+    mock_client.create_message_batch = AsyncMock(
+        return_value={"messages": [{"id": "msg-agent-emer", "sender": "AGENT"}]}
+    )
+    mock_client.set_fencing_token = MagicMock()
+    mock_client.create_booking = AsyncMock()
+
+    mock_graph = MagicMock()
+
+    async def mock_astream_events(*args: Any, **kwargs: Any) -> Any:
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": MagicMock(content="Planning emergency itinerary...")},
+        }
+        # Simulate long-running in-flight turn waiting for model stream
+        await asyncio.sleep(60)
+
+    mock_graph.astream_events = mock_astream_events
+
+    with patch(
+        "agent.repositories.session_lock_repository.get_redis_client",
+        return_value=mock_redis,
+    ):
+        queue_manager = MessageQueueManager()
+        queue_manager.repo = SessionLockRepository()
+        runner = ChatTurnRunner(
+            graph=mock_graph,
+            queue_manager=queue_manager,
+            client_factory=lambda **kwargs: mock_client,
+            redis_client=mock_redis,
+        )
+
+        command = ChatTurnCommand(
+            user_id=user_id,
+            session_id=session_id,
+            message="Search flights to Tokyo",
+            token="jwt.mock.token",
+        )
+
+        gen = runner.run(command)
+
+        event = await anext(gen)
+        assert isinstance(event, TokenEvent)
+        assert "Planning emergency" in event.data.content
+
+        assert session_id in queue_manager.active_fences
+        assert queue_manager.depths.get(session_id) == 1
+        assert queue_manager.get_fence(session_id) == 1
+        mock_client.set_fencing_token.assert_called_with(1)
+        expected_lock_key = f"chat:session-lock:{user_id}:{session_id}"
+        assert expected_lock_key in redis_store
+
+        await asyncio.wait_for(gen.aclose(), timeout=5.0)
+
+        assert await anext(gen, None) is None
+        assert session_id not in queue_manager.active_fences
+        assert session_id not in queue_manager.depths
+        assert expected_lock_key not in redis_store
+        mock_client.create_booking.assert_not_called()
+
+        session_id_stale = "sess-rollout-stale"
+        mock_client_stale = MagicMock(spec=NestJSClient)
+        mock_client_stale.get_memory = AsyncMock(
+            return_value={"recentMessages": [], "summary": None, "totalMessageCount": 0}
+        )
+        mock_client_stale.create_message_batch = AsyncMock()
+        mock_client_stale.set_fencing_token = MagicMock()
+        mock_client_stale.create_booking = AsyncMock()
+
+        runner_stale = ChatTurnRunner(
+            graph=mock_graph,
+            queue_manager=queue_manager,
+            client_factory=lambda **kwargs: mock_client_stale,
+            redis_client=mock_redis,
+        )
+        cmd_stale = ChatTurnCommand(
+            user_id=user_id,
+            session_id=session_id_stale,
+            message="Second search flight",
+            token="jwt.mock.token",
+        )
+
+        gen_stale = runner_stale.run(cmd_stale)
+        event_stale = await anext(gen_stale)
+        assert isinstance(event_stale, TokenEvent)
+
+        stale_lock_key = f"chat:session-lock:{user_id}:{session_id_stale}"
+        redis_store[stale_lock_key] = {"req_id": "stolen-req-id", "fence": "999"}
+
+        await asyncio.wait_for(gen_stale.aclose(), timeout=5.0)
+
+        assert await anext(gen_stale, None) is None
+        assert session_id_stale not in queue_manager.active_fences
+        assert session_id_stale not in queue_manager.depths
+
+        for call_args in mock_client_stale.create_message_batch.call_args_list:
+            persisted_messages = call_args[0][1] if len(call_args[0]) > 1 else call_args.args[1]
+            assert all(m.get("sender") != "AGENT" for m in persisted_messages)
+
+        mock_client_stale.create_booking.assert_not_called()
+
+        session_id_rejected = "sess-rollout-rejected"
+        mock_client_rejected = MagicMock(spec=NestJSClient)
+        mock_client_rejected.create_message_batch = AsyncMock()
+        mock_client_rejected.create_booking = AsyncMock()
+
+        queue_manager.depths[session_id_rejected] = queue_manager.max_depth
+        runner_rejected = ChatTurnRunner(
+            graph=mock_graph,
+            queue_manager=queue_manager,
+            client_factory=lambda **kwargs: mock_client_rejected,
+            redis_client=mock_redis,
+        )
+        cmd_rejected = ChatTurnCommand(
+            user_id=user_id,
+            session_id=session_id_rejected,
+            message="Third attempt rejected",
+            token="jwt.mock.token",
+        )
+        gen_rejected = runner_rejected.run(cmd_rejected)
+        rej_event = await anext(gen_rejected)
+        assert rej_event.event == "error"
+        assert rej_event.data.code == "PERSISTENCE_ERROR"
+        mock_client_rejected.create_message_batch.assert_not_called()
+        mock_client_rejected.create_booking.assert_not_called()
+
+
 # ---------------------------------------------------------------------------
 # Area C: Health Verification Probes
 # ---------------------------------------------------------------------------
@@ -589,7 +862,6 @@ def test_health_live_probe_guarantees() -> None:
         assert response.status_code == 200
         assert response.json() == {"status": "ok"}
 
-        # Zero inference, network, or cache calls
         mock_http_get.assert_not_called()
         mock_redis.assert_not_called()
 
@@ -598,7 +870,6 @@ def test_health_probe_dependency_reporting_matrix() -> None:
     """Verify /health accurately reports dependency status (guardrails: deterministic, redis, nestjsApi)."""
     client = TestClient(app)
 
-    # 1. All dependencies healthy -> overall ok
     mock_redis_ok = MagicMock()
     mock_redis_ok.ping = AsyncMock(return_value=True)
 
@@ -622,7 +893,6 @@ def test_health_probe_dependency_reporting_matrix() -> None:
         assert data["dependencies"]["nestjsApi"]["status"] == "ok"
         assert data["dependencies"]["redis"]["status"] == "ok"
 
-    # 2. NestJS API down -> overall degraded
     with (
         patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get_down,
         patch("agent.main.settings") as mock_settings,
@@ -639,7 +909,6 @@ def test_health_probe_dependency_reporting_matrix() -> None:
         assert data_down["dependencies"]["guardrails"] == {"status": "deterministic"}
         assert data_down["dependencies"]["redis"]["status"] == "ok"
 
-    # 3. Redis down -> overall degraded
     mock_redis_down = MagicMock()
     mock_redis_down.ping = AsyncMock(side_effect=RuntimeError("Redis disconnected"))
 
@@ -662,3 +931,69 @@ def test_health_probe_dependency_reporting_matrix() -> None:
         assert data_redis_down["dependencies"]["redis"]["status"] == "down"
         assert data_redis_down["dependencies"]["nestjsApi"]["status"] == "ok"
         assert data_redis_down["dependencies"]["guardrails"] == {"status": "deterministic"}
+
+
+def test_health_probe_reports_down_when_guardrails_or_keys_missing() -> None:
+    """Verify /health reports guardrails down and overall degraded when gateway or keys are missing."""
+    client = TestClient(app)
+    mock_redis = MagicMock()
+    mock_redis.ping = AsyncMock(return_value=True)
+
+    with (
+        patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get,
+        patch("agent.infrastructure.redis.get_redis_client", return_value=mock_redis),
+        patch("agent.main.settings") as mock_settings,
+    ):
+        mock_settings.NESTJS_API_URL = "http://localhost:3001"
+        mock_settings.AGENT_SERVICE_API_KEY = "test-agent-key"
+        mock_settings.JWT_SECRET = TEST_JWT_SECRET
+        mock_settings.CLAIM_TOKEN_SECRET = TEST_CLAIM_SECRET
+        mock_get.return_value = httpx.Response(
+            200,
+            json={"status": "ok"},
+            request=httpx.Request("GET", "http://localhost:3001/api/health"),
+        )
+
+        base_resp = client.get("/health")
+        assert base_resp.status_code == 200
+        assert base_resp.json()["status"] == "ok"
+        assert base_resp.json()["dependencies"]["guardrails"]["status"] == "deterministic"
+
+        with patch.object(app.state, "guardrail_gateway", None, create=True):
+            resp = client.get("/health")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["status"] == "degraded"
+            assert data["dependencies"]["guardrails"]["status"] == "down"
+
+        degraded_gateway = DegradedGateway()
+        with patch.object(app.state, "guardrail_gateway", degraded_gateway, create=True):
+            resp = client.get("/health")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["status"] == "degraded"
+            assert data["dependencies"]["guardrails"]["status"] == "down"
+
+        mock_settings.AGENT_SERVICE_API_KEY = ""
+        resp = client.get("/health")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "degraded"
+        assert data["dependencies"]["guardrails"]["status"] == "down"
+        mock_settings.AGENT_SERVICE_API_KEY = "test-agent-key"
+
+        mock_settings.JWT_SECRET = ""
+        resp = client.get("/health")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "degraded"
+        assert data["dependencies"]["guardrails"]["status"] == "down"
+        mock_settings.JWT_SECRET = TEST_JWT_SECRET
+
+        mock_settings.CLAIM_TOKEN_SECRET = ""
+        resp = client.get("/health")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "degraded"
+        assert data["dependencies"]["guardrails"]["status"] == "down"
+        mock_settings.CLAIM_TOKEN_SECRET = TEST_CLAIM_SECRET

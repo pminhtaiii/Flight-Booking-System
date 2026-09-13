@@ -6,6 +6,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from langchain_core.messages import AIMessage, ToolMessage
 
+from agent.guardrails.gateway import GuardrailGateway
+from agent.guardrails.registry import create_production_registry
 from agent.memory.manager import MemoryManager
 from agent.models.events import DisplayInfo, HandoffEvent
 from agent.observability.chat_observability import (
@@ -433,6 +435,7 @@ async def test_sse_streaming_chunk_stream_simulation_scan():
     mock_guardrails.validate_text = AsyncMock(return_value=(True, None, None))
     mock_guardrails.is_healthy = MagicMock(return_value=True)
     mock_app.state.guardrails = mock_guardrails
+    mock_app.state.guardrail_gateway = GuardrailGateway(create_production_registry())
 
     scope = {
         "type": "http",
