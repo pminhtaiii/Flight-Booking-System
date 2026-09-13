@@ -1250,7 +1250,7 @@ CI review follow-up (2026-09-11): application and shared-package changes route b
      - **Strict Privacy Invariants**:
        - Zero Raw Payloads: Telemetry records and metric labels strictly forbid user prompts, model responses, tool outputs, session IDs, and customer PII (credit cards, passport numbers, emails, phone numbers).
        - Zero High-Cardinality Labels: Dynamic user identifiers and session IDs are disallowed as Prometheus labels (cardinality limit $\le 10$ keys per metric).
-       - Pseudonymized Subject Reference: Structured event schema `security_guardrail_eval` requires `subject_ref` formatted strictly as an HMAC-SHA256 digest (`^hmac_sha256:[a-f0-9]{64}$`), rotated on a 90-day cycle without persisting raw user IDs.
+       - Pseudonymized Subject Reference: Structured event schema `security_guardrail_eval` requires `subject_ref` formatted strictly as an HMAC-SHA256 digest (`^hmac_sha256:[a-f0-9]{64}$`), governed by daily HMAC key rotation with 30-day retention and cryptographic shredding SOP without persisting raw user IDs.
    - **Operational Dashboards & Alert Runbooks (`docs/security/observability.md`)**:
      - Codifies real-time Grafana dashboard panels for guardrail decisions, P50/P95/P99 latency decomposition, and telemetry emitter error rates.
      - Establishes Standard Operating Procedures (SOP) for false-positive tracking derived from offline labeled holdout evaluations and triage, not raw block counts.

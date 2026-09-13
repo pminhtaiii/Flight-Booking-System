@@ -7,20 +7,18 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const CONTRACT_PATH = resolve(__dirname, 'observability-contract.json');
+assert.ok(existsSync(CONTRACT_PATH), 'observability-contract.json must exist');
+const contract = JSON.parse(readFileSync(CONTRACT_PATH, 'utf8'));
 
 test('observability contract exists and is valid JSON', () => {
-  assert.ok(existsSync(CONTRACT_PATH), 'observability-contract.json must exist');
-  const raw = readFileSync(CONTRACT_PATH, 'utf8');
-  const contract = JSON.parse(raw);
   assert.equal(contract.version, '2026-09-13');
+  assert.equal(contract.$schema, 'https://json-schema.org/draft/2020-12/schema');
 });
 
 test('defines required metrics with strict bounded labels and buckets', () => {
-  const contract = JSON.parse(readFileSync(CONTRACT_PATH, 'utf8'));
   const metrics = contract.metrics;
   assert.ok(metrics, 'metrics section required');
 
-  // 1. Decisions counter
   assert.ok(metrics.security_guardrail_decisions_total);
   assert.equal(metrics.security_guardrail_decisions_total.type, 'counter');
   assert.deepEqual(
@@ -36,7 +34,6 @@ test('defines required metrics with strict bounded labels and buckets', () => {
     ['BLOCK', 'PASS', 'SKIP'].sort()
   );
 
-  // 2. Latency histogram
   assert.ok(metrics.security_guardrail_latency_ms);
   assert.equal(metrics.security_guardrail_latency_ms.type, 'histogram');
   assert.deepEqual(
@@ -49,7 +46,6 @@ test('defines required metrics with strict bounded labels and buckets', () => {
     [0.5, 1, 2, 5, 10, 25, 50, 100, 250]
   );
 
-  // 3. Emitter errors counter
   assert.ok(metrics.security_emitter_errors_total);
   assert.equal(metrics.security_emitter_errors_total.type, 'counter');
   assert.deepEqual(
@@ -59,7 +55,6 @@ test('defines required metrics with strict bounded labels and buckets', () => {
 });
 
 test('enforces zero dynamic user payload / high-cardinality label invariants', () => {
-  const contract = JSON.parse(readFileSync(CONTRACT_PATH, 'utf8'));
   const forbidden = contract.label_constraints.forbidden_dynamic_labels;
   assert.ok(Array.isArray(forbidden), 'forbidden labels must be an array');
   const requiredForbidden = [
@@ -83,13 +78,24 @@ test('enforces zero dynamic user payload / high-cardinality label invariants', (
 });
 
 test('defines strict event schema with pseudonymized subject ref and zero raw payloads', () => {
-  const contract = JSON.parse(readFileSync(CONTRACT_PATH, 'utf8'));
   const schema = contract.event_schema;
   assert.ok(schema, 'event_schema required');
-  assert.equal(schema.type, 'object');
-  assert.equal(schema.additionalProperties, false);
+  assert.ok(Array.isArray(schema.oneOf), 'event_schema must use oneOf');
+  assert.equal(schema.oneOf.length, 2);
 
-  const requiredFields = [
+  const evalSchema = schema.oneOf.find(
+    (branch) => branch.properties?.event_type?.enum?.includes('security_guardrail_eval')
+  );
+  const errorSchema = schema.oneOf.find(
+    (branch) => branch.properties?.event_type?.enum?.includes('security_emitter_error')
+  );
+
+  assert.ok(evalSchema, 'must define security_guardrail_eval branch');
+  assert.ok(errorSchema, 'must define security_emitter_error branch');
+
+  assert.equal(evalSchema.type, 'object');
+  assert.equal(evalSchema.additionalProperties, false);
+  const requiredEvalFields = [
     'event_type',
     'timestamp_utc',
     'trace_id',
@@ -99,40 +105,59 @@ test('defines strict event schema with pseudonymized subject ref and zero raw pa
     'decision',
     'latency_ms'
   ];
-  for (const field of requiredFields) {
-    assert.ok(schema.required.includes(field), `event_schema must require ${field}`);
+  for (const field of requiredEvalFields) {
+    assert.ok(evalSchema.required.includes(field), `evalSchema must require ${field}`);
   }
+  assert.deepEqual(evalSchema.properties.event_type.enum, ['security_guardrail_eval']);
+  assert.equal(evalSchema.properties.subject_ref.pattern, '^hmac_sha256:[a-f0-9]{64}$');
+  assert.deepEqual(evalSchema.properties.stage.enum, ['input', 'tool', 'output']);
+  assert.deepEqual(evalSchema.properties.decision.enum, ['PASS', 'BLOCK', 'SKIP']);
+  assert.equal(evalSchema.properties.latency_ms.minimum, 0);
 
-  assert.equal(
-    schema.properties.subject_ref.pattern,
-    '^hmac_sha256:[a-f0-9]{64}$'
-  );
+  assert.equal(errorSchema.type, 'object');
+  assert.equal(errorSchema.additionalProperties, false);
+  const requiredErrorFields = [
+    'event_type',
+    'timestamp_utc',
+    'trace_id',
+    'sink',
+    'error_type'
+  ];
+  for (const field of requiredErrorFields) {
+    assert.ok(errorSchema.required.includes(field), `errorSchema must require ${field}`);
+  }
+  assert.deepEqual(errorSchema.properties.event_type.enum, ['security_emitter_error']);
+  assert.deepEqual(errorSchema.properties.sink.enum, ['security_audit_log', 'prometheus', 'redis']);
+  assert.equal(errorSchema.properties.details.type, 'string');
 
-  // Assert forbidden payload fields are not allowed in schema properties
   const forbiddenProperties = ['prompt', 'payload', 'message', 'token', 'user_id', 'content'];
   for (const prop of forbiddenProperties) {
-    assert.equal(
-      schema.properties[prop],
-      undefined,
-      `event_schema must not define raw property ${prop}`
-    );
+    assert.equal(evalSchema.properties[prop], undefined);
+    assert.equal(errorSchema.properties[prop], undefined);
   }
 });
 
 test('defines required alert rules with operational thresholds', () => {
-  const contract = JSON.parse(readFileSync(CONTRACT_PATH, 'utf8'));
   const alerts = contract.alert_rules;
   assert.ok(alerts, 'alert_rules section required');
 
-  // Injection spike alert
   assert.ok(alerts.InjectionBlockRateSpike);
+  assert.equal(alerts.InjectionBlockRateSpike.severity, 'critical');
   assert.equal(alerts.InjectionBlockRateSpike.condition.threshold_multiplier, 5);
+  assert.equal(alerts.InjectionBlockRateSpike.condition.baseline_window, '7d');
+  assert.equal(alerts.InjectionBlockRateSpike.condition.evaluation_window, '5m');
 
-  // Latency breach alert
   assert.ok(alerts.GuardrailLatencyP95Breach);
+  assert.equal(alerts.GuardrailLatencyP95Breach.severity, 'warning');
+  assert.equal(alerts.GuardrailLatencyP95Breach.condition.percentile, 95);
   assert.equal(alerts.GuardrailLatencyP95Breach.condition.threshold_ms, 50);
+  assert.equal(alerts.GuardrailLatencyP95Breach.condition.evaluation_window, '5m');
 
-  // Emitter drop alert
   assert.ok(alerts.TelemetryEmitterDropRateHigh);
+  assert.equal(alerts.TelemetryEmitterDropRateHigh.severity, 'critical');
   assert.equal(alerts.TelemetryEmitterDropRateHigh.condition.threshold_percent, 1.0);
+  assert.equal(alerts.TelemetryEmitterDropRateHigh.condition.denominator_metric, 'security_guardrail_decisions_total');
+  assert.equal(alerts.TelemetryEmitterDropRateHigh.condition.evaluation_window, '5m');
+  assert.ok(alerts.TelemetryEmitterDropRateHigh.condition.formula.includes('security_emitter_errors_total'));
+  assert.ok(alerts.TelemetryEmitterDropRateHigh.condition.formula.includes('security_guardrail_decisions_total'));
 });

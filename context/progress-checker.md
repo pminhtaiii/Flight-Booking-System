@@ -1,6 +1,6 @@
 # Progress Tracker
 
-### Feature 023 — Security Systems: Phase 7 US5 Observability Contract, Operational Runbooks & Rollout Hardening (Tasks T045 & T047 Completed) (2026-09-13)
+### Feature 023 — Security Systems: Phase 7 US5 Observability Contract, Operational Runbooks & Rollout Hardening (Task T045 Completed) (2026-09-13)
 
 - **T045 Security Observability Contract, Dashboards, False Positive Tracking & Alert Runbooks (`tests/security/observability-contract.json`, `tests/security/observability-contract.test.mjs`, `docs/security/observability.md`)**:
   - Implemented deterministic operational telemetry contract and verification suite (5/5 tests passing with exit code 0):
@@ -17,28 +17,8 @@
     - **Observability Runbook & Dashboard Specifications (`docs/security/observability.md`)**:
       - Real-time Grafana dashboard specs: Guardrail Decisions & Block Rates, Layer Latency Distribution (P50/P95/P99), Emitter Error and Health status.
       - False positive tracking standard operating procedure (SOP): derived strictly from labeled evaluation holdouts and offline triage without capturing raw user payloads.
-      - Pseudonym retention and 90-day HMAC key rotation SOP: multi-key rotation window with zero plaintext identifier retention.
+      - Pseudonym retention and daily HMAC key rotation with 30-day retention and cryptographic shredding SOP: multi-key rotation window with zero plaintext identifier retention.
       - Operational alert runbooks: step-by-step triage, investigation commands, and escalation matrix for critical and warning alerts.
-
-- **T047 Fail-Closed Startup, Rollout, Rollback & Health Hardening (`apps/agent/tests/security/test_rollout.py`, `docs/security/rollout.md`)**:
-  - Implemented and verified complete rollout and fail-closed verification suite (16/16 tests passing, exit code 0):
-    - **Startup & Ingress Fail-Closed Validation**:
-      - `AGENT_SERVICE_API_KEY`, `JWT_SECRET`, and `CLAIM_TOKEN_SECRET` fail-fast validation in Pydantic `Settings`. Empty keys abort startup immediately.
-      - `GuardrailGateway.is_healthy()` contract enforcing valid `GuardrailRegistry` and compulsory production layers.
-      - POST `/chat/stream` ingress fail-closed guard: returns HTTP 503 (`GUARDRAIL_GATEWAY_UNAVAILABLE`) if `guardrail_gateway` is None or degraded, with zero runner invocations.
-      - **Zero Quota Consumption on Gateway Failures**: Guardrail gateway readiness is evaluated *before* Redis quota admission in `/chat/stream`, ensuring 503 gateway errors never consume user daily or burst quotas (`test_gateway_failure_does_not_consume_quota`).
-    - **Health Probe Key & Subsystem Verification**:
-      - `/health/live`: Lightweight probe guaranteed HTTP 200 with zero model inference, zero guardrail checks, zero Redis/external I/O (< 10ms).
-      - `/health`: Deep probe monitoring `guardrails: deterministic`, `redis`, and `nestjsApi`. Degrades status to `degraded` with `guardrails: {"status": "down"}` if gateway is None/degraded or if `AGENT_SERVICE_API_KEY`, `JWT_SECRET`, or `CLAIM_TOKEN_SECRET` are missing.
-    - **Emergency Rollback Mid-Stream Lock Purge & Teardown**:
-      - Rehearsed active streaming turn cancellation mid-flight. Verified `queue_manager.release()` cleanly purges session lock in Redis, resets active fence, leaves no orphan locks, and executes zero unauthenticated database mutations.
-      - Rehearsed stolen/stale fence invalidation during turn teardown; verified response batch persistence is safely aborted.
-    - **Operational Runbook & Documentation (`docs/security/rollout.md`)**:
-      - Pre-flight verification checklist (Corpus gates: 200 malicious, 500 benign, TPR >= 95%, FPR <= 2%, zero false negatives; SAST baseline; Clean SCA reports; Test suite green status).
-      - Canary rollout stages (Stage 0: 1%, Stage 1: 5%, Stage 2: 25%, Stage 3: 100%, traffic drain commands, telemetry gates).
-      - Operator manual rollback procedure: immediate traffic shift pause and manual kubectl ingress drain commands upon any telemetry gate breach.
-      - Key rotation procedures (Multi-key secret rings `jwt_secret_ring` and `claim_token_secret_ring`, 3-phase zero-downtime rotation, rolling restart commands).
-      - Emergency rollback procedures (flag deprecation, traffic drain, session namespace purge, post-mortem incident triage).
 
 ### Feature 023 — Security Systems: Phase 7 US5 Slice 3 T047 Rollout Hardening, Review Remediation & Full Suite Alignment Completed (2026-09-13)
 

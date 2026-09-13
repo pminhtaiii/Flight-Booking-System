@@ -93,9 +93,13 @@ Aligned with [`tests/security/observability-contract.json`](file:///c:/Booking%2
 
 ---
 
-### 1.3 Event Schema (`security_guardrail_eval`)
+### 1.3 Event Schemas (`oneOf`)
 
-Structured security audit records emitted to `security_audit_log` must conform to the JSON schema defined in [`tests/security/observability-contract.json`](file:///c:/Booking%20Systems/tests/security/observability-contract.json):
+Structured security audit and operational telemetry records emitted to sinks must conform to the `oneOf` schema defined in [`tests/security/observability-contract.json`](file:///c:/Booking%20Systems/tests/security/observability-contract.json), distinguishing guardrail evaluation records from telemetry emitter error events:
+
+#### 1.3.1 Guardrail Evaluation Record (`security_guardrail_eval`)
+
+Emitted to `security_audit_log` on every deterministic guardrail evaluation across ingress, tool, or egress stages:
 
 ```json
 {
@@ -113,15 +117,41 @@ Structured security audit records emitted to `security_audit_log` must conform t
 
 | Field Name | Type | Format / Constraints | Description |
 |---|---|---|---|
-| `event_type` | string | `security_guardrail_eval` \| `security_emitter_error` | Categorical event classification. |
+| `event_type` | string | `security_guardrail_eval` | Categorical event classification. |
 | `timestamp_utc` | string | ISO 8601 UTC date-time | Precise timestamp of guardrail decision. |
-| `trace_id` | string | `^[a-f0-9\\-]+$` | Ephemeral distributed turn/request trace identifier. |
+| `trace_id` | string | `^[a-f0-9\-]+$` | Ephemeral distributed turn/request trace identifier. |
 | `subject_ref` | string | `^hmac_sha256:[a-f0-9]{64}$` | Daily rotating pseudonymized HMAC digest of user identifier. |
 | `stage` | string | `input` \| `tool` \| `output` | Pipeline execution stage. |
 | `layer_key` | string | e.g. `input.injection`, `output.pii` | Canonical dot-notation guardrail layer key. |
 | `decision` | string | `PASS` \| `BLOCK` \| `SKIP` | Deterministic policy decision. |
 | `latency_ms` | number | $\ge 0.0$ | Active compute time in milliseconds. |
 | `reason` | string | Optional string token | Standardized failure code (e.g. `PII_MASKED`, `REJECTED`). |
+
+*Additional properties outside this schema are rejected (`additionalProperties: false`).*
+
+#### 1.3.2 Telemetry Emitter Error Record (`security_emitter_error`)
+
+Emitted when an asynchronous or bounded ring-buffer telemetry emission fails:
+
+```json
+{
+  "event_type": "security_emitter_error",
+  "timestamp_utc": "2026-09-13T12:00:00.000Z",
+  "trace_id": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+  "sink": "security_audit_log",
+  "error_type": "connection_timeout",
+  "details": "Connection timed out after 500ms writing to audit sink"
+}
+```
+
+| Field Name | Type | Format / Constraints | Description |
+|---|---|---|---|
+| `event_type` | string | `security_emitter_error` | Categorical event classification. |
+| `timestamp_utc` | string | ISO 8601 UTC date-time | Precise timestamp of emitter error. |
+| `trace_id` | string | `^[a-f0-9\-]+$` | Ephemeral distributed turn/request trace identifier. |
+| `sink` | string | `security_audit_log` \| `prometheus` \| `redis` | Telemetry sink that experienced the error. |
+| `error_type` | string | String token | Error classification code. |
+| `details` | string | Optional string | Diagnostic failure details (zero raw payloads). |
 
 *Additional properties outside this schema are rejected (`additionalProperties: false`).*
 
@@ -455,7 +485,7 @@ Where:
   ```promql
   sum(rate(security_guardrail_decisions_total{stage="input", layer_key="input.injection", decision="BLOCK"}[5m]))
     >
-  5 * (sum(rate(security_guardrail_decisions_total{stage="input", layer_key="input.injection", decision="BLOCK"}[7d])) / 2016)
+  5 * sum(rate(security_guardrail_decisions_total{stage="input", layer_key="input.injection", decision="BLOCK"}[7d]))
   ```
 - **Description**: Block rate for the prompt injection layer exceeds $5\times$ the 7-day rolling baseline over a 5-minute evaluation window.
 - **SLA**: Acknowledge within **5 minutes**; initiate triage within **15 minutes**.

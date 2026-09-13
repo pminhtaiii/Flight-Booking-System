@@ -44,29 +44,52 @@
     "disallow_arbitrary_labels": true
   },
   "event_schema": {
-    "type": "object",
-    "required": [
-      "event_type",
-      "timestamp_utc",
-      "trace_id",
-      "subject_ref",
-      "stage",
-      "layer_key",
-      "decision",
-      "latency_ms"
-    ],
-    "properties": {
-      "event_type": { "type": "string", "enum": ["security_guardrail_eval", "security_emitter_error"] },
-      "timestamp_utc": { "type": "string", "format": "date-time" },
-      "trace_id": { "type": "string", "pattern": "^[a-f0-9\\-]+$" },
-      "subject_ref": { "type": "string", "pattern": "^hmac_sha256:[a-f0-9]{64}$" },
-      "stage": { "type": "string", "enum": ["input", "tool", "output"] },
-      "layer_key": { "type": "string" },
-      "decision": { "type": "string", "enum": ["PASS", "BLOCK", "SKIP"] },
-      "latency_ms": { "type": "number", "minimum": 0 },
-      "reason": { "type": "string" }
-    },
-    "additionalProperties": false
+    "oneOf": [
+      {
+        "type": "object",
+        "required": [
+          "event_type",
+          "timestamp_utc",
+          "trace_id",
+          "subject_ref",
+          "stage",
+          "layer_key",
+          "decision",
+          "latency_ms"
+        ],
+        "properties": {
+          "event_type": { "type": "string", "enum": ["security_guardrail_eval"] },
+          "timestamp_utc": { "type": "string", "format": "date-time" },
+          "trace_id": { "type": "string", "pattern": "^[a-f0-9\\-]+$" },
+          "subject_ref": { "type": "string", "pattern": "^hmac_sha256:[a-f0-9]{64}$" },
+          "stage": { "type": "string", "enum": ["input", "tool", "output"] },
+          "layer_key": { "type": "string" },
+          "decision": { "type": "string", "enum": ["PASS", "BLOCK", "SKIP"] },
+          "latency_ms": { "type": "number", "minimum": 0 },
+          "reason": { "type": "string" }
+        },
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "required": [
+          "event_type",
+          "timestamp_utc",
+          "trace_id",
+          "sink",
+          "error_type"
+        ],
+        "properties": {
+          "event_type": { "type": "string", "enum": ["security_emitter_error"] },
+          "timestamp_utc": { "type": "string", "format": "date-time" },
+          "trace_id": { "type": "string", "pattern": "^[a-f0-9\\-]+$" },
+          "sink": { "type": "string", "enum": ["security_audit_log", "prometheus", "redis"] },
+          "error_type": { "type": "string" },
+          "details": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    ]
   },
   "alert_rules": {
     "InjectionBlockRateSpike": {
@@ -76,6 +99,7 @@
         "metric": "security_guardrail_decisions_total",
         "labels": { "stage": "input", "layer_key": "input.injection", "decision": "BLOCK" },
         "threshold_multiplier": 5,
+        "baseline_window": "7d",
         "evaluation_window": "5m"
       }
     },
@@ -94,8 +118,10 @@
       "description": "Telemetry event emitter drop/error rate exceeds 1% of total emissions.",
       "condition": {
         "metric": "security_emitter_errors_total",
+        "denominator_metric": "security_guardrail_decisions_total",
         "threshold_percent": 1.0,
-        "evaluation_window": "5m"
+        "evaluation_window": "5m",
+        "formula": "sum(rate(security_emitter_errors_total[5m])) / sum(rate(security_guardrail_decisions_total[5m])) > 0.01"
       }
     }
   }
