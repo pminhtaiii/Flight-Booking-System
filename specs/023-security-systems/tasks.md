@@ -1,7 +1,7 @@
 # Tasks: Deterministic Guardrails and Security Verification
 
 **Input**: `specs/023-security-systems/{spec,plan,research,data-model}.md`, contracts and security test matrix.
-**Status**: Phase 6 US4 complete (Tasks T036-T041 completed and verified across dual DAST runs); Phase 7 (US5) next. This checklist records scoped evidence and does not claim tests or scanners outside that evidence have run.
+**Status**: Phase 6 US4 complete; Phase 7 (US5) tasks T043, T045, T046, T047 completed and verified. This checklist records scoped evidence and does not claim tests or scanners outside that evidence have run.
 **Format**: `- [ ] Tnnn [P?] [USn?] action with file path`. `[P]` means independent file work after stated prerequisites. Tests precede the implementation they verify. New paths are intentional implementation targets.
 
 ## Phase 1: Setup
@@ -85,7 +85,7 @@ Goal: payload-free operations and safe rollout. Independent test: emitter failur
 - [ ] T042 [P] [US5] Add event-schema/privacy/canary/cardinality/sink-outage tests in `apps/agent/tests/security/test_security_events.py`; include PASS/BLOCK and distinguish skipped layers from passes.
 - [x] T043 [P] [US5] Add reproducible warm/cold and hostile near-limit benchmarks in `apps/agent/tests/security/test_security_performance.py`; report p50/p95/p99, hardware, memory, concurrency and buffer wait separately from guardrail compute.
 - [ ] T044 [US5] Implement SecurityEventEmitter in `apps/agent/src/agent/observability/security_events.py`; integrate gateway decisions with existing telemetry conventions, restricted HMAC subjectRef/keyId and no raw userId or high-cardinality metric labels.
-- [ ] T045 [US5] Define block/latency/error dashboards, pseudonym retention/rotation and alert runbook in `docs/security/observability.md` and `tests/security/observability-contract.json`; derive false-positive trends from labeled evaluations/triage, not raw block counts.
+- [x] T045 [US5] Define block/latency/error dashboards, pseudonym retention/rotation and alert runbook in `docs/security/observability.md` and `tests/security/observability-contract.json`; derive false-positive trends from labeled evaluations/triage, not raw block counts.
 - [x] T046 [US5] Run T043 benchmarks against proposed SC-004 and resource ceilings; record evidence and fix breaches in `docs/security/performance-validation.md`; do not silently lower thresholds when failing.
 - [x] T047 [US5] Rehearse rollout/rollback and fail-closed startup with tests in `apps/agent/tests/security/test_rollout.py` and `docs/security/rollout.md`; retain existing handoff flags and disable chat safely if a protected build cannot start.
 
