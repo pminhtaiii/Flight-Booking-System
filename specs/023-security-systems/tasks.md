@@ -1,7 +1,7 @@
 # Tasks: Deterministic Guardrails and Security Verification
 
 **Input**: `specs/023-security-systems/{spec,plan,research,data-model}.md`, contracts and security test matrix.
-**Status**: Phase 7 (US5) complete; Phase 8 Closure next. All Phase 7 tasks (T042-T047) completed and verified. This checklist records scoped evidence and does not claim tests or scanners outside that evidence have run.
+**Status**: Feature 023 complete. All 52 tasks (T001-T052) and convergence task T053 completed, verified, and signed off. Ready to merge into development.
 **Format**: `- [ ] Tnnn [P?] [USn?] action with file path`. `[P]` means independent file work after stated prerequisites. Tests precede the implementation they verify. New paths are intentional implementation targets.
 
 ## Phase 1: Setup
@@ -94,10 +94,10 @@ Goal: payload-free operations and safe rollout. Independent test: emitter failur
 Goal: reviewable release evidence. Depends on all stories.
 
 - [x] T048 Perform disposable mutation controls removing input check, dispatch allowlist, result scan and output holdback; require targeted tests to catch each mutation and record coverage/critical-transition evidence in `docs/security/coverage-validation.md`.
-- [ ] T049 Run change-aware existing static/API/web/agent gates and all security suites using `specs/023-security-systems/quickstart.md`; record final exit codes, counts, skipped gates with justification and artifact hashes in `docs/security/release-evidence.md`.
-- [ ] T050 Triage/reproduce/fix/retest every release-blocking finding and benign neighbor; maintain fingerprint/owner/severity/retest ledger in `docs/security/findings.md`; no unresolved Critical/High or invariant failures at release.
-- [ ] T051 [P] Sync implemented behavior and remaining work in `context/architecture.md`, `context/progress-checker.md` and `context/library-docs.md`; document verified scanner commands without presenting planned work as shipped.
-- [ ] T052 Perform independent security/spec review and verify all SEC matrix rows have actual evidence in `docs/security/release-evidence.md`; mark tasks complete only after their exit criteria and close any review corrections.
+- [x] T049 Run change-aware existing static/API/web/agent gates and all security suites using `specs/023-security-systems/quickstart.md`; record final exit codes, counts, skipped gates with justification and artifact hashes in `docs/security/release-evidence.md`.
+- [x] T050 Triage/reproduce/fix/retest every release-blocking finding and benign neighbor; maintain fingerprint/owner/severity/retest ledger in `docs/security/findings.md`; no unresolved Critical/High or invariant failures at release.
+- [x] T051 [P] Sync implemented behavior and remaining work in `context/architecture.md`, `context/progress-checker.md` and `context/library-docs.md`; document verified scanner commands without presenting planned work as shipped.
+- [x] T052 Perform independent security/spec review and verify all SEC matrix rows have actual evidence in `docs/security/release-evidence.md`; mark tasks complete only after their exit criteria and close any review corrections.
 
 ## Dependencies and Parallel Execution
 

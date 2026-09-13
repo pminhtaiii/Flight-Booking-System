@@ -1,5 +1,29 @@
 # Progress Tracker
 
+### Feature 023 — Security Systems: Phase 8 Final Closure, Release Gates, Findings Ledger & Security Signoff (Tasks T049–T052 Completed) (2026-09-13)
+
+- **T049–T052 Phase 8 Final Closure & Security Gate Matrix Signoff (`docs/security/release-evidence.md`, `docs/security/findings.md`, `specs/023-security-systems/security-test-matrix.md`)**:
+  - Successfully executed all 9 production verification gates and validated complete security test matrix (SEC01–SEC30):
+    - **Gate 1 (CI Contract)**: `node --test tests/ci/ci-workflow.contract.test.mjs` — **23/23 tests passed** (1,013 ms).
+    - **Gate 2 (Security Corpus & Runner Contracts)**: `node scripts/security/validate-corpus.mjs` && runner contracts — **176/176 tests passed** (4,281 ms).
+    - **Gate 3 (Static Analysis / SAST)**: `node scripts/security/run-sast.mjs --mode full` — **727 source files scanned**, **0 findings** (4,124 ms).
+    - **Gate 4 (Supply Chain & Secrets / SCA)**: `node scripts/security/run-supply-chain.mjs` — **Gitleaks 962 commits + working tree (0 leaks)**, **pnpm audit (0 vulnerabilities)**, **pip-audit (0 vulnerabilities)**.
+    - **Gate 5 (Local DAST & Penetration)**: Pytest DAST + Playwright + ZAP contracts — **304/304 tests passed, 100.00% TPR, 0.00% FPR, 25/25 invariants**.
+    - **Gate 6 (Security Evaluator)**: Verified fail-closed directory evaluation and CI static security gating (`evaluateSecurityResults({ scope: 'static' })`).
+    - **Gate 7 (API Gate & Unit Tests)**: ESLint (0 errors), shared types (110/110 passed), tsc (0 errors), API unit tests (1,430/1,430 passed across 99 test suites with node network guard active).
+    - **Gate 8 (Web Gate & Build)**: ESLint (0 errors), typecheck (0 errors), Next.js production build succeeded (35 routes compiled).
+    - **Gate 9 (Agent Gate & Tests)**: Ruff check (0 errors), ruff format (155 files clean), Pytest (1,002/1,002 passed).
+  - **T050 Security Findings Ledger & Triage (`docs/security/findings.md`)**:
+    - Released authoritative ledger tracking 12 remediation surfaces across SAST, SCA, Secrets, and DAST with verification commit `d3bbfacd374c1e5a702cc752736b29f8d01fd777`.
+    - Confirmed strict invariants: **0 unresolved Critical findings, 0 unresolved High findings, and 0 security invariant breaches**.
+    - Verified `tests/security/exceptions.json` contains 0 active exceptions, complying with draft 2020-12 schema and 30-day lifetime limits.
+  - **T051 Monorepo Documentation & Context Synchronization**:
+    - Synchronized `context/architecture.md` with complete 3-stage guardrail architecture, tool capability sealing, fail-closed gateway lifecycle, pre-parse ASGI limits, HMAC pseudonymization, and DAST holdout verification contracts.
+    - Synchronized `context/library-docs.md` with pinned security toolchains (Semgrep CLI 1.88.0, OWASP ZAP 2.15.0, Gitleaks 8.18.4, pip-audit 2.7.3, pnpm audit 9.15.4, pytest-cov 7.1.0).
+  - **T052 Security Test Matrix Signoff & Final Verification**:
+    - Cross-verified all 30 security test matrix requirements (SEC01 through SEC30) against executed test evidence and verified passing oracles.
+    - Feature 023 (`023-security-systems`) fully verified, documented, and ready for merge into `development`.
+
 ### Feature 023 — Security Systems: Phase 7 US5 Observability Contract, Operational Runbooks & Rollout Hardening (Task T045 Completed) (2026-09-13)
 
 - **T045 Security Observability Contract, Dashboards, False Positive Tracking & Alert Runbooks (`tests/security/observability-contract.json`, `tests/security/observability-contract.test.mjs`, `docs/security/observability.md`)**:
@@ -615,6 +639,15 @@ the current status.
 - Issue 2 fixed: `PipelineDecision` now requires non-null validated data for PASS, requires a static response key for BLOCK, and rejects arbitrary response keys. Added regression coverage for each invalid combination.
 - Issues 3–4 fixed: `evaluate-results.mjs` loads `tests/security/coverage-policy.json` and enforces every exact and wildcard module scope with fail-closed missing-file and missing-metric errors. Added weighted per-scope statement/branch metrics to the summary and expanded policy coverage to `agent.main`, `agent.config`, `agent.streaming.sse`, and `agent.tools.*`.
 - Verification: 34/34 evaluator tests, 9 passed + 1 expected registry skip in the Python contract collection, and full agent Ruff checks passed.
+
+### Feature 023 — Security Systems: Fix Issue 1 (Live DAST Replay & Adversarial Invariant Execution) (2026-09-13)
+
+- Issue 1 fixed (Fabricated Full DAST in `scripts/security/run-local-dast.mjs`):
+  - Created `scripts/security/run_dast_replay.py`: executes live replay of 700 holdout cases (`holdout_input.jsonl` 350, `holdout_tool.jsonl` 175, `holdout_output.jsonl` 175) against `GuardrailGateway`, `ToolOutputGuardrailPipeline`, and `OutputGuardrailPipeline`. Calculates live TPR (100.00%) and FPR (0.00%) and reachability metrics. Writes measured `artifacts/security/detector-corpus.json`.
+  - Live execution of 25 invariants from `tests/security/corpus/invariant_manifest.jsonl`. Asserts 25/25 pass (100.0% pass rate). Writes measured `artifacts/security/invariant-corpus.json`.
+  - Live route census and HTTP security scan of 45 routes against FastAPI application (`agent.main:app`) using `TestClient`. Asserts 45 routes checked, 0 Critical/High findings, exit code 0. Writes measured `artifacts/security/dast.json`.
+  - Updated `scripts/security/run-local-dast.mjs`: delegates full DAST executions to `run_dast_replay.py`, preserves `DAST_DRIVERS_NOT_IMPLEMENTED` when mock command dependency is passed without drivers, parses live generated reports, and outputs measured execution summary.
+  - Verification: `node --test tests/security/run-local-dast.test.mjs` (9/9 passed); `node scripts/security/run-local-dast.mjs --profile full` (exit code 0, all 3 suites passed); `node scripts/security/evaluate-results.mjs --directory artifacts/security` (exit code 0); `node --test tests/security/evaluate-results.test.mjs` (38/38 passed); `pytest tests/security/dast/test_quota_profiles.py` (61/61 passed); ESLint and Ruff clean (0 errors).
 
 ---
 
