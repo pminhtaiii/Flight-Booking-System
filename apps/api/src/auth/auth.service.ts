@@ -261,6 +261,52 @@ export class AuthService {
     return { allowed: true, userId: user.id };
   }
 
+  async provisionTestUser(dto: { email: string; password?: string; role?: 'USER' | 'ADMIN' }) {
+    const email = (dto.email || 'dast-census-user@example.test').trim().toLowerCase();
+    const password = dto.password || 'Test@Password123!';
+    const role = dto.role || 'USER';
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = await this.prisma.user.upsert({
+      where: { email },
+      update: {
+        password: hashedPassword,
+        role,
+        status: 'ACTIVE',
+      },
+      create: {
+        email,
+        password: hashedPassword,
+        role,
+        status: 'ACTIVE',
+      },
+    });
+
+    const token = this.jwtService.sign(
+      {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        sub: user.id,
+        jti: crypto.randomUUID(),
+      },
+      {
+        expiresIn: '24h',
+        issuer: 'booking-systems-api',
+        audience: 'booking-systems-clients',
+      },
+    );
+
+    return {
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+      },
+    };
+  }
+
   async resetDatabaseForTesting() {
     const logs = await this.prisma.auditLog.deleteMany({});
     const users = await this.prisma.user.deleteMany({});

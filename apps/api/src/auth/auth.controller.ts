@@ -138,4 +138,15 @@ export class AuthController {
     }
     return { success: true };
   }
+
+  @Post('test/provision-user')
+  @HttpCode(200)
+  async provisionUser(
+    @Body() body: { email: string; password?: string; role?: 'USER' | 'ADMIN' },
+  ) {
+    if (process.env.NODE_ENV !== 'test') {
+      throw new HttpException('Not Found', HttpStatus.NOT_FOUND);
+    }
+    return this.authService.provisionTestUser(body);
+  }
 }

@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+import dotenv
 import jwt
 import pytest
 import redis.asyncio as redis
@@ -24,8 +25,23 @@ if _AGENT_SRC not in sys.path:
     sys.path.insert(0, _AGENT_SRC)
 
 
+def _load_runtime_env() -> None:
+    """Load runtime env files if present before fallback defaults."""
+    for env_path in [
+        _REPO_ROOT / "apps" / "api" / ".env",
+        _REPO_ROOT / "apps" / "agent" / ".env",
+        _REPO_ROOT / ".env",
+    ]:
+        if env_path.is_file():
+            dotenv.load_dotenv(dotenv_path=env_path, override=False)
+
+
+_load_runtime_env()
+
+
 def pytest_configure(config: pytest.Config) -> None:
     """Ensure DAST environment variables are populated dynamically if not set."""
+    _load_runtime_env()
     os.environ.setdefault(
         "JWT_SECRET",
         os.environ.get("TEST_JWT_SECRET") or secrets.token_hex(32),

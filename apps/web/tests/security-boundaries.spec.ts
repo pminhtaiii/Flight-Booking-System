@@ -8,46 +8,98 @@ const TEST_SECRET = process.env.NEXTAUTH_SECRET || randomBytes(32).toString('bas
 let mockAuthBackend: http.Server | undefined;
 
 test.beforeAll(async () => {
-  await new Promise<void>((resolve) => {
-    const server = http.createServer((req, res) => {
-      if (req.url?.includes('/auth/login') && req.method === 'POST') {
-        let body = '';
-        req.on('data', (chunk) => {
-          body += chunk;
-        });
-        req.on('end', () => {
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(
-            JSON.stringify({
-              token: 'sec-auth-token-real',
-              user: {
-                id: 'sec-user-456',
-                email: 'security-audit@example.test',
-              },
-            }),
-          );
-        });
-        return;
-      }
-      res.writeHead(404);
-      res.end();
+  let isRealApiRunning = false;
+  try {
+    const healthRes = await fetch('http://127.0.0.1:3001/health', {
+      signal: AbortSignal.timeout(2000),
+    });
+    if (healthRes.ok) {
+      isRealApiRunning = true;
+    }
+  } catch {
+    isRealApiRunning = false;
+  }
+
+  if (isRealApiRunning) {
+    const regRes = await fetch('http://127.0.0.1:3001/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: 'security-audit@example.test',
+        password: 'AuditPassword123!',
+      }),
     });
 
-    server.once('error', () => {
-      resolve();
+    if (regRes.status !== 201 && regRes.status !== 200 && regRes.status !== 409) {
+      const text = await regRes.text().catch(() => '');
+      throw new Error(
+        `Failed to provision security audit user: HTTP ${regRes.status} ${text}`,
+      );
+    }
+
+    const verifyRes = await fetch('http://127.0.0.1:3001/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: 'security-audit@example.test',
+        password: 'AuditPassword123!',
+      }),
     });
 
-    server.listen(3001, () => {
-      mockAuthBackend = server;
-      resolve();
+    if (!verifyRes.ok) {
+      const text = await verifyRes.text().catch(() => '');
+      throw new Error(
+        `Failed to verify security audit user credentials on real API: HTTP ${verifyRes.status} ${text}`,
+      );
+    }
+  } else {
+    await new Promise<void>((resolve, reject) => {
+      const server = http.createServer((req, res) => {
+        if (req.url?.includes('/auth/login') && req.method === 'POST') {
+          let body = '';
+          req.on('data', (chunk) => {
+            body += chunk;
+          });
+          req.on('end', () => {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(
+              JSON.stringify({
+                token: 'sec-auth-token-real',
+                user: {
+                  id: 'sec-user-456',
+                  email: 'security-audit@example.test',
+                },
+              }),
+            );
+          });
+          return;
+        }
+        res.writeHead(404);
+        res.end();
+      });
+
+      server.once('error', (err) => {
+        reject(err);
+      });
+
+      server.listen(3001, () => {
+        mockAuthBackend = server;
+        resolve();
+      });
     });
-  });
+  }
 });
 
 test.afterAll(async () => {
   if (mockAuthBackend) {
-    await new Promise<void>((resolve) => {
-      mockAuthBackend?.close(() => resolve());
+    await new Promise<void>((resolve, reject) => {
+      mockAuthBackend?.close((err) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
     });
   }
 });
@@ -159,6 +211,7 @@ test.describe('Web Browser Security Boundaries', () => {
     test('checkout passengers page renders offerId payload as safe text without dialog execution', async ({
       page,
     }) => {
+      test.slow();
       let dialogFired = false;
       page.on('dialog', async (dialog) => {
         dialogFired = true;

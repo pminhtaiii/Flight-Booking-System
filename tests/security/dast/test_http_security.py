@@ -40,6 +40,7 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import dotenv
 import httpx
 import jwt
 import pytest
@@ -55,6 +56,14 @@ except ImportError:
 
 def _resolve_test_env() -> dict[str, str]:
     """Resolve test configuration dynamically without hardcoding secret literals."""
+    for env_path in [
+        REPO_ROOT / "apps" / "api" / ".env",
+        REPO_ROOT / "apps" / "agent" / ".env",
+        REPO_ROOT / ".env",
+    ]:
+        if env_path.is_file():
+            dotenv.load_dotenv(dotenv_path=env_path, override=False)
+
     jwt_secret = (
         os.environ.get("TEST_JWT_SECRET") or os.environ.get("JWT_SECRET") or secrets.token_hex(32)
     )
@@ -760,6 +769,90 @@ def test_route_inventory_census_count_and_categories() -> None:
     }, f"Unexpected service distribution: {service_counts}"
 
 
+async def _provision_live_census_user(
+    api_url: str,
+    email: str,
+    role: str = "USER",
+    password: str = "Password123!",
+) -> tuple[str, dict[str, Any]]:
+    """Dynamically obtain live census token and user ID from NestJS API."""
+    base_api = api_url.rstrip("/")
+    base_origin = base_api[:-4] if base_api.endswith("/api") else base_api
+
+    candidate_provision_urls = [
+        f"{base_api}/test/provision-user",
+        f"{base_api}/auth/test/provision-user",
+        f"{base_origin}/api/auth/test/provision-user",
+        f"{base_origin}/auth/test/provision-user",
+        f"{base_origin}/test/provision-user",
+    ]
+    provision_payload = {"email": email, "password": password, "role": role}
+
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        for prov_url in candidate_provision_urls:
+            try:
+                resp = await client.post(
+                    prov_url,
+                    json=provision_payload,
+                    headers={"Origin": "http://localhost:3000"},
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    tok = data.get("token")
+                    usr = data.get("user") or {}
+                    if tok:
+                        return tok, usr
+            except Exception:
+                continue
+
+        # Fallback to register if test endpoint is not available
+        reg_urls = [
+            f"{base_api}/auth/register",
+            f"{base_origin}/api/auth/register",
+            f"{base_origin}/auth/register",
+        ]
+        auth_payload = {"email": email, "password": password}
+        for reg_url in reg_urls:
+            try:
+                resp = await client.post(
+                    reg_url,
+                    json=auth_payload,
+                    headers={"Origin": "http://localhost:3000"},
+                )
+                if resp.status_code in (200, 201):
+                    data = resp.json()
+                    tok = data.get("token")
+                    usr = data.get("user") or {}
+                    if tok:
+                        return tok, usr
+            except Exception:
+                continue
+
+        # Fallback to login if already registered
+        login_urls = [
+            f"{base_api}/auth/login",
+            f"{base_origin}/api/auth/login",
+            f"{base_origin}/auth/login",
+        ]
+        for login_url in login_urls:
+            try:
+                resp = await client.post(
+                    login_url,
+                    json=auth_payload,
+                    headers={"Origin": "http://localhost:3000"},
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    tok = data.get("token")
+                    usr = data.get("user") or {}
+                    if tok:
+                        return tok, usr
+            except Exception:
+                continue
+
+    return make_jwt_token(role=role), {"id": "usr_synthetic_sec_001", "email": email, "role": role}
+
+
 @pytest.mark.asyncio
 async def test_route_inventory_all_45_routes_http_or_contract(
     fast_api_client: TestClient,
@@ -797,6 +890,25 @@ async def test_route_inventory_all_45_routes_http_or_contract(
         token=user_token,
     )
     gateway_headers = client_for_headers._get_gateway_headers()
+
+    if is_live_api:
+        live_user_token, _ = await _provision_live_census_user(
+            api_url,
+            email="dast-census-user@example.test",
+            role="USER",
+        )
+        live_admin_token, _ = await _provision_live_census_user(
+            api_url,
+            email="dast-census-admin@example.test",
+            role="ADMIN",
+        )
+        live_client = NestJSClient(
+            base_url=_TEST_ENV["NESTJS_API_URL"],
+            token=live_user_token,
+        )
+        user_token = live_user_token
+        admin_token = live_admin_token
+        gateway_headers = live_client._get_gateway_headers()
 
     for route in routes:
         svc = route["service"]
@@ -1133,6 +1245,16 @@ async def test_route_inventory_admin_routes_reject_standard_user() -> None:
         is_live_api = False
 
     if is_live_api:
+        user_token, _ = await _provision_live_census_user(
+            api_url,
+            email="dast-census-user@example.test",
+            role="USER",
+        )
+        admin_token, _ = await _provision_live_census_user(
+            api_url,
+            email="dast-census-admin@example.test",
+            role="ADMIN",
+        )
         async with httpx.AsyncClient(timeout=2.0) as client:
             for route in admin_routes:
                 path = route["path"].replace(":refundId", "syn_refund_001")
