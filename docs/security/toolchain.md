@@ -19,7 +19,7 @@ This document defines the verified security scanner toolchain for the Flight Boo
 | Tool | Capability | Pinned Version / Digest | Output Schema | License | Freshness Constraint |
 |---|---|---|---|---|---|
 | **Semgrep** | SAST (Agent, API, Web) | CLI `1.88.0` | SARIF v2.1.0 | LGPL-2.1 / Community | Pinned ruleset tags |
-| **OWASP ZAP** | DAST (REST API & Web) | `zaproxy/zap-stable:2.15.0@sha256:2d184081c7ff8be2ad7500599a0d4c82c3cfa5d95b542013fbe40d346ffc0303` | SARIF v2.1.0 / JSON | Apache-2.0 | Engine release build |
+| **OWASP ZAP** | DAST (REST API & Web) | `zaproxy/zap-stable:2.15.0@sha256:8dc78e39fafc3281ac2cf54eab05c3ea02721a1ea58f1c135f981a57f4e218b1` | SARIF v2.1.0 / JSON | Apache-2.0 | Engine release build |
 | **Gitleaks** | Secret Detection | `v8.18.4` | JSON | MIT | Pinned release binary |
 | **pip-audit** | Python SCA (Agent) | CLI `2.7.3` | JSON | Apache-2.0 | Max advisory age 24h |
 | **pnpm audit** | Node.js SCA (API, Web) | CLI `9.0.0+` | JSON | MIT | Live registry query |
@@ -50,12 +50,12 @@ This document defines the verified security scanner toolchain for the Flight Boo
   - `2`: Blocking security findings detected (`--error` flag enforces exit code 2 on ERROR-level findings).
 
 ### 3.2 OWASP ZAP (DAST)
-- **Container Digest**: `zaproxy/zap-stable:2.15.0@sha256:2d184081c7ff8be2ad7500599a0d4c82c3cfa5d95b542013fbe40d346ffc0303`
+- **Container Digest**: `zaproxy/zap-stable:2.15.0@sha256:8dc78e39fafc3281ac2cf54eab05c3ea02721a1ea58f1c135f981a57f4e218b1`
 - **Invocation (API Automation)**:
   ```bash
   docker run --rm \
     -v "${PWD}/tests/security/zap:/zap/wrk/:rw" \
-    -t zaproxy/zap-stable:2.15.0@sha256:2d184081c7ff8be2ad7500599a0d4c82c3cfa5d95b542013fbe40d346ffc0303 \
+    -t zaproxy/zap-stable:2.15.0@sha256:8dc78e39fafc3281ac2cf54eab05c3ea02721a1ea58f1c135f981a57f4e218b1 \
     zap-api-scan.py \
     -t http://host.docker.internal:3001/api/docs-json \
     -f openapi \

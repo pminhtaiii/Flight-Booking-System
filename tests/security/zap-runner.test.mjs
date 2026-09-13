@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   buildZapDockerArgs,
+  DEFAULT_ZAP_PINNED_IMAGE,
   evaluateZapReport,
   runZap,
   SUPPORTED_ZAP_JOB_TYPES,
@@ -149,11 +150,16 @@ test('validateRedirectScope: rejects out-of-scope or external redirect destinati
 // -----------------------------------------------------------------------------
 // Suite 2: buildZapDockerArgs(options)
 // -----------------------------------------------------------------------------
-test('buildZapDockerArgs: reads pinned image/digest from toolchain.json and generates docker run args', () => {
+test('buildZapDockerArgs: canonical behavior matches pinnedImage from toolchain.json', () => {
   const toolchain = JSON.parse(readFileSync(toolchainPath, 'utf8'));
   const expectedPinnedImage = toolchain.scanners.zap.pinnedImage;
 
   assert.ok(expectedPinnedImage, 'toolchain.json must define scanners.zap.pinnedImage');
+  assert.equal(
+    expectedPinnedImage,
+    'zaproxy/zap-stable:2.15.0@sha256:8dc78e39fafc3281ac2cf54eab05c3ea02721a1ea58f1c135f981a57f4e218b1',
+    'toolchain.json must define canonical pinned ZAP image digest',
+  );
 
   const args = buildZapDockerArgs({ toolchainPath });
 
@@ -164,6 +170,10 @@ test('buildZapDockerArgs: reads pinned image/digest from toolchain.json and gene
   assert.ok(
     args.includes(expectedPinnedImage),
     `args must include pinned image: ${expectedPinnedImage}`,
+  );
+  assert.ok(
+    args.includes(DEFAULT_ZAP_PINNED_IMAGE),
+    'canonical args must match DEFAULT_ZAP_PINNED_IMAGE',
   );
 
   // Check volume mount contains /zap/wrk/:rw
@@ -182,6 +192,60 @@ test('buildZapDockerArgs: reads pinned image/digest from toolchain.json and gene
     args.some((arg) => arg.includes('automation.yaml')),
     'args must specify automation.yaml config file',
   );
+});
+
+test('buildZapDockerArgs: fallback behavior when toolchainPath points to non-existent file', () => {
+  const nonExistentPath = resolve(tmpdir(), `non-existent-toolchain-${Date.now()}.json`);
+  const args = buildZapDockerArgs({ toolchainPath: nonExistentPath });
+
+  assert.ok(Array.isArray(args), 'buildZapDockerArgs must return an array of arguments');
+  assert.ok(
+    args.includes(
+      'zaproxy/zap-stable:2.15.0@sha256:8dc78e39fafc3281ac2cf54eab05c3ea02721a1ea58f1c135f981a57f4e218b1',
+    ),
+    'command args must include canonical fallback image digest when toolchainPath does not exist',
+  );
+  assert.ok(
+    args.includes(DEFAULT_ZAP_PINNED_IMAGE),
+    'command args must include DEFAULT_ZAP_PINNED_IMAGE when toolchainPath does not exist',
+  );
+});
+
+test('buildZapDockerArgs: fallback behavior when toolchainPath points to corrupted file or missing zap config', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'zap-corrupt-test-'));
+  try {
+    const corruptPath = join(tempDir, 'corrupted-toolchain.json');
+    writeFileSync(corruptPath, '{"scanners": { zap: invalid_json_syntax', 'utf8');
+
+    const argsCorrupt = buildZapDockerArgs({ toolchainPath: corruptPath });
+    assert.ok(Array.isArray(argsCorrupt), 'buildZapDockerArgs must return an array of arguments');
+    assert.ok(
+      argsCorrupt.includes(
+        'zaproxy/zap-stable:2.15.0@sha256:8dc78e39fafc3281ac2cf54eab05c3ea02721a1ea58f1c135f981a57f4e218b1',
+      ),
+      'command args must include canonical fallback image digest when toolchain file is corrupted',
+    );
+    assert.ok(
+      argsCorrupt.includes(DEFAULT_ZAP_PINNED_IMAGE),
+      'command args must include DEFAULT_ZAP_PINNED_IMAGE when toolchain file is corrupted',
+    );
+
+    const missingZapPath = join(tempDir, 'missing-zap-toolchain.json');
+    writeFileSync(missingZapPath, JSON.stringify({ scanners: {} }), 'utf8');
+    const argsMissing = buildZapDockerArgs({ toolchainPath: missingZapPath });
+    assert.ok(
+      argsMissing.includes(
+        'zaproxy/zap-stable:2.15.0@sha256:8dc78e39fafc3281ac2cf54eab05c3ea02721a1ea58f1c135f981a57f4e218b1',
+      ),
+      'command args must include canonical fallback image digest when toolchain file lacks zap key',
+    );
+    assert.ok(
+      argsMissing.includes(DEFAULT_ZAP_PINNED_IMAGE),
+      'command args must include DEFAULT_ZAP_PINNED_IMAGE when toolchain file lacks zap key',
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
 });
 
 test('buildZapDockerArgs: supports custom zapDir and user options', () => {

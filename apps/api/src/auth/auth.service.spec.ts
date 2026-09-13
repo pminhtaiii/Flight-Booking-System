@@ -5,7 +5,12 @@ import { AuditService } from '@/audit/audit.service';
 import { LockoutService } from './rate-limit/lockout.service';
 import { JwtService } from '@nestjs/jwt';
 import { CacheService } from '@/cache/cache.service';
-import { ConflictException, BadRequestException, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  BadRequestException,
+  UnauthorizedException,
+  ForbiddenException,
+} from '@nestjs/common';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -15,6 +20,7 @@ describe('AuthService', () => {
       findUnique: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      upsert: jest.fn(),
     },
     $transaction: jest.fn(async (cb: (tx: unknown) => Promise<unknown>): Promise<unknown> => {
       return cb(mockPrismaService);
@@ -210,6 +216,89 @@ describe('AuthService', () => {
       await expect(
         service.validateUserAccess('user-123', 'jti-revoked', 'mock_token'),
       ).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  describe('provisionTestUser', () => {
+    it('should upsert user with role, active status, hash password, and return token with user', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue(null);
+      mockPrismaService.user.upsert.mockResolvedValue({
+        id: 'usr-provisioned-123',
+        email: 'dast-user@example.test',
+        role: 'ADMIN',
+        status: 'ACTIVE',
+      });
+
+      const res = await service.provisionTestUser({
+        email: 'dast-user@example.test',
+        password: 'Password123!',
+        role: 'ADMIN',
+      });
+
+      expect(res).toEqual({
+        token: 'mock_token',
+        user: {
+          id: 'usr-provisioned-123',
+          email: 'dast-user@example.test',
+          role: 'ADMIN',
+        },
+      });
+      expect(mockPrismaService.user.findUnique).toHaveBeenCalledWith({
+        where: { email: 'dast-user@example.test' },
+      });
+      expect(mockPrismaService.user.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { email: 'dast-user@example.test' },
+          create: expect.objectContaining({
+            email: 'dast-user@example.test',
+            role: 'ADMIN',
+            status: 'ACTIVE',
+          }),
+          update: expect.objectContaining({
+            role: 'ADMIN',
+            status: 'ACTIVE',
+          }),
+        }),
+      );
+      expect(mockJwtService.sign).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'usr-provisioned-123',
+          email: 'dast-user@example.test',
+          role: 'ADMIN',
+          sub: 'usr-provisioned-123',
+        }),
+        expect.objectContaining({
+          expiresIn: '24h',
+          issuer: 'booking-systems-api',
+          audience: 'booking-systems-clients',
+        }),
+      );
+    });
+
+    it('should throw ForbiddenException if attempting to provision a non-test account', async () => {
+      await expect(
+        service.provisionTestUser({
+          email: 'victim@customer.com',
+          password: 'Password123!',
+          role: 'ADMIN',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should throw ForbiddenException if existing user in database is not a test account', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 'victim-123',
+        email: 'victim@customer.com',
+        status: 'ACTIVE',
+      });
+
+      await expect(
+        service.provisionTestUser({
+          email: 'test-admin@example.test',
+          password: 'Password123!',
+          role: 'ADMIN',
+        }),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 });

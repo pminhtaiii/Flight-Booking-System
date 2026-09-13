@@ -15,6 +15,9 @@ const defaultConfigFile = 'automation.yaml';
 const defaultOutputPath = resolve(repoRoot, 'artifacts/security/zap-report.json');
 const defaultRawReportPath = resolve(defaultZapDir, 'zap-raw-report.json');
 
+export const DEFAULT_ZAP_PINNED_IMAGE =
+  'zaproxy/zap-stable:2.15.0@sha256:8dc78e39fafc3281ac2cf54eab05c3ea02721a1ea58f1c135f981a57f4e218b1';
+
 export const ALLOWED_LOOPBACK_HOSTS = new Set([
   '127.0.0.1',
   'localhost',
@@ -126,8 +129,7 @@ export function validateRedirectScope(redirectTarget, baseUrl) {
  */
 export function buildZapDockerArgs(options = {}) {
   const toolchainFile = options.toolchainPath || defaultToolchainPath;
-  let pinnedImage =
-    'zaproxy/zap-stable:2.15.0@sha256:2d184081c7ff8be2ad7500599a0d4c82c3cfa5d95b542013fbe40d346ffc0303';
+  let pinnedImage = DEFAULT_ZAP_PINNED_IMAGE;
 
   if (existsSync(toolchainFile)) {
     try {
