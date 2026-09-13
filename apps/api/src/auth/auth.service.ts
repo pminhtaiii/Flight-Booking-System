@@ -3,6 +3,7 @@ import {
   ConflictException,
   UnauthorizedException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
@@ -261,8 +262,32 @@ export class AuthService {
     return { allowed: true, userId: user.id };
   }
 
-  async provisionTestUser(dto: { email: string; password?: string; role?: 'USER' | 'ADMIN' }) {
+  private isTestScopedEmail(email: string): boolean {
+    const isTestDomain =
+      email.endsWith('.test') ||
+      email.endsWith('.example') ||
+      email.endsWith('.local') ||
+      email.includes('+test@');
+    const isTestPrefix =
+      email.startsWith('test-') ||
+      email.startsWith('dast-') ||
+      email.startsWith('sec-') ||
+      email.startsWith('security-') ||
+      email.startsWith('census-');
+    return isTestDomain || isTestPrefix;
+  }
+
+  async provisionTestUser(dto: { email?: string; password?: string; role?: 'USER' | 'ADMIN' }) {
     const email = (dto.email || 'dast-census-user@example.test').trim().toLowerCase();
+    if (!this.isTestScopedEmail(email)) {
+      throw new ForbiddenException('Cannot modify non-test accounts via test fixture');
+    }
+
+    const existingUser = await this.prisma.user.findUnique({ where: { email } });
+    if (existingUser && !this.isTestScopedEmail(existingUser.email)) {
+      throw new ForbiddenException('Cannot modify non-test accounts via test fixture');
+    }
+
     const password = dto.password || 'Test@Password123!';
     const role = dto.role || 'USER';
     const hashedPassword = await bcrypt.hash(password, 10);

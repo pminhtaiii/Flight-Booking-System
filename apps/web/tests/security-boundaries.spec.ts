@@ -5,6 +5,10 @@ import { encode } from 'next-auth/jwt';
 import { getAuthCookieConfig } from '../lib/auth';
 
 const TEST_SECRET = process.env.NEXTAUTH_SECRET || randomBytes(32).toString('base64url');
+const AUDIT_EMAIL =
+  process.env.TEST_AUDIT_EMAIL ||
+  `security-audit-${Date.now()}-${randomBytes(4).toString('hex')}@example.test`;
+const AUDIT_PASSWORD = 'AuditPassword123!';
 let mockAuthBackend: http.Server | undefined;
 
 test.beforeAll(async () => {
@@ -21,28 +25,54 @@ test.beforeAll(async () => {
   }
 
   if (isRealApiRunning) {
-    const regRes = await fetch('http://127.0.0.1:3001/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: 'security-audit@example.test',
-        password: 'AuditPassword123!',
-      }),
-    });
+    let provisioned = false;
+    for (const url of [
+      'http://127.0.0.1:3001/api/auth/test/provision-user',
+      'http://127.0.0.1:3001/auth/test/provision-user',
+    ]) {
+      try {
+        const provisionRes = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: AUDIT_EMAIL,
+            password: AUDIT_PASSWORD,
+            role: 'USER',
+          }),
+        });
+        if (provisionRes.status === 200) {
+          provisioned = true;
+          break;
+        }
+      } catch {
+        // continue
+      }
+    }
 
-    if (regRes.status !== 201 && regRes.status !== 200 && regRes.status !== 409) {
-      const text = await regRes.text().catch(() => '');
-      throw new Error(
-        `Failed to provision security audit user: HTTP ${regRes.status} ${text}`,
-      );
+    if (!provisioned) {
+      const regRes = await fetch('http://127.0.0.1:3001/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: AUDIT_EMAIL,
+          password: AUDIT_PASSWORD,
+        }),
+      });
+
+      if (regRes.status !== 201 && regRes.status !== 200) {
+        const text = await regRes.text().catch(() => '');
+        throw new Error(
+          `Failed to provision security audit user: HTTP ${regRes.status} ${text}`,
+        );
+      }
     }
 
     const verifyRes = await fetch('http://127.0.0.1:3001/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email: 'security-audit@example.test',
-        password: 'AuditPassword123!',
+        email: AUDIT_EMAIL,
+        password: AUDIT_PASSWORD,
       }),
     });
 
@@ -67,7 +97,7 @@ test.beforeAll(async () => {
                 token: 'sec-auth-token-real',
                 user: {
                   id: 'sec-user-456',
-                  email: 'security-audit@example.test',
+                  email: AUDIT_EMAIL,
                 },
               }),
             );
@@ -114,7 +144,7 @@ async function authenticateSession(
       sub: 'sec-user-456',
       id: 'sec-user-456',
       accessToken: scenarioToken,
-      email: 'security-audit@example.test',
+      email: AUDIT_EMAIL,
       name: 'Security Audit User',
     },
   });
@@ -136,7 +166,7 @@ async function authenticateSession(
       body: JSON.stringify({
         user: {
           id: 'sec-user-456',
-          email: 'security-audit@example.test',
+          email: AUDIT_EMAIL,
           name: 'Security Audit User',
         },
         accessToken: scenarioToken,
@@ -341,7 +371,7 @@ test.describe('Web Browser Security Boundaries', () => {
       expect(content).not.toContain('Upcoming Bookings');
       expect(content).not.toContain('Completed Bookings');
       expect(content).not.toContain('Recent Bookings');
-      expect(content).not.toContain('security-audit@example.test');
+      expect(content).not.toContain(AUDIT_EMAIL);
     });
 
     test('unauthenticated visit to /bookings redirects cleanly to login with zero booking leakage', async ({
@@ -413,8 +443,8 @@ async function authenticateViaNextAuthCallback(page: Page): Promise<{
   const callbackRes = await page.request.post('/api/auth/callback/credentials', {
     form: {
       csrfToken: csrfToken || '',
-      email: 'security-audit@example.test',
-      password: 'AuditPassword123!',
+      email: AUDIT_EMAIL,
+      password: AUDIT_PASSWORD,
       callbackUrl: 'http://127.0.0.1:3000/',
       json: 'true',
     },
