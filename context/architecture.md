@@ -80,7 +80,7 @@
 │
 ├── tests/
 │   ├── ci/                            → CI workflow contract & network guard tests
-│   ├── security/                      → Security test harnesses, toolchain pins, sast runner, zap runner, and corpus manifests
+│   ├── security/                      → Security test harnesses, toolchain pins, sast runner, zap runner, corpus manifests, and observability contract
 │   │   ├── corpus/                    → schema.json, holdout_input.jsonl, holdout_tool.jsonl, holdout_output.jsonl, invariant_manifest.jsonl, manifest.json
 │   │   ├── sast/                      → guardrails.yml, ruleset.yml, snapshots/, and fixtures/ safe/unsafe control matrix
 │   │   ├── zap/                       → routes.json (45 route catalog), automation.yaml (AF config), routes-config.test.mjs
@@ -93,7 +93,8 @@
 │
 ├── docs/
 │   ├── adr/                           → Architectural Decision Records
-│   └── runbooks/                      → Authoritative operational runbooks
+│   ├── runbooks/                      → Authoritative operational runbooks
+│   └── security/                      → observability.md, rollout.md, performance-validation.md, toolchain.md
 │
 ├── context/
 │   ├── architecture.md                → This file
@@ -1209,7 +1210,7 @@ CI review follow-up (2026-09-11): application and shared-package changes route b
      - Immediate fail-closed rejection on expired exceptions (`expiresAt < currentDate`).
      - Non-bypassable hard rules: `no-llm-in-guardrails`, `no-unshielded-tool-execution`, and any Critical, High, or Error severity findings can NEVER be suppressed by baseline or exceptions.
 
-### Phase 7 US5 — Performance Benchmarks, Resource Validation & Fail-Closed Rollout Architecture
+### Phase 7 US5 — Security Observability, Performance Benchmarks & Rollout Controls
 
 1. **Hostile Near-Limit Performance Benchmarks (`apps/agent/tests/security/test_security_performance.py`)**:
    - **Timing Decomposition**: Active CPU compute latency is strictly decoupled from token stream arrival rate and 512-scalar buffer holdback wait time in `OutputGuardrailPipeline` and `ChunkBuffer`.
@@ -1228,7 +1229,8 @@ CI review follow-up (2026-09-11): application and shared-package changes route b
      - `GuardrailGateway` requires an instance of `GuardrailRegistry`; invalid configurations raise `RegistryContractError`.
      - `create_production_registry` enforces all $9$ compulsory layers; attempts to disable compulsory layers raise `RegistryContractError`.
      - Corrupted or invalid regex rules fail closed at startup with `ValueError`.
-     - Missing `JWT_SECRET` or `CLAIM_TOKEN_SECRET` halts boot via Pydantic `ValidationError`. Unauthenticated ingress returns 401; unauthorized origins return 403; requests never reach the runner or tools.
+     - Missing `AGENT_SERVICE_API_KEY`, `JWT_SECRET`, or `CLAIM_TOKEN_SECRET` halts boot via Pydantic `ValidationError`. Unauthenticated ingress returns 401; unauthorized origins return 403; requests never reach the runner or tools.
+     - Ingress fail-closed guard in `/chat/stream`: returns HTTP 503 (`GUARDRAIL_GATEWAY_UNAVAILABLE`) if `guardrail_gateway` is None or degraded without consuming daily/burst user quota or invoking runner.
      - Zero Fail-Open Bypass Invariant: All unexpected failures in input, tool execution, or tool batching return `status == 'BLOCK'`.
    - **Feature Flag Rollout & Rollback Rehearsals**:
      - $3$-phase rehearsal cycle (rollout $\to$ rollback $\to$ re-rollout) verified for `FEATURE_FLAG_CHAT_MULTI_AGENT`, `FEATURE_FLAG_CHAT_HANDOFF_ISSUE` / `NEXT_PUBLIC_FEATURE_FLAG_CHAT_HANDOFF`, and `NEXT_PUBLIC_FEATURE_FLAG_BOOKING_READINESS`.
@@ -1236,4 +1238,20 @@ CI review follow-up (2026-09-11): application and shared-package changes route b
    - **Operational Runbook & Health Probes**:
      - `/health/live`: Lightweight probe ($<1\text{ ms}$) performing zero model inference, guardrail compute, or network I/O.
      - `/health`: Comprehensive probe validating `nestjsApi`, `redis`, and deterministic `guardrails`.
-     - `docs/security/rollout.md` Section 5 establishes the step-by-step emergency rollback playbook and operator command runbook.
+     - `docs/security/rollout.md` establishes pre-flight verification gates, 4-stage canary rollout steps, key rotation SOPs, and step-by-step emergency rollback procedures.
+
+3. **Security Observability & Telemetry Contract (`tests/security/observability-contract.json`, `tests/security/observability-contract.test.mjs`, `docs/security/observability.md`)**:
+   - **Contract Authority & Invariant Enforcement**:
+     - Authoritative schema defined in `tests/security/observability-contract.json` and verified continuously by `tests/security/observability-contract.test.mjs`.
+     - **Bounded Metric Telemetry**:
+       - `security_guardrail_decisions_total` (counter, labels: `stage`, `decision`, `layer_key`, bounded cardinality $\le 90$).
+       - `security_guardrail_latency_ms` (histogram, buckets: `[0.5, 1, 2, 5, 10, 25, 50, 100, 250]`, labels: `stage`, `layer_key`).
+       - `security_emitter_errors_total` (counter, labels: `sink`, `error_type`, bounded cardinality $\le 15$).
+     - **Strict Privacy Invariants**:
+       - Zero Raw Payloads: Telemetry records and metric labels strictly forbid user prompts, model responses, tool outputs, session IDs, and customer PII (credit cards, passport numbers, emails, phone numbers).
+       - Zero High-Cardinality Labels: Dynamic user identifiers and session IDs are disallowed as Prometheus labels (cardinality limit $\le 10$ keys per metric).
+       - Pseudonymized Subject Reference: Structured event schema `security_guardrail_eval` requires `subject_ref` formatted strictly as an HMAC-SHA256 digest (`^hmac_sha256:[a-f0-9]{64}$`), governed by daily HMAC key rotation with 30-day retention and cryptographic shredding SOP without persisting raw user IDs.
+   - **Operational Dashboards & Alert Runbooks (`docs/security/observability.md`)**:
+     - Codifies real-time Grafana dashboard panels for guardrail decisions, P50/P95/P99 latency decomposition, and telemetry emitter error rates.
+     - Establishes Standard Operating Procedures (SOP) for false-positive tracking derived from offline labeled holdout evaluations and triage, not raw block counts.
+     - Codifies operational alert runbooks and incident response playbooks for `InjectionBlockRateSpike`, `GuardrailLatencyP95Breach`, and `TelemetryEmitterDropRateHigh`.

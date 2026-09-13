@@ -1,5 +1,25 @@
 # Progress Tracker
 
+### Feature 023 — Security Systems: Phase 7 US5 Observability Contract, Operational Runbooks & Rollout Hardening (Task T045 Completed) (2026-09-13)
+
+- **T045 Security Observability Contract, Dashboards, False Positive Tracking & Alert Runbooks (`tests/security/observability-contract.json`, `tests/security/observability-contract.test.mjs`, `docs/security/observability.md`)**:
+  - Implemented deterministic operational telemetry contract and verification suite (5/5 tests passing with exit code 0):
+    - **Telemetry Contract Schema (`tests/security/observability-contract.json`)**:
+      - Bounded metric definitions:
+        - `security_guardrail_decisions_total` (counter, labels `[stage, decision, layer_key]`, allowed stages `input/tool/output`, decisions `PASS/BLOCK/SKIP`, cardinality bound <= 90).
+        - `security_guardrail_latency_ms` (histogram, buckets `[0.5, 1, 2, 5, 10, 25, 50, 100, 250]`, unit ms, labels `[stage, layer_key]`).
+        - `security_emitter_errors_total` (counter, labels `[sink, error_type]`, sinks `security_audit_log/prometheus/redis`, cardinality bound <= 15).
+      - Label constraints: Max label cardinality 10, disallow arbitrary dynamic labels, strictly forbids dynamic user/session payload fields (`user_id`, `prompt`, `message`, `content`, `session_id`, `token`, `payload`, `email`, `ip_address`).
+      - Structured event schema: `security_guardrail_eval` requiring `event_type`, `timestamp_utc`, `trace_id`, `subject_ref`, `stage`, `layer_key`, `decision`, `latency_ms`; subject reference strictly pseudonymized via HMAC-SHA256 (`^hmac_sha256:[a-f0-9]{64}$`).
+      - Alert rules with operational thresholds: `InjectionBlockRateSpike` (critical, 5x 7-day baseline), `GuardrailLatencyP95Breach` (warning, > 50 ms budget), `TelemetryEmitterDropRateHigh` (critical, > 1% errors).
+    - **Contract Verification Test Suite (`tests/security/observability-contract.test.mjs`)**:
+      - Validates JSON schema validity, metric types/buckets/labels, high-cardinality/PII prohibition, event schema regex patterns, and alert definitions.
+    - **Observability Runbook & Dashboard Specifications (`docs/security/observability.md`)**:
+      - Real-time Grafana dashboard specs: Guardrail Decisions & Block Rates, Layer Latency Distribution (P50/P95/P99), Emitter Error and Health status.
+      - False positive tracking standard operating procedure (SOP): derived strictly from labeled evaluation holdouts and offline triage without capturing raw user payloads.
+      - Pseudonym retention and daily HMAC key rotation with 30-day retention and cryptographic shredding SOP: multi-key rotation window with zero plaintext identifier retention.
+      - Operational alert runbooks: step-by-step triage, investigation commands, and escalation matrix for critical and warning alerts.
+
 ### Feature 023 — Security Systems: Phase 7 US5 Slice 3 T047 Rollout Hardening, Review Remediation & Full Suite Alignment Completed (2026-09-13)
 
 - **T047 Fail-Closed Startup, Rollout, Rollback & Health Hardening (`apps/agent/tests/security/test_rollout.py`, `docs/security/rollout.md`)**:

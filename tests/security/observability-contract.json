@@ -1,0 +1,194 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "2026-09-13",
+  "description": "Deterministic operational security observability and telemetry contract for Feature 023.",
+  "metrics": {
+    "security_guardrail_decisions_total": {
+      "type": "counter",
+      "description": "Total count of deterministic guardrail decisions partitioned strictly by stage, layer, and decision outcome.",
+      "labels": ["stage", "decision", "layer_key"],
+      "allowed_stages": ["input", "tool", "output"],
+      "allowed_decisions": ["PASS", "BLOCK", "SKIP"],
+      "allowed_layer_keys": [
+        "input.length",
+        "input.pii",
+        "input.injection",
+        "input.topic",
+        "output.pii",
+        "tool.size_structure",
+        "tool.schema",
+        "tool.pii",
+        "tool.untrusted_content_injection"
+      ],
+      "cardinality_bound": 90
+    },
+    "security_guardrail_latency_ms": {
+      "type": "histogram",
+      "description": "Execution latency distribution of guardrail layers in milliseconds.",
+      "labels": ["stage", "layer_key"],
+      "buckets": [0.5, 1, 2, 5, 10, 25, 50, 100, 250],
+      "unit": "milliseconds"
+    },
+    "security_guardrail_turn_latency_ms": {
+      "type": "histogram",
+      "description": "Aggregate active CPU guardrail compute latency per complete chat turn in milliseconds.",
+      "buckets": [0.5, 1, 2, 5, 10, 20, 50, 100],
+      "unit": "milliseconds"
+    },
+    "security_emitter_errors_total": {
+      "type": "counter",
+      "description": "Count of failed telemetry emission attempts to background sinks.",
+      "labels": ["sink", "error_type"],
+      "allowed_sinks": ["security_audit_log", "prometheus", "redis"],
+      "allowed_error_types": [
+        "connection_timeout",
+        "buffer_overflow",
+        "io_error",
+        "serialization_failure",
+        "sink_unreachable",
+        "authentication_failure"
+      ],
+      "cardinality_bound": 18
+    }
+  },
+  "label_constraints": {
+    "max_label_cardinality": 10,
+    "forbidden_dynamic_labels": [
+      "user_id",
+      "userId",
+      "prompt",
+      "message",
+      "content",
+      "session_id",
+      "sessionId",
+      "token",
+      "payload",
+      "email",
+      "ip_address"
+    ],
+    "disallow_arbitrary_labels": true
+  },
+  "event_schema": {
+    "oneOf": [
+      {
+        "type": "object",
+        "required": [
+          "event_type",
+          "timestamp_utc",
+          "trace_id",
+          "subject_ref",
+          "stage",
+          "layer_key",
+          "decision",
+          "latency_ms"
+        ],
+        "properties": {
+          "event_type": { "type": "string", "enum": ["security_guardrail_eval"] },
+          "timestamp_utc": { "type": "string", "format": "date-time" },
+          "trace_id": { "type": "string", "pattern": "^[a-f0-9\\-]+$" },
+          "subject_ref": { "type": "string", "pattern": "^hmac_sha256:[a-f0-9]{64}$" },
+          "stage": { "type": "string", "enum": ["input", "tool", "output"] },
+          "layer_key": {
+            "type": "string",
+            "enum": [
+              "input.length",
+              "input.pii",
+              "input.injection",
+              "input.topic",
+              "output.pii",
+              "tool.size_structure",
+              "tool.schema",
+              "tool.pii",
+              "tool.untrusted_content_injection"
+            ]
+          },
+          "decision": { "type": "string", "enum": ["PASS", "BLOCK", "SKIP"] },
+          "latency_ms": { "type": "number", "minimum": 0 },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "LENGTH_EXCEEDED",
+              "PII_MASKED",
+              "PROMPT_INJECTION_DETECTED",
+              "TOPIC_VIOLATION",
+              "TOOL_SIZE_EXCEEDED",
+              "TOOL_SCHEMA_INVALID",
+              "UNTRUSTED_CONTENT_DETECTED",
+              "CLASSIFIER_FAILED_CLOSED",
+              "PASSED",
+              "SKIPPED"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "required": [
+          "event_type",
+          "timestamp_utc",
+          "trace_id",
+          "sink",
+          "error_type"
+        ],
+        "properties": {
+          "event_type": { "type": "string", "enum": ["security_emitter_error"] },
+          "timestamp_utc": { "type": "string", "format": "date-time" },
+          "trace_id": { "type": "string", "pattern": "^[a-f0-9\\-]+$" },
+          "sink": { "type": "string", "enum": ["security_audit_log", "prometheus", "redis"] },
+          "error_type": {
+            "type": "string",
+            "enum": [
+              "connection_timeout",
+              "buffer_overflow",
+              "io_error",
+              "serialization_failure",
+              "sink_unreachable",
+              "authentication_failure"
+            ]
+          },
+          "details": {
+            "type": "string",
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9_.: /\\-]{1,128}$"
+          }
+        },
+        "additionalProperties": false
+      }
+    ]
+  },
+  "alert_rules": {
+    "InjectionBlockRateSpike": {
+      "severity": "critical",
+      "description": "Block rate for prompt injection layer exceeds 5x 7-day rolling baseline.",
+      "condition": {
+        "metric": "security_guardrail_decisions_total",
+        "labels": { "stage": "input", "layer_key": "input.injection", "decision": "BLOCK" },
+        "threshold_multiplier": 5,
+        "baseline_window": "7d",
+        "evaluation_window": "5m"
+      }
+    },
+    "GuardrailLatencyP95Breach": {
+      "severity": "warning",
+      "description": "p95 compute latency for guardrail execution exceeds 50 ms budget.",
+      "condition": {
+        "metric": "security_guardrail_latency_ms",
+        "percentile": 95,
+        "threshold_ms": 50,
+        "evaluation_window": "5m"
+      }
+    },
+    "TelemetryEmitterDropRateHigh": {
+      "severity": "critical",
+      "description": "Telemetry event emitter drop/error rate exceeds 1% of total emissions.",
+      "condition": {
+        "metric": "security_emitter_errors_total",
+        "denominator_metric": "security_guardrail_decisions_total",
+        "threshold_percent": 1.0,
+        "evaluation_window": "5m",
+        "formula": "sum(rate(security_emitter_errors_total[5m])) / sum(rate(security_guardrail_decisions_total[5m])) > 0.01"
+      }
+    }
+  }
+}
