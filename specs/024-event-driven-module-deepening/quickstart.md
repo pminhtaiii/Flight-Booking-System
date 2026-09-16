@@ -10,6 +10,10 @@ Node >=20, pnpm >=9, installed workspace dependencies, Docker PostgreSQL/Redis a
 
 ```powershell
 docker compose up -d
+$databaseExists = docker compose exec -T postgres psql -U postgres -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='test_db'"
+if ($databaseExists.Trim() -ne '1') {
+  docker compose exec -T postgres createdb -U postgres test_db
+}
 $env:NODE_ENV = 'test'
 $env:DATABASE_URL = 'postgresql://postgres:postgres@127.0.0.1:5432/test_db'
 pnpm --filter @api/backend exec prisma generate

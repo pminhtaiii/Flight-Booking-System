@@ -267,10 +267,6 @@ flowchart TD
   SAGA -->|"injects"| IDS
   SAGA -->|"calls"| BLM
 
-  style PFM fill:#0f172a,stroke:#1e293b,color:#94a3b8
-  style IM fill:#ecfdf5,stroke:#059669
-  style SM fill:#f1f5f9,stroke:#94a3b8
-  style DM fill:#f1f5f9,stroke:#94a3b8
 ```
 
 ### Saga Pipeline with Compensating Actions
@@ -308,9 +304,6 @@ flowchart TD
     COMP_B["⟲ Cancel Airline Order\nFulfillmentGatewayPort.cancelOrder()\n+ Void Stripe Hold\n+ BookingLifecycle.updateToFailed()"]
   end
 
-  style Saga fill:#0f172a,stroke:#1e293b,color:#94a3b8
-  style Compensate fill:#fef2f2,stroke:#dc2626
-  style DONE fill:#ecfdf5,stroke:#059669
 ```
 
 ### Ports & Adapters: Before → After
@@ -348,10 +341,6 @@ flowchart LR
     BRS_A -->|"direct"| DS_A
   end
 
-  style Before fill:#fef2f2,stroke:#dc2626
-  style After fill:#ecfdf5,stroke:#059669
-  style PGP fill:#0f172a,stroke:#1e293b,color:#94a3b8
-  style FGP fill:#0f172a,stroke:#1e293b,color:#94a3b8
 ```
 
 ---
