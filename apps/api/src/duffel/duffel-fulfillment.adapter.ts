@@ -9,7 +9,10 @@ import {
   PersistedOrderEvidence,
   PortInvocationControl,
 } from '@/payment-fulfillment/ports';
-import { BoundedSemaphore } from '@/payment-fulfillment/utils/bounded-semaphore';
+import {
+  BoundedSemaphore,
+  parsePositiveIntegerSetting,
+} from '@/payment-fulfillment/utils/bounded-semaphore';
 import { DuffelService } from './duffel.service';
 
 @Injectable()
@@ -24,15 +27,21 @@ export class DuffelFulfillmentAdapter implements FulfillmentGatewayPort {
     if (semaphore) {
       this.semaphore = semaphore;
     } else {
-      const activeLimit = process.env.DUFFEL_ADMISSION_ACTIVE_LIMIT
-        ? Number.parseInt(process.env.DUFFEL_ADMISSION_ACTIVE_LIMIT, 10)
-        : 10;
-      const queueLimit = process.env.DUFFEL_ADMISSION_QUEUE_LIMIT
-        ? Number.parseInt(process.env.DUFFEL_ADMISSION_QUEUE_LIMIT, 10)
-        : 100;
-      const timeoutMs = process.env.DUFFEL_ADMISSION_TIMEOUT_MS
-        ? Number.parseInt(process.env.DUFFEL_ADMISSION_TIMEOUT_MS, 10)
-        : 5000;
+      const activeLimit = parsePositiveIntegerSetting(
+        process.env.DUFFEL_ADMISSION_ACTIVE_LIMIT,
+        10,
+        'DUFFEL_ADMISSION_ACTIVE_LIMIT',
+      );
+      const queueLimit = parsePositiveIntegerSetting(
+        process.env.DUFFEL_ADMISSION_QUEUE_LIMIT,
+        100,
+        'DUFFEL_ADMISSION_QUEUE_LIMIT',
+      );
+      const timeoutMs = parsePositiveIntegerSetting(
+        process.env.DUFFEL_ADMISSION_TIMEOUT_MS,
+        5000,
+        'DUFFEL_ADMISSION_TIMEOUT_MS',
+      );
 
       this.semaphore = new BoundedSemaphore(activeLimit, queueLimit, timeoutMs);
     }

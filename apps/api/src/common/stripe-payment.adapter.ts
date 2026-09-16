@@ -8,7 +8,10 @@ import {
   VoidHoldOutcome,
   PaymentAuthorizationStatus,
 } from '@/payment-fulfillment/ports';
-import { BoundedSemaphore } from '@/payment-fulfillment/utils/bounded-semaphore';
+import {
+  BoundedSemaphore,
+  parsePositiveIntegerSetting,
+} from '@/payment-fulfillment/utils/bounded-semaphore';
 
 @Injectable()
 export class StripePaymentAdapter implements PaymentGatewayPort {
@@ -21,15 +24,21 @@ export class StripePaymentAdapter implements PaymentGatewayPort {
     if (semaphore) {
       this._semaphore = semaphore;
     } else {
-      const activeLimit = process.env.STRIPE_ADMISSION_ACTIVE_LIMIT
-        ? parseInt(process.env.STRIPE_ADMISSION_ACTIVE_LIMIT, 10)
-        : 20;
-      const queueLimit = process.env.STRIPE_ADMISSION_QUEUE_LIMIT
-        ? parseInt(process.env.STRIPE_ADMISSION_QUEUE_LIMIT, 10)
-        : 100;
-      const timeoutMs = process.env.STRIPE_ADMISSION_TIMEOUT_MS
-        ? parseInt(process.env.STRIPE_ADMISSION_TIMEOUT_MS, 10)
-        : 5000;
+      const activeLimit = parsePositiveIntegerSetting(
+        process.env.STRIPE_ADMISSION_ACTIVE_LIMIT,
+        20,
+        'STRIPE_ADMISSION_ACTIVE_LIMIT',
+      );
+      const queueLimit = parsePositiveIntegerSetting(
+        process.env.STRIPE_ADMISSION_QUEUE_LIMIT,
+        100,
+        'STRIPE_ADMISSION_QUEUE_LIMIT',
+      );
+      const timeoutMs = parsePositiveIntegerSetting(
+        process.env.STRIPE_ADMISSION_TIMEOUT_MS,
+        5000,
+        'STRIPE_ADMISSION_TIMEOUT_MS',
+      );
       this._semaphore = new BoundedSemaphore(activeLimit, queueLimit, timeoutMs);
     }
   }
@@ -69,7 +78,7 @@ export class StripePaymentAdapter implements PaymentGatewayPort {
       await control.beforeInvoke();
       const pi = await this.stripeService.capturePaymentIntent(intentId, undefined, captureKey);
       return {
-        success: true,
+        success: pi.status === 'succeeded',
         intentId,
         status: pi.status,
         capturedAmount: pi.amount_received ?? pi.amount,

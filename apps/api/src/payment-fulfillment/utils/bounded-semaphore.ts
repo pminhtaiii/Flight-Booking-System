@@ -29,6 +29,29 @@ function validatePositiveBoundedInteger(val: unknown, name: string): asserts val
   }
 }
 
+export function parsePositiveIntegerSetting(
+  rawValue: string | undefined,
+  defaultValue: number,
+  varName: string,
+): number {
+  if (rawValue === undefined || rawValue === '') {
+    return defaultValue;
+  }
+  const trimmed = rawValue.trim();
+  if (!/^[1-9]\d*$/.test(trimmed)) {
+    throw new Error(
+      `Invalid configuration for ${varName}: "${rawValue}". Must be a positive integer string.`,
+    );
+  }
+  const parsed = Number(trimmed);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    throw new Error(
+      `Invalid configuration for ${varName}: "${rawValue}". Must be a safe positive integer.`,
+    );
+  }
+  return parsed;
+}
+
 export class BoundedSemaphore {
   private readonly _activeLimit: number;
   private readonly _queueLimit: number;

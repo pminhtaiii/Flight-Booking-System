@@ -15,7 +15,7 @@ import { DuffelFulfillmentAdapter } from './duffel-fulfillment.adapter';
     DuffelFulfillmentAdapter,
     {
       provide: FULFILLMENT_GATEWAY_PORT,
-      useClass: DuffelFulfillmentAdapter,
+      useExisting: DuffelFulfillmentAdapter,
     },
   ],
   exports: [DuffelService, DuffelFulfillmentAdapter, FULFILLMENT_GATEWAY_PORT],

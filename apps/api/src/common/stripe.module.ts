@@ -10,7 +10,7 @@ import { PAYMENT_GATEWAY_PORT } from '@/payment-fulfillment/ports';
     StripePaymentAdapter,
     {
       provide: PAYMENT_GATEWAY_PORT,
-      useClass: StripePaymentAdapter,
+      useExisting: StripePaymentAdapter,
     },
   ],
   exports: [StripeService, StripePaymentAdapter, PAYMENT_GATEWAY_PORT],

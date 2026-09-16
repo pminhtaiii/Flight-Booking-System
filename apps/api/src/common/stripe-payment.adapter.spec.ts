@@ -78,6 +78,29 @@ describe('StripePaymentAdapter', () => {
       expect(customAdapter.semaphore).toBe(customSem);
       expect(customAdapter.semaphore.activeLimit).toBe(3);
     });
+
+    it.each([
+      ['STRIPE_ADMISSION_ACTIVE_LIMIT', '5workers'],
+      ['STRIPE_ADMISSION_ACTIVE_LIMIT', '2.5'],
+      ['STRIPE_ADMISSION_ACTIVE_LIMIT', '-1'],
+      ['STRIPE_ADMISSION_ACTIVE_LIMIT', '0'],
+      ['STRIPE_ADMISSION_QUEUE_LIMIT', '5workers'],
+      ['STRIPE_ADMISSION_QUEUE_LIMIT', '2.5'],
+      ['STRIPE_ADMISSION_QUEUE_LIMIT', '-1'],
+      ['STRIPE_ADMISSION_QUEUE_LIMIT', '0'],
+      ['STRIPE_ADMISSION_TIMEOUT_MS', '5workers'],
+      ['STRIPE_ADMISSION_TIMEOUT_MS', '2.5'],
+      ['STRIPE_ADMISSION_TIMEOUT_MS', '-1'],
+      ['STRIPE_ADMISSION_TIMEOUT_MS', '0'],
+    ])(
+      'throws an Error naming the variable when %s is set to %p',
+      (envVar, invalidValue) => {
+        process.env[envVar] = invalidValue;
+        expect(() => new StripePaymentAdapter(stripeService)).toThrowError(
+          new RegExp(`Invalid configuration for ${envVar}: "${invalidValue}"`),
+        );
+      },
+    );
   });
 
   describe('authorizeHold', () => {
@@ -176,6 +199,38 @@ describe('StripePaymentAdapter', () => {
       ).rejects.toThrow('Card declined on capture');
       expect(adapter.semaphore.activeCount).toBe(0);
     });
+
+    it.each([
+      'processing',
+      'requires_action',
+      'requires_capture',
+      'requires_confirmation',
+      'requires_payment_method',
+      'canceled',
+    ])(
+      'returns success: false when capture returns non-succeeded status "%s"',
+      async (stripeStatus) => {
+        stripeService.capturePaymentIntent.mockResolvedValue({
+          id: 'pi_cap_nonfinal',
+          status: stripeStatus,
+          amount: 5000,
+          amount_received: 0,
+          currency: 'usd',
+        } as any);
+
+        const control = createControl();
+        const result = await adapter.capturePayment('pi_cap_nonfinal', 'cap_key', control);
+
+        expect(result).toEqual({
+          success: false,
+          intentId: 'pi_cap_nonfinal',
+          status: stripeStatus,
+          capturedAmount: 0,
+          currency: 'usd',
+        });
+        expect(adapter.semaphore.activeCount).toBe(0);
+      },
+    );
   });
 
   describe('voidHold', () => {
@@ -448,6 +503,7 @@ describe('StripePaymentAdapter', () => {
 
       expect(gatewayPort).toBeInstanceOf(StripePaymentAdapter);
       expect(adapterInstance).toBeInstanceOf(StripePaymentAdapter);
+      expect(moduleRef.get(PAYMENT_GATEWAY_PORT)).toBe(moduleRef.get(StripePaymentAdapter));
     });
   });
 });

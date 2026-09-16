@@ -3,6 +3,7 @@ import {
   BoundedSemaphore,
   AdmissionTimeoutException,
   AdmissionQueueFullException,
+  parsePositiveIntegerSetting,
 } from './bounded-semaphore';
 
 describe('BoundedSemaphore', () => {
@@ -405,4 +406,29 @@ describe('BoundedSemaphore', () => {
       expect(semaphore.activeCount).toBe(0);
     });
   });
+
+  describe('parsePositiveIntegerSetting', () => {
+    it('returns defaultValue when rawValue is undefined or empty string', () => {
+      expect(parsePositiveIntegerSetting(undefined, 20, 'TEST_VAR')).toBe(20);
+      expect(parsePositiveIntegerSetting('', 100, 'TEST_VAR')).toBe(100);
+    });
+
+    it('parses and trims valid positive integer strings', () => {
+      expect(parsePositiveIntegerSetting('5', 20, 'TEST_VAR')).toBe(5);
+      expect(parsePositiveIntegerSetting('  42  ', 20, 'TEST_VAR')).toBe(42);
+      expect(parsePositiveIntegerSetting('1000', 20, 'TEST_VAR')).toBe(1000);
+    });
+
+    it.each(['5workers', '2.5', '-1', '0'])(
+      'throws an Error naming the variable when rawValue is %p',
+      (invalidValue) => {
+        expect(() =>
+          parsePositiveIntegerSetting(invalidValue, 20, 'MY_SETTING_VAR'),
+        ).toThrowError(
+          new RegExp(`Invalid configuration for MY_SETTING_VAR: "${invalidValue}"`),
+        );
+      },
+    );
+  });
 });
+

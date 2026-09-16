@@ -1,7 +1,21 @@
-import { AdmissionQueueFullException, AdmissionTimeoutException, BoundedSemaphore } from '@/payment-fulfillment/utils/bounded-semaphore';
-import { CreateOrderInput, PassengerEnrichmentInput, PersistedOrderEvidence, PortInvocationControl } from '@/payment-fulfillment/ports';
+import {
+  AdmissionQueueFullException,
+  AdmissionTimeoutException,
+  BoundedSemaphore,
+} from '@/payment-fulfillment/utils/bounded-semaphore';
+import {
+  CreateOrderInput,
+  FULFILLMENT_GATEWAY_PORT,
+  PassengerEnrichmentInput,
+  PersistedOrderEvidence,
+  PortInvocationControl,
+} from '@/payment-fulfillment/ports';
+import { Test, TestingModule } from '@nestjs/testing';
+import { CacheService } from '@/cache/cache.service';
+import { PrismaService } from '@/prisma/prisma.service';
 import { DuffelFulfillmentAdapter } from './duffel-fulfillment.adapter';
 import { DuffelService } from './duffel.service';
+import { DuffelModule } from './duffel.module';
 
 describe('DuffelFulfillmentAdapter', () => {
   let adapter: DuffelFulfillmentAdapter;
@@ -21,6 +35,63 @@ describe('DuffelFulfillmentAdapter', () => {
     };
 
     adapter = new DuffelFulfillmentAdapter(mockDuffelService as DuffelService);
+  });
+
+  describe('Semaphore Configuration & Defaults', () => {
+    const originalEnv = { ...process.env };
+
+    afterEach(() => {
+      process.env = { ...originalEnv };
+    });
+
+    it('initializes with default semaphore parameters (10, 100, 5000) when env vars are absent', () => {
+      delete process.env.DUFFEL_ADMISSION_ACTIVE_LIMIT;
+      delete process.env.DUFFEL_ADMISSION_QUEUE_LIMIT;
+      delete process.env.DUFFEL_ADMISSION_TIMEOUT_MS;
+
+      const defaultAdapter = new DuffelFulfillmentAdapter(mockDuffelService as DuffelService);
+      const sem = defaultAdapter.semaphore;
+
+      expect(sem.activeLimit).toBe(10);
+      expect(sem.queueLimit).toBe(100);
+      expect(sem.timeoutMs).toBe(5000);
+    });
+
+    it('configures semaphore limits from environment variables when provided', () => {
+      process.env.DUFFEL_ADMISSION_ACTIVE_LIMIT = '5';
+      process.env.DUFFEL_ADMISSION_QUEUE_LIMIT = '15';
+      process.env.DUFFEL_ADMISSION_TIMEOUT_MS = '2500';
+
+      const configuredAdapter = new DuffelFulfillmentAdapter(mockDuffelService as DuffelService);
+      const sem = configuredAdapter.semaphore;
+
+      expect(sem.activeLimit).toBe(5);
+      expect(sem.queueLimit).toBe(15);
+      expect(sem.timeoutMs).toBe(2500);
+    });
+
+    it.each([
+      ['DUFFEL_ADMISSION_ACTIVE_LIMIT', '5workers'],
+      ['DUFFEL_ADMISSION_ACTIVE_LIMIT', '2.5'],
+      ['DUFFEL_ADMISSION_ACTIVE_LIMIT', '-1'],
+      ['DUFFEL_ADMISSION_ACTIVE_LIMIT', '0'],
+      ['DUFFEL_ADMISSION_QUEUE_LIMIT', '5workers'],
+      ['DUFFEL_ADMISSION_QUEUE_LIMIT', '2.5'],
+      ['DUFFEL_ADMISSION_QUEUE_LIMIT', '-1'],
+      ['DUFFEL_ADMISSION_QUEUE_LIMIT', '0'],
+      ['DUFFEL_ADMISSION_TIMEOUT_MS', '5workers'],
+      ['DUFFEL_ADMISSION_TIMEOUT_MS', '2.5'],
+      ['DUFFEL_ADMISSION_TIMEOUT_MS', '-1'],
+      ['DUFFEL_ADMISSION_TIMEOUT_MS', '0'],
+    ])(
+      'throws an Error naming the variable when %s is set to %p',
+      (envVar, invalidValue) => {
+        process.env[envVar] = invalidValue;
+        expect(() => new DuffelFulfillmentAdapter(mockDuffelService as DuffelService)).toThrowError(
+          new RegExp(`Invalid configuration for ${envVar}: "${invalidValue}"`),
+        );
+      },
+    );
   });
 
   describe('createOrder', () => {
@@ -500,4 +571,29 @@ describe('DuffelFulfillmentAdapter', () => {
       expect(enriched.passengers[1].phone_number).toBe('+4445556666');
     });
   });
+
+  describe('Module Wiring (DuffelModule)', () => {
+    it('binds and exports FULFILLMENT_GATEWAY_PORT as a singleton alias of DuffelFulfillmentAdapter', async () => {
+      const moduleRef: TestingModule = await Test.createTestingModule({
+        imports: [DuffelModule],
+      })
+        .overrideProvider(CacheService)
+        .useValue({})
+        .overrideProvider(PrismaService)
+        .useValue({})
+        .compile();
+
+      const gatewayPort = moduleRef.get(FULFILLMENT_GATEWAY_PORT);
+      const adapterInstance = moduleRef.get(DuffelFulfillmentAdapter);
+
+      expect(gatewayPort).toBeDefined();
+      expect(adapterInstance).toBeDefined();
+      expect(gatewayPort).toBeInstanceOf(DuffelFulfillmentAdapter);
+      expect(adapterInstance).toBeInstanceOf(DuffelFulfillmentAdapter);
+      expect(moduleRef.get(FULFILLMENT_GATEWAY_PORT)).toBe(
+        moduleRef.get(DuffelFulfillmentAdapter),
+      );
+    });
+  });
 });
+
