@@ -10,6 +10,29 @@ import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import * as crypto from 'crypto';
 
+export interface SagaOwnership {
+  key: string;
+  userId: string;
+  requestPath: string;
+  requestHash: string;
+  lockedAt: Date;
+}
+
+export type SagaCheckpoint =
+  | 'started'
+  | 'stripe_authorized'
+  | 'duffel_order_created'
+  | 'captured'
+  | 'completed';
+
+export const SAGA_CHECKPOINTS: readonly SagaCheckpoint[] = [
+  'started',
+  'stripe_authorized',
+  'duffel_order_created',
+  'captured',
+  'completed',
+] as const;
+
 @Injectable()
 export class PaymentIdempotencyService {
   private readonly logger = new Logger(PaymentIdempotencyService.name);
@@ -227,6 +250,124 @@ export class PaymentIdempotencyService {
         lockedAt: null,
       },
     });
+  }
+
+  /**
+   * Asserts that the current worker holds active, uncontested ownership of the saga key.
+   * Matches key, customerId, requestPath, requestHash, lockedAt, and uncompleted responseBody.
+   * If key is deleted, cron-cleared, lease stolen/modified, or completed, throws ConflictException.
+   */
+  async assertOwned(ownership: SagaOwnership): Promise<void> {
+    const existing = await this.prisma.idempotencyKey.findFirst({
+      where: {
+        key: ownership.key,
+        customerId: ownership.userId,
+        requestPath: ownership.requestPath,
+        requestHash: ownership.requestHash,
+        lockedAt: ownership.lockedAt,
+        responseBody: { equals: Prisma.DbNull },
+      },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      throw new ConflictException('Idempotency key ownership lost');
+    }
+  }
+
+  /**
+   * Atomically advances the saga recovery point without allowing checkpoint regression.
+   * Validates transition against current checkpoint, allows same-stage no-op,
+   * and conditions atomic update on full ownership predicate and allowed predecessor recoveryPoints.
+   */
+  async advanceSagaCheckpoint(
+    ownership: SagaOwnership,
+    targetCheckpoint: SagaCheckpoint,
+  ): Promise<void> {
+    const existing = await this.prisma.idempotencyKey.findFirst({
+      where: {
+        key: ownership.key,
+        customerId: ownership.userId,
+        requestPath: ownership.requestPath,
+        requestHash: ownership.requestHash,
+        lockedAt: ownership.lockedAt,
+        responseBody: { equals: Prisma.DbNull },
+      },
+      select: {
+        recoveryPoint: true,
+      },
+    });
+
+    if (!existing) {
+      throw new ConflictException('Idempotency key ownership lost');
+    }
+
+    const targetIndex = SAGA_CHECKPOINTS.indexOf(targetCheckpoint);
+    if (targetIndex === -1) {
+      throw new ConflictException(`Invalid saga checkpoint: ${targetCheckpoint}`);
+    }
+
+    const currentIndex = SAGA_CHECKPOINTS.indexOf(existing.recoveryPoint as SagaCheckpoint);
+    if (currentIndex !== -1 && currentIndex > targetIndex) {
+      throw new ConflictException(
+        `Cannot regress saga checkpoint from '${existing.recoveryPoint}' to '${targetCheckpoint}'`,
+      );
+    }
+
+    if (currentIndex === targetIndex) {
+      return;
+    }
+
+    const allowedPredecessors = SAGA_CHECKPOINTS.slice(0, targetIndex);
+    const result = await this.prisma.idempotencyKey.updateMany({
+      where: {
+        key: ownership.key,
+        customerId: ownership.userId,
+        requestPath: ownership.requestPath,
+        requestHash: ownership.requestHash,
+        lockedAt: ownership.lockedAt,
+        responseBody: { equals: Prisma.DbNull },
+        recoveryPoint: { in: [...allowedPredecessors] },
+      },
+      data: {
+        recoveryPoint: targetCheckpoint,
+      },
+    });
+
+    if (result.count === 0) {
+      throw new ConflictException('Idempotency key ownership lost');
+    }
+  }
+
+  /**
+   * Atomically completes the saga key lifecycle: persists responseCode, responseBody,
+   * sets recoveryPoint to 'completed', and clears lockedAt in a single owner-fenced update.
+   */
+  async completeSagaKeyAtomic(
+    ownership: SagaOwnership,
+    responseCode: number,
+    responseBody: unknown,
+  ): Promise<void> {
+    const result = await this.prisma.idempotencyKey.updateMany({
+      where: {
+        key: ownership.key,
+        customerId: ownership.userId,
+        requestPath: ownership.requestPath,
+        requestHash: ownership.requestHash,
+        lockedAt: ownership.lockedAt,
+        responseBody: { equals: Prisma.DbNull },
+      },
+      data: {
+        recoveryPoint: 'completed',
+        responseCode,
+        responseBody: (responseBody ?? null) as Prisma.InputJsonValue,
+        lockedAt: null,
+      },
+    });
+
+    if (result.count === 0) {
+      throw new ConflictException('Idempotency key ownership lost');
+    }
   }
 
   /**

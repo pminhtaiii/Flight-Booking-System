@@ -4,12 +4,28 @@
 
 Planning artifacts: [specification](../specs/024-event-driven-module-deepening/spec.md), [plan](../specs/024-event-driven-module-deepening/plan.md), and [tasks](../specs/024-event-driven-module-deepening/tasks.md).
 
-### Implemented Architecture (Phase 2 Foundation Completed)
+#### Implemented Architecture (Phase 3 Slice 1 Foundation Completed)
 
 - **IdempotencyModule (`apps/api/src/idempotency/`)**:
   - Independent domain module extracted from `PaymentModule`, providing and exporting `PaymentIdempotencyService` and `@IdempotencyKey()` parameter decorator.
   - Encapsulates atomic key acquisition, 5-minute stale-lock CAS, 409 conflict detection, 422 payload mismatch verification, response caching, and completion recording over Prisma `IdempotencyKey`.
+  - **Saga Ownership Fencing (T005)**: Added `assertOwned(ownership)`, `advanceSagaCheckpoint(ownership, target)`, and `completeSagaKeyAtomic(ownership, code, body)` conditioned on full predicate (`key`, `customerId`, `requestPath`, `requestHash`, `lockedAt`, and uncompleted response). Strictly prevents checkpoint regression and rejects stale/stolen/cleared ownership in foreground and post-25s background handoff.
   - Preserves backward compatibility via deprecation re-export in `apps/api/src/payment/payment-idempotency.service.ts`.
+- **Payment Fulfillment Ports (`apps/api/src/payment-fulfillment/ports/`) (T006)**:
+  - Provider-blind ports decoupled from third-party SDKs: `payment-gateway.port.ts` and `fulfillment-gateway.port.ts` with barrel export `index.ts`.
+  - Bound via DI tokens `PAYMENT_GATEWAY_PORT` and `FULFILLMENT_GATEWAY_PORT`.
+  - Enforces `PortInvocationControl` (`beforeInvoke: () => Promise<void>`) across all gateway operations for pre-SDK saga ownership assertion.
+- **Stripe Payment Adapter (`apps/api/src/common/stripe-payment.adapter.ts`) (T007)**:
+  - Implements `PaymentGatewayPort` and bound to `PAYMENT_GATEWAY_PORT` in `StripeModule`.
+  - Injects `StripeService` and guards calls with `BoundedSemaphore` admission control (`activeLimit=20`, `queueLimit=100`, `timeoutMs=5000` configurable via env).
+  - Implemented `authorizeHold` (status normalization: `requires_capture` -> `authorized`, `succeeded` -> `captured`, `canceled` -> `voided`, others -> `nonfinal`), `capturePayment` (with capture idempotency key), and `voidHold`.
+  - Enforces `PortInvocationControl.beforeInvoke()` before SDK calls, immediately releasing admission permit if ownership assertion fails.
+- **Duffel Fulfillment Adapter (`apps/api/src/duffel/duffel-fulfillment.adapter.ts`) (T008)**:
+  - Implements `FulfillmentGatewayPort` and bound to `FULFILLMENT_GATEWAY_PORT` in `DuffelModule`.
+  - Injects `DuffelService` and guards calls with `BoundedSemaphore` admission control (`activeLimit=10`, `queueLimit=100`, `timeoutMs=5000`).
+  - Maps services, metadata, and idempotency key, redacting passenger PII (`email`, `born_on`, `given_name`, `family_name`, `phone_number`) from persisted order evidence.
+  - Enriches fallback snapshot with passenger input and contact email if live upstream order retrieval fails.
+  - Enforces `PortInvocationControl.beforeInvoke()` before SDK calls, immediately releasing admission permit if ownership check fails.
 - **AncillariesModule Decoupling (`apps/api/src/ancillaries/`)**:
   - `AncillariesModule` now imports `IdempotencyModule` directly with zero imports from `PaymentModule`.
   - Decoupling verified with unit/compilation tests in `apps/api/src/ancillaries/ancillaries.module.spec.ts`.
