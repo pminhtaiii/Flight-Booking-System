@@ -424,8 +424,8 @@ describe('BoundedSemaphore', () => {
       (invalidValue) => {
         expect(() =>
           parsePositiveIntegerSetting(invalidValue, 20, 'MY_SETTING_VAR'),
-        ).toThrowError(
-          new RegExp(`Invalid configuration for MY_SETTING_VAR: "${invalidValue}"`),
+        ).toThrow(
+          `Invalid configuration for MY_SETTING_VAR: "${invalidValue}"`,
         );
       },
     );

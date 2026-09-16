@@ -96,8 +96,8 @@ describe('StripePaymentAdapter', () => {
       'throws an Error naming the variable when %s is set to %p',
       (envVar, invalidValue) => {
         process.env[envVar] = invalidValue;
-        expect(() => new StripePaymentAdapter(stripeService)).toThrowError(
-          new RegExp(`Invalid configuration for ${envVar}: "${invalidValue}"`),
+        expect(() => new StripePaymentAdapter(stripeService)).toThrow(
+          `Invalid configuration for ${envVar}: "${invalidValue}"`,
         );
       },
     );

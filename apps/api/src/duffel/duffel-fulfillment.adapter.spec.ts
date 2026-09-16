@@ -87,8 +87,8 @@ describe('DuffelFulfillmentAdapter', () => {
       'throws an Error naming the variable when %s is set to %p',
       (envVar, invalidValue) => {
         process.env[envVar] = invalidValue;
-        expect(() => new DuffelFulfillmentAdapter(mockDuffelService as DuffelService)).toThrowError(
-          new RegExp(`Invalid configuration for ${envVar}: "${invalidValue}"`),
+        expect(() => new DuffelFulfillmentAdapter(mockDuffelService as DuffelService)).toThrow(
+          `Invalid configuration for ${envVar}: "${invalidValue}"`,
         );
       },
     );
