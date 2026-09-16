@@ -93,3 +93,13 @@ Existing public failure text can overstate compensation success. Characterize an
 Split existing payment.service and ancillary confirmation tests into saga-owned suites without losing create-payment coverage. Preserve `payment-ancillary-order-recovery.spec.ts` cases for immutable version N, binding recheck, supplier failure, capture failure, capture timeout-after-success, unknown reconciliation, background binding, and idempotent crash recovery. Preserve payment-state-machine, idempotency, recovery, Stripe/Duffel and refund/webhook/cron suites.
 
 Add real controller characterization for immediate, first-failure, replay, legacy-completed and Tier 2 behavior. Add adapter argument/normalization/fallback/admission tests, every-checkpoint resume tests, and lost-lease foreground/background tests. Real PostgreSQL tests must prove stale owners cannot advance/complete a key, atomic terminal cache/checkpoint persistence, and financial transaction rollback. Compile/init actual Nest modules to prove single PaymentMethodService registration and absence of saga/PaymentModule cycles. Runtime validation results belong to implementation; this document is not evidence that tests passed.
+
+## Baseline Verification Note (2026-09-16)
+
+On 2026-09-16, a complete static re-inventory of entry points, direct projection calls (all 9 sites), and booking business-state mutation sites was conducted. Confirmed 0 drift on line numbers, signatures, and context against current runtime codebase:
+- `apps/api/src/payment/payment.controller.ts`: lines 62–84 (`confirmPayment`, `HttpStatus.OK`, `HttpStatus.ACCEPTED` Tier 2 handoff).
+- `apps/api/src/payment/payment.service.ts`: line 939 (`confirmPayment`), line 995 (`executeConfirmPayment`), line 1863 (`handleBackgroundError`).
+- `apps/api/src/payment/payment-idempotency.service.ts`: line 22 (`acquireOrReplay`), line 176 (`abandonAcquiredKey`), line 211 (`updateRecoveryPoint`), line 221 (`completeKey`), line 235 (`getResumePoint`), line 245 (`isLocked`).
+- Provider boundaries verified in `apps/api/src/common/stripe.service.ts` and `apps/api/src/duffel/duffel.service.ts`.
+Zero drift detected across all entry points, idempotency semantics, and saga extraction boundaries.
+
