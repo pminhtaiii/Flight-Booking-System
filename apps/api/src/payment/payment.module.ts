@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { PaymentIdempotencyService } from './payment-idempotency.service';
+import { IdempotencyModule } from '@/idempotency/idempotency.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PaymentService } from './payment.service';
 import { PaymentRefundService } from './payment-refund.service';
@@ -22,6 +22,7 @@ import { RefundSettlementModule } from '../refund-settlement/refund-settlement.m
     PrismaModule,
     DuffelModule,
     AuditModule,
+    IdempotencyModule,
     RefundModule,
     RefundSettlementModule,
     BookingLifecycleModule,
@@ -29,7 +30,6 @@ import { RefundSettlementModule } from '../refund-settlement/refund-settlement.m
   ],
   controllers: [PaymentController, PaymentWebhookController, AdminRefundController],
   providers: [
-    PaymentIdempotencyService,
     PaymentService,
     PaymentRefundService,
     PaymentMethodService,
@@ -38,7 +38,7 @@ import { RefundSettlementModule } from '../refund-settlement/refund-settlement.m
     AncillaryPaymentValidationService,
   ],
   exports: [
-    PaymentIdempotencyService,
+    IdempotencyModule,
     PaymentService,
     PaymentRefundService,
     PaymentMethodService,
@@ -47,3 +47,4 @@ import { RefundSettlementModule } from '../refund-settlement/refund-settlement.m
   ],
 })
 export class PaymentModule {}
+

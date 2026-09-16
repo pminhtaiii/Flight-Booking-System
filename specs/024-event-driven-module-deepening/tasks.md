@@ -13,8 +13,8 @@
 
 These stable seams block US1 extraction. Event infrastructure/schema are deliberately deferred to US2 so US1 is independently deployable.
 
-- [ ] T003 Extract existing idempotency service/decorator and its regression tests into `apps/api/src/idempotency/payment-idempotency.service.ts`, `payment-idempotency.service.spec.ts` and `idempotency.module.ts`; preserve the complete non-saga surface and all acquisition/abandon semantics.
-- [ ] T004 Rewire service/decorator imports and remove duplicate payment provider registration in `apps/api/src/payment/payment.module.ts`, payment controllers/services and `apps/api/src/ancillaries/ancillaries.module.ts`, `apps/api/src/ancillaries/ancillaries.service.ts`; prove ancillary code no longer imports PaymentModule solely for idempotency.
+- [x] T003 Extract existing idempotency service/decorator and its regression tests into `apps/api/src/idempotency/payment-idempotency.service.ts`, `payment-idempotency.service.spec.ts` and `idempotency.module.ts`; preserve the complete non-saga surface and all acquisition/abandon semantics.
+- [x] T004 Rewire service/decorator imports and remove duplicate payment provider registration in `apps/api/src/payment/payment.module.ts`, payment controllers/services and `apps/api/src/ancillaries/ancillaries.module.ts`, `apps/api/src/ancillaries/ancillaries.service.ts`; prove ancillary code no longer imports PaymentModule solely for idempotency.
 
 ## Phase 3 — US1: Safe payment orchestration (P1, MVP)
 

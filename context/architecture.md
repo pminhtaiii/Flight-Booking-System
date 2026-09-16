@@ -1,8 +1,23 @@
 # Architecture
 
-## Planned Feature 024 — Event-Driven Module Deepening
+## Feature 024 — Event-Driven Module Deepening (In Progress)
 
-Planning artifacts: [specification](../specs/024-event-driven-module-deepening/spec.md), [plan](../specs/024-event-driven-module-deepening/plan.md), and [tasks](../specs/024-event-driven-module-deepening/tasks.md). These are planned boundaries, not implemented runtime changes.
+Planning artifacts: [specification](../specs/024-event-driven-module-deepening/spec.md), [plan](../specs/024-event-driven-module-deepening/plan.md), and [tasks](../specs/024-event-driven-module-deepening/tasks.md).
+
+### Implemented Architecture (Phase 2 Foundation Completed)
+
+- **IdempotencyModule (`apps/api/src/idempotency/`)**:
+  - Independent domain module extracted from `PaymentModule`, providing and exporting `PaymentIdempotencyService` and `@IdempotencyKey()` parameter decorator.
+  - Encapsulates atomic key acquisition, 5-minute stale-lock CAS, 409 conflict detection, 422 payload mismatch verification, response caching, and completion recording over Prisma `IdempotencyKey`.
+  - Preserves backward compatibility via deprecation re-export in `apps/api/src/payment/payment-idempotency.service.ts`.
+- **AncillariesModule Decoupling (`apps/api/src/ancillaries/`)**:
+  - `AncillariesModule` now imports `IdempotencyModule` directly with zero imports from `PaymentModule`.
+  - Decoupling verified with unit/compilation tests in `apps/api/src/ancillaries/ancillaries.module.spec.ts`.
+- **PaymentModule Clean Composition (`apps/api/src/payment/`)**:
+  - `PaymentModule` imports and re-exports `IdempotencyModule` without duplicate provider registration for `PaymentIdempotencyService`.
+  - All payment services, controllers, and spec files directly import from `@/idempotency/payment-idempotency.service`.
+
+### Remaining Architecture (Phases 3–6)
 
 - Extract payment confirmation into PaymentFulfillmentSaga, SDK-local adapters and IdempotencyModule; retain public HTTP behavior and financial transaction/recovery semantics.
 - Extract BookingProjectionModule with passive postcommit events, coherent versioned hydration, guarded persistence and bounded reconciliation (100 candidates, five repairs concurrently).
@@ -54,13 +69,15 @@ Planning artifacts: [specification](../specs/024-event-driven-module-deepening/s
 │   │   │   │   ├── traveler-preferences/  → PII-stripped preferences projection
 │   │   │   │   ├── auth/                  → AgentAuthModule (API key & claim token guards)
 │   │   │   │   └── audit/                 → AgentToolAuditModule (privacy-safe telemetry)
+│   │   │   ├── ancillaries/           → Ancillary services (seats, baggage) importing IdempotencyModule directly
 │   │   │   ├── booking/               → Pure umbrella BookingModule aggregating submodules
 │   │   │   ├── booking-lifecycle/     → Provider-blind lifecycle transitions & recovery
 │   │   │   ├── booking-management/    → Owner read models, disruption & revision queries
 │   │   │   ├── cancellation/          → Cancellation quotes, locks & obligation generation
 │   │   │   ├── chat/                  → Chat persistence & AgentChatController (JTI checks)
 │   │   │   ├── dashboard/             → Direct Prisma booking summary read model & stats
-│   │   │   ├── payment/               → Payment processing & trigger coordinators
+│   │   │   ├── idempotency/           → IdempotencyModule providing PaymentIdempotencyService
+│   │   │   ├── payment/               → Payment processing & trigger coordinators (imports IdempotencyModule)
 │   │   │   ├── refund/                → RefundTransactionService & capacity reservation
 │   │   │   └── refund-settlement/     → Provider-blind atomic ledger & projection settlement
 │   │   └── test/                      → API E2E & characterization spec tests
@@ -1305,7 +1322,7 @@ CI review follow-up (2026-09-11): application and shared-package changes route b
 
 3. **Fail-Closed Gateway Lifecycle & Ingress Guarantees**:
    - **Compulsory 9-Layer Production Registry**: `GuardrailGateway` requires `create_production_registry` with all 9 compulsory layers active. Disabling or skipping any compulsory layer raises `RegistryContractError` during startup.
-   - **Ingress Availability Guard (`/chat/stream`)**: Gateway status is evaluated *prior* to Redis quota admission. If `guardrail_gateway` is None or degraded, returns HTTP 503 `GUARDRAIL_GATEWAY_UNAVAILABLE` immediately without consuming user daily/burst quotas or invoking LLM runners.
+   - **Ingress Availability Guard (`/chat/stream`)**: Gateway status is evaluated _prior_ to Redis quota admission. If `guardrail_gateway` is None or degraded, returns HTTP 503 `GUARDRAIL_GATEWAY_UNAVAILABLE` immediately without consuming user daily/burst quotas or invoking LLM runners.
    - **Zero Fail-Open Bypass**: Unexpected exceptions in input parsing, layer evaluation, or tool execution default to `PipelineDecision(status="BLOCK")` and safe user-facing fallbacks.
 
 4. **Pre-Parse ASGI Request Limits (`BodyLimitMiddleware`)**:

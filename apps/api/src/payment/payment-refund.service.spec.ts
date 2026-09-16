@@ -3,7 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BookingStatus, PaymentStatus, RefundStatus, RefundTriggerType } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { StripeService } from '@/common/stripe.service';
-import { PaymentIdempotencyService } from '@/payment/payment-idempotency.service';
+import { PaymentIdempotencyService } from '@/idempotency/payment-idempotency.service';
 import { AuditService } from '@/audit/audit.service';
 import { RefundTransactionService } from '../refund/refund-transaction.service';
 import { RefundSettlementService } from '../refund-settlement/refund-settlement.service';

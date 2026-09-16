@@ -1,5 +1,24 @@
 # Progress Tracker
 
+### Feature 024 — Event-Driven Module Deepening: Phase 2 Foundation Completed (Tasks T003, T004) (2026-09-16)
+
+- **T003 [Foundation]**: Extracted `IdempotencyModule` and `PaymentIdempotencyService` into dedicated `apps/api/src/idempotency/`:
+  - Moved `PaymentIdempotencyService` and `@IdempotencyKey()` parameter decorator to `apps/api/src/idempotency/payment-idempotency.service.ts` preserving complete non-saga acquisition, lock CAS, replay detection, hash verification, and completion recording semantics verbatim.
+  - Relocated full regression test suite to `apps/api/src/idempotency/payment-idempotency.service.spec.ts` (23/23 tests pass).
+  - Maintained backward compatibility via deprecation re-export in `apps/api/src/payment/payment-idempotency.service.ts`.
+- **T004 [Foundation]**: Rewired imports and decoupled `AncillariesModule` from `PaymentModule`:
+  - `AncillariesModule` now imports `IdempotencyModule` directly; eliminated `PaymentModule` dependency completely.
+  - Created decoupling test `apps/api/src/ancillaries/ancillaries.module.spec.ts` verifying `AncillariesModule` contains 0 imports from `PaymentModule` and compiles independently.
+  - Updated `PaymentModule` to import and re-export `IdempotencyModule` without duplicate provider registration for `PaymentIdempotencyService`.
+  - Migrated all payment callers, services, controllers, and 9 test suites from legacy payment-scoped import to `@/idempotency/payment-idempotency.service`.
+- **Verification**:
+  - ESLint API: 0 warnings, 0 errors (`pnpm exec eslint "apps/api/**/*.ts" --max-warnings 0`).
+  - TypeScript API: `tsc --noEmit` passed with 0 errors (`pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`).
+  - Idempotency unit tests: 23/23 passed with CI node network guard (`pnpm --filter @api/backend test -- apps/api/src/idempotency/payment-idempotency.service.spec.ts`).
+  - Ancillaries unit tests passed across 4 suites (`pnpm --filter @api/backend test -- apps/api/src/ancillaries/`).
+  - Payment characterization E2E: 9/9 tests passed across 5 scenarios (`pnpm --filter @api/backend test -- apps/api/test/payment-fulfillment.e2e-spec.ts`).
+- Phase 2 (Foundation) completed; Phase 3 (US1: Safe payment orchestration, Tasks T005–T014) is unblocked.
+
 ### Feature 024 — Event-Driven Module Deepening: Phase 1 Setup Completed (Tasks T001, T002) (2026-09-16)
 
 - **T001 [Setup]**: Completed full static re-inventory of payment entry points, 9 direct projection calls, and booking business-state writers. Confirmed 0 drift against `contracts/booking-events.md` and `contracts/payment-fulfillment.md`. Appended formal baseline notes.
@@ -79,7 +98,7 @@
       - `AGENT_SERVICE_API_KEY`, `JWT_SECRET`, and `CLAIM_TOKEN_SECRET` fail-fast validation in Pydantic `Settings`. Empty keys abort startup immediately.
       - `GuardrailGateway.is_healthy()` contract enforcing valid `GuardrailRegistry` and compulsory production layers.
       - POST `/chat/stream` ingress fail-closed guard: returns HTTP 503 (`GUARDRAIL_GATEWAY_UNAVAILABLE`) if `guardrail_gateway` is None or degraded, with zero runner invocations.
-      - **Zero Quota Consumption on Gateway Failures**: Guardrail gateway readiness is evaluated *before* Redis quota admission in `/chat/stream`, ensuring 503 gateway errors never consume user daily or burst quotas (`test_gateway_failure_does_not_consume_quota`).
+      - **Zero Quota Consumption on Gateway Failures**: Guardrail gateway readiness is evaluated _before_ Redis quota admission in `/chat/stream`, ensuring 503 gateway errors never consume user daily or burst quotas (`test_gateway_failure_does_not_consume_quota`).
     - **Health Probe Key & Subsystem Verification**:
       - `/health/live`: Lightweight probe guaranteed HTTP 200 with zero model inference, zero guardrail checks, zero Redis/external I/O (< 10ms).
       - `/health`: Deep probe monitoring `guardrails: deterministic`, `redis`, and `nestjsApi`. Degrades status to `degraded` with `guardrails: {"status": "down"}` if gateway is None/degraded or if `AGENT_SERVICE_API_KEY`, `JWT_SECRET`, or `CLAIM_TOKEN_SECRET` are missing.
@@ -262,6 +281,7 @@
   - Issue 9 (Dynamic Test Configuration): Removed hardcoded secret literals and URLs from module import level in `test_ownership.py`; resolved dynamically via `_resolve_test_env()` using `secrets.token_hex(32)` or environment variables in `conftest.py` / `test_ownership.py`.
   - Issue 10 (Comment Quality & Rationale): Purged redundant narration comments throughout both test modules; preserved only security rationale, threat model, and invariant explanations.
   - Sanitized failure diagnostics in `tests/security/dast/test_adversarial.py` leak assertions to report only `case_id`, `mode`, and `category`, preventing sensitive fixture strings or raw text disclosure in test outputs.
+
   ### Feature 023 — Security Systems: Phase 8 Slice 1 (Task T048 Completed) (2026-09-13)
 
 - **T048 Disposable Mutation Controls & Critical Transition Verification**:

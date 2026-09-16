@@ -23,7 +23,7 @@ import { CreatePaymentDto } from './dto/create-payment.dto';
 import { ConfirmPaymentDto } from './dto/confirm-payment.dto';
 import { PaymentResponseDto } from './dto/payment-response.dto';
 import { RefundPaymentDto } from './dto/refund-payment.dto';
-import { IdempotencyKey } from './payment-idempotency.service';
+import { IdempotencyKey } from '@/idempotency/payment-idempotency.service';
 
 interface AuthenticatedRequest extends Request {
   user: {
