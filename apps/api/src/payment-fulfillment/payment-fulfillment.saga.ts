@@ -35,6 +35,7 @@ import {
   PassengerEnrichmentInput,
   PersistedOrderEvidence,
   EphemeralPassenger,
+  CapturePaymentOutcome,
 } from './ports';
 
 function isOwnershipLost(error: unknown): boolean {
@@ -60,9 +61,6 @@ export class PaymentFulfillmentSaga {
     private readonly bookingPassengerFinalValidator?: BookingPassengerFinalValidatorService,
   ) {}
 
-  /**
-   * Confirm Payment: Entry point with Tier 2 (25s) handoff and background execution
-   */
   async confirmPayment(
     dto: ConfirmPaymentDto,
     idempotencyKey: string,
@@ -129,11 +127,11 @@ export class PaymentFulfillmentSaga {
         (raceResult as { isTimeout: boolean }).isTimeout &&
         !isFinished
       ) {
-        this.logger.log('confirmPayment hit Tier 2 timeout (25s). Handoff to async polling.');
+        this.logger.log('[confirmPayment] Hit Tier 2 timeout (25s). Handoff to async polling.');
 
         confirmPromise.catch((err: unknown) => {
           this.logger.error(
-            `Background confirmPayment execution failed for payment ${dto.paymentId}: ${
+            `[confirmPayment] Background execution failed for payment ${dto.paymentId}: ${
               err instanceof Error ? err.message : String(err)
             }`,
             err instanceof Error ? err.stack : undefined,
@@ -146,7 +144,7 @@ export class PaymentFulfillmentSaga {
             err,
           ).catch((bgErr: unknown) => {
             this.logger.error(
-              `Failed to execute background error recovery: ${
+              `[confirmPayment] Failed to execute background error recovery: ${
                 bgErr instanceof Error ? bgErr.message : String(bgErr)
               }`,
               bgErr instanceof Error ? bgErr.stack : undefined,
@@ -174,9 +172,6 @@ export class PaymentFulfillmentSaga {
     }
   }
 
-  /**
-   * Core Saga Orchestration: 4-Stage Sequential Checkpointed Pipeline
-   */
   async executeConfirmPayment(
     dto: ConfirmPaymentDto,
     idempotencyKey: string,
@@ -216,7 +211,6 @@ export class PaymentFulfillmentSaga {
     };
 
     try {
-      // 1. Query payment
       let payment = await this.prisma.payment.findUnique({
         where: { id: dto.paymentId },
         include: {
@@ -251,7 +245,6 @@ export class PaymentFulfillmentSaga {
         }
       }
 
-      // 2. Create canonical booking in PROCESSING state
       const canonicalBooking = await this.bookingLifecycleService.createBooking(
         userId,
         dto.bookingId,
@@ -263,7 +256,6 @@ export class PaymentFulfillmentSaga {
         throw new ForbiddenException('You do not own this booking');
       }
 
-      // 3. Resume from recovery point
       let recoveryPoint = await this.idempotency.getResumePoint(idempotencyKey);
       if (!recoveryPoint) {
         recoveryPoint = 'started';
@@ -279,6 +271,7 @@ export class PaymentFulfillmentSaga {
             orderBy: { createdAt: 'desc' },
           });
 
+          // Metadata stored in paymentEvent is a Prisma Json object containing the order details
           const duffelOrder = duffelEvent?.metadata as Record<string, unknown> | null;
           if (!duffelOrder) {
             throw new InternalServerErrorException(
@@ -290,11 +283,16 @@ export class PaymentFulfillmentSaga {
             success: true,
             paymentId: payment.id,
             status: 'SUCCEEDED',
-            bookingReference: (duffelOrder.bookingReference || duffelOrder.booking_reference) as string,
+            bookingReference: (duffelOrder.bookingReference ||
+              duffelOrder.booking_reference) as string,
             duffelOrderId: duffelOrder.id as string,
           };
 
-          await this.idempotency.completeSagaKeyAtomic(currentOwnership, HttpStatus.OK, successResponse);
+          await this.idempotency.completeSagaKeyAtomic(
+            currentOwnership,
+            HttpStatus.OK,
+            successResponse,
+          );
           return successResponse;
         } else {
           const duffelEvent = await this.prisma.paymentEvent.findFirst({
@@ -328,7 +326,6 @@ export class PaymentFulfillmentSaga {
         }
       }
 
-      // Stage 1: Authorization Validation
       if (recoveryPoint === 'started') {
         const authOutcome = await this.paymentGateway.authorizeHold(
           payment.stripePaymentIntentId,
@@ -338,21 +335,29 @@ export class PaymentFulfillmentSaga {
         if (authOutcome.status === 'authorized') {
           if (payment.status === 'CREATED') {
             enforceTransition(payment.status, 'AUTHORIZED');
-            const pId = payment.id;
-            const pStatus = payment.status;
-            const pAmount = payment.amount;
+            await this.idempotency.assertOwned(currentOwnership);
+
+            const paymentId = payment.id;
+            const previousStatus = payment.status;
+            const authorizedAmount = payment.amount;
+
             await this.prisma.$transaction(async (tx) => {
-              await tx.payment.update({
-                where: { id: pId },
+              const updateResult = await tx.payment.updateMany({
+                where: { id: paymentId, status: 'CREATED' },
                 data: { status: 'AUTHORIZED' },
               });
+              if (updateResult.count === 0) {
+                throw new ConflictException(
+                  `Payment ${paymentId} status is no longer CREATED; cannot transition to AUTHORIZED`,
+                );
+              }
               await tx.paymentEvent.create({
                 data: {
-                  paymentId: pId,
+                  paymentId,
                   eventType: 'payment_authorized',
-                  previousStatus: pStatus,
+                  previousStatus,
                   newStatus: 'AUTHORIZED',
-                  amount: pAmount,
+                  amount: authorizedAmount,
                   source: 'API',
                   createdBy: userId,
                 },
@@ -371,7 +376,9 @@ export class PaymentFulfillmentSaga {
           }
         } else if (authOutcome.status !== 'captured') {
           throw new BadRequestException(
-            `Stripe PaymentIntent is in invalid status: ${authOutcome.rawStatus || authOutcome.status}`,
+            `Stripe PaymentIntent is in invalid status: ${
+              authOutcome.rawStatus || authOutcome.status
+            }`,
           );
         }
 
@@ -379,7 +386,6 @@ export class PaymentFulfillmentSaga {
         recoveryPoint = 'stripe_authorized';
       }
 
-      // Stage 2: Fulfillment Order Booking
       if (recoveryPoint === 'stripe_authorized') {
         const bookingIntent = await this.prisma.bookingIntent.findUnique({
           where: { id: payment.bookingIntentId },
@@ -430,10 +436,6 @@ export class PaymentFulfillmentSaga {
               correlationId: traceContext?.correlationId,
             });
           } catch (validationError: unknown) {
-            if (isOwnershipLost(validationError)) {
-              throw validationError;
-            }
-
             const error = validationError as Error;
             const responseObj =
               validationError instanceof HttpException
@@ -449,7 +451,7 @@ export class PaymentFulfillmentSaga {
                 : HttpStatus.UNPROCESSABLE_ENTITY;
 
             this.logger.error(
-              `Final passenger validation failed for booking intent ${bookingIntent.id}: ${error.message}`,
+              `[executeConfirmPayment] Final passenger validation failed for booking intent ${bookingIntent.id}: ${error.message}`,
               error.stack,
             );
 
@@ -468,24 +470,23 @@ export class PaymentFulfillmentSaga {
               correlationId: traceContext?.correlationId,
             });
 
-            // Void / cancel Stripe authorization hold via paymentGateway
             try {
               await this.paymentGateway.voidHold(payment.stripePaymentIntentId, control);
             } catch (voidError: unknown) {
               if (isOwnershipLost(voidError)) {
                 throw voidError;
               }
-              const err = voidError as Error;
+              const voidErr = voidError as Error;
               this.logger.error(
-                `paymentGateway voidHold failed after passenger validation error: ${err.message}`,
-                err.stack,
+                `[executeConfirmPayment] Payment gateway voidHold failed after passenger validation error: ${voidErr.message}`,
+                voidErr.stack,
               );
             }
 
-            // Update Payment, BookingIntent, and Booking status atomically
             enforceTransition(payment.status, 'CANCELLED');
             const nextBookingStatus =
               bookingIntent.paymentAttemptCount < 2 ? 'AWAITING_PAYMENT' : 'CANCELLED';
+
             await this.prisma.$transaction(async (tx) => {
               await tx.payment.update({
                 where: { id: payment.id },
@@ -526,7 +527,11 @@ export class PaymentFulfillmentSaga {
               code: reasonCode,
               bookingStatus: nextBookingStatus,
             };
-            await this.idempotency.completeSagaKeyAtomic(currentOwnership, status, failureResponse);
+            await this.idempotency.completeSagaKeyAtomic(
+              currentOwnership,
+              status,
+              failureResponse,
+            );
 
             throw new HttpException(failureResponse, status);
           }
@@ -534,17 +539,21 @@ export class PaymentFulfillmentSaga {
           passengersToOrder = bookingIntent.passengers.map((p) => {
             const mapped: EphemeralPassenger = {
               id: p.id,
-              givenName: p.givenName,
-              familyName: p.familyName,
-              type: p.type ? String(p.type).toLowerCase() : undefined,
-              gender: p.gender ?? undefined,
-              dateOfBirth: p.dateOfBirth,
-              duffelPassengerId: p.duffelPassengerId ?? undefined,
-              middleName: p.middleName ?? undefined,
+              givenName: p.givenName ?? undefined,
+              familyName: p.familyName ?? undefined,
               title: p.title ?? undefined,
               email: p.email ?? undefined,
               phoneNumber: p.phoneNumber ?? undefined,
+              type: p.type ?? undefined,
+              dateOfBirth: p.dateOfBirth ?? undefined,
+              gender: p.gender ?? undefined,
+              middleName: p.middleName ?? undefined,
               phoneCountryCode: p.phoneCountryCode ?? undefined,
+              nationality: p.nationality ?? undefined,
+              passportNumber: p.passportNumber ?? undefined,
+              passportExpiry: p.passportExpiry ?? undefined,
+              travelerProfileId: p.travelerProfileId ?? undefined,
+              duffelPassengerId: p.duffelPassengerId ?? undefined,
               documentType: p.documentType ?? undefined,
               issuingCountry: p.issuingCountry ?? undefined,
             };
@@ -552,47 +561,53 @@ export class PaymentFulfillmentSaga {
           });
         }
 
-        let orderOutcome;
-        try {
-          const recheckedPayment = await this.prisma.payment.findUnique({
-            where: { id: payment.id },
-            include: {
-              bookingIntent: true,
-              ancillarySelection: {
-                include: {
-                  seatSelections: true,
-                  baggageSelections: true,
-                },
+        const recheckedPayment = await this.prisma.payment.findUnique({
+          where: { id: payment.id },
+          include: {
+            bookingIntent: true,
+            ancillarySelection: {
+              include: {
+                seatSelections: true,
+                baggageSelections: true,
               },
             },
-          });
-          if (!recheckedPayment) {
-            throw new InternalServerErrorException(
-              'Payment-bound ancillary selection could not be recovered',
-            );
-          }
-          const orderPayment = recheckedPayment;
-          const hasAncillaryBinding = payment.ancillarySelectionId !== null;
-          const hasExactBoundSelection =
-            orderPayment.ancillarySelectionId === payment.ancillarySelectionId &&
-            orderPayment.ancillarySelectionVersion === payment.ancillarySelectionVersion &&
-            (hasAncillaryBinding
-              ? orderPayment.ancillarySelection?.id === payment.ancillarySelectionId &&
-                orderPayment.ancillarySelection.version === payment.ancillarySelectionVersion &&
-                orderPayment.ancillarySelection.status === 'PAYMENT_BOUND'
-              : orderPayment.ancillarySelection === null);
-          if (!hasExactBoundSelection) {
-            throw new InternalServerErrorException(
-              'Payment-bound ancillary selection could not be recovered',
-            );
-          }
+          },
+        });
 
+        if (!recheckedPayment) {
+          throw new InternalServerErrorException(
+            'Payment-bound ancillary selection could not be recovered',
+          );
+        }
+
+        const orderPayment = recheckedPayment;
+        const hasAncillaryBinding = payment.ancillarySelectionId !== null;
+        const hasExactBoundSelection =
+          orderPayment.ancillarySelectionId === payment.ancillarySelectionId &&
+          orderPayment.ancillarySelectionVersion === payment.ancillarySelectionVersion &&
+          (hasAncillaryBinding
+            ? orderPayment.ancillarySelection?.id === payment.ancillarySelectionId &&
+              orderPayment.ancillarySelection.version === payment.ancillarySelectionVersion &&
+              orderPayment.ancillarySelection.status === 'PAYMENT_BOUND'
+            : orderPayment.ancillarySelection === null);
+
+        if (!hasExactBoundSelection) {
+          throw new InternalServerErrorException(
+            'Payment-bound ancillary selection could not be recovered',
+          );
+        }
+
+        let orderOutcome: Awaited<ReturnType<FulfillmentGatewayPort['createOrder']>>;
+        try {
           orderOutcome = await this.fulfillmentGateway.createOrder(
             {
               offerId: bookingIntent.duffelOfferId,
               passengers: passengersToOrder,
               services: services.length > 0 ? services : undefined,
-              metadata: { bookingIntentId: bookingIntent.id, paymentId: payment.id },
+              metadata: {
+                bookingIntentId: bookingIntent.id,
+                paymentId: payment.id,
+              },
               idempotencyKey,
             },
             control,
@@ -603,23 +618,28 @@ export class PaymentFulfillmentSaga {
           }
 
           const error = fulfillmentError as Error;
-          this.logger.error(`Fulfillment booking failed: ${error.message}`, error.stack);
+          this.logger.error(
+            `[executeConfirmPayment] Fulfillment order booking failed: ${error.message}`,
+            error.stack,
+          );
 
-          // Cancel/Void Stripe authorization hold
           try {
             await this.paymentGateway.voidHold(payment.stripePaymentIntentId, control);
           } catch (voidError: unknown) {
             if (isOwnershipLost(voidError)) {
               throw voidError;
             }
-            const err = voidError as Error;
-            this.logger.error(`paymentGateway voidHold failed: ${err.message}`, err.stack);
+            const voidErr = voidError as Error;
+            this.logger.error(
+              `[executeConfirmPayment] Payment gateway voidHold failed after fulfillment error: ${voidErr.message}`,
+              voidErr.stack,
+            );
           }
 
-          // Update Payment, BookingIntent, and Booking status atomically
           enforceTransition(payment.status, 'CANCELLED');
           const nextBookingStatus =
             bookingIntent.paymentAttemptCount < 2 ? 'AWAITING_PAYMENT' : 'CANCELLED';
+
           await this.prisma.$transaction(async (tx) => {
             await tx.payment.update({
               where: { id: payment.id },
@@ -664,39 +684,61 @@ export class PaymentFulfillmentSaga {
           throw new HttpException(failureResponse, HttpStatus.BAD_GATEWAY);
         }
 
-        // Fulfillment order succeeded. Log payment event with evidence.
-        await this.prisma.paymentEvent.create({
-          data: {
-            paymentId: payment.id,
-            eventType: 'duffel_order_created',
-            previousStatus: 'AUTHORIZED',
-            newStatus: 'AUTHORIZED',
-            amount: payment.amount,
-            source: 'API',
-            metadata: orderOutcome.evidence as Prisma.InputJsonValue,
-            createdBy: userId,
-          },
+        await this.idempotency.assertOwned(currentOwnership);
+        await this.prisma.$transaction(async (tx) => {
+          const currentPayment = await tx.payment.findUnique({ where: { id: payment.id } });
+          if (currentPayment?.status !== 'AUTHORIZED') {
+            throw new ConflictException(`Payment ${payment.id} status is no longer AUTHORIZED`);
+          }
+          await tx.paymentEvent.create({
+            data: {
+              paymentId: payment.id,
+              eventType: 'duffel_order_created',
+              previousStatus: 'AUTHORIZED',
+              newStatus: 'AUTHORIZED',
+              amount: payment.amount,
+              source: 'API',
+              metadata: orderOutcome.evidence as Prisma.InputJsonValue,
+              createdBy: userId,
+            },
+          });
         });
 
         await this.idempotency.advanceSagaCheckpoint(currentOwnership, 'duffel_order_created');
         recoveryPoint = 'duffel_order_created';
       }
 
-      // Stage 3: Payment Capture
       if (recoveryPoint === 'duffel_order_created') {
+        let captureOutcome: CapturePaymentOutcome | undefined;
+        let captureFailed = false;
+        let initialCaptureError: Error | undefined;
+
         try {
-          await this.paymentGateway.capturePayment(
+          captureOutcome = await this.paymentGateway.capturePayment(
             payment.stripePaymentIntentId,
             `${idempotencyKey}-stripe-capture`,
             control,
           );
+          if (!captureOutcome || !captureOutcome.success || captureOutcome.status !== 'succeeded') {
+            captureFailed = true;
+            initialCaptureError = new Error(
+              `Payment capture returned non-success status: ${captureOutcome?.status ?? 'unknown'}`,
+            );
+          }
         } catch (captureError: unknown) {
           if (isOwnershipLost(captureError)) {
             throw captureError;
           }
+          captureFailed = true;
+          initialCaptureError =
+            captureError instanceof Error ? captureError : new Error(String(captureError));
+        }
 
-          const error = captureError as Error;
-          this.logger.error(`Payment capture failed: ${error.message}`, error.stack);
+        if (captureFailed) {
+          this.logger.error(
+            `[executeConfirmPayment] Payment capture failed: ${initialCaptureError?.message}`,
+            initialCaptureError?.stack,
+          );
 
           let reconcileOutcome: AuthorizeHoldOutcome;
           try {
@@ -713,7 +755,7 @@ export class PaymentFulfillmentSaga {
                 ? reconciliationError.message
                 : String(reconciliationError);
             this.logger.error(
-              `Payment capture outcome remains unknown for payment ${payment.id}: ${reconciliationMessage}`,
+              `[executeConfirmPayment] Payment capture outcome remains unknown for payment ${payment.id}: ${reconciliationMessage}`,
             );
             throw new HttpException(
               {
@@ -743,7 +785,6 @@ export class PaymentFulfillmentSaga {
           }
 
           if (reconcileOutcome.status !== 'captured') {
-            // Authoritative noncapture: compensate order and hold
             const duffelEvent = await this.prisma.paymentEvent.findFirst({
               where: {
                 paymentId: payment.id,
@@ -758,7 +799,7 @@ export class PaymentFulfillmentSaga {
               try {
                 await this.fulfillmentGateway.cancelOrder(duffelOrderId, control);
                 this.logger.log(
-                  `Successfully cancelled fulfillment order ${duffelOrderId} as compensation.`,
+                  `[executeConfirmPayment] Successfully cancelled fulfillment order ${duffelOrderId} as compensation.`,
                 );
               } catch (cancelError: unknown) {
                 if (isOwnershipLost(cancelError)) {
@@ -766,7 +807,7 @@ export class PaymentFulfillmentSaga {
                 }
                 const err = cancelError as Error;
                 this.logger.error(
-                  `Fulfillment order cancellation failed during compensation: ${err.message}`,
+                  `[executeConfirmPayment] Fulfillment order cancellation failed during compensation: ${err.message}`,
                   err.stack,
                 );
               }
@@ -780,7 +821,7 @@ export class PaymentFulfillmentSaga {
               }
               const err = voidError as Error;
               this.logger.error(
-                `Payment gateway voidHold failed during compensation: ${err.message}`,
+                `[executeConfirmPayment] Payment gateway voidHold failed during compensation: ${err.message}`,
                 err.stack,
               );
             }
@@ -801,23 +842,9 @@ export class PaymentFulfillmentSaga {
                   where: { id: payment.bookingIntentId },
                   include: { passengers: true, user: true },
                 });
-                const passengerEnrichment: PassengerEnrichmentInput[] = (
-                  fullBookingIntent?.passengers || []
-                ).map((p) => ({
-                  id: p.id,
-                  firstName: p.givenName,
-                  lastName: p.familyName,
-                  title: p.title ?? undefined,
-                  gender: p.gender ?? undefined,
-                  dateOfBirth: p.dateOfBirth
-                    ? p.dateOfBirth instanceof Date
-                      ? p.dateOfBirth.toISOString().split('T')[0]
-                      : String(p.dateOfBirth).split('T')[0]
-                    : undefined,
-                  passengerType: p.type ? String(p.type).toLowerCase() : undefined,
-                  email: p.email ?? undefined,
-                  phoneNumber: p.phoneNumber ?? undefined,
-                }));
+                const passengerEnrichment = this.mapPassengerEnrichment(
+                  fullBookingIntent?.passengers,
+                );
                 const contactEmail = fullBookingIntent?.user?.email || '';
 
                 const snaps = await this.fulfillmentGateway.retrieveOrderSnapshot(
@@ -830,13 +857,10 @@ export class PaymentFulfillmentSaga {
                 flightSnap = snaps.flightSnapshot;
                 passSnap = snaps.passengerSnapshot;
                 departAt = snaps.departureAt;
-              } catch (e: unknown) {
-                if (isOwnershipLost(e)) {
-                  throw e;
-                }
-                const err = e as Error;
+              } catch (snapshotErr: unknown) {
+                const err = snapshotErr as Error;
                 this.logger.warn(
-                  `Failed to recover order snapshots for booking ${canonicalBooking.id}: ${err.message}`,
+                  `[executeConfirmPayment] Failed to recover fulfillment order snapshots during capture compensation: ${err.message}`,
                   err.stack,
                 );
               }
@@ -876,7 +900,7 @@ export class PaymentFulfillmentSaga {
             const failureResponse = {
               success: false,
               error: `Stripe capture failed: ${
-                error.message || 'Unknown error'
+                initialCaptureError?.message || 'Unknown error'
               }. Duffel order cancelled and hold released.`,
               bookingStatus: nextBookingStatus,
             };
@@ -894,7 +918,6 @@ export class PaymentFulfillmentSaga {
         recoveryPoint = 'captured';
       }
 
-      // Stage 4: Post-Capture Updates
       if (recoveryPoint === 'captured') {
         const duffelEvent = await this.prisma.paymentEvent.findFirst({
           where: {
@@ -916,23 +939,7 @@ export class PaymentFulfillmentSaga {
           include: { passengers: true, user: true },
         });
 
-        const passengerEnrichment: PassengerEnrichmentInput[] = (
-          fullBookingIntent?.passengers || []
-        ).map((p) => ({
-          id: p.id,
-          firstName: p.givenName,
-          lastName: p.familyName,
-          title: p.title ?? undefined,
-          gender: p.gender ?? undefined,
-          dateOfBirth: p.dateOfBirth
-            ? p.dateOfBirth instanceof Date
-              ? p.dateOfBirth.toISOString().split('T')[0]
-              : String(p.dateOfBirth).split('T')[0]
-            : undefined,
-          passengerType: p.type ? String(p.type).toLowerCase() : undefined,
-          email: p.email ?? undefined,
-          phoneNumber: p.phoneNumber ?? undefined,
-        }));
+        const passengerEnrichment = this.mapPassengerEnrichment(fullBookingIntent?.passengers);
         const contactEmail = fullBookingIntent?.user?.email || '';
 
         const snapshotOutcome = await this.fulfillmentGateway.retrieveOrderSnapshot(
@@ -946,12 +953,18 @@ export class PaymentFulfillmentSaga {
         const transactionId = crypto.randomUUID();
         if (payment.status !== 'SUCCEEDED') {
           enforceTransition(payment.status, 'SUCCEEDED');
+          await this.idempotency.assertOwned(currentOwnership);
 
           await this.prisma.$transaction(async (tx) => {
-            await tx.payment.update({
-              where: { id: payment.id },
+            const updateResult = await tx.payment.updateMany({
+              where: { id: payment.id, status: 'AUTHORIZED' },
               data: { status: 'SUCCEEDED' },
             });
+            if (updateResult.count === 0) {
+              throw new ConflictException(
+                `Payment ${payment.id} is no longer in AUTHORIZED status`,
+              );
+            }
 
             await tx.paymentEvent.create({
               data: {
@@ -1036,7 +1049,7 @@ export class PaymentFulfillmentSaga {
             );
           } catch (methodError: unknown) {
             this.logger.warn(
-              `Unable to save payment method for payment ${payment.id}: ${
+              `[executeConfirmPayment] Unable to save payment method for payment ${payment.id}: ${
                 methodError instanceof Error ? methodError.message : String(methodError)
               }`,
             );
@@ -1063,16 +1076,15 @@ export class PaymentFulfillmentSaga {
       }
     } catch (error) {
       this.logger.error(
-        `Error in executeConfirmPayment: ${error instanceof Error ? error.message : String(error)}`,
+        `[executeConfirmPayment] Error in executeConfirmPayment: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
         error instanceof Error ? error.stack : undefined,
       );
       throw error;
     }
   }
 
-  /**
-   * Cleans up state and resolves background errors following Tier 2 handoff
-   */
   async handleBackgroundError(
     paymentId: string,
     idempotencyKey: string,
@@ -1081,12 +1093,20 @@ export class PaymentFulfillmentSaga {
     error: unknown,
   ): Promise<void> {
     try {
-      if (isOwnershipLost(error)) {
+      try {
+        await this.idempotency.assertOwned(ownership);
+      } catch (leaseError: unknown) {
         this.logger.warn(
-          `Ownership lost in handleBackgroundError for key ${idempotencyKey}; aborting background recovery.`,
+          `[handleBackgroundError] Ownership lost in handleBackgroundError for key ${idempotencyKey}: ${
+            leaseError instanceof Error ? leaseError.message : String(leaseError)
+          }`,
         );
         return;
       }
+
+      const control: PortInvocationControl = {
+        beforeInvoke: () => this.idempotency.assertOwned(ownership),
+      };
 
       const payment = await this.prisma.payment.findUnique({
         where: { id: paymentId },
@@ -1110,10 +1130,6 @@ export class PaymentFulfillmentSaga {
         return;
       }
 
-      const control: PortInvocationControl = {
-        beforeInvoke: () => this.idempotency.assertOwned(ownership),
-      };
-
       let authOutcome: AuthorizeHoldOutcome;
       try {
         authOutcome = await this.paymentGateway.authorizeHold(
@@ -1122,13 +1138,10 @@ export class PaymentFulfillmentSaga {
         );
       } catch (gatewayErr: unknown) {
         if (isOwnershipLost(gatewayErr)) {
-          this.logger.warn(
-            `Ownership lost in handleBackgroundError for key ${idempotencyKey}`,
-          );
           return;
         }
         this.logger.warn(
-          `Failed to retrieve Payment status for payment ${paymentId}: ${
+          `[handleBackgroundError] Failed to retrieve payment intent for payment ${paymentId}: ${
             gatewayErr instanceof Error ? gatewayErr.message : String(gatewayErr)
           }`,
         );
@@ -1136,9 +1149,11 @@ export class PaymentFulfillmentSaga {
       }
 
       const finalStatuses = ['captured', 'authorized', 'voided'];
-      if (!authOutcome || !finalStatuses.includes(authOutcome.status)) {
+      if (!finalStatuses.includes(authOutcome.status)) {
         this.logger.warn(
-          `Payment intent for payment ${paymentId} is in non-final status: ${authOutcome?.status}. Warning & returning early.`,
+          `[handleBackgroundError] Payment intent for payment ${paymentId} is in non-final status: ${
+            authOutcome.rawStatus || authOutcome.status
+          }. Warning and returning early for authoritative recovery.`,
         );
         return;
       }
@@ -1149,9 +1164,8 @@ export class PaymentFulfillmentSaga {
           try {
             await this.idempotency.advanceSagaCheckpoint(ownership, 'captured');
           } catch (updateErr: unknown) {
-            if (isOwnershipLost(updateErr)) return;
             this.logger.error(
-              `Failed to advance recovery point to 'captured' for payment ${paymentId}: ${
+              `[handleBackgroundError] Failed to advance recovery point to 'captured' for payment ${paymentId}: ${
                 updateErr instanceof Error ? updateErr.message : String(updateErr)
               }`,
             );
@@ -1159,7 +1173,7 @@ export class PaymentFulfillmentSaga {
         }
 
         this.logger.error(
-          `CRITICAL: Background confirmation failed after Stripe capture for payment ${paymentId}. Customer has been charged. Retries will attempt to resume post-capture updates.`,
+          `[handleBackgroundError] CRITICAL: Background confirmation failed after Stripe capture for payment ${paymentId}. Customer has been charged. Retries will attempt to resume post-capture updates.`,
           error instanceof Error ? error.stack : undefined,
         );
         return;
@@ -1175,15 +1189,20 @@ export class PaymentFulfillmentSaga {
 
       if (authOutcome.status === 'authorized' || authOutcome.status === 'voided') {
         if (duffelEvent) {
-          const duffelOrder = duffelEvent.metadata as Record<string, unknown> | null;
-          const duffelOrderId = duffelOrder?.id as string | undefined;
+          const rawOrder = duffelEvent.metadata as Record<string, unknown> | null;
+          const duffelOrderId = rawOrder?.id as string | undefined;
           if (duffelOrderId) {
             try {
               await this.fulfillmentGateway.cancelOrder(duffelOrderId, control);
             } catch (cancelError: unknown) {
-              if (isOwnershipLost(cancelError)) return;
+              if (isOwnershipLost(cancelError)) {
+                return;
+              }
               const err = cancelError as Error;
-              this.logger.error(`Background cancelOrder failed: ${err.message}`);
+              this.logger.error(
+                `[handleBackgroundError] Background cancelOrder failed: ${err.message}`,
+                err.stack,
+              );
             }
           }
         }
@@ -1192,9 +1211,14 @@ export class PaymentFulfillmentSaga {
           try {
             await this.paymentGateway.voidHold(payment.stripePaymentIntentId, control);
           } catch (voidError: unknown) {
-            if (isOwnershipLost(voidError)) return;
+            if (isOwnershipLost(voidError)) {
+              return;
+            }
             const err = voidError as Error;
-            this.logger.error(`Background voidHold failed: ${err.message}`);
+            this.logger.error(
+              `[handleBackgroundError] Background voidHold failed: ${err.message}`,
+              err.stack,
+            );
           }
         }
       }
@@ -1217,23 +1241,7 @@ export class PaymentFulfillmentSaga {
         try {
           const rawOrder = duffelEvent.metadata as Record<string, unknown>;
           if (rawOrder && rawOrder.id) {
-            const passengerEnrichment: PassengerEnrichmentInput[] = (
-              bookingIntent?.passengers || []
-            ).map((p) => ({
-              id: p.id,
-              firstName: p.givenName,
-              lastName: p.familyName,
-              title: p.title ?? undefined,
-              gender: p.gender ?? undefined,
-              dateOfBirth: p.dateOfBirth
-                ? p.dateOfBirth instanceof Date
-                  ? p.dateOfBirth.toISOString().split('T')[0]
-                  : String(p.dateOfBirth).split('T')[0]
-                : undefined,
-              passengerType: p.type ? String(p.type).toLowerCase() : undefined,
-              email: p.email ?? undefined,
-              phoneNumber: p.phoneNumber ?? undefined,
-            }));
+            const passengerEnrichment = this.mapPassengerEnrichment(bookingIntent?.passengers);
             const contactEmail = bookingIntent?.user?.email || '';
 
             const snaps = await this.fulfillmentGateway.retrieveOrderSnapshot(
@@ -1248,10 +1256,9 @@ export class PaymentFulfillmentSaga {
             departAt = snaps.departureAt;
           }
         } catch (e: unknown) {
-          if (isOwnershipLost(e)) return;
           const err = e as Error;
           this.logger.warn(
-            `Failed to recover Duffel order snapshots in background handler: ${err.message}`,
+            `[handleBackgroundError] Failed to recover fulfillment order snapshots in background handler: ${err.message}`,
             err.stack,
           );
         }
@@ -1297,12 +1304,44 @@ export class PaymentFulfillmentSaga {
         bookingStatus: nextBookingStatus,
       });
     } catch (err: unknown) {
-      if (isOwnershipLost(err)) return;
       const errorObj = err as Error;
       this.logger.error(
-        `Error in handleBackgroundError: ${errorObj.message}`,
+        `[handleBackgroundError] Error in handleBackgroundError: ${errorObj.message}`,
         errorObj.stack,
       );
     }
+  }
+
+  private mapPassengerEnrichment(
+    passengers?: Array<{
+      id?: string;
+      givenName?: string;
+      familyName?: string;
+      firstName?: string;
+      lastName?: string;
+      title?: string | null;
+      gender?: string | null;
+      dateOfBirth?: Date | string | null;
+      type?: string | null;
+      passengerType?: string | null;
+      email?: string | null;
+      phoneNumber?: string | null;
+    }>,
+  ): PassengerEnrichmentInput[] {
+    return (passengers || []).map((p) => ({
+      id: p.id,
+      firstName: p.givenName || p.firstName,
+      lastName: p.familyName || p.lastName,
+      title: p.title ?? undefined,
+      gender: p.gender ?? undefined,
+      dateOfBirth: p.dateOfBirth
+        ? p.dateOfBirth instanceof Date
+          ? p.dateOfBirth.toISOString().split('T')[0]
+          : String(p.dateOfBirth).split('T')[0]
+        : undefined,
+      passengerType: p.type ? String(p.type).toLowerCase() : p.passengerType ?? undefined,
+      email: p.email ?? undefined,
+      phoneNumber: p.phoneNumber ?? undefined,
+    }));
   }
 }

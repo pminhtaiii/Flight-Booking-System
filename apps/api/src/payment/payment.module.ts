@@ -3,7 +3,6 @@ import { IdempotencyModule } from '@/idempotency/idempotency.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PaymentService } from './payment.service';
 import { PaymentRefundService } from './payment-refund.service';
-import { PaymentMethodService } from './payment-method.service';
 import { PaymentMethodsModule } from './payment-methods.module';
 import { PaymentController } from './payment.controller';
 import { PaymentWebhookController } from './payment-webhook.controller';
@@ -43,7 +42,6 @@ import { RefundSettlementModule } from '../refund-settlement/refund-settlement.m
     PaymentMethodsModule,
     PaymentService,
     PaymentRefundService,
-    PaymentMethodService,
     PaymentWebhookService,
     AncillaryPaymentValidationService,
   ],
