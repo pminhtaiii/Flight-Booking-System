@@ -157,3 +157,45 @@ This document records pre-change baseline verification evidence for the payment 
 
 ### Conclusion & Phase 1 Sign-Off
 Baseline characterization is fully established and passing under CI network isolation guards. All runtime files in `apps/api/src/` remain unaltered. The test harness in `apps/api/test/payment-fulfillment.e2e-spec.ts` serves as the regression anchor for Phase 2 (Foundation) and Phase 3 (US1: Safe payment orchestration).
+
+---
+
+## Phase 3 Slice 2 Verification: Tasks T007 & T008 (US1 Provider Adapters)
+
+**Execution Date**: 2026-09-16  
+**Scope**: Provider-blind adapter implementations with bounded concurrency admission:
+- Task T007 [US1]: `StripePaymentAdapter` (`apps/api/src/common/stripe-payment.adapter.ts`), `StripeModule` binding (`PAYMENT_GATEWAY_PORT`).
+- Task T008 [US1]: `DuffelFulfillmentAdapter` (`apps/api/src/duffel/duffel-fulfillment.adapter.ts`), `DuffelModule` binding (`FULFILLMENT_GATEWAY_PORT`).
+- Reusable utility: `BoundedSemaphore` (`apps/api/src/payment-fulfillment/utils/bounded-semaphore.ts`).
+
+### 1. Adapter Unit Test Results (CI Network Guard)
+
+```powershell
+$guard = (Convert-Path "$PWD/tests/ci/node-network-guard.cjs").Replace('\', '/'); $env:NODE_OPTIONS = "--require=`"$guard`""; pnpm --filter @api/backend test -- apps/api/src/payment-fulfillment/utils/bounded-semaphore.spec.ts apps/api/src/common/stripe-payment.adapter.spec.ts apps/api/src/duffel/duffel-fulfillment.adapter.spec.ts apps/api/src/idempotency/payment-idempotency.service.spec.ts; Remove-Item Env:NODE_OPTIONS -ErrorAction SilentlyContinue
+```
+
+```
+PASS src/payment-fulfillment/utils/bounded-semaphore.spec.ts
+PASS src/idempotency/payment-idempotency.service.spec.ts
+PASS src/duffel/duffel-fulfillment.adapter.spec.ts
+PASS src/common/stripe-payment.adapter.spec.ts
+
+Test Suites: 4 passed, 4 total
+Tests:       119 passed, 119 total
+Snapshots:   0 total
+```
+
+### 2. Static Type & Linter Verification
+
+- `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`: **Exit code 0** (0 errors)
+- `pnpm exec eslint "apps/api/src/common/**/*.ts" "apps/api/src/duffel/**/*.ts" "apps/api/src/payment-fulfillment/**/*.ts" --max-warnings 0`: **Exit code 0** (0 errors, 0 warnings)
+
+### 3. E2E Characterization Suite Regression Check
+
+- `pnpm --filter @api/backend test:e2e -- test/payment-fulfillment.e2e-spec.ts`: **9 passed, 9 total** (Exit code 0)
+
+### 4. Dual-Axis Code Review Sign-off
+
+- Standards Review: 0 blocking violations; explicit logging added on order retrieval fallback; parameter types and return values fully typed.
+- Spec Review: Status normalization includes `'invalid'` for `requires_payment_method` / unknown; void idempotency key (`${intentId}-stripe-void`) passed; positive integer validation on environment parameters verified.
+

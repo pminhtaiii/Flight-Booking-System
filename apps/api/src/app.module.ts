@@ -68,6 +68,30 @@ export const envSchema = z
     CHAT_HANDOFF_SECRET_V2: z.string().optional(),
     CHAT_HANDOFF_SECRET_V3: z.string().optional(),
     CHAT_HANDOFF_CLAIM_TTL: z.coerce.number().optional().default(600),
+    STRIPE_ADMISSION_ACTIVE_LIMIT: z
+      .string()
+      .regex(/^[1-9]\d*$/, 'STRIPE_ADMISSION_ACTIVE_LIMIT must be a positive integer string')
+      .optional(),
+    STRIPE_ADMISSION_QUEUE_LIMIT: z
+      .string()
+      .regex(/^[1-9]\d*$/, 'STRIPE_ADMISSION_QUEUE_LIMIT must be a positive integer string')
+      .optional(),
+    STRIPE_ADMISSION_TIMEOUT_MS: z
+      .string()
+      .regex(/^[1-9]\d*$/, 'STRIPE_ADMISSION_TIMEOUT_MS must be a positive integer string')
+      .optional(),
+    DUFFEL_ADMISSION_ACTIVE_LIMIT: z
+      .string()
+      .regex(/^[1-9]\d*$/, 'DUFFEL_ADMISSION_ACTIVE_LIMIT must be a positive integer string')
+      .optional(),
+    DUFFEL_ADMISSION_QUEUE_LIMIT: z
+      .string()
+      .regex(/^[1-9]\d*$/, 'DUFFEL_ADMISSION_QUEUE_LIMIT must be a positive integer string')
+      .optional(),
+    DUFFEL_ADMISSION_TIMEOUT_MS: z
+      .string()
+      .regex(/^[1-9]\d*$/, 'DUFFEL_ADMISSION_TIMEOUT_MS must be a positive integer string')
+      .optional(),
   })
   .passthrough()
   .refine(

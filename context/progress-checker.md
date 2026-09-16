@@ -1,5 +1,53 @@
 # Progress Tracker
 
+### Feature 024 — Event-Driven Module Deepening: Phase 3 Slice 2 (Tasks T007, T008) Completed (2026-09-16)
+
+- **T007 [US1] Stripe Payment Adapter & Module Wiring**:
+  - Implemented `StripePaymentAdapter` in `apps/api/src/common/stripe-payment.adapter.ts` implementing `PaymentGatewayPort` from `@/payment-fulfillment/ports`.
+  - Injected `StripeService` and bounded admission with `BoundedSemaphore` (`activeLimit=20`, `queueLimit=100`, `timeoutMs=5000` with env var overrides `STRIPE_ADMISSION_ACTIVE_LIMIT`, `STRIPE_ADMISSION_QUEUE_LIMIT`, `STRIPE_ADMISSION_TIMEOUT_MS`).
+  - Implemented `authorizeHold`: acquires permit, enforces `PortInvocationControl.beforeInvoke()`, calls `retrievePaymentIntent`, normalizes status (`requires_capture` -> `authorized`, `succeeded` -> `captured`, `canceled` -> `voided`, others -> `nonfinal`), and releases permit in `finally`.
+  - Implemented `capturePayment`: passes `intentId`, `undefined`, and `captureKey`, normalizes captured amount (`amount_received ?? amount`), and releases permit in `finally`.
+  - Implemented `voidHold`: cancels payment intent and returns void outcome, releasing permit in `finally`.
+  - Enforced admission guarantees: queue full or timeout rejects before invoking `beforeInvoke` or Stripe SDK; failed `beforeInvoke` immediately releases permit without invoking SDK.
+  - Wired `StripeModule` in `apps/api/src/common/stripe.module.ts`: registered `StripePaymentAdapter`, bound `PAYMENT_GATEWAY_PORT` to `StripePaymentAdapter`, and exported both alongside `StripeService`.
+  - **Verification**:
+    - Unit tests: 26/26 passed with CI node network guard (`pnpm --filter @api/backend test -- apps/api/src/common/stripe-payment.adapter.spec.ts`).
+    - Typecheck: `tsc -p tsconfig.json --noEmit` passed with 0 errors.
+    - Linter: `eslint apps/api/src/common/ --max-warnings 0` passed with 0 warnings.
+
+- **T008 [US1] Duffel Fulfillment Adapter & Module Wiring**:
+  - Implemented `DuffelFulfillmentAdapter` in `apps/api/src/duffel/duffel-fulfillment.adapter.ts` implementing `FulfillmentGatewayPort` from `@/payment-fulfillment/ports`.
+  - Injected `DuffelService` and wired `BoundedSemaphore` admission control (`activeLimit=10`, `queueLimit=100`, `timeoutMs=5000` default from environment).
+  - Implemented privacy helpers:
+    - `redactDuffelOrder`: Clones Duffel order and sanitizes passenger PII (`email`, `born_on`, `given_name`, `family_name`, `phone_number`) to `'REDACTED'`.
+    - `enrichRedactedDuffelOrder`: Restores passenger names, DOB, contact email and phone from caller enrichment inputs matching by id or index.
+  - Implemented `createOrder`, `cancelOrder`, and `retrieveOrderSnapshot` with `PortInvocationControl.beforeInvoke()` pre-flight lease checking.
+  - Fallback mechanism in `retrieveOrderSnapshot`: If live `retrieveCompleteOrder` fails, catches and reconstructs coherent snapshots via `enrichRedactedDuffelOrder` on `fallbackEvidence`.
+  - Wired `DuffelModule` in `apps/api/src/duffel/duffel.module.ts`: bound `FULFILLMENT_GATEWAY_PORT` to `DuffelFulfillmentAdapter` and exported both.
+  - **Verification**:
+    - Unit tests: 12/12 passed with CI node network guard (`pnpm --filter @api/backend test -- apps/api/src/duffel/duffel-fulfillment.adapter.spec.ts`).
+    - Typecheck: `tsc -p tsconfig.json --noEmit` passed with 0 errors.
+    - Linter: `eslint apps/api/src/duffel/ --max-warnings 0` passed with 0 warnings.
+
+### Feature 024 — Event-Driven Module Deepening: Phase 3 Slice 1 (Tasks T005, T006) Completed (2026-09-16)
+
+- **T005 [US1]**: Implemented saga lease assertion, fenced checkpoint progression, and atomic terminal completion in `PaymentIdempotencyService`:
+  - Added `SagaOwnership` and `SagaCheckpoint` types with ordered progression (`started` -> `stripe_authorized` -> `duffel_order_created` -> `captured` -> `completed`).
+  - Added `assertOwned(ownership)`: predicates on full key, customerId, requestPath, requestHash, lockedAt, and incomplete response; raises 409 `ConflictException` on stolen/cleared/deleted/completed ownership.
+  - Added `advanceSagaCheckpoint(ownership, target)`: enforces monotonic advancement and same-stage no-ops while rejecting checkpoint regressions; executes atomic `updateMany` with predecessor checking.
+  - Added `completeSagaKeyAtomic(ownership, code, body)`: executes single atomic `updateMany` setting `recoveryPoint: completed`, response code, response body, and clearing `lockedAt` to null.
+  - Added 18 unit tests in `payment-idempotency.service.spec.ts` covering normal advancement, stale-owner takeover, post-25s background execution lease theft, and regression prevention (41/41 unit tests pass).
+- **T006 [US1]**: Defined provider-blind port interfaces and DI tokens in `apps/api/src/payment-fulfillment/ports/`:
+  - Created `payment-gateway.port.ts` and `fulfillment-gateway.port.ts` with barrel export `index.ts`.
+  - Exported DI tokens `PAYMENT_GATEWAY_PORT` and `FULFILLMENT_GATEWAY_PORT`.
+  - Guaranteed zero external SDK types, zero Nest module imports, zero `any`, and mandatory `PortInvocationControl` on all operations.
+- **Verification & Review**:
+  - API Unit Tests: 41/41 passed with CI node network guard (`pnpm --filter @api/backend test -- apps/api/src/idempotency/payment-idempotency.service.spec.ts`).
+  - E2E Characterization: 9/9 passed with CI node network guard (`pnpm --filter @api/backend test:e2e -- test/payment-fulfillment.e2e-spec.ts`).
+  - Linters & Typechecks: 0 ESLint warnings/errors; `tsc --noEmit` passed with 0 errors.
+  - Dual-Axis Review: Standards and Spec review subagents completed with 0 P0/P1 issues.
+- Phase 3 Slice 1 completed; Phase 3 Slice 2 (Tasks T007 & T008: Stripe and Duffel Adapters) is unblocked.
+
 ### Feature 024 — Event-Driven Module Deepening: Phase 2 Foundation Completed (Tasks T003, T004) (2026-09-16)
 
 - **T003 [Foundation]**: Extracted `IdempotencyModule` and `PaymentIdempotencyService` into dedicated `apps/api/src/idempotency/`:
