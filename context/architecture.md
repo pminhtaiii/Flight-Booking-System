@@ -1,5 +1,14 @@
 # Architecture
 
+## Planned Feature 024 — Event-Driven Module Deepening
+
+Planning artifacts: [specification](../specs/024-event-driven-module-deepening/spec.md), [plan](../specs/024-event-driven-module-deepening/plan.md), and [tasks](../specs/024-event-driven-module-deepening/tasks.md). These are planned boundaries, not implemented runtime changes.
+
+- Extract payment confirmation into PaymentFulfillmentSaga, SDK-local adapters and IdempotencyModule; retain public HTTP behavior and financial transaction/recovery semantics.
+- Extract BookingProjectionModule with passive postcommit events, coherent versioned hydration, guarded persistence and bounded reconciliation (100 candidates, five repairs concurrently).
+- Share provider-blind lifecycle registration through BookingStateModule and existing saved-method support through PaymentMethodsModule to avoid new cycles.
+- US1 can ship independently; event producers, projection listener and reconciliation activate together without dual writes. See the plan for additive schema and rollback/reactivation safeguards.
+
 ## Stack
 
 | Layer              | Tool                         | Purpose                                                                               |
