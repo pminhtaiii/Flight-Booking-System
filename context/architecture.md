@@ -8,7 +8,7 @@ Planning artifacts: [specification](../specs/024-event-driven-module-deepening/s
 
 - **IdempotencyModule (`apps/api/src/idempotency/`)**:
   - Independent domain module extracted from `PaymentModule`, providing and exporting `PaymentIdempotencyService` and `@IdempotencyKey()` parameter decorator.
-  - Encapsulates atomic key acquisition, 5-minute stale-lock CAS, 409 conflict detection, 422 payload mismatch verification, response caching, and completion recording over Prisma `PaymentIdempotency`.
+  - Encapsulates atomic key acquisition, 5-minute stale-lock CAS, 409 conflict detection, 422 payload mismatch verification, response caching, and completion recording over Prisma `IdempotencyKey`.
   - Preserves backward compatibility via deprecation re-export in `apps/api/src/payment/payment-idempotency.service.ts`.
 - **AncillariesModule Decoupling (`apps/api/src/ancillaries/`)**:
   - `AncillariesModule` now imports `IdempotencyModule` directly with zero imports from `PaymentModule`.

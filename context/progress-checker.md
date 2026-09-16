@@ -15,8 +15,8 @@
   - ESLint API: 0 warnings, 0 errors (`pnpm exec eslint "apps/api/**/*.ts" --max-warnings 0`).
   - TypeScript API: `tsc --noEmit` passed with 0 errors (`pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`).
   - Idempotency unit tests: 23/23 passed with CI node network guard (`pnpm --filter @api/backend test -- apps/api/src/idempotency/payment-idempotency.service.spec.ts`).
-  - Ancillaries unit tests: 19/19 passed across 2 suites (`pnpm --filter @api/backend test -- apps/api/src/ancillaries/`).
-  - Payment characterization E2E: 6/6 scenarios passed (`pnpm --filter @api/backend test -- apps/api/test/payment-fulfillment.e2e-spec.ts`).
+  - Ancillaries unit tests passed across 4 suites (`pnpm --filter @api/backend test -- apps/api/src/ancillaries/`).
+  - Payment characterization E2E: 9/9 tests passed across 5 scenarios (`pnpm --filter @api/backend test -- apps/api/test/payment-fulfillment.e2e-spec.ts`).
 - Phase 2 (Foundation) completed; Phase 3 (US1: Safe payment orchestration, Tasks T005–T014) is unblocked.
 
 ### Feature 024 — Event-Driven Module Deepening: Phase 1 Setup Completed (Tasks T001, T002) (2026-09-16)
