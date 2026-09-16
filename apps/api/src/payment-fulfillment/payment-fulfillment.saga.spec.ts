@@ -837,6 +837,44 @@ describe('PaymentFulfillmentSaga', () => {
       );
     });
 
+    it('builds failureResponse bookingStatus from freshly loaded bookingIntent status (e.g. PAYMENT_EXHAUSTED) in executeConfirmPayment', async () => {
+      mockPaymentGateway.capturePayment.mockImplementationOnce(async () => {
+        mockPrisma.payment.updateMany.mockImplementationOnce(async () => ({ count: 0 }));
+        currentPaymentState.status = 'EXPIRED';
+        mockPrisma.payment.findUnique.mockResolvedValueOnce({
+          ...basePayment,
+          status: 'EXPIRED',
+        });
+        mockPrisma.bookingIntent.findUnique.mockImplementation(async () => ({
+          ...baseBookingIntent,
+          status: 'PAYMENT_EXHAUSTED',
+        }));
+        throw new Error('Stripe transient capture failure');
+      });
+      mockPaymentGateway.authorizeHold
+        .mockResolvedValueOnce({
+          status: 'authorized',
+          intentId: 'pi-123',
+        })
+        .mockResolvedValueOnce({
+          status: 'authorized',
+          intentId: 'pi-123',
+        });
+
+      await expect(saga.confirmPayment(dto, idempotencyKey, userId)).rejects.toThrow(
+        HttpException,
+      );
+
+      expect(mockIdempotency.completeSagaKeyAtomic).toHaveBeenCalledWith(
+        expect.objectContaining({ key: idempotencyKey }),
+        HttpStatus.BAD_GATEWAY,
+        expect.objectContaining({
+          success: false,
+          bookingStatus: 'PAYMENT_EXHAUSTED',
+        }),
+      );
+    });
+
     it('does NOT compensate if capture fails but reconciles to captured/succeeded (continues to Stage 4)', async () => {
       mockPaymentGateway.capturePayment.mockRejectedValueOnce(new Error('Network disconnect on return'));
       mockPaymentGateway.authorizeHold
@@ -1089,6 +1127,44 @@ describe('PaymentFulfillmentSaga', () => {
         expect.objectContaining({
           success: false,
           error: expect.stringContaining('background crash'),
+        }),
+      );
+    });
+
+    it('builds background failure response bookingStatus from freshly loaded bookingIntent status (e.g. PAYMENT_EXHAUSTED) in handleBackgroundError', async () => {
+      mockPrisma.payment.findUnique
+        .mockResolvedValueOnce({
+          ...basePayment,
+          status: 'AUTHORIZED',
+        })
+        .mockResolvedValueOnce({
+          ...basePayment,
+          status: 'EXPIRED',
+        });
+      mockPrisma.bookingIntent.findUnique
+        .mockResolvedValueOnce({
+          ...baseBookingIntent,
+          status: 'AWAITING_PAYMENT',
+        })
+        .mockResolvedValueOnce({
+          ...baseBookingIntent,
+          status: 'PAYMENT_EXHAUSTED',
+        });
+      mockPaymentGateway.authorizeHold.mockResolvedValueOnce({
+        status: 'authorized',
+        intentId: 'pi-123',
+      });
+
+      mockPrisma.payment.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      await saga.handleBackgroundError(paymentId, idempotencyKey, userId, ownership, new Error('background crash'));
+
+      expect(mockIdempotency.completeSagaKeyAtomic).toHaveBeenCalledWith(
+        ownership,
+        HttpStatus.BAD_GATEWAY,
+        expect.objectContaining({
+          success: false,
+          bookingStatus: 'PAYMENT_EXHAUSTED',
         }),
       );
     });

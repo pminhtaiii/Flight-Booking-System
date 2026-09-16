@@ -869,6 +869,7 @@ export class PaymentFulfillmentSaga {
             await this.idempotency.assertOwned(currentOwnership);
 
             let compensationAborted = false;
+            let resolvedBookingStatus: string = nextBookingStatus;
             await this.prisma.$transaction(async (tx) => {
               const paymentUpdate = await tx.payment.updateMany({
                 where: {
@@ -885,6 +886,14 @@ export class PaymentFulfillmentSaga {
                   where: { id: payment.id },
                   select: { status: true },
                 });
+                const latestBookingIntent = await tx.bookingIntent.findUnique({
+                  where: { id: payment.bookingIntentId },
+                  select: { status: true },
+                });
+                if (latestBookingIntent?.status) {
+                  resolvedBookingStatus = latestBookingIntent.status;
+                }
+
                 if (latestPayment?.status === PaymentStatus.SUCCEEDED) {
                   this.logger.warn(
                     `[executeConfirmPayment] Payment ${payment.id} is already SUCCEEDED; aborting compensation.`,
@@ -955,7 +964,7 @@ export class PaymentFulfillmentSaga {
               error: `Stripe capture failed: ${
                 initialCaptureError?.message || 'Unknown error'
               }. Duffel order cancelled and hold released.`,
-              bookingStatus: nextBookingStatus,
+              bookingStatus: resolvedBookingStatus,
             };
             await this.idempotency.completeSagaKeyAtomic(
               currentOwnership,
@@ -1330,6 +1339,7 @@ export class PaymentFulfillmentSaga {
       }
 
       let compensationAborted = false;
+      let resolvedBookingStatus: string = nextBookingStatus;
       await this.prisma.$transaction(async (tx) => {
         const paymentUpdate = await tx.payment.updateMany({
           where: {
@@ -1346,6 +1356,14 @@ export class PaymentFulfillmentSaga {
             where: { id: paymentId },
             select: { status: true },
           });
+          const latestBookingIntent = await tx.bookingIntent.findUnique({
+            where: { id: payment.bookingIntentId },
+            select: { status: true },
+          });
+          if (latestBookingIntent?.status) {
+            resolvedBookingStatus = latestBookingIntent.status;
+          }
+
           if (latestPayment?.status === PaymentStatus.SUCCEEDED) {
             this.logger.warn(
               `[handleBackgroundError] Payment ${paymentId} is already SUCCEEDED; aborting compensation.`,
@@ -1398,7 +1416,7 @@ export class PaymentFulfillmentSaga {
       await this.idempotency.completeSagaKeyAtomic(ownership, HttpStatus.BAD_GATEWAY, {
         success: false,
         error: `Background processing failed: ${errObj.message || 'Unknown error'}. Hold released.`,
-        bookingStatus: nextBookingStatus,
+        bookingStatus: resolvedBookingStatus,
       });
     } catch (err: unknown) {
       const errorObj = err as Error;
