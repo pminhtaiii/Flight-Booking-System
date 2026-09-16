@@ -6,8 +6,8 @@
 
 ## Phase 1 — Setup
 
-- [ ] T001 Re-inventory payment entry points, every projection call and all booking business-state writers against current code; update `specs/024-event-driven-module-deepening/contracts/booking-events.md` and `contracts/payment-fulfillment.md` with any drift before editing runtime files.
-- [ ] T002 Record pre-change HTTP success/failure/replay/Tier2 and compensation baselines in `apps/api/test/payment-fulfillment.e2e-spec.ts` using existing controller and controlled providers; record baseline commands in `specs/024-event-driven-module-deepening/validation-evidence.md`.
+- [x] T001 [Setup] Re-inventory payment entry points, every projection call and all booking business-state writers against current code; update `specs/024-event-driven-module-deepening/contracts/booking-events.md` and `contracts/payment-fulfillment.md` with any drift before editing runtime files.
+- [x] T002 [Setup] Record pre-change HTTP success/failure/replay/Tier2 and compensation baselines in `apps/api/test/payment-fulfillment.e2e-spec.ts` using existing controller and controlled providers; record baseline commands in `specs/024-event-driven-module-deepening/validation-evidence.md`.
 
 ## Phase 2 — Foundation
 

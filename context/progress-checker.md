@@ -1,11 +1,25 @@
 # Progress Tracker
 
+### Feature 024 — Event-Driven Module Deepening: Phase 1 Setup Completed (Tasks T001, T002) (2026-09-16)
+
+- **T001 [Setup]**: Completed full static re-inventory of payment entry points, 9 direct projection calls, and booking business-state writers. Confirmed 0 drift against `contracts/booking-events.md` and `contracts/payment-fulfillment.md`. Appended formal baseline notes.
+- **T002 [Setup]**: Built comprehensive pre-refactor E2E characterization suite in `apps/api/test/payment-fulfillment.e2e-spec.ts` with controlled test doubles for Stripe and Duffel:
+  - Scenario 1: HTTP 200 Immediate Success (requires_capture, Duffel order creation, Stripe capture, DB SUCCEEDED/CONFIRMED).
+  - Scenario 2: HTTP 202 Tier 2 Handoff (25s timeout simulation -> 202 Accepted with PENDING status and pollUrl).
+  - Scenario 3: Idempotency Replay Asymmetry (replays cached response without duplicate provider calls).
+  - Scenario 4: Validation Rejection (missing Idempotency-Key header 400; invalid payload 400).
+  - Scenario 5: Controlled Compensation (Duffel failure triggers Stripe cancelPaymentIntent, DB CANCELLED/FAILED, 502 response).
+- Zero modifications made to `apps/api/src/` runtime files.
+- Executed typecheck (`tsc --noEmit`) and characterization suite under CI node network guard (`pnpm test:e2e -- payment-fulfillment.e2e-spec.ts`) with 6/6 tests passing (exit code 0).
+- Recorded baseline execution evidence in `specs/024-event-driven-module-deepening/validation-evidence.md`.
+- Completed dual-axis code review (Standards & Spec) and polished test typing, behavioral naming, and test double contracts.
+- Phase 2 (Foundation Tasks T003–T004) remains cleanly unstarted.
+
 ### Feature 024 — Event-Driven Module Deepening: Planning (2026-09-16)
 
 - Specification, implementation plan, research, data model, two internal contracts, validation guide and 44 unstarted tasks created in `specs/024-event-driven-module-deepening/`.
 - Scope: payment saga/idempotency extraction and event-driven booking projections based on the two recorded grilling sessions.
 - Luna exploration and two Luna MAX convergence reviews completed. After revisions, both targeted rechecks reported zero unresolved CRITICAL/HIGH/MEDIUM/LOW findings; evidence is in `specs/024-event-driven-module-deepening/reviews/convergence.md`.
-- Runtime implementation, dependency installation, migration execution and feature tests have not started.
 
 ### Feature 023 — Security Systems: Phase 8 Final Closure, Release Gates, Findings Ledger & Security Signoff (Tasks T049–T052 Completed) (2026-09-13)
 

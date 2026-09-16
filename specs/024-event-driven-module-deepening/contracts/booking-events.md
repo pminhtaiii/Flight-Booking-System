@@ -86,3 +86,16 @@ Record `booking_projection.failure` and `projection_reconciliation.{stale_found,
 Unit tests cover envelope privacy, outcome routing, no-op count, fresh retry collectors, failure isolation and missing-data policy. PostgreSQL integration proves rollback suppression, outer commit timing, coherent snapshot/version, reversed hydration completion, concurrent insert/stable reference, duplicate deliveries, migration drift, missing projection and fair >100-row traversal. Boot the real module graph without new cycles.
 
 Adapt `src/agent-gateway/booking-agent-projection.service.spec.ts` into projection tests and update lifecycle/recovery/cancellation/supplier-sync/refund-settlement/payment-refund service specs. Preserve `src/agent-gateway/safe-booking-read/safe-booking-read.service.spec.ts`, `test/booking-agent-projection-privacy.e2e-spec.ts`, `test/booking-projection-backfill.e2e-spec.ts`, `test/chat-persistence-migration.e2e-spec.ts`, `test/characterization/booking-characterization.e2e-spec.ts`, `test/characterization/refund-characterization.e2e-spec.ts`, `test/refund-settlement.e2e-spec.ts` and existing disruption database suites. Eventual-consistency assertions use bounded waits, not synchronous projection assumptions.
+
+## Baseline Verification Note (2026-09-16)
+
+On 2026-09-16, a complete static re-inventory of entry points, direct projection calls (all 9 sites), and booking business-state mutation sites was conducted. Confirmed 0 drift on line numbers, signatures, and context against current runtime codebase:
+- `apps/api/src/booking-lifecycle/booking-lifecycle.service.ts`: lines 47, 113/131, 144/162, 281/295.
+- `apps/api/src/booking-lifecycle/booking-recovery.service.ts`: lines 175/182, 231/243, 277/303, 306/313.
+- `apps/api/src/cancellation/cancellation.service.ts`: lines 344, 406/412.
+- `apps/api/src/disruption/sync/supplier-sync.service.ts`: lines 482/502.
+- `apps/api/src/disruption/api/disruption.service.ts`: lines 142, 234.
+- `apps/api/src/refund-settlement/refund-settlement.service.ts`: lines 294, 349.
+- `apps/api/src/payment/payment-refund.service.ts`: line 628.
+All 9 direct projection calls (`bookingAgentProjectionService`) confirmed and mapped with 0 drift.
+
