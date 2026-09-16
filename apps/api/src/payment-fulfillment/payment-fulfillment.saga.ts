@@ -11,7 +11,7 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
-import { BookingFailureReason, Prisma } from '@prisma/client';
+import { BookingFailureReason, PaymentStatus, Prisma } from '@prisma/client';
 import * as crypto from 'crypto';
 import { PrismaService } from '@/prisma/prisma.service';
 import {
@@ -873,16 +873,28 @@ export class PaymentFulfillmentSaga {
               const paymentUpdate = await tx.payment.updateMany({
                 where: {
                   id: payment.id,
-                  status: { not: 'SUCCEEDED' },
+                  status: {
+                    in: [PaymentStatus.CREATED, PaymentStatus.AUTHORIZED],
+                  },
                 },
-                data: { status: 'CANCELLED' },
+                data: { status: PaymentStatus.CANCELLED },
               });
 
               if (paymentUpdate.count === 0) {
+                const latestPayment = await tx.payment.findUnique({
+                  where: { id: payment.id },
+                  select: { status: true },
+                });
+                if (latestPayment?.status === PaymentStatus.SUCCEEDED) {
+                  this.logger.warn(
+                    `[executeConfirmPayment] Payment ${payment.id} is already SUCCEEDED; aborting compensation.`,
+                  );
+                  compensationAborted = true;
+                  return;
+                }
                 this.logger.warn(
-                  `[executeConfirmPayment] Payment ${payment.id} is already SUCCEEDED; aborting compensation.`,
+                  `[executeConfirmPayment] Payment ${payment.id} status is ${latestPayment?.status}; skipping cancellation compensation.`,
                 );
-                compensationAborted = true;
                 return;
               }
 
@@ -1322,16 +1334,28 @@ export class PaymentFulfillmentSaga {
         const paymentUpdate = await tx.payment.updateMany({
           where: {
             id: paymentId,
-            status: { not: 'SUCCEEDED' },
+            status: {
+              in: [PaymentStatus.CREATED, PaymentStatus.AUTHORIZED],
+            },
           },
-          data: { status: 'CANCELLED' },
+          data: { status: PaymentStatus.CANCELLED },
         });
 
         if (paymentUpdate.count === 0) {
+          const latestPayment = await tx.payment.findUnique({
+            where: { id: paymentId },
+            select: { status: true },
+          });
+          if (latestPayment?.status === PaymentStatus.SUCCEEDED) {
+            this.logger.warn(
+              `[handleBackgroundError] Payment ${paymentId} is already SUCCEEDED; aborting compensation.`,
+            );
+            compensationAborted = true;
+            return;
+          }
           this.logger.warn(
-            `[handleBackgroundError] Payment ${paymentId} is already SUCCEEDED; aborting compensation.`,
+            `[handleBackgroundError] Payment ${paymentId} status is ${latestPayment?.status}; skipping cancellation compensation.`,
           );
-          compensationAborted = true;
           return;
         }
 

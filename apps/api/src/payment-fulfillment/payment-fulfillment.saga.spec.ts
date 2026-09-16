@@ -93,6 +93,7 @@ describe('PaymentFulfillmentSaga', () => {
   let mockValidator: {
     validateAndMapPassengers: jest.Mock;
   };
+  let currentPaymentState: Record<string, unknown>;
 
   const userId = 'user-123';
   const idempotencyKey = 'idemp-key-123';
@@ -252,7 +253,7 @@ describe('PaymentFulfillmentSaga', () => {
       }),
     };
 
-    const currentPaymentState = JSON.parse(JSON.stringify(basePayment));
+    currentPaymentState = JSON.parse(JSON.stringify(basePayment));
     mockPrisma = {
       $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback(mockPrisma)),
       payment: {
@@ -267,8 +268,12 @@ describe('PaymentFulfillmentSaga', () => {
           return JSON.parse(JSON.stringify(currentPaymentState));
         }),
         updateMany: jest.fn().mockImplementation(async (args: { data?: Record<string, unknown>; where?: Record<string, unknown> }) => {
-          if (args?.where?.status && typeof args.where.status === 'object' && 'not' in (args.where.status as Record<string, unknown>)) {
-            if (currentPaymentState.status === (args.where.status as Record<string, unknown>).not) {
+          if (args?.where?.status && typeof args.where.status === 'object') {
+            const statusObj = args.where.status as Record<string, unknown>;
+            if ('not' in statusObj && currentPaymentState.status === statusObj.not) {
+              return { count: 0 };
+            }
+            if ('in' in statusObj && Array.isArray(statusObj.in) && !statusObj.in.includes(currentPaymentState.status)) {
               return { count: 0 };
             }
           }
@@ -762,6 +767,11 @@ describe('PaymentFulfillmentSaga', () => {
       mockPaymentGateway.capturePayment.mockImplementationOnce(async () => {
         // Parallel execution takes over and completes payment to SUCCEEDED
         mockPrisma.payment.updateMany.mockImplementationOnce(async () => ({ count: 0 }));
+        currentPaymentState.status = 'SUCCEEDED';
+        mockPrisma.payment.findUnique.mockResolvedValueOnce({
+          ...basePayment,
+          status: 'SUCCEEDED',
+        });
         throw new Error('Stripe transient capture failure');
       });
       mockPaymentGateway.authorizeHold
@@ -783,6 +793,47 @@ describe('PaymentFulfillmentSaga', () => {
         expect.anything(),
         HttpStatus.BAD_GATEWAY,
         expect.anything(),
+      );
+    });
+
+    it('skips cancellation compensation and throws BAD_GATEWAY if payment is in non-cancellable status (e.g. FAILED) in executeConfirmPayment', async () => {
+      mockPaymentGateway.capturePayment.mockImplementationOnce(async () => {
+        // Parallel execution or another process moved payment to FAILED
+        mockPrisma.payment.updateMany.mockImplementationOnce(async () => ({ count: 0 }));
+        currentPaymentState.status = 'FAILED';
+        mockPrisma.payment.findUnique.mockResolvedValueOnce({
+          ...basePayment,
+          status: 'FAILED',
+        });
+        throw new Error('Stripe transient capture failure');
+      });
+      mockPaymentGateway.authorizeHold
+        .mockResolvedValueOnce({
+          status: 'authorized',
+          intentId: 'pi-123',
+        })
+        .mockResolvedValueOnce({
+          status: 'authorized',
+          intentId: 'pi-123',
+        });
+
+      await expect(saga.confirmPayment(dto, idempotencyKey, userId)).rejects.toThrow(
+        HttpException,
+      );
+
+      expect(mockBookingLifecycle.updateToFailed).not.toHaveBeenCalled();
+      expect(mockPrisma.paymentEvent.create).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ eventType: 'payment_cancelled' }),
+        }),
+      );
+      expect(mockIdempotency.completeSagaKeyAtomic).toHaveBeenCalledWith(
+        expect.objectContaining({ key: idempotencyKey }),
+        HttpStatus.BAD_GATEWAY,
+        expect.objectContaining({
+          success: false,
+          error: expect.stringContaining('Stripe capture failed'),
+        }),
       );
     });
 
@@ -991,6 +1042,10 @@ describe('PaymentFulfillmentSaga', () => {
 
       // Payment was completed in parallel, so updateMany returns 0
       mockPrisma.payment.updateMany.mockResolvedValueOnce({ count: 0 });
+      mockPrisma.payment.findUnique.mockResolvedValueOnce({
+        ...basePayment,
+        status: 'SUCCEEDED',
+      });
 
       await saga.handleBackgroundError(paymentId, idempotencyKey, userId, ownership, new Error('background crash'));
 
@@ -999,6 +1054,42 @@ describe('PaymentFulfillmentSaga', () => {
         ownership,
         HttpStatus.BAD_GATEWAY,
         expect.anything(),
+      );
+    });
+
+    it('skips cancellation compensation and completes key with BAD_GATEWAY if payment is in non-cancellable status (e.g. FAILED) in handleBackgroundError', async () => {
+      mockPrisma.payment.findUnique
+        .mockResolvedValueOnce({
+          ...basePayment,
+          status: 'AUTHORIZED',
+        })
+        .mockResolvedValueOnce({
+          ...basePayment,
+          status: 'FAILED',
+        });
+      mockPaymentGateway.authorizeHold.mockResolvedValueOnce({
+        status: 'authorized',
+        intentId: 'pi-123',
+      });
+
+      // Payment is now FAILED, updateMany returns 0
+      mockPrisma.payment.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      await saga.handleBackgroundError(paymentId, idempotencyKey, userId, ownership, new Error('background crash'));
+
+      expect(mockBookingLifecycle.updateToFailed).not.toHaveBeenCalled();
+      expect(mockPrisma.paymentEvent.create).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ eventType: 'payment_cancelled' }),
+        }),
+      );
+      expect(mockIdempotency.completeSagaKeyAtomic).toHaveBeenCalledWith(
+        ownership,
+        HttpStatus.BAD_GATEWAY,
+        expect.objectContaining({
+          success: false,
+          error: expect.stringContaining('background crash'),
+        }),
       );
     });
 
