@@ -98,7 +98,7 @@
       - `AGENT_SERVICE_API_KEY`, `JWT_SECRET`, and `CLAIM_TOKEN_SECRET` fail-fast validation in Pydantic `Settings`. Empty keys abort startup immediately.
       - `GuardrailGateway.is_healthy()` contract enforcing valid `GuardrailRegistry` and compulsory production layers.
       - POST `/chat/stream` ingress fail-closed guard: returns HTTP 503 (`GUARDRAIL_GATEWAY_UNAVAILABLE`) if `guardrail_gateway` is None or degraded, with zero runner invocations.
-      - **Zero Quota Consumption on Gateway Failures**: Guardrail gateway readiness is evaluated *before* Redis quota admission in `/chat/stream`, ensuring 503 gateway errors never consume user daily or burst quotas (`test_gateway_failure_does_not_consume_quota`).
+      - **Zero Quota Consumption on Gateway Failures**: Guardrail gateway readiness is evaluated _before_ Redis quota admission in `/chat/stream`, ensuring 503 gateway errors never consume user daily or burst quotas (`test_gateway_failure_does_not_consume_quota`).
     - **Health Probe Key & Subsystem Verification**:
       - `/health/live`: Lightweight probe guaranteed HTTP 200 with zero model inference, zero guardrail checks, zero Redis/external I/O (< 10ms).
       - `/health`: Deep probe monitoring `guardrails: deterministic`, `redis`, and `nestjsApi`. Degrades status to `degraded` with `guardrails: {"status": "down"}` if gateway is None/degraded or if `AGENT_SERVICE_API_KEY`, `JWT_SECRET`, or `CLAIM_TOKEN_SECRET` are missing.
@@ -281,6 +281,7 @@
   - Issue 9 (Dynamic Test Configuration): Removed hardcoded secret literals and URLs from module import level in `test_ownership.py`; resolved dynamically via `_resolve_test_env()` using `secrets.token_hex(32)` or environment variables in `conftest.py` / `test_ownership.py`.
   - Issue 10 (Comment Quality & Rationale): Purged redundant narration comments throughout both test modules; preserved only security rationale, threat model, and invariant explanations.
   - Sanitized failure diagnostics in `tests/security/dast/test_adversarial.py` leak assertions to report only `case_id`, `mode`, and `category`, preventing sensitive fixture strings or raw text disclosure in test outputs.
+
   ### Feature 023 — Security Systems: Phase 8 Slice 1 (Task T048 Completed) (2026-09-13)
 
 - **T048 Disposable Mutation Controls & Critical Transition Verification**:

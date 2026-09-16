@@ -1322,7 +1322,7 @@ CI review follow-up (2026-09-11): application and shared-package changes route b
 
 3. **Fail-Closed Gateway Lifecycle & Ingress Guarantees**:
    - **Compulsory 9-Layer Production Registry**: `GuardrailGateway` requires `create_production_registry` with all 9 compulsory layers active. Disabling or skipping any compulsory layer raises `RegistryContractError` during startup.
-   - **Ingress Availability Guard (`/chat/stream`)**: Gateway status is evaluated *prior* to Redis quota admission. If `guardrail_gateway` is None or degraded, returns HTTP 503 `GUARDRAIL_GATEWAY_UNAVAILABLE` immediately without consuming user daily/burst quotas or invoking LLM runners.
+   - **Ingress Availability Guard (`/chat/stream`)**: Gateway status is evaluated _prior_ to Redis quota admission. If `guardrail_gateway` is None or degraded, returns HTTP 503 `GUARDRAIL_GATEWAY_UNAVAILABLE` immediately without consuming user daily/burst quotas or invoking LLM runners.
    - **Zero Fail-Open Bypass**: Unexpected exceptions in input parsing, layer evaluation, or tool execution default to `PipelineDecision(status="BLOCK")` and safe user-facing fallbacks.
 
 4. **Pre-Parse ASGI Request Limits (`BodyLimitMiddleware`)**:
