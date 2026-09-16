@@ -13,7 +13,7 @@ import { StripeService } from '@/common/stripe.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { DuffelOrder } from '@/duffel/duffel.types';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
-import { PaymentIdempotencyService } from '@/payment/payment-idempotency.service';
+import { PaymentIdempotencyService } from '@/idempotency/payment-idempotency.service';
 import {
   Prisma,
   PaymentStatus,

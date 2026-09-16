@@ -9,7 +9,7 @@ import {
 import { AncillaryStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
-import { PaymentIdempotencyService } from '@/payment/payment-idempotency.service';
+import { PaymentIdempotencyService } from '@/idempotency/payment-idempotency.service';
 import { AncillaryCatalogService } from './ancillary-catalog.service';
 import { CommitAncillarySelectionDto } from './dto/commit-ancillary-selection.dto';
 import { calculateAncillaryTotals } from './ancillary-pricing';

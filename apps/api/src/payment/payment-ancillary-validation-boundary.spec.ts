@@ -3,7 +3,7 @@ import { AuditService } from '@/audit/audit.service';
 import { BookingLifecycleService } from '@/booking-lifecycle/booking-lifecycle.service';
 import { StripeService } from '@/common/stripe.service';
 import { DuffelService } from '@/duffel/duffel.service';
-import { PaymentIdempotencyService } from '@/payment/payment-idempotency.service';
+import { PaymentIdempotencyService } from '@/idempotency/payment-idempotency.service';
 import { PaymentMethodService } from '@/payment/payment-method.service';
 import { PaymentService } from '@/payment/payment.service';
 import { PrismaService } from '@/prisma/prisma.service';

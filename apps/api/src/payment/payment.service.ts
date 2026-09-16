@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { StripeService } from '@/common/stripe.service';
-import { PaymentIdempotencyService } from '@/payment/payment-idempotency.service';
+import { PaymentIdempotencyService } from '@/idempotency/payment-idempotency.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { AuditService } from '@/audit/audit.service';
 import { PaymentMethodService } from '@/payment/payment-method.service';
