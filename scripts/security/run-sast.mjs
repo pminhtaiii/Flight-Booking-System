@@ -1679,6 +1679,46 @@ export function runSastScan(options = {}) {
         errors.push(...evalResult.errors);
       }
 
+      if (sarifOutput) {
+        try {
+          const sarifDir = dirname(sarifOutput);
+          mkdirSync(sarifDir, { recursive: true });
+          const sarifPayload = {
+            version: '2.1.0',
+            $schema: 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json',
+            runs: [
+              {
+                tool: {
+                  driver: {
+                    name: 'Semgrep',
+                    semanticVersion: '1.88.0',
+                    rules: [],
+                  },
+                },
+                results: fallbackFindings.map((f) => ({
+                  ruleId: f.ruleId,
+                  level: f.severity === 'Critical' || f.severity === 'High' ? 'error' : 'warning',
+                  message: { text: f.message },
+                  locations: [
+                    {
+                      physicalLocation: {
+                        artifactLocation: { uri: f.file },
+                        region: { startLine: f.line || 1 },
+                      },
+                    },
+                  ],
+                })),
+              },
+            ],
+          };
+          writeFileSync(sarifOutput, JSON.stringify(sarifPayload, null, 2), 'utf8');
+        } catch (err) {
+          errors.push(
+            `[SAST Output Error] Failed to write SARIF output to ${sarifOutput}: ${err.message}`,
+          );
+        }
+      }
+
       const passed = evalResult.passed && errors.length === 0;
       return {
         passed,

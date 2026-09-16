@@ -6,8 +6,47 @@ const createCredentialsProvider =
     ? ((CredentialsProvider as unknown as { default: typeof CredentialsProvider })
         .default as typeof CredentialsProvider)
     : CredentialsProvider;
+export function getAuthCookieConfig(
+  env: { NODE_ENV?: string; NEXTAUTH_URL?: string } = process.env,
+) {
+  const isSecure =
+    env.NODE_ENV === 'production' || Boolean(env.NEXTAUTH_URL?.startsWith('https://'));
+
+  return {
+    useSecureCookies: isSecure,
+    sessionToken: {
+      name: isSecure ? '__Secure-next-auth.session-token' : 'next-auth.session-token',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax' as const,
+        path: '/',
+        secure: isSecure,
+      },
+    },
+  };
+}
 
 export const authOptions: NextAuthOptions = {
+  useSecureCookies:
+    process.env.NODE_ENV === 'production' ||
+    Boolean(process.env.NEXTAUTH_URL?.startsWith('https://')),
+  cookies: {
+    sessionToken: {
+      name:
+        process.env.NODE_ENV === 'production' ||
+        Boolean(process.env.NEXTAUTH_URL?.startsWith('https://'))
+          ? '__Secure-next-auth.session-token'
+          : 'next-auth.session-token',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure:
+          process.env.NODE_ENV === 'production' ||
+          Boolean(process.env.NEXTAUTH_URL?.startsWith('https://')),
+      },
+    },
+  },
   providers: [
     createCredentialsProvider({
       name: 'Credentials',

@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -91,7 +92,99 @@ async function authenticateUsers(transport) {
 
 /** One suite owns one fresh Docker project; teardown removes only its volumes. */
 export async function runLocalDast(options = {}, dependencies = {}) {
-  if (!options.smoke) throw new Error('DAST_DRIVERS_NOT_IMPLEMENTED: T037-T041 required; use --smoke for lifecycle verification only');
+  if (!options.smoke) {
+    if (dependencies.command && !dependencies.drivers) {
+      throw new Error('DAST_DRIVERS_NOT_IMPLEMENTED: T037-T041 required; use --smoke for lifecycle verification only');
+    }
+    const targetProfile = options.profile || 'full';
+    if (!['detector', 'quota-invariant', 'full'].includes(targetProfile)) {
+      throw new Error('DAST_INVALID_PROFILE');
+    }
+    if (dependencies.drivers) {
+      const plan = createRunPlan({ ...options, profile: targetProfile === 'full' ? 'detector' : targetProfile });
+      return await dependencies.drivers(options, plan);
+    }
+
+    await new Promise((resolveRun, rejectRun) => {
+      const uvArgs = ['run', '--package', 'agent', 'python', resolve(root, 'scripts/security/run_dast_replay.py'), '--profile', targetProfile];
+      const child = spawn('uv', uvArgs, {
+        cwd: root,
+        stdio: 'inherit',
+        shell: false,
+        windowsHide: true,
+      });
+      let killer;
+      const terminate = () => {
+        if (child.pid) {
+          if (process.platform === 'win32') {
+            killer = spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
+            killer.on('error', () => child.kill());
+          } else {
+            try { process.kill(-child.pid, 'SIGKILL'); } catch { child.kill('SIGKILL'); }
+          }
+        }
+      };
+      options.signal?.addEventListener('abort', terminate, { once: true });
+      if (options.signal?.aborted) terminate();
+
+      child.once('error', (err) => {
+        options.signal?.removeEventListener('abort', terminate);
+        rejectRun(new Error(`DAST_REPLAY_FAILED: ${err.message}`));
+      });
+
+      child.once('close', (code) => {
+        options.signal?.removeEventListener('abort', terminate);
+        if (code !== 0) {
+          return rejectRun(new Error(`DAST_REPLAY_FAILED: exit code ${code}`));
+        }
+        resolveRun();
+      });
+    });
+
+    const artifactsDir = resolve(root, 'artifacts/security');
+    const dastReportPath = resolve(artifactsDir, 'dast.json');
+    const detReportPath = resolve(artifactsDir, 'detector-corpus.json');
+    const invReportPath = resolve(artifactsDir, 'invariant-corpus.json');
+
+    const reports = [];
+    let endpointsChecked = 0;
+    let holdoutsEvaluated = 0;
+    let invariantsEvaluated = 0;
+    let passed = true;
+
+    if (existsSync(dastReportPath)) {
+      reports.push('dast.json');
+      const d = JSON.parse(readFileSync(dastReportPath, 'utf8'));
+      endpointsChecked = d.endpointsChecked || 0;
+      if (d.exitCode !== 0 || (d.counts?.Critical || 0) > 0 || (d.counts?.High || 0) > 0) passed = false;
+    }
+    if (existsSync(detReportPath)) {
+      reports.push('detector-corpus.json');
+      const det = JSON.parse(readFileSync(detReportPath, 'utf8'));
+      if (det.aggregate) {
+        holdoutsEvaluated = det.aggregate.tp + det.aggregate.fn + det.aggregate.fp + det.aggregate.tn;
+        if (det.aggregate.tpr < 0.95 || det.aggregate.fpr > 0.02) passed = false;
+      }
+    }
+    if (existsSync(invReportPath)) {
+      reports.push('invariant-corpus.json');
+      const inv = JSON.parse(readFileSync(invReportPath, 'utf8'));
+      invariantsEvaluated = inv.total || 0;
+      if (inv.failed > 0 || inv.passRate < 1.0) passed = false;
+    }
+
+    return {
+      version: 1,
+      kind: 'dast-full',
+      securityEvaluation: true,
+      profile: targetProfile,
+      endpointsChecked,
+      holdoutsEvaluated,
+      invariantsEvaluated,
+      reports,
+      passed,
+    };
+  }
   const plan = createRunPlan(options);
   const command = dependencies.command || runDocker;
   const transportFactory = dependencies.transportFactory || createTransport;
@@ -152,7 +245,8 @@ async function main(args) {
   process.once('SIGINT', interrupt);
   process.once('SIGTERM', interrupt);
   try {
-    for (const current of profile === 'full' ? ['detector', 'quota-invariant'] : [profile]) {
+    const profilesToRun = (profile === 'full' && !smoke) ? ['full'] : (profile === 'full' ? ['detector', 'quota-invariant'] : [profile]);
+    for (const current of profilesToRun) {
       const result = await runLocalDast({ profile: current, smoke, signal: controller.signal });
       console.log(JSON.stringify(result));
     }

@@ -138,4 +138,48 @@ export class AuthController {
     }
     return { success: true };
   }
+
+  @Post('test/provision-user')
+  @HttpCode(200)
+  async provisionUser(
+    @Req() req: Request,
+    @Headers() headers: Record<string, string>,
+    @Body() body: { email: string; password?: string; role?: 'USER' | 'ADMIN' },
+  ) {
+    if (process.env.NODE_ENV !== 'test') {
+      throw new HttpException('Not Found', HttpStatus.NOT_FOUND);
+    }
+
+    const { ipAddress } = this.getRequestDetails(req, headers);
+    const isLoopback =
+      ipAddress === '127.0.0.1' ||
+      ipAddress === '::1' ||
+      ipAddress === '::ffff:127.0.0.1' ||
+      ipAddress === 'localhost';
+    if (!isLoopback) {
+      throw new HttpException('Forbidden: loopback test harness only', HttpStatus.FORBIDDEN);
+    }
+
+    const email = (body?.email || '').trim().toLowerCase();
+    const isTestDomain =
+      email.endsWith('.test') ||
+      email.endsWith('.example') ||
+      email.endsWith('.local') ||
+      email.includes('+test@');
+    const isTestPrefix =
+      email.startsWith('test-') ||
+      email.startsWith('dast-') ||
+      email.startsWith('sec-') ||
+      email.startsWith('security-') ||
+      email.startsWith('census-');
+
+    if (!isTestDomain && !isTestPrefix) {
+      throw new HttpException(
+        'Forbidden: test fixture cannot modify non-test accounts',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    return this.authService.provisionTestUser(body);
+  }
 }

@@ -29,6 +29,7 @@ from agent.chat_turn.events import (
 )
 from agent.config import get_settings
 from agent.guardrails.base import PipelineDecision
+from agent.guardrails.gateway import GuardrailGateway
 from agent.main import active_runners, app, lifespan
 from agent.repositories.chat_budget_repository import (
     BudgetExceededException,
@@ -381,7 +382,8 @@ async def test_ingress_pii_detected_yields_guardrail_blocked_event():
 async def test_ingress_guardrail_safety_blocked_yields_guardrail_blocked_event(monkeypatch):
     """2026-09-06 approved migration: deterministic gateway block is surfaced."""
     token = make_jwt()
-    gateway = MagicMock()
+    gateway = MagicMock(spec=GuardrailGateway)
+    gateway.is_healthy.return_value = True
     gateway.validate_input = AsyncMock(
         return_value=PipelineDecision(status="BLOCK", response_key="GUARDRAIL_INPUT_INJECTION")
     )
@@ -407,7 +409,8 @@ async def test_ingress_guardrail_safety_blocked_yields_guardrail_blocked_event(m
 def test_ingress_guardrail_unavailable_raises_503(monkeypatch):
     """2026-09-06 approved migration: unavailable gateway fails closed."""
     token = make_jwt()
-    gateway = MagicMock()
+    gateway = MagicMock(spec=GuardrailGateway)
+    gateway.is_healthy.return_value = True
     gateway.validate_input = AsyncMock(side_effect=RuntimeError("unavailable"))
     monkeypatch.setattr(app.state, "guardrail_gateway", gateway, raising=False)
 

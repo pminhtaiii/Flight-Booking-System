@@ -85,6 +85,7 @@ class Settings(BaseSettings):
     FEATURE_FLAG_CHAT_MULTI_AGENT: bool = False
     FEATURE_FLAG_CHAT_HANDOFF_ACCEPT: bool = False
     FEATURE_FLAG_CHAT_HANDOFF_ISSUE: bool = False
+    FEATURE_FLAG_BOOKING_READINESS: bool = False
     FEATURE_FLAG_CHAT_DIRECT_STREAM: Optional[Union[bool, str]] = None
     ENABLE_DIRECT_AGENT_STREAM: Optional[Union[bool, str]] = None
     CHAT_STREAM_TRANSPORT: Optional[str] = None

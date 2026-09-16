@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from typing import Any, ClassVar, Literal
 
 from agent.guardrails.base import (
@@ -119,6 +120,13 @@ class GuardrailRegistry:
     def keys(self) -> set[str]:
         return set(self._layers.keys())
 
+    def is_healthy(self) -> bool:
+        if self.production:
+            for layer_name in COMPULSORY_PRODUCTION_LAYERS:
+                if layer_name not in self._layers:
+                    return False
+        return True
+
     def inject_for_test(self, layer: Any) -> None:
         if self.production:
             raise RegistryContractError("inject_for_test is strictly forbidden in production mode.")
@@ -198,9 +206,17 @@ class GuardrailRegistry:
 
 
 def create_production_registry(
-    disabled_keys: set[str] | None = None,
+    disabled_keys: Iterable[str] | None = None,
 ) -> GuardrailRegistry:
-    effective_disabled = set(disabled_keys) if disabled_keys is not None else set()
+    if disabled_keys is not None:
+        if isinstance(disabled_keys, (str, bytes)) or not isinstance(disabled_keys, Iterable):
+            raise RegistryContractError("disabled_keys must be an iterable of strings.")
+        disabled_list = list(disabled_keys)
+        if not all(isinstance(k, str) for k in disabled_list):
+            raise RegistryContractError("disabled_keys must contain only string keys.")
+        effective_disabled = set(disabled_list)
+    else:
+        effective_disabled = set()
     disabled_compulsory = effective_disabled.intersection(COMPULSORY_PRODUCTION_LAYERS)
     if disabled_compulsory:
         raise RegistryContractError(

@@ -935,3 +935,42 @@ export type BookingManagementOutcome<T> =
 - Datetime strings MUST enforce ISO 8601 offset strings via `z.string().datetime({ offset: true })`.
 - Types must NEVER be declared as independent interfaces and then separately cast; use `z.infer<typeof Schema>` exclusively.
 - Upstream NestJS responses in `apps/web/lib/server/` must be validated with `Schema.safeParse(await response.json())` before returning outcomes.
+
+---
+
+## Security Verification Toolchains (Feature 023)
+
+All security scanners, linters, container images, and audit drivers are pinned in `tests/security/toolchain.json` and documented in `docs/security/toolchain.md`.
+
+### 1. Semgrep (SAST)
+- **Engine**: Semgrep CLI `1.88.0` (pinned CLI release, backwards-compatible with `1.85.0+`).
+- **Rulesets**: Custom rules (`tests/security/sast/guardrails.yml`, `tests/security/sast/ruleset.yml`) and reviewed generic rulesets (`p/default`, `p/owasp-top-ten`, `p/security-audit`, `p/secrets`).
+- **Output Schema**: SARIF v2.1.0 (`artifacts/security/sast.sarif`).
+- **Exit Code Semantics**:
+  - `0`: Scan clean, zero blocking findings.
+  - `1`: Execution error / syntax fault.
+  - `2`: Blocking security findings detected (`failSeverity: ERROR`).
+- **Platform-Aware AST Fallback**: `scripts/security/run-sast.mjs` provides deterministic AST fallback (`runAstFallbackScan`) parsing Python (`ast.parse`) and TypeScript (`typescript.createSourceFile`) when native Semgrep CLI is unavailable.
+
+### 2. OWASP ZAP (DAST)
+- **Container Image**: `zaproxy/zap-stable:2.15.0@sha256:8dc78e39fafc3281ac2cf54eab05c3ea02721a1ea58f1c135f981a57f4e218b1`.
+- **Config & Automation**: Automation Framework specification (`tests/security/zap/automation.yaml`) targeting 45 cataloged endpoints (`tests/security/zap/routes.json`).
+- **Driver**: `scripts/security/run-zap.mjs` enforces scoped authenticated target allowlists, bounded execution timeouts, sanitized evidence output, and fail-closed exit codes on High/Critical findings.
+
+### 3. Gitleaks (Secret Detection)
+- **Pinned Version**: `v8.18.4` binary / GitHub Action `gitleaks/gitleaks-action@v2`.
+- **Configuration**: `.gitleaks.toml` with scoped allowlists for synthetic test fixtures and examples.
+- **Driver**: `scripts/security/run-supply-chain.mjs` executes Gitleaks in two isolated modes:
+  - Commit history: `detect --source . --config .gitleaks.toml --report-format json --redact --log-opts=--all`.
+  - Working tree: `detect --source . --config .gitleaks.toml --report-format json --redact --no-git`.
+- **Sanitization**: Intermediates are redacted and unlinked immediately; secrets are never persisted to artifacts or logs.
+
+### 4. pip-audit & pnpm audit (Supply Chain / SCA)
+- **pip-audit**: CLI `2.7.3`, PyPI advisory service, maximum advisory age 24 hours. Scans frozen locked requirements exported from `apps/agent/uv.lock` via `uv export --package agent --locked --no-dev`.
+- **pnpm audit**: CLI `9.15.4` / `11.9.0`, live npm registry query, audit level `moderate`.
+- **Advisory Deferral Policy**: Stored in `docs/security/dependency-advisories.md` with strict expiry (`Policy-Expires-At <= 30 days`), required owner, rationale, and CVE tracking.
+
+### 5. pytest-cov (Coverage Enforcement)
+- **Pinned Version**: `pytest-cov>=5.0.0` (installed `7.1.0`).
+- **Thresholds**: Strictly enforced by `tests/security/coverage-policy.json`: `>=95.0%` statement coverage and `>=90.0%` branch coverage across changed security modules.
+

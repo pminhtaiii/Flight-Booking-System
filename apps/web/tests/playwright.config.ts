@@ -18,9 +18,14 @@ const t093Secrets = {
   stripeWebhook: process.env.STRIPE_WEBHOOK_SECRET || `whsec_${generatedSecret()}`,
 };
 
+const nextAuthSecret =
+  process.env.NEXTAUTH_SECRET ||
+  (t093RealFlow ? t093Secrets.jwt : 'test_secret');
+process.env.NEXTAUTH_SECRET = nextAuthSecret;
+
 const frontendEnv = {
   CI: 'true',
-  NEXTAUTH_SECRET: t093RealFlow ? t093Secrets.jwt : 'test_secret',
+  NEXTAUTH_SECRET: nextAuthSecret,
   NEXTAUTH_URL: t093RealFlow ? 'http://localhost:3000' : 'http://127.0.0.1:3000',
   // Search Server Actions run in Next.js, so their upstream fixture must be reachable
   // from the Next process rather than intercepted from the browser.

@@ -26,8 +26,8 @@
     "zap": {
       "name": "OWASP ZAP",
       "containerImage": "zaproxy/zap-stable:2.15.0",
-      "containerDigest": "sha256:2d184081c7ff8be2ad7500599a0d4c82c3cfa5d95b542013fbe40d346ffc0303",
-      "pinnedImage": "zaproxy/zap-stable:2.15.0@sha256:2d184081c7ff8be2ad7500599a0d4c82c3cfa5d95b542013fbe40d346ffc0303",
+      "containerDigest": "sha256:8dc78e39fafc3281ac2cf54eab05c3ea02721a1ea58f1c135f981a57f4e218b1",
+      "pinnedImage": "zaproxy/zap-stable:2.15.0@sha256:8dc78e39fafc3281ac2cf54eab05c3ea02721a1ea58f1c135f981a57f4e218b1",
       "license": "Apache-2.0",
       "outputFormat": "sarif",
       "alertThreshold": "LOW",

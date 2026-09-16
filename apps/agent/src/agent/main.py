@@ -8,43 +8,33 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from agent.config import get_settings
+from agent.guardrails.gateway import GuardrailGateway
+from agent.guardrails.registry import create_production_registry
 from agent.middleware.auth import JWTAuthMiddleware
 from agent.middleware.body_limit import BodyLimitMiddleware
+from agent.queue.message_queue import MessageQueueManager
 from agent.streaming.sse import router as sse_router
 
 settings = get_settings()
 
-# Global set to track active SSE connection queues for graceful shutdown (M2)
 active_streams: Set[asyncio.Queue] = set()
 active_runners: Set[asyncio.Task] = set()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Lifespan context manager that initializes NeMo Guardrails configuration,
-    message queue manager, and Redis on startup, and flushes active SSE connections on shutdown.
-    """
     from agent.infrastructure.redis import close_redis, init_redis
 
     if settings.REDIS_URL:
         await init_redis(settings.REDIS_URL)
-
-    # Initialize message queue manager
-    from agent.queue.message_queue import MessageQueueManager
 
     app.state.message_queue = MessageQueueManager(
         max_depth=settings.QUEUE_MAX_DEPTH,
         lock_ttl_ms=settings.SESSION_LOCK_TTL_MS,
         refresh_interval=settings.SESSION_LOCK_REFRESH_INTERVAL_SECONDS,
     )
-
-    from agent.guardrails.gateway import GuardrailGateway
-    from agent.guardrails.registry import create_production_registry
-
     app.state.guardrail_gateway = GuardrailGateway(create_production_registry())
     yield
-    # Graceful shutdown: cancel and await all active runner tasks
     if active_runners:
         tasks_to_cancel = [t for t in active_runners if not t.done()]
         for t in tasks_to_cancel:
@@ -77,6 +67,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="AI Chatbot Agent Service", version="0.1.0", lifespan=lifespan)
+app.state.guardrail_gateway = GuardrailGateway(create_production_registry())
 app.include_router(sse_router)
 
 allowed_origins = [url.strip() for url in settings.FRONTEND_URL.split(",") if url.strip()]
@@ -163,15 +154,30 @@ async def health_check(request: Request):
         logging.getLogger("agent.main").error(f"Redis health check failed: {e!s}")
         redis_status = "down"
 
+    guardrail_gateway = getattr(request.app.state, "guardrail_gateway", None)
+    guardrail_status = "deterministic"
+    gateway_healthy = True
+    if guardrail_gateway is None:
+        gateway_healthy = False
+    elif hasattr(guardrail_gateway, "is_healthy") and not guardrail_gateway.is_healthy():
+        gateway_healthy = False
+
+    keys_valid = bool(
+        settings.JWT_SECRET and settings.CLAIM_TOKEN_SECRET and settings.AGENT_SERVICE_API_KEY
+    )
+
+    if not gateway_healthy or not keys_valid:
+        guardrail_status = "down"
+
     overall_status = "ok"
-    if nestjs_status == "down" or redis_status == "down":
+    if nestjs_status == "down" or redis_status == "down" or guardrail_status == "down":
         overall_status = "degraded"
 
     return {
         "status": overall_status,
         "dependencies": {
             "nestjsApi": {"status": nestjs_status, "latencyMs": nestjs_latency},
-            "guardrails": {"status": "deterministic"},
+            "guardrails": {"status": guardrail_status},
             "redis": {"status": redis_status},
         },
         "version": "0.1.0",

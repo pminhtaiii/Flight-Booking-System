@@ -13,6 +13,7 @@ os.environ["NESTJS_API_URL"] = "http://localhost:3001/api"
 os.environ["AGENT_SERVICE_API_KEY"] = "mock_agent_key"
 os.environ["CLAIM_TOKEN_SECRET"] = "mock_claim_secret_must_be_long_enough_for_security"
 os.environ["OUTPUT_GUARDRAIL_ENABLED"] = "false"
+os.environ["FEATURE_FLAG_BOOKING_READINESS"] = "true"
 
 
 def pytest_collection_modifyitems(items):
@@ -68,6 +69,12 @@ def setup_env(monkeypatch):
     monkeypatch.setattr("agent.infrastructure.redis.close_redis", AsyncMock())
 
     agent.infrastructure.redis._redis_client = mock_redis
+
+    from agent.guardrails.gateway import GuardrailGateway
+    from agent.guardrails.registry import create_production_registry
+    from agent.main import app
+
+    app.state.guardrail_gateway = GuardrailGateway(create_production_registry())
 
     # Keep variables set, but yield for test duration
     yield
