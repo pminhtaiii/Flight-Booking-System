@@ -1,5 +1,24 @@
 # Progress Tracker
 
+### Feature 024 — Event-Driven Module Deepening: Phase 2 Foundation Completed (Tasks T003, T004) (2026-09-16)
+
+- **T003 [Foundation]**: Extracted `IdempotencyModule` and `PaymentIdempotencyService` into dedicated `apps/api/src/idempotency/`:
+  - Moved `PaymentIdempotencyService` and `@IdempotencyKey()` parameter decorator to `apps/api/src/idempotency/payment-idempotency.service.ts` preserving complete non-saga acquisition, lock CAS, replay detection, hash verification, and completion recording semantics verbatim.
+  - Relocated full regression test suite to `apps/api/src/idempotency/payment-idempotency.service.spec.ts` (23/23 tests pass).
+  - Maintained backward compatibility via deprecation re-export in `apps/api/src/payment/payment-idempotency.service.ts`.
+- **T004 [Foundation]**: Rewired imports and decoupled `AncillariesModule` from `PaymentModule`:
+  - `AncillariesModule` now imports `IdempotencyModule` directly; eliminated `PaymentModule` dependency completely.
+  - Created decoupling test `apps/api/src/ancillaries/ancillaries.module.spec.ts` verifying `AncillariesModule` contains 0 imports from `PaymentModule` and compiles independently.
+  - Updated `PaymentModule` to import and re-export `IdempotencyModule` without duplicate provider registration for `PaymentIdempotencyService`.
+  - Migrated all payment callers, services, controllers, and 9 test suites from legacy payment-scoped import to `@/idempotency/payment-idempotency.service`.
+- **Verification**:
+  - ESLint API: 0 warnings, 0 errors (`pnpm exec eslint "apps/api/**/*.ts" --max-warnings 0`).
+  - TypeScript API: `tsc --noEmit` passed with 0 errors (`pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`).
+  - Idempotency unit tests: 23/23 passed with CI node network guard (`pnpm --filter @api/backend test -- apps/api/src/idempotency/payment-idempotency.service.spec.ts`).
+  - Ancillaries unit tests: 19/19 passed across 2 suites (`pnpm --filter @api/backend test -- apps/api/src/ancillaries/`).
+  - Payment characterization E2E: 6/6 scenarios passed (`pnpm --filter @api/backend test -- apps/api/test/payment-fulfillment.e2e-spec.ts`).
+- Phase 2 (Foundation) completed; Phase 3 (US1: Safe payment orchestration, Tasks T005–T014) is unblocked.
+
 ### Feature 024 — Event-Driven Module Deepening: Phase 1 Setup Completed (Tasks T001, T002) (2026-09-16)
 
 - **T001 [Setup]**: Completed full static re-inventory of payment entry points, 9 direct projection calls, and booking business-state writers. Confirmed 0 drift against `contracts/booking-events.md` and `contracts/payment-fulfillment.md`. Appended formal baseline notes.
