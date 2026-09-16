@@ -866,12 +866,27 @@ export class PaymentFulfillmentSaga {
               }
             }
 
-            enforceTransition(payment.status, 'CANCELLED');
+            await this.idempotency.assertOwned(currentOwnership);
+
+            let compensationAborted = false;
             await this.prisma.$transaction(async (tx) => {
-              await tx.payment.update({
-                where: { id: payment.id },
+              const paymentUpdate = await tx.payment.updateMany({
+                where: {
+                  id: payment.id,
+                  status: { not: 'SUCCEEDED' },
+                },
                 data: { status: 'CANCELLED' },
               });
+
+              if (paymentUpdate.count === 0) {
+                this.logger.warn(
+                  `[executeConfirmPayment] Payment ${payment.id} is already SUCCEEDED; aborting compensation.`,
+                );
+                compensationAborted = true;
+                return;
+              }
+
+              enforceTransition(payment.status, 'CANCELLED');
               await tx.paymentEvent.create({
                 data: {
                   paymentId: payment.id,
@@ -883,8 +898,11 @@ export class PaymentFulfillmentSaga {
                   createdBy: userId,
                 },
               });
-              await tx.bookingIntent.update({
-                where: { id: payment.bookingIntentId },
+              await tx.bookingIntent.updateMany({
+                where: {
+                  id: payment.bookingIntentId,
+                  status: { not: 'CONFIRMED' },
+                },
                 data: { status: nextBookingStatus },
               });
               await this.bookingLifecycleService.updateToFailed(
@@ -896,6 +914,29 @@ export class PaymentFulfillmentSaga {
                 tx,
               );
             });
+
+            if (compensationAborted) {
+              const duffelEvent = await this.prisma.paymentEvent.findFirst({
+                where: {
+                  paymentId: payment.id,
+                  eventType: 'duffel_order_created',
+                },
+                orderBy: { createdAt: 'desc' },
+              });
+
+              const rawOrder = duffelEvent?.metadata as Record<string, unknown> | null;
+              const duffelOrder = (rawOrder?.data || rawOrder || {}) as Record<string, unknown>;
+
+              return {
+                success: true,
+                paymentId: payment.id,
+                status: 'SUCCEEDED',
+                bookingReference: (duffelOrder.bookingReference ||
+                  duffelOrder.booking_reference ||
+                  '') as string,
+                duffelOrderId: (duffelOrder.id || '') as string,
+              };
+            }
 
             const failureResponse = {
               success: false,
@@ -1264,12 +1305,37 @@ export class PaymentFulfillmentSaga {
         }
       }
 
-      enforceTransition(payment.status, 'CANCELLED');
+      try {
+        await this.idempotency.assertOwned(ownership);
+      } catch (ownershipErr) {
+        if (isOwnershipLost(ownershipErr)) {
+          this.logger.warn(
+            `[handleBackgroundError] Ownership lost before compensation transaction for payment ${paymentId}; aborting.`,
+          );
+          return;
+        }
+        throw ownershipErr;
+      }
+
+      let compensationAborted = false;
       await this.prisma.$transaction(async (tx) => {
-        await tx.payment.update({
-          where: { id: paymentId },
+        const paymentUpdate = await tx.payment.updateMany({
+          where: {
+            id: paymentId,
+            status: { not: 'SUCCEEDED' },
+          },
           data: { status: 'CANCELLED' },
         });
+
+        if (paymentUpdate.count === 0) {
+          this.logger.warn(
+            `[handleBackgroundError] Payment ${paymentId} is already SUCCEEDED; aborting compensation.`,
+          );
+          compensationAborted = true;
+          return;
+        }
+
+        enforceTransition(payment.status, 'CANCELLED');
         await tx.paymentEvent.create({
           data: {
             paymentId,
@@ -1281,8 +1347,11 @@ export class PaymentFulfillmentSaga {
             createdBy: userId,
           },
         });
-        await tx.bookingIntent.update({
-          where: { id: payment.bookingIntentId },
+        await tx.bookingIntent.updateMany({
+          where: {
+            id: payment.bookingIntentId,
+            status: { not: 'CONFIRMED' },
+          },
           data: { status: nextBookingStatus },
         });
         if (booking) {
@@ -1296,6 +1365,10 @@ export class PaymentFulfillmentSaga {
           );
         }
       });
+
+      if (compensationAborted) {
+        return;
+      }
 
       const errObj = error as Error;
       await this.idempotency.completeSagaKeyAtomic(ownership, HttpStatus.BAD_GATEWAY, {
