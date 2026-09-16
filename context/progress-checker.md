@@ -1,5 +1,24 @@
 # Progress Tracker
 
+### Feature 024 — Event-Driven Module Deepening: Phase 3 Slice 2 (Tasks T009, T010) Completed (2026-09-16)
+
+- **T009 [US1] PaymentMethodsModule Extraction**:
+  - Created `PaymentMethodsModule` in `apps/api/src/payment/payment-methods.module.ts` importing `PrismaModule`, providing and exporting `PaymentMethodService`.
+  - Refactored `PaymentModule` in `apps/api/src/payment/payment.module.ts`: imported `PaymentMethodsModule`, removed `PaymentMethodService` from `providers` (preventing duplicate provider instantiation), and re-exported `PaymentMethodsModule` and `PaymentMethodService` for backward compatibility.
+  - Verified `PaymentMethodService` unit tests remain 100% intact (3/3 tests pass).
+- **T010 [US1] PaymentFulfillmentSaga Implementation & Unit Specs**:
+  - Implemented `PaymentFulfillmentSaga` in `apps/api/src/payment-fulfillment/payment-fulfillment.saga.ts` with provider-blind ports (`PAYMENT_GATEWAY_PORT`, `FULFILLMENT_GATEWAY_PORT`) and zero direct SDK dependencies.
+  - Enforced preflight ownership assertion via `PortInvocationControl = { beforeInvoke: () => this.idempotency.assertOwned(ownership) }` on every port call (`authorizeHold`, `createOrder`, `capturePayment`, `voidHold`, `cancelOrder`, `retrieveOrderSnapshot`), halting immediately without downstream mutations upon lease loss.
+  - Implemented 25-second handoff returning HTTP 202 (`PENDING`) with pollUrl, while maintaining the same execution promise in the background and invoking `handleBackgroundError` under the retained `lockedAt` ownership lease upon failure.
+  - Implemented 4-stage orchestration pipeline: `started` -> `stripe_authorized` -> `duffel_order_created` -> `captured` -> `completed`, with atomic terminal completion via `idempotency.completeSagaKeyAtomic`.
+  - Implemented full compensation matrix: Duffel order failure voids hold; capture failure reconciles intent and compensates (void hold + cancel order) if known failed, or safely preserves for recovery if nonfinal/unknown.
+  - Preserved strict invariant: database transactions never span external provider calls.
+  - Added comprehensive unit test suite in `apps/api/src/payment-fulfillment/payment-fulfillment.saga.spec.ts` (20/20 unit tests pass).
+- **Verification**:
+  - Unit tests: 23/23 tests pass across `payment-method.service.spec.ts` and `payment-fulfillment.saga.spec.ts` under CI network guard.
+  - Lint: 0 ESLint errors/warnings (`pnpm exec eslint "apps/api/**/*.ts" --max-warnings 0`).
+  - Typecheck: 0 TypeScript compiler errors (`pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`).
+
 ### Feature 024 — Event-Driven Module Deepening: Phase 3 Slice 2 (Tasks T007, T008) Completed (2026-09-16)
 
 - **T007 [US1] Stripe Payment Adapter & Module Wiring**:

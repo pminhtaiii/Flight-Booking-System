@@ -26,11 +26,20 @@ Planning artifacts: [specification](../specs/024-event-driven-module-deepening/s
   - Maps services, metadata, and idempotency key, redacting passenger PII (`email`, `born_on`, `given_name`, `family_name`, `phone_number`) from persisted order evidence.
   - Enriches fallback snapshot with passenger input and contact email if live upstream order retrieval fails.
   - Enforces `PortInvocationControl.beforeInvoke()` before SDK calls, immediately releasing admission permit if ownership check fails.
+- **PaymentMethodsModule (`apps/api/src/payment/payment-methods.module.ts`) (T009)**:
+  - Extracted shared payment method management service into dedicated module importing `PrismaModule`.
+  - Provides and exports `PaymentMethodService` once; imported by `PaymentModule` (with duplicate provider registration removed) to eliminate circular dependencies with `PaymentFulfillmentModule`.
+- **PaymentFulfillmentSaga (`apps/api/src/payment-fulfillment/payment-fulfillment.saga.ts`) (T010)**:
+  - Standalone provider-blind payment confirmation orchestrator coordinating `PaymentGatewayPort` (Stripe) and `FulfillmentGatewayPort` (Duffel).
+  - Enforces `PortInvocationControl = { beforeInvoke: () => this.idempotency.assertOwned(ownership) }` on every port call (`authorizeHold`, `createOrder`, `capturePayment`, `voidHold`, `cancelOrder`, `retrieveOrderSnapshot`), ensuring immediate preflight abort on lease theft or takeover.
+  - Implements 25-second handoff returning HTTP 202 (`PENDING`) with pollUrl, continuing the same in-flight execution promise in the background and executing `handleBackgroundError` under retained lease ownership upon failure.
+  - Manages 4-stage checkpointed pipeline: `started` -> `stripe_authorized` -> `duffel_order_created` -> `captured` -> `completed` with atomic terminal completion via `completeSagaKeyAtomic`.
+  - Comprehensive compensation matrix: Duffel failure triggers `voidHold`; capture failure reconciles intent and performs clean rollback (`voidHold` + `cancelOrder`) if known failed, or safely preserves for recovery if nonfinal/unknown. Database transactions never span remote provider calls.
 - **AncillariesModule Decoupling (`apps/api/src/ancillaries/`)**:
   - `AncillariesModule` now imports `IdempotencyModule` directly with zero imports from `PaymentModule`.
   - Decoupling verified with unit/compilation tests in `apps/api/src/ancillaries/ancillaries.module.spec.ts`.
 - **PaymentModule Clean Composition (`apps/api/src/payment/`)**:
-  - `PaymentModule` imports and re-exports `IdempotencyModule` without duplicate provider registration for `PaymentIdempotencyService`.
+  - `PaymentModule` imports and re-exports `IdempotencyModule` and `PaymentMethodsModule` without duplicate provider registrations.
   - All payment services, controllers, and spec files directly import from `@/idempotency/payment-idempotency.service`.
 
 ### Remaining Architecture (Phases 3–6)

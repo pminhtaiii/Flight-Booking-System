@@ -4,6 +4,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { PaymentService } from './payment.service';
 import { PaymentRefundService } from './payment-refund.service';
 import { PaymentMethodService } from './payment-method.service';
+import { PaymentMethodsModule } from './payment-methods.module';
 import { PaymentController } from './payment.controller';
 import { PaymentWebhookController } from './payment-webhook.controller';
 import { PaymentWebhookService } from './payment-webhook.service';
@@ -27,18 +28,19 @@ import { RefundSettlementModule } from '../refund-settlement/refund-settlement.m
     RefundSettlementModule,
     BookingLifecycleModule,
     BookingIntentModule,
+    PaymentMethodsModule,
   ],
   controllers: [PaymentController, PaymentWebhookController, AdminRefundController],
   providers: [
     PaymentService,
     PaymentRefundService,
-    PaymentMethodService,
     PaymentWebhookService,
     PaymentCronService,
     AncillaryPaymentValidationService,
   ],
   exports: [
     IdempotencyModule,
+    PaymentMethodsModule,
     PaymentService,
     PaymentRefundService,
     PaymentMethodService,
