@@ -13,6 +13,7 @@ import { StripeService } from '@/common/stripe.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { DuffelOrder } from '@/duffel/duffel.types';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
+import { PaymentIdempotencyService } from '@/payment/payment-idempotency.service';
 import {
   Prisma,
   PaymentStatus,
@@ -22,6 +23,18 @@ import {
   Payment,
 } from '@prisma/client';
 import * as crypto from 'crypto';
+
+function assertDisposableDatabase(): void {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (
+    !databaseUrl ||
+    (!/(test|e2e|flight_booking)/i.test(databaseUrl) && process.env.NODE_ENV !== 'test')
+  ) {
+    throw new Error(
+      'Refusing to run destructive E2E cleanup against non-test database. Ensure DATABASE_URL targets a test/e2e database or NODE_ENV is set to "test".',
+    );
+  }
+}
 
 interface MockDuffelOrder {
   id: string;
@@ -70,11 +83,14 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
   let jwtService: JwtService;
   let stripeService: StripeService;
   let duffelService: DuffelService;
+  let idempotencyService: PaymentIdempotencyService;
 
   let testUser: { id: string; email: string };
   let testToken: string;
 
   beforeAll(async () => {
+    assertDisposableDatabase();
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -95,6 +111,7 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
     jwtService = moduleFixture.get<JwtService>(JwtService);
     stripeService = moduleFixture.get<StripeService>(StripeService);
     duffelService = moduleFixture.get<DuffelService>(DuffelService);
+    idempotencyService = moduleFixture.get<PaymentIdempotencyService>(PaymentIdempotencyService);
   });
 
   afterAll(async () => {
@@ -103,6 +120,8 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
   });
 
   beforeEach(async () => {
+    assertDisposableDatabase();
+
     await prisma.chatHandoff.deleteMany({});
     await prisma.chatSession.deleteMany({});
     await prisma.bookingAgentProjection.deleteMany({});
@@ -416,15 +435,22 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
         });
 
         // Wait for background fulfillment to complete before teardown/restoring mocks
+        let finalPayment: Payment | null = null;
         for (let i = 0; i < 100; i++) {
-          const payment = await prisma.payment.findUnique({
+          finalPayment = await prisma.payment.findUnique({
             where: { id: paymentFixture.id },
           });
-          if (payment?.status === PaymentStatus.SUCCEEDED) {
+          if (finalPayment?.status === PaymentStatus.SUCCEEDED) {
             break;
           }
           await new Promise((resolve) => origSetTimeout(resolve, 50));
         }
+        expect(finalPayment).not.toBeNull();
+        expect(finalPayment?.status).toBe(PaymentStatus.SUCCEEDED);
+        const canonicalBooking = await prisma.booking.findUnique({
+          where: { id: bookingId },
+        });
+        expect(canonicalBooking?.status).toBe(BookingStatus.CONFIRMED);
       } finally {
         timeoutSpy.mockRestore();
       }
@@ -501,6 +527,207 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
       expect(retrieveSpy).toHaveBeenCalledTimes(1);
       expect(createOrderSpy).toHaveBeenCalledTimes(1);
       expect(captureSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('replays a completed failure with HTTP 200 and preserved failure body', async () => {
+      const offer = await createFlightOffer();
+      const intent = await createBookingIntent(testUser.id, offer.id);
+      const payment = await createPaymentFixture(testUser.id, intent.id);
+      const bookingId = crypto.randomUUID();
+      const idempotencyKey = `idem-confirm-fail-${crypto.randomUUID()}`;
+
+      // Mock Stripe retrievePaymentIntent with requires_capture status
+      const retrieveSpy = jest
+        .spyOn(stripeService, 'retrievePaymentIntent')
+        .mockResolvedValue({
+          id: payment.stripePaymentIntentId,
+          status: 'requires_capture',
+        } as unknown as Stripe.PaymentIntent);
+
+      const duffelSpy = jest
+        .spyOn(duffelService, 'createOrder')
+        .mockRejectedValue(new Error('Duffel booking failed'));
+
+      const cancelSpy = jest
+        .spyOn(stripeService, 'cancelPaymentIntent')
+        .mockResolvedValue({
+          id: payment.stripePaymentIntentId,
+          status: 'canceled',
+        } as unknown as Stripe.PaymentIntent);
+
+      const payload = { paymentId: payment.id, bookingId };
+
+      // Initial request fails with HTTP 502 and saves responseCode: 502 in idempotency key
+      const initialRes = await request(app.getHttpServer())
+        .post('/api/bookings/payment/confirm')
+        .set('Authorization', `Bearer ${testToken}`)
+        .set('Idempotency-Key', idempotencyKey)
+        .send(payload)
+        .expect(502);
+
+      expect(initialRes.body).toEqual(
+        expect.objectContaining({
+          success: false,
+          error: expect.stringContaining('Duffel booking failed'),
+        }),
+      );
+
+      const storedKey = await prisma.idempotencyKey.findUnique({
+        where: { key: idempotencyKey },
+      });
+      expect(storedKey).not.toBeNull();
+      expect(storedKey?.responseCode).toBe(502);
+      expect(storedKey?.recoveryPoint).toBe('completed');
+
+      // Replay call with exact request returns HTTP 200 (stored response code does not control replay status in existing controller)
+      const replayRes = await request(app.getHttpServer())
+        .post('/api/bookings/payment/confirm')
+        .set('Authorization', `Bearer ${testToken}`)
+        .set('Idempotency-Key', idempotencyKey)
+        .send(payload)
+        .expect(200);
+
+      expect(replayRes.body).toEqual(
+        expect.objectContaining({
+          success: false,
+          error: expect.stringContaining('Duffel booking failed'),
+        }),
+      );
+
+      // Assert no second downstream calls were made on replay
+      expect(retrieveSpy).toHaveBeenCalledTimes(1);
+      expect(duffelSpy).toHaveBeenCalledTimes(1);
+      expect(cancelSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('reconstructs legacy completed success row without cached responseBody with HTTP 200', async () => {
+      const offer = await createFlightOffer();
+      const intent = await createBookingIntent(testUser.id, offer.id);
+      const payment = await createPaymentFixture(testUser.id, intent.id);
+      const bookingId = crypto.randomUUID();
+      const idempotencyKey = `idem-legacy-success-${crypto.randomUUID()}`;
+      const payload = { paymentId: payment.id, bookingId };
+
+      // Payment is SUCCEEDED
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: { status: PaymentStatus.SUCCEEDED },
+      });
+
+      // PaymentEvent has duffel_order_created
+      await prisma.paymentEvent.create({
+        data: {
+          paymentId: payment.id,
+          eventType: 'duffel_order_created',
+          previousStatus: 'AUTHORIZED',
+          newStatus: 'AUTHORIZED',
+          amount: payment.amount,
+          source: 'API',
+          metadata: {
+            id: 'ord_legacy_succ',
+            booking_reference: 'REF_LEGACY_SUCC',
+          },
+          createdBy: testUser.id,
+        },
+      });
+
+      // IdempotencyKey has recoveryPoint: 'completed' and responseBody: null
+      await prisma.idempotencyKey.create({
+        data: {
+          key: idempotencyKey,
+          requestHash: idempotencyService.computeHash(payload),
+          customerId: testUser.id,
+          requestPath: '/api/bookings/payment/confirm',
+          recoveryPoint: 'completed',
+          responseBody: Prisma.DbNull,
+          responseCode: null,
+          lockedAt: null,
+          expiresAt: new Date(Date.now() + 86400000),
+        },
+      });
+
+      const res = await request(app.getHttpServer())
+        .post('/api/bookings/payment/confirm')
+        .set('Authorization', `Bearer ${testToken}`)
+        .set('Idempotency-Key', idempotencyKey)
+        .send(payload)
+        .expect(200);
+
+      expect(res.body).toEqual({
+        success: true,
+        status: 'SUCCEEDED',
+        paymentId: payment.id,
+        bookingReference: 'REF_LEGACY_SUCC',
+        duffelOrderId: 'ord_legacy_succ',
+      });
+
+      const updatedKey = await prisma.idempotencyKey.findUnique({
+        where: { key: idempotencyKey },
+      });
+      expect(updatedKey?.responseCode).toBe(200);
+      expect(updatedKey?.responseBody).toEqual(
+        expect.objectContaining({
+          success: true,
+          status: 'SUCCEEDED',
+          bookingReference: 'REF_LEGACY_SUCC',
+          duffelOrderId: 'ord_legacy_succ',
+        }),
+      );
+    });
+
+    it('reconstructs legacy completed failure row without cached responseBody with HTTP 200', async () => {
+      const offer = await createFlightOffer();
+      const intent = await createBookingIntent(testUser.id, offer.id);
+      const payment = await createPaymentFixture(testUser.id, intent.id);
+      const bookingId = crypto.randomUUID();
+      const idempotencyKey = `idem-legacy-fail-${crypto.randomUUID()}`;
+      const payload = { paymentId: payment.id, bookingId };
+
+      // Payment is CANCELLED
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: { status: PaymentStatus.CANCELLED },
+      });
+
+      // IdempotencyKey has recoveryPoint: 'completed' and responseBody: null
+      await prisma.idempotencyKey.create({
+        data: {
+          key: idempotencyKey,
+          requestHash: idempotencyService.computeHash(payload),
+          customerId: testUser.id,
+          requestPath: '/api/bookings/payment/confirm',
+          recoveryPoint: 'completed',
+          responseBody: Prisma.DbNull,
+          responseCode: null,
+          lockedAt: null,
+          expiresAt: new Date(Date.now() + 86400000),
+        },
+      });
+
+      const res = await request(app.getHttpServer())
+        .post('/api/bookings/payment/confirm')
+        .set('Authorization', `Bearer ${testToken}`)
+        .set('Idempotency-Key', idempotencyKey)
+        .send(payload)
+        .expect(200);
+
+      expect(res.body).toEqual(
+        expect.objectContaining({
+          success: false,
+          error: expect.stringContaining('Payment hold released'),
+        }),
+      );
+
+      const updatedKey = await prisma.idempotencyKey.findUnique({
+        where: { key: idempotencyKey },
+      });
+      expect(updatedKey?.responseCode).toBe(502);
+      expect(updatedKey?.responseBody).toEqual(
+        expect.objectContaining({
+          success: false,
+          error: expect.stringContaining('Payment hold released'),
+        }),
+      );
     });
   });
 
