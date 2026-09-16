@@ -183,5 +183,5 @@ The repository enforces automated continuous integration via `.github/workflows/
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/023-security-systems/plan.md
+at specs/024-event-driven-module-deepening/plan.md
 <!-- SPECKIT END -->

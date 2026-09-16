@@ -1,5 +1,12 @@
 # Progress Tracker
 
+### Feature 024 — Event-Driven Module Deepening: Planning (2026-09-16)
+
+- Specification, implementation plan, research, data model, two internal contracts, validation guide and 44 unstarted tasks created in `specs/024-event-driven-module-deepening/`.
+- Scope: payment saga/idempotency extraction and event-driven booking projections based on the two recorded grilling sessions.
+- Luna exploration and two Luna MAX convergence reviews completed. After revisions, both targeted rechecks reported zero unresolved CRITICAL/HIGH/MEDIUM/LOW findings; evidence is in `specs/024-event-driven-module-deepening/reviews/convergence.md`.
+- Runtime implementation, dependency installation, migration execution and feature tests have not started.
+
 ### Feature 023 — Security Systems: Phase 8 Final Closure, Release Gates, Findings Ledger & Security Signoff (Tasks T049–T052 Completed) (2026-09-13)
 
 - **T049–T052 Phase 8 Final Closure & Security Gate Matrix Signoff (`docs/security/release-evidence.md`, `docs/security/findings.md`, `specs/023-security-systems/security-test-matrix.md`)**:
