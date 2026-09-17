@@ -8,6 +8,7 @@ import { RefundSettlementModule } from '@/refund-settlement/refund-settlement.mo
 import { StripeModule } from '@/common/stripe.module';
 import { BookingStateModule } from './booking-state.module';
 import { BookingRecoveryService } from './booking-recovery.service';
+import { DomainEventsModule } from '@/domain-events/domain-events.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { BookingRecoveryService } from './booking-recovery.service';
     RefundSettlementModule,
     ScheduleModule,
     StripeModule,
+    DomainEventsModule,
   ],
   providers: [BookingRecoveryService],
   exports: [BookingStateModule, BookingRecoveryService],

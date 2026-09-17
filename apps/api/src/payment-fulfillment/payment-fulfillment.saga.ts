@@ -1072,7 +1072,7 @@ export class PaymentFulfillmentSaga {
             });
 
             const pnr = (rawOrder.bookingReference || rawOrder.booking_reference) as string;
-            await this.bookingLifecycleService.updateToConfirmed(
+            await this.bookingLifecycleService.confirmBooking(
               canonicalBooking.id,
               pnr,
               rawOrder.id as string,
@@ -1104,7 +1104,16 @@ export class PaymentFulfillmentSaga {
             });
           });
           if (eventContext && eventContext.events.length > 0 && this.publisher) {
-            await this.publisher.publish(eventContext.events);
+            try {
+              await this.publisher.publish(eventContext.events);
+            } catch (error) {
+              this.logger.error(
+                `[executeConfirmPayment] Failed to dispatch domain events after confirming payment ${payment.id}: ${
+                  error instanceof Error ? error.message : String(error)
+                }`,
+                error instanceof Error ? error.stack : undefined,
+              );
+            }
           }
 
           await this.auditService.createLog(this.prisma, {

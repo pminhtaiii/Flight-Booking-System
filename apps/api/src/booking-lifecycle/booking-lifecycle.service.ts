@@ -23,6 +23,8 @@ import {
   BookingConfirmedEvent,
   BookingFailedEvent,
   BookingCompletedEvent,
+  BookingCancellationPendingEvent,
+  BookingCancelledEvent,
   BookingEventPublisherService,
   DomainEventBase,
   TransactionEventContext,
@@ -619,5 +621,157 @@ export class BookingLifecycleService {
     context?: TransactionEventContext,
   ): Promise<BookingWithRelations> {
     return this.checkAndCompleteBooking(bookingOrId, context);
+  }
+
+  async claimCancellation(
+    bookingId: string,
+    userId: string,
+    staleThreshold: Date,
+    tx?: Prisma.TransactionClient,
+    context?: TransactionEventContext,
+  ): Promise<{ count: number }> {
+    const { tx: resolvedTx, context: resolvedContext } = resolveTxAndContext(tx, context);
+
+    return this.executeMutation(resolvedContext, resolvedTx, async (client, events) => {
+      // 1. Attempt business status transition to CANCELLATION_PENDING
+      const transitionResult = await client.booking.updateMany({
+        where: {
+          id: bookingId,
+          userId,
+          status: { in: [BookingStatus.CONFIRMED, BookingStatus.COMPLETED] },
+        },
+        data: {
+          status: BookingStatus.CANCELLATION_PENDING,
+          version: { increment: 1 },
+        },
+      });
+
+      if (transitionResult.count > 0) {
+        const booking = await client.booking.findUnique({
+          where: { id: bookingId },
+          select: { version: true, status: true },
+        });
+
+        events.push(
+          new BookingCancellationPendingEvent({
+            bookingId,
+            eventId: randomUUID(),
+            sourceVersion: booking?.version ?? 1,
+            status: BookingStatus.CANCELLATION_PENDING,
+            timestamp: new Date(),
+          }),
+        );
+
+        return { count: transitionResult.count };
+      }
+
+      // 2. Attempt refreshing stale CANCELLATION_PENDING lease
+      // Invariant: If already CANCELLATION_PENDING (refreshing stale lease),
+      // do NOT increment version and do NOT emit event!
+      const refreshResult = await client.booking.updateMany({
+        where: {
+          id: bookingId,
+          userId,
+          status: BookingStatus.CANCELLATION_PENDING,
+          updatedAt: { lte: staleThreshold },
+        },
+        data: {
+          status: BookingStatus.CANCELLATION_PENDING,
+        },
+      });
+
+      return { count: refreshResult.count };
+    });
+  }
+
+  async cancelBooking(
+    bookingId: string,
+    cancellationStatus: BookingStatus,
+    refundAmount: string,
+    disruptionResolution?: {
+      resolvedByType?: DisruptionActorType;
+      resolvedById?: string;
+    },
+    tx?: Prisma.TransactionClient,
+    context?: TransactionEventContext,
+  ): Promise<{
+    count: number;
+    hasActiveDisruption: boolean;
+    activeDisruptionRevisionId: string | null;
+    previousDisruptionStatus: DisruptionStatus | null;
+  }> {
+    const { tx: resolvedTx, context: resolvedContext } = resolveTxAndContext(tx, context);
+
+    return this.executeMutation(resolvedContext, resolvedTx, async (client, events) => {
+      const dbBooking = await client.booking.findUnique({
+        where: { id: bookingId },
+        select: {
+          status: true,
+          disruptionStatus: true,
+          activeDisruptionRevisionId: true,
+          version: true,
+        },
+      });
+
+      if (!dbBooking || dbBooking.status !== BookingStatus.CANCELLATION_PENDING) {
+        return {
+          count: 0,
+          hasActiveDisruption: false,
+          activeDisruptionRevisionId: null,
+          previousDisruptionStatus: null,
+        };
+      }
+
+      const hasActiveDisruption =
+        dbBooking.disruptionStatus === DisruptionStatus.DETECTED ||
+        dbBooking.disruptionStatus === DisruptionStatus.ACKNOWLEDGED;
+
+      const updateData: Prisma.BookingUpdateInput = {
+        status: cancellationStatus,
+        airlineRefundAmount: refundAmount,
+        customerRefundAmount: refundAmount,
+        version: { increment: 1 },
+      };
+
+      if (hasActiveDisruption) {
+        updateData.disruptionStatus = DisruptionStatus.RESOLVED;
+        updateData.disruptionResolvedReason = 'BOOKING_CANCELLED';
+        updateData.disruptionResolvedAt = new Date();
+        updateData.disruptionResolvedByType =
+          disruptionResolution?.resolvedByType ?? DisruptionActorType.TRAVELLER;
+        if (disruptionResolution?.resolvedById) {
+          updateData.disruptionResolvedById = disruptionResolution.resolvedById;
+        }
+      }
+
+      const result = await client.booking.updateMany({
+        where: { id: bookingId, status: BookingStatus.CANCELLATION_PENDING },
+        data: updateData,
+      });
+
+      if (result.count > 0) {
+        const updated = await client.booking.findUnique({
+          where: { id: bookingId },
+          select: { version: true },
+        });
+
+        events.push(
+          new BookingCancelledEvent({
+            bookingId,
+            eventId: randomUUID(),
+            sourceVersion: updated?.version ?? (dbBooking.version ?? 1) + 1,
+            status: cancellationStatus,
+            timestamp: new Date(),
+          }),
+        );
+      }
+
+      return {
+        count: result.count,
+        hasActiveDisruption,
+        activeDisruptionRevisionId: dbBooking.activeDisruptionRevisionId,
+        previousDisruptionStatus: dbBooking.disruptionStatus,
+      };
+    });
   }
 }

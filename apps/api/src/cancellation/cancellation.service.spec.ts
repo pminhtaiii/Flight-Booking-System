@@ -4,19 +4,32 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import { BookingFailureReason, BookingStatus, RefundStatus } from '@prisma/client';
+import {
+  BookingFailureReason,
+  BookingStatus,
+  DisruptionActorType,
+  DisruptionStatus,
+  RefundStatus,
+} from '@prisma/client';
 import { CancellationService } from './cancellation.service';
 import {
   parseDuffelCancellationQuoteId,
   serializeDuffelCancellationQuoteId,
 } from './cancellation.types';
+import {
+  BookingCancellationPendingEvent,
+  BookingCancelledEvent,
+  BookingEventPublisherService,
+} from '@/domain-events';
+import { BookingLifecycleService } from '@/booking-lifecycle/booking-lifecycle.service';
 
 describe('CancellationService', () => {
   let service: CancellationService;
   let mockPrisma: any;
   let mockDuffelService: any;
   let mockPaymentRefundService: any;
-  let mockBookingAgentProjectionService: any;
+  let mockBookingLifecycleService: any;
+  let mockPublisher: jest.Mocked<BookingEventPublisherService>;
 
   beforeEach(() => {
     mockPrisma = {
@@ -25,16 +38,16 @@ describe('CancellationService', () => {
         updateMany: jest.fn(),
       },
       cancellationRefundObligation: {
-        findUnique: jest.fn(),
-        upsert: jest.fn(),
+        findUnique: jest.fn().mockResolvedValue(null),
+        upsert: jest.fn().mockResolvedValue({ id: 'obligation-default' }),
       },
       auditLog: {
-        create: jest.fn(),
+        create: jest.fn().mockResolvedValue({ id: 'audit-default' }),
       },
       disruptionAuditEvent: {
-        create: jest.fn(),
+        create: jest.fn().mockResolvedValue({ id: 'disr-default' }),
       },
-      $transaction: jest.fn(),
+      $transaction: jest.fn(async (cb: any) => cb(mockPrisma)),
     };
 
     mockDuffelService = {
@@ -44,18 +57,35 @@ describe('CancellationService', () => {
     };
 
     mockPaymentRefundService = {
-      processCancellationRefund: jest.fn(),
+      processCancellationRefund: jest.fn().mockResolvedValue({
+        refundStatus: 'SUCCEEDED',
+        refundAmount: '100.00',
+        nextRetryAt: null,
+      }),
     };
 
-    mockBookingAgentProjectionService = {
-      updateProjectionStatus: jest.fn(),
+    mockBookingLifecycleService = {
+      claimCancellation: jest.fn().mockResolvedValue({ count: 1 }),
+      cancelBooking: jest.fn().mockResolvedValue({
+        count: 1,
+        hasActiveDisruption: false,
+        activeDisruptionRevisionId: null,
+        previousDisruptionStatus: null,
+      }),
     };
+
+    mockPublisher = {
+      createContext: jest.fn((tx) => ({ tx, events: [] })),
+      publish: jest.fn().mockResolvedValue(undefined),
+      resolveEventName: jest.fn().mockReturnValue(null),
+    } as unknown as jest.Mocked<BookingEventPublisherService>;
 
     service = new CancellationService(
       mockPrisma,
       mockDuffelService,
       mockPaymentRefundService,
-      mockBookingAgentProjectionService,
+      mockBookingLifecycleService as unknown as BookingLifecycleService,
+      mockPublisher,
     );
   });
 
@@ -689,7 +719,7 @@ describe('CancellationService', () => {
         customerRefundAmount: { toString: () => '125.00' },
       };
       mockPrisma.booking.findUnique.mockResolvedValue(failedBooking);
-      mockPrisma.booking.updateMany.mockResolvedValue({ count: 0 });
+      mockBookingLifecycleService.claimCancellation.mockResolvedValue({ count: 0 });
 
       await expect(service.cancelBooking('booking-1', 'user-1', 'quote-1')).resolves.toEqual({
         bookingId: 'booking-1',
@@ -703,7 +733,7 @@ describe('CancellationService', () => {
 
     it('throws NotFoundException if claim fails and booking no longer exists', async () => {
       mockPrisma.booking.findUnique.mockResolvedValueOnce(booking).mockResolvedValueOnce(null);
-      mockPrisma.booking.updateMany.mockResolvedValue({ count: 0 });
+      mockBookingLifecycleService.claimCancellation.mockResolvedValue({ count: 0 });
 
       await expect(service.cancelBooking('booking-1', 'user-1', 'quote-1')).rejects.toThrow(
         NotFoundException,
@@ -712,7 +742,6 @@ describe('CancellationService', () => {
 
     it('confirms cancellation with Duffel if not already CANCELLED', async () => {
       mockPrisma.booking.findUnique.mockResolvedValue(booking);
-      mockPrisma.booking.updateMany.mockResolvedValue({ count: 1 });
       mockDuffelService.retrieveOrder.mockResolvedValue({ status: 'CONFIRMED' });
       mockDuffelService.confirmCancellationQuote.mockResolvedValue({
         status: 'CONFIRMED',
@@ -721,14 +750,6 @@ describe('CancellationService', () => {
       });
 
       const transactionClient = {
-        booking: {
-          findUnique: jest.fn().mockResolvedValue({
-            status: BookingStatus.CANCELLATION_PENDING,
-            disruptionStatus: null,
-            activeDisruptionRevisionId: null,
-          }),
-          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-        },
         cancellationRefundObligation: {
           findUnique: jest.fn().mockResolvedValue(null),
           upsert: jest.fn().mockResolvedValue({ id: 'obligation-1' }),
@@ -750,10 +771,16 @@ describe('CancellationService', () => {
 
       const result = await service.cancelBooking('booking-1', 'user-1', 'quote-1');
       expect(mockDuffelService.confirmCancellationQuote).toHaveBeenCalledWith('quote-1');
-      expect(mockBookingAgentProjectionService.updateProjectionStatus).toHaveBeenCalledWith(
+      expect(mockBookingLifecycleService.cancelBooking).toHaveBeenCalledWith(
         'booking-1',
         BookingStatus.CANCELLED_PENDING_REFUND,
+        '100.00',
+        {
+          resolvedByType: DisruptionActorType.TRAVELLER,
+          resolvedById: 'user-1',
+        },
         transactionClient,
+        expect.any(Object),
       );
       expect(mockPaymentRefundService.processCancellationRefund).toHaveBeenCalledWith({
         bookingId: 'booking-1',
@@ -773,7 +800,6 @@ describe('CancellationService', () => {
 
     it('throws BadGatewayException if supplier confirmation status is not CONFIRMED', async () => {
       mockPrisma.booking.findUnique.mockResolvedValue(booking);
-      mockPrisma.booking.updateMany.mockResolvedValue({ count: 1 });
       mockDuffelService.retrieveOrder.mockResolvedValue({ status: 'CONFIRMED' });
       mockDuffelService.confirmCancellationQuote.mockResolvedValue({
         status: 'FAILED',
@@ -786,14 +812,6 @@ describe('CancellationService', () => {
 
     it('aborts cancellation persistence before a provider refund when obligation auditing fails in the transaction', async () => {
       const transactionClient = {
-        booking: {
-          findUnique: jest.fn().mockResolvedValue({
-            status: BookingStatus.CANCELLATION_PENDING,
-            disruptionStatus: null,
-            activeDisruptionRevisionId: null,
-          }),
-          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-        },
         cancellationRefundObligation: {
           findUnique: jest.fn().mockResolvedValue(null),
           upsert: jest.fn().mockResolvedValue({ id: 'obligation-1' }),
@@ -803,7 +821,6 @@ describe('CancellationService', () => {
         },
       };
       mockPrisma.booking.findUnique.mockResolvedValue(booking);
-      mockPrisma.booking.updateMany.mockResolvedValue({ count: 1 });
       mockDuffelService.retrieveOrder.mockResolvedValue({ status: 'CANCELLED' });
       mockPrisma.$transaction.mockImplementation(async (callback: any) =>
         callback(transactionClient),
@@ -820,18 +837,15 @@ describe('CancellationService', () => {
 
     it('resolves active disruption and logs disruption audit event when cancelling disrupted booking', async () => {
       mockPrisma.booking.findUnique.mockResolvedValue(booking);
-      mockPrisma.booking.updateMany.mockResolvedValue({ count: 1 });
       mockDuffelService.retrieveOrder.mockResolvedValue({ status: 'CANCELLED' });
+      mockBookingLifecycleService.cancelBooking.mockResolvedValueOnce({
+        count: 1,
+        hasActiveDisruption: true,
+        activeDisruptionRevisionId: 'disruption-rev-1',
+        previousDisruptionStatus: DisruptionStatus.DETECTED,
+      });
 
       const transactionClient = {
-        booking: {
-          findUnique: jest.fn().mockResolvedValue({
-            status: BookingStatus.CANCELLATION_PENDING,
-            disruptionStatus: 'DETECTED',
-            activeDisruptionRevisionId: 'disruption-rev-1',
-          }),
-          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-        },
         cancellationRefundObligation: {
           findUnique: jest.fn().mockResolvedValue({ id: 'obligation-1' }),
           upsert: jest.fn().mockResolvedValue({ id: 'obligation-1' }),
@@ -852,24 +866,26 @@ describe('CancellationService', () => {
       });
 
       const result = await service.cancelBooking('booking-1', 'user-1', 'quote-1');
-      expect(transactionClient.booking.updateMany).toHaveBeenCalledWith({
-        where: { id: 'booking-1', status: BookingStatus.CANCELLATION_PENDING },
-        data: expect.objectContaining({
-          disruptionStatus: 'RESOLVED',
-          disruptionResolvedReason: 'BOOKING_CANCELLED',
-          disruptionResolvedByType: 'TRAVELLER',
-          disruptionResolvedById: 'user-1',
-        }),
-      });
+      expect(mockBookingLifecycleService.cancelBooking).toHaveBeenCalledWith(
+        'booking-1',
+        BookingStatus.CANCELLED_PENDING_REFUND,
+        '100.00',
+        {
+          resolvedByType: DisruptionActorType.TRAVELLER,
+          resolvedById: 'user-1',
+        },
+        transactionClient,
+        expect.any(Object),
+      );
       expect(transactionClient.disruptionAuditEvent.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             bookingId: 'booking-1',
             revisionId: 'disruption-rev-1',
             action: 'BOOKING_CANCELLED',
-            fromStatus: 'DETECTED',
-            toStatus: 'RESOLVED',
-            actorType: 'TRAVELLER',
+            fromStatus: DisruptionStatus.DETECTED,
+            toStatus: DisruptionStatus.RESOLVED,
+            actorType: DisruptionActorType.TRAVELLER,
             actorId: 'user-1',
           }),
         }),
@@ -885,18 +901,9 @@ describe('CancellationService', () => {
         customerRefundAmount: { toString: () => '0.00' },
       };
       mockPrisma.booking.findUnique.mockResolvedValue(noRefundBooking);
-      mockPrisma.booking.updateMany.mockResolvedValue({ count: 1 });
       mockDuffelService.retrieveOrder.mockResolvedValue({ status: 'CANCELLED' });
 
       const transactionClient = {
-        booking: {
-          findUnique: jest.fn().mockResolvedValue({
-            status: BookingStatus.CANCELLATION_PENDING,
-            disruptionStatus: null,
-            activeDisruptionRevisionId: null,
-          }),
-          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-        },
         cancellationRefundObligation: {
           findUnique: jest.fn().mockResolvedValue(null),
           upsert: jest.fn().mockResolvedValue({ id: 'obligation-0' }),
@@ -924,19 +931,9 @@ describe('CancellationService', () => {
         payment: null,
       };
       mockPrisma.booking.findUnique.mockResolvedValue(noPaymentBooking);
-      mockPrisma.booking.updateMany.mockResolvedValue({ count: 1 });
       mockDuffelService.retrieveOrder.mockResolvedValue({ status: 'CANCELLED' });
 
-      const transactionClient = {
-        booking: {
-          findUnique: jest.fn().mockResolvedValue({
-            status: BookingStatus.CANCELLATION_PENDING,
-            disruptionStatus: null,
-            activeDisruptionRevisionId: null,
-          }),
-          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-        },
-      };
+      const transactionClient = {};
       mockPrisma.$transaction.mockImplementation(async (cb: any) => cb(transactionClient));
 
       const result = await service.cancelBooking('booking-1', 'user-1', 'quote-1');
@@ -955,9 +952,8 @@ describe('CancellationService', () => {
         ...booking,
         status: BookingStatus.CANCELLED_AND_REFUNDED,
       });
-      mockPrisma.booking.updateMany.mockResolvedValue({ count: 1 });
       mockDuffelService.retrieveOrder.mockResolvedValue({ status: 'CANCELLED' });
-      mockPrisma.$transaction.mockResolvedValue(0);
+      mockBookingLifecycleService.cancelBooking.mockResolvedValueOnce({ count: 0 });
 
       const result = await service.cancelBooking('booking-1', 'user-1', 'quote-1');
       expect(result).toEqual({
@@ -967,6 +963,212 @@ describe('CancellationService', () => {
         duffelCancellationQuoteId: 'quote-1',
         refundStatus: 'SUCCEEDED',
         refundAmount: '100.00',
+      });
+    });
+
+    describe('lifecycle event routing and invariants', () => {
+      it('claim acquisition: status transition from CONFIRMED emits BookingCancellationPendingEvent post-commit', async () => {
+        mockPrisma.booking.findUnique.mockResolvedValue(booking);
+        mockBookingLifecycleService.claimCancellation.mockImplementation(
+          async (id: string, userId: string, threshold: Date, tx: any, context: any) => {
+            if (context) {
+              context.events.push(
+                new BookingCancellationPendingEvent({
+                  bookingId: id,
+                  eventId: 'claim-event-1',
+                  sourceVersion: 2,
+                  status: BookingStatus.CANCELLATION_PENDING,
+                }),
+              );
+            }
+            return { count: 1 };
+          },
+        );
+        mockDuffelService.retrieveOrder.mockResolvedValue({ status: 'CANCELLED' });
+
+        await service.cancelBooking('booking-1', 'user-1', 'quote-1');
+
+        expect(mockBookingLifecycleService.claimCancellation).toHaveBeenCalledWith(
+          'booking-1',
+          'user-1',
+          expect.any(Date),
+          mockPrisma,
+          expect.objectContaining({ events: expect.any(Array) }),
+        );
+        expect(mockPublisher.publish).toHaveBeenCalledWith(
+          expect.arrayContaining([
+            expect.objectContaining({
+              bookingId: 'booking-1',
+              sourceVersion: 2,
+              status: BookingStatus.CANCELLATION_PENDING,
+            }),
+          ]),
+        );
+      });
+
+      it('claim acquisition: stale lease refresh does not emit BookingCancellationPendingEvent', async () => {
+        mockPrisma.booking.findUnique.mockResolvedValue(booking);
+        // Stale lease refresh: claim succeeded (count: 1) but NO event added to context
+        mockBookingLifecycleService.claimCancellation.mockResolvedValueOnce({ count: 1 });
+        mockDuffelService.retrieveOrder.mockResolvedValue({ status: 'CANCELLED' });
+
+        await service.cancelBooking('booking-1', 'user-1', 'quote-1');
+
+        expect(mockBookingLifecycleService.claimCancellation).toHaveBeenCalled();
+        const publishCalls = mockPublisher.publish.mock.calls;
+        const emittedCancellationPending = publishCalls.some(([events]) =>
+          events?.some((e: any) => e instanceof BookingCancellationPendingEvent),
+        );
+        expect(emittedCancellationPending).toBe(false);
+      });
+
+      it('final cancellation: version incremented, BookingCancelledEvent published strictly post-commit', async () => {
+        mockPrisma.booking.findUnique.mockResolvedValue(booking);
+        mockDuffelService.retrieveOrder.mockResolvedValue({ status: 'CANCELLED' });
+        mockBookingLifecycleService.cancelBooking.mockImplementation(
+          async (id: string, status: any, refund: string, disr: any, tx: any, context: any) => {
+            if (context) {
+              context.events.push(
+                new BookingCancelledEvent({
+                  bookingId: id,
+                  eventId: 'cancel-event-1',
+                  sourceVersion: 3,
+                  status,
+                }),
+              );
+            }
+            return {
+              count: 1,
+              hasActiveDisruption: false,
+              activeDisruptionRevisionId: null,
+              previousDisruptionStatus: null,
+            };
+          },
+        );
+
+        let publishCalledDuringTransaction = false;
+        mockPrisma.$transaction.mockImplementation(async (cb: any) => {
+          const res = await cb(mockPrisma);
+          // Check whether publisher was called before transaction resolved
+          publishCalledDuringTransaction = mockPublisher.publish.mock.calls.some(([events]) =>
+            events?.some((e: any) => e instanceof BookingCancelledEvent),
+          );
+          return res;
+        });
+
+        await service.cancelBooking('booking-1', 'user-1', 'quote-1');
+
+        expect(publishCalledDuringTransaction).toBe(false);
+        expect(mockPublisher.publish).toHaveBeenCalledWith(
+          expect.arrayContaining([
+            expect.objectContaining({
+              bookingId: 'booking-1',
+              sourceVersion: 3,
+              status: BookingStatus.CANCELLED_PENDING_REFUND,
+            }),
+          ]),
+        );
+      });
+
+      it('final cancellation: obligation and disruption bundle committed atomically in transaction', async () => {
+        mockPrisma.booking.findUnique.mockResolvedValue(booking);
+        mockDuffelService.retrieveOrder.mockResolvedValue({ status: 'CANCELLED' });
+        mockBookingLifecycleService.cancelBooking.mockResolvedValueOnce({
+          count: 1,
+          hasActiveDisruption: true,
+          activeDisruptionRevisionId: 'rev-atomic-1',
+          previousDisruptionStatus: DisruptionStatus.DETECTED,
+        });
+
+        const txClient = {
+          cancellationRefundObligation: {
+            findUnique: jest.fn().mockResolvedValue(null),
+            upsert: jest.fn().mockResolvedValue({ id: 'obl-atomic' }),
+          },
+          auditLog: {
+            create: jest.fn().mockResolvedValue({ id: 'audit-atomic' }),
+          },
+          disruptionAuditEvent: {
+            create: jest.fn().mockResolvedValue({ id: 'disr-atomic' }),
+          },
+        };
+
+        mockPrisma.$transaction.mockImplementation(async (cb: any) => cb(txClient));
+
+        await service.cancelBooking('booking-1', 'user-1', 'quote-1');
+
+        expect(txClient.cancellationRefundObligation.upsert).toHaveBeenCalled();
+        expect(txClient.auditLog.create).toHaveBeenCalled();
+        expect(txClient.disruptionAuditEvent.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              bookingId: 'booking-1',
+              revisionId: 'rev-atomic-1',
+              toStatus: DisruptionStatus.RESOLVED,
+            }),
+          }),
+        );
+      });
+
+      it('guarantees zero calls to BookingAgentProjectionService', async () => {
+        // Assert service does not have or call BookingAgentProjectionService
+        expect((service as any).bookingAgentProjectionService).toBeUndefined();
+      });
+
+      it('rollback: zero events published on claim transaction rollback', async () => {
+        mockPrisma.booking.findUnique.mockResolvedValue(booking);
+        mockPrisma.$transaction.mockRejectedValueOnce(new Error('Claim transaction rollback'));
+
+        await expect(service.cancelBooking('booking-1', 'user-1', 'quote-1')).rejects.toThrow(
+          'Claim transaction rollback',
+        );
+
+        expect(mockPublisher.publish).not.toHaveBeenCalled();
+      });
+
+      it('rollback: zero cancellation events published on final cancellation transaction rollback', async () => {
+        mockPrisma.booking.findUnique.mockResolvedValue(booking);
+        mockDuffelService.retrieveOrder.mockResolvedValue({ status: 'CANCELLED' });
+
+        mockBookingLifecycleService.cancelBooking.mockImplementation(
+          async (id: string, status: any, refund: string, disr: any, tx: any, context: any) => {
+            if (context) {
+              context.events.push(
+                new BookingCancelledEvent({
+                  bookingId: id,
+                  eventId: 'cancel-event-err',
+                  sourceVersion: 3,
+                  status,
+                }),
+              );
+            }
+            return {
+              count: 1,
+              hasActiveDisruption: false,
+              activeDisruptionRevisionId: null,
+              previousDisruptionStatus: null,
+            };
+          },
+        );
+
+        // Fail second transaction (final cancellation transaction)
+        let txCallCount = 0;
+        mockPrisma.$transaction.mockImplementation(async (cb: any) => {
+          txCallCount += 1;
+          if (txCallCount === 1) {
+            return cb(mockPrisma);
+          }
+          throw new Error('Final cancellation transaction failed');
+        });
+
+        await expect(service.cancelBooking('booking-1', 'user-1', 'quote-1')).rejects.toThrow(
+          'Final cancellation transaction failed',
+        );
+
+        const publishedCancellationEvent = mockPublisher.publish.mock.calls.some(([events]) =>
+          events?.some((e: any) => e instanceof BookingCancelledEvent),
+        );
+        expect(publishedCancellationEvent).toBe(false);
       });
     });
   });

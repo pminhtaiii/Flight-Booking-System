@@ -1,5 +1,58 @@
 # Progress Tracker
 
+### Feature 024 — Event-Driven Module Deepening: Phase 4 Slice 4 (Tasks T024, T025, T026) Completed (2026-09-17)
+
+- **T024 [US2] Saga Post-Commit Event Dispatch**:
+  - `apps/api/src/payment-fulfillment/payment-fulfillment.saga.ts`:
+    - Updated confirmation path to invoke `this.bookingLifecycleService.confirmBooking(canonicalBooking.id, pnr, rawOrder.id, snapshotOutcome.flightSnapshot, snapshotOutcome.passengerSnapshot, tx, eventContext)`.
+    - In `executeConfirmPayment`: Wrapped post-commit event dispatch in `try/catch` to isolate dispatcher/listener failures, guaranteeing payment confirmation succeeds and cannot trigger compensation or reject to caller.
+    - Verified zero direct projection calls remain in `PaymentFulfillmentSaga`.
+  - `apps/api/src/payment-fulfillment/payment-fulfillment.saga.spec.ts`:
+    - Wired `mockPublisher` (`createContext`, `publish`) in test setup.
+    - Verified collected events are published only after outer transaction commits.
+    - Proved publisher/listener failure cannot trigger compensation or fail confirmed payment.
+
+- **T025 [US2] Booking Recovery Service Lifecycle Integration**:
+  - `apps/api/src/booking-lifecycle/booking-lifecycle.module.ts`:
+    - Imported `DomainEventsModule` from `@/domain-events/domain-events.module`.
+  - `apps/api/src/booking-lifecycle/booking-recovery.service.ts`:
+    - Removed `BookingAgentProjectionService` from imports and constructor. Injected `@Optional() private readonly publisher?: BookingEventPublisherService`.
+    - Rewired all 4 recovery branches in `reconcileBookingIfStale`:
+      - Branch 1 (Verified capture + Duffel order): Atomic transaction commits booking `CONFIRMED` (via `confirmBooking`) + payment `SUCCEEDED`. Post-commit `publisher.publish`.
+      - Branch 2 (Verified non-capture / voided hold): Atomic transaction commits booking `FAILED` (via `failBooking(CAPTURE_FAILED)`) + payment `CANCELLED`. Post-commit `publisher.publish`.
+      - Branch 3 (Captured without Duffel order): Atomic transaction commits booking `FAILED` (via `failBooking(SYSTEM_ERROR)`). Post-commit `publisher.publish`. Automated refund triggered strictly *outside* transaction.
+      - Branch 4 (No-payment branch): Atomic transaction commits booking `FAILED` (via `failBooking(BOOKING_TIMEOUT)`). Post-commit `publisher.publish`.
+    - Removed all 4 direct calls to `BookingAgentProjectionService`.
+  - `apps/api/src/booking-lifecycle/booking-recovery.service.spec.ts`:
+    - Replaced projection mock with `mockPublisher`.
+    - Verified all 4 recovery branches commit atomically, collect events, publish post-commit, zero projection calls, and rollback publishes zero events.
+
+- **T026 [US2] Cancellation Service Lifecycle & Event Routing**:
+  - `apps/api/src/cancellation/cancellation.module.ts`:
+    - Replaced `AgentGatewayModule` with `BookingStateModule` and `DomainEventsModule`.
+    - Zero imports of `BookingLifecycleModule` or `AgentGatewayModule`.
+  - `apps/api/src/booking-lifecycle/booking-lifecycle.service.ts`:
+    - Added `claimCancellation(bookingId, userId, staleThreshold, tx?, context?)`:
+      - Invariant: Increments `version` and emits `BookingCancellationPendingEvent` ONLY when business status transitions to `CANCELLATION_PENDING` (from `CONFIRMED` or `COMPLETED`).
+      - Invariant: Refreshing a stale `CANCELLATION_PENDING` lease does NOT increment `version` and emits ZERO events.
+      - Invariant: Replay/no-op returns `{ count: 0 }` with ZERO events.
+    - Added `cancelBooking(bookingId, cancellationStatus, refundAmount, disruptionResolution?, tx?, context?)`:
+      - Increments `Booking.version` atomically, updates status (`CANCELLED_PENDING_REFUND` or `CANCELLED_NO_REFUND`), resolves active disruption if present (`RESOLVED`, `BOOKING_CANCELLED`, `TRAVELLER`), and emits `BookingCancelledEvent`.
+      - Returns mutation counts and disruption revision metadata.
+  - `apps/api/src/cancellation/cancellation.service.ts`:
+    - Completely removed `BookingAgentProjectionService` from imports and constructor.
+    - Injected `BookingLifecycleService` and `BookingEventPublisherService`.
+    - Claim Acquisition (`CANCELLATION_PENDING`): wrapped in `prisma.$transaction`, delegates to `bookingLifecycleService.claimCancellation`, and flushes `BookingCancellationPendingEvent` strictly post-commit.
+    - Final Cancellation: delegates to `bookingLifecycleService.cancelBooking` within outer transaction, atomically executes obligation upsert, obligation audit log, disruption audit event, and flushes `BookingCancelledEvent` strictly post-commit.
+    - Guaranteed zero calls to `BookingAgentProjectionService`.
+    - Guaranteed zero events published on transaction rollback.
+  - **Verification**:
+    - `pnpm --filter @api/backend test -- apps/api/src/payment-fulfillment/payment-fulfillment.saga.spec.ts --runInBand` (44/44 tests passed, exit code 0).
+    - `pnpm --filter @api/backend test -- apps/api/src/booking-lifecycle/booking-recovery.service.spec.ts --runInBand` (10/10 tests passed, exit code 0).
+    - `pnpm --filter @api/backend test -- apps/api/src/cancellation/cancellation.service.spec.ts --runInBand` (53/53 tests passed, exit code 0).
+    - `pnpm --filter @api/backend test -- apps/api/src/booking-lifecycle/booking-lifecycle.service.spec.ts --runInBand` (42/42 tests passed, exit code 0).
+    - `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` (0 errors, exit code 0).
+
 ### Feature 024 — Event-Driven Module Deepening: Phase 4 Slice 3 (Tasks T021, T022, T023) Completed (2026-09-17)
 
 - **T021 [US2] Cycle-Scoped Promise Hydrator**:

@@ -1,4 +1,4 @@
-import { BookingStatus, RefundStatus, RefundTriggerType } from '@prisma/client';
+import { BookingFailureReason, BookingStatus, RefundStatus, RefundTriggerType } from '@prisma/client';
 import { BookingRecoveryService } from './booking-recovery.service';
 import { BookingWithRelations } from './booking-lifecycle.types';
 
@@ -10,10 +10,16 @@ describe('BookingRecoveryService', () => {
   let mockRefundTransactionService: any;
   let mockRefundSettlementService: any;
   let mockBookingLifecycleService: any;
-  let mockProjectionService: any;
+  let mockPublisher: any;
 
   beforeEach(() => {
     mockPrisma = {
+      $transaction: jest.fn().mockImplementation(async (cb: any) => {
+        if (typeof cb === 'function') {
+          return cb(mockPrisma);
+        }
+        return cb;
+      }),
       booking: {
         findMany: jest.fn(),
         findUnique: jest.fn(),
@@ -25,9 +31,15 @@ describe('BookingRecoveryService', () => {
       },
       paymentEvent: {
         findFirst: jest.fn(),
+        create: jest.fn(),
+      },
+      ledgerEntry: {
+        createMany: jest.fn(),
       },
       bookingIntent: {
         findUnique: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
       },
       refund: {
         findMany: jest.fn(),
@@ -53,13 +65,33 @@ describe('BookingRecoveryService', () => {
       settleVerifiedOutcome: jest.fn(),
     };
 
-    mockBookingLifecycleService = {
-      checkAndCompleteBooking: jest.fn(),
+    mockPublisher = {
+      createContext: jest.fn((tx: any) => ({ tx, events: [] })),
+      publish: jest.fn().mockResolvedValue(undefined),
     };
 
-    mockProjectionService = {
-      createOrUpdateProjection: jest.fn().mockResolvedValue(null),
-      updateProjectionStatus: jest.fn().mockResolvedValue(null),
+    mockBookingLifecycleService = {
+      checkAndCompleteBooking: jest.fn(),
+      confirmBooking: jest.fn().mockImplementation(async (id, pnr, orderId, flight, passenger, tx, eventContext) => {
+        if (eventContext?.events) {
+          eventContext.events.push({
+            eventId: 'evt-confirmed-1',
+            bookingId: id,
+            eventName: 'booking.confirmed',
+          });
+        }
+        return { id, status: BookingStatus.CONFIRMED, pnrReference: pnr, duffelOrderId: orderId };
+      }),
+      failBooking: jest.fn().mockImplementation(async (id, reason, flight, passenger, dep, tx, eventContext) => {
+        if (eventContext?.events) {
+          eventContext.events.push({
+            eventId: 'evt-failed-1',
+            bookingId: id,
+            eventName: 'booking.failed',
+          });
+        }
+        return { id, status: BookingStatus.FAILED, failureReason: reason };
+      }),
     };
 
     service = new BookingRecoveryService(
@@ -69,7 +101,7 @@ describe('BookingRecoveryService', () => {
       mockRefundTransactionService,
       mockRefundSettlementService,
       mockBookingLifecycleService,
-      mockProjectionService,
+      mockPublisher,
     );
   });
 
@@ -88,6 +120,7 @@ describe('BookingRecoveryService', () => {
 
       expect(result).toBe(booking);
       expect(mockPrisma.booking.updateMany).not.toHaveBeenCalled();
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
 
     it('returns booking untouched if createdAt is less than 15 minutes ago', async () => {
@@ -101,9 +134,10 @@ describe('BookingRecoveryService', () => {
 
       expect(result).toBe(booking);
       expect(mockPrisma.booking.updateMany).not.toHaveBeenCalled();
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
 
-    it('marks booking FAILED with BOOKING_TIMEOUT if missing stripePaymentIntentId', async () => {
+    it('marks booking FAILED with BOOKING_TIMEOUT if missing stripePaymentIntentId (Branch 4)', async () => {
       const booking = {
         id: 'b-1',
         status: BookingStatus.PROCESSING,
@@ -111,23 +145,30 @@ describe('BookingRecoveryService', () => {
         payment: null,
       } as unknown as BookingWithRelations;
 
-      mockPrisma.booking.updateMany.mockResolvedValue({ count: 1 });
-
       const result = await service.reconcileBookingIfStale(booking);
 
       expect(result.status).toBe(BookingStatus.FAILED);
-      expect(result.failureReason).toBe('BOOKING_TIMEOUT');
-      expect(mockPrisma.booking.updateMany).toHaveBeenCalledWith({
-        where: { id: 'b-1', status: BookingStatus.PROCESSING },
-        data: { status: BookingStatus.FAILED, failureReason: 'BOOKING_TIMEOUT' },
-      });
-      expect(mockProjectionService.updateProjectionStatus).toHaveBeenCalledWith(
+      expect(result.failureReason).toBe(BookingFailureReason.BOOKING_TIMEOUT);
+      expect(mockPrisma.$transaction).toHaveBeenCalled();
+      expect(mockBookingLifecycleService.failBooking).toHaveBeenCalledWith(
         'b-1',
-        BookingStatus.FAILED,
+        BookingFailureReason.BOOKING_TIMEOUT,
+        undefined,
+        undefined,
+        undefined,
+        expect.anything(),
+        expect.objectContaining({ events: expect.any(Array) }),
       );
+      expect(mockPublisher.publish).toHaveBeenCalledWith([
+        expect.objectContaining({
+          eventId: 'evt-failed-1',
+          bookingId: 'b-1',
+          eventName: 'booking.failed',
+        }),
+      ]);
     });
 
-    it('handles incomplete Stripe payment: cancels Duffel order, cancels Stripe intent, and marks booking FAILED with CAPTURE_FAILED', async () => {
+    it('handles incomplete Stripe payment: cancels Duffel order, cancels Stripe intent, and marks booking FAILED with CAPTURE_FAILED (Branch 2)', async () => {
       const booking = {
         id: 'b-1',
         status: BookingStatus.PROCESSING,
@@ -146,7 +187,6 @@ describe('BookingRecoveryService', () => {
       });
       mockDuffelService.cancelOrder.mockResolvedValue({});
       mockStripeService.cancelPaymentIntent.mockResolvedValue({});
-      mockPrisma.booking.updateMany.mockResolvedValue({ count: 1 });
       mockPrisma.payment.updateMany.mockResolvedValue({ count: 1 });
 
       const result = await service.reconcileBookingIfStale(booking);
@@ -154,18 +194,31 @@ describe('BookingRecoveryService', () => {
       expect(mockDuffelService.cancelOrder).toHaveBeenCalledWith('ord_123');
       expect(mockStripeService.cancelPaymentIntent).toHaveBeenCalledWith('pi_123');
       expect(result.status).toBe(BookingStatus.FAILED);
-      expect(result.failureReason).toBe('CAPTURE_FAILED');
+      expect(result.failureReason).toBe(BookingFailureReason.CAPTURE_FAILED);
+      expect(mockPrisma.$transaction).toHaveBeenCalled();
+      expect(mockBookingLifecycleService.failBooking).toHaveBeenCalledWith(
+        'b-1',
+        BookingFailureReason.CAPTURE_FAILED,
+        undefined,
+        undefined,
+        undefined,
+        expect.anything(),
+        expect.objectContaining({ events: expect.any(Array) }),
+      );
       expect(mockPrisma.payment.updateMany).toHaveBeenCalledWith({
         where: { id: 'pay-1', status: { notIn: ['CANCELLED', 'REFUNDED'] } },
         data: { status: 'CANCELLED' },
       });
-      expect(mockProjectionService.updateProjectionStatus).toHaveBeenCalledWith(
-        'b-1',
-        BookingStatus.FAILED,
-      );
+      expect(mockPublisher.publish).toHaveBeenCalledWith([
+        expect.objectContaining({
+          eventId: 'evt-failed-1',
+          bookingId: 'b-1',
+          eventName: 'booking.failed',
+        }),
+      ]);
     });
 
-    it('handles Stripe payment succeeded with existing Duffel order: confirms booking and syncs payment and projection', async () => {
+    it('handles Stripe payment succeeded with existing Duffel order: confirms booking and syncs payment and publisher (Branch 1)', async () => {
       const booking = {
         id: 'b-1',
         bookingIntentId: 'intent-1',
@@ -198,7 +251,6 @@ describe('BookingRecoveryService', () => {
           passengers: [{ firstName: 'John', lastName: 'Doe' }],
         },
       });
-      mockPrisma.booking.updateMany.mockResolvedValue({ count: 1 });
       mockPrisma.payment.updateMany.mockResolvedValue({ count: 1 });
 
       const result = await service.reconcileBookingIfStale(booking);
@@ -206,14 +258,30 @@ describe('BookingRecoveryService', () => {
       expect(result.status).toBe(BookingStatus.CONFIRMED);
       expect(result.pnrReference).toBe('PNR999');
       expect(result.duffelOrderId).toBe('ord_123');
+      expect(mockPrisma.$transaction).toHaveBeenCalled();
+      expect(mockBookingLifecycleService.confirmBooking).toHaveBeenCalledWith(
+        'b-1',
+        'PNR999',
+        'ord_123',
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({ events: expect.any(Array) }),
+      );
       expect(mockPrisma.payment.updateMany).toHaveBeenCalledWith({
         where: { id: 'pay-1', status: { notIn: ['SUCCEEDED', 'REFUNDED', 'CANCELLED'] } },
         data: { status: 'SUCCEEDED' },
       });
-      expect(mockProjectionService.createOrUpdateProjection).toHaveBeenCalledWith('b-1');
+      expect(mockPublisher.publish).toHaveBeenCalledWith([
+        expect.objectContaining({
+          eventId: 'evt-confirmed-1',
+          bookingId: 'b-1',
+          eventName: 'booking.confirmed',
+        }),
+      ]);
     });
 
-    it('handles Stripe payment succeeded but NO Duffel order: marks FAILED with SYSTEM_ERROR and triggers automated refund', async () => {
+    it('handles Stripe payment succeeded but NO Duffel order: marks FAILED with SYSTEM_ERROR and triggers automated refund (Branch 3)', async () => {
       const booking = {
         id: 'b-1',
         status: BookingStatus.PROCESSING,
@@ -226,7 +294,6 @@ describe('BookingRecoveryService', () => {
 
       mockStripeService.retrievePaymentIntent.mockResolvedValue({ status: 'succeeded' });
       mockPrisma.paymentEvent.findFirst.mockResolvedValue(null);
-      mockPrisma.booking.updateMany.mockResolvedValue({ count: 1 });
 
       mockPrisma.payment.findUnique.mockResolvedValue({
         id: 'pay-1',
@@ -247,11 +314,24 @@ describe('BookingRecoveryService', () => {
       const result = await service.reconcileBookingIfStale(booking);
 
       expect(result.status).toBe(BookingStatus.FAILED);
-      expect(result.failureReason).toBe('SYSTEM_ERROR');
-      expect(mockProjectionService.updateProjectionStatus).toHaveBeenCalledWith(
+      expect(result.failureReason).toBe(BookingFailureReason.SYSTEM_ERROR);
+      expect(mockPrisma.$transaction).toHaveBeenCalled();
+      expect(mockBookingLifecycleService.failBooking).toHaveBeenCalledWith(
         'b-1',
-        BookingStatus.FAILED,
+        BookingFailureReason.SYSTEM_ERROR,
+        undefined,
+        undefined,
+        undefined,
+        expect.anything(),
+        expect.objectContaining({ events: expect.any(Array) }),
       );
+      expect(mockPublisher.publish).toHaveBeenCalledWith([
+        expect.objectContaining({
+          eventId: 'evt-failed-1',
+          bookingId: 'b-1',
+          eventName: 'booking.failed',
+        }),
+      ]);
       expect(mockRefundTransactionService.reserveTransaction).toHaveBeenCalledWith(
         expect.objectContaining({
           kind: 'DIRECT',
@@ -291,7 +371,6 @@ describe('BookingRecoveryService', () => {
 
       mockStripeService.retrievePaymentIntent.mockResolvedValue({ status: 'succeeded' });
       mockPrisma.paymentEvent.findFirst.mockResolvedValue(null);
-      mockPrisma.booking.updateMany.mockResolvedValue({ count: 1 });
 
       mockPrisma.payment.findUnique.mockResolvedValue({
         id: 'pay-1',
@@ -317,6 +396,75 @@ describe('BookingRecoveryService', () => {
           }),
         }),
       );
+    });
+
+    it('publishes zero events if transaction rolls back and preserves existing financial and booking records without duplicate writes', async () => {
+      const booking = {
+        id: 'b-1',
+        status: BookingStatus.PROCESSING,
+        createdAt: staleDate,
+        payment: { id: 'p-1', stripePaymentIntentId: 'pi-1' },
+      } as unknown as BookingWithRelations;
+
+      mockStripeService.retrievePaymentIntent.mockResolvedValue({ status: 'succeeded' });
+      mockPrisma.paymentEvent.findFirst.mockResolvedValue({ metadata: { id: 'ord-1' } });
+      mockDuffelService.mapDuffelOrderToSnapshots.mockReturnValue({
+        flightSnapshot: { segments: [{ departureAt: new Date().toISOString() }] },
+        passengerSnapshot: { passengers: [] },
+      });
+
+      mockPrisma.$transaction.mockRejectedValue(new Error('Transaction deadlock'));
+
+      await expect(service.reconcileBookingIfStale(booking)).rejects.toThrow('Transaction deadlock');
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
+      expect(mockPrisma.paymentEvent.create).not.toHaveBeenCalled();
+      expect(mockPrisma.ledgerEntry.createMany).not.toHaveBeenCalled();
+      expect(mockPrisma.bookingIntent.update).not.toHaveBeenCalled();
+      expect(mockPrisma.bookingIntent.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('does not publish events while transaction is unresolved and publishes one committed batch after resolution', async () => {
+      const booking = {
+        id: 'b-1',
+        status: BookingStatus.PROCESSING,
+        createdAt: staleDate,
+        payment: null,
+      } as unknown as BookingWithRelations;
+
+      let publishCalledDuringTransaction = false;
+      mockPrisma.$transaction.mockImplementation(async (cb: any) => {
+        publishCalledDuringTransaction = mockPublisher.publish.mock.calls.length > 0;
+        return cb(mockPrisma);
+      });
+
+      await service.reconcileBookingIfStale(booking);
+
+      expect(publishCalledDuringTransaction).toBe(false);
+      expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not update payment or mutate status if lifecycle booking transition produces zero count (no-op)', async () => {
+      const booking = {
+        id: 'b-1',
+        status: BookingStatus.PROCESSING,
+        createdAt: staleDate,
+        payment: { id: 'p-1', stripePaymentIntentId: 'pi-1' },
+      } as unknown as BookingWithRelations;
+
+      mockStripeService.retrievePaymentIntent.mockResolvedValue({ status: 'succeeded' });
+      mockPrisma.paymentEvent.findFirst.mockResolvedValue({ metadata: { id: 'ord-1' } });
+      mockDuffelService.mapDuffelOrderToSnapshots.mockReturnValue({
+        flightSnapshot: { segments: [{ departureAt: new Date().toISOString() }] },
+        passengerSnapshot: { passengers: [] },
+      });
+
+      // Simulate lifecycle confirmBooking returning without adding events (count 0 / concurrent transition)
+      mockBookingLifecycleService.confirmBooking.mockResolvedValue({ id: 'b-1', status: 'CONFIRMED' });
+
+      await service.reconcileBookingIfStale(booking);
+
+      expect(mockPrisma.payment.updateMany).not.toHaveBeenCalled();
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
   });
 

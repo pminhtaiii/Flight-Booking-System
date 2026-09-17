@@ -1,14 +1,14 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { BookingStatus, RefundStatus, RefundTriggerType } from '@prisma/client';
+import { BookingFailureReason, BookingStatus, Prisma, RefundStatus, RefundTriggerType } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { StripeService } from '@/common/stripe.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { RefundTransactionService } from '@/refund/refund-transaction.service';
 import { RefundSettlementService } from '@/refund-settlement/refund-settlement.service';
-import { BookingAgentProjectionService } from '@/agent-gateway/booking-agent-projection.service';
 import { BookingLifecycleService } from './booking-lifecycle.service';
 import { BookingWithRelations } from './booking-lifecycle.types';
+import { BookingEventPublisherService, TransactionEventContext } from '@/domain-events';
 
 function enrichRedactedDuffelOrder(duffelOrder: any, dbPassengers: any[], userEmail: string): any {
   if (!duffelOrder) return duffelOrder;
@@ -50,7 +50,7 @@ export class BookingRecoveryService {
     private readonly refundTransactionService: RefundTransactionService,
     private readonly refundSettlementService: RefundSettlementService,
     private readonly bookingLifecycleService: BookingLifecycleService,
-    @Optional() private readonly bookingAgentProjectionService?: BookingAgentProjectionService,
+    @Optional() private readonly publisher?: BookingEventPublisherService,
   ) {}
 
   @Cron(CronExpression.EVERY_10_MINUTES)
@@ -172,28 +172,41 @@ export class BookingRecoveryService {
       };
 
       if (!booking.payment?.stripePaymentIntentId) {
-        const res = await this.prisma.booking.updateMany({
-          where: { id: booking.id, status: BookingStatus.PROCESSING },
-          data: { status: BookingStatus.FAILED, failureReason: 'BOOKING_TIMEOUT' },
-        });
-        if (res.count > 0) {
-          booking.status = BookingStatus.FAILED;
-          booking.failureReason = 'BOOKING_TIMEOUT';
-          await this.bookingAgentProjectionService?.updateProjectionStatus(
+        let eventContext: TransactionEventContext | undefined;
+        let didTransition = false;
+        await this.prisma.$transaction(async (tx) => {
+          eventContext = this.publisher ? this.publisher.createContext(tx) : { tx, events: [] };
+          await this.bookingLifecycleService.failBooking(
             booking.id,
-            BookingStatus.FAILED,
+            BookingFailureReason.BOOKING_TIMEOUT,
+            undefined,
+            undefined,
+            undefined,
+            tx,
+            eventContext,
           );
+          didTransition = (eventContext?.events.length ?? 0) > 0;
+        });
+
+        if (didTransition) {
+          booking.status = BookingStatus.FAILED;
+          booking.failureReason = BookingFailureReason.BOOKING_TIMEOUT;
+
+          if (eventContext && eventContext.events.length > 0 && this.publisher) {
+            await this.publisher.publish(eventContext.events);
+          }
         }
         return booking;
       }
 
+      const payment = booking.payment;
       const intent = await withTimeout(
-        this.stripeService.retrievePaymentIntent(booking.payment.stripePaymentIntentId),
+        this.stripeService.retrievePaymentIntent(payment.stripePaymentIntentId),
       );
       if (intent.status !== 'succeeded') {
         try {
           const duffelEvent = await this.prisma.paymentEvent.findFirst({
-            where: { paymentId: booking.payment.id, eventType: 'duffel_order_created' },
+            where: { paymentId: payment.id, eventType: 'duffel_order_created' },
             orderBy: { createdAt: 'desc' },
           });
           const duffelOrder = duffelEvent?.metadata as Record<string, unknown> | null;
@@ -213,9 +226,9 @@ export class BookingRecoveryService {
 
         // Release the Stripe authorization hold (cancel intent)
         try {
-          await this.stripeService.cancelPaymentIntent(booking.payment.stripePaymentIntentId);
+          await this.stripeService.cancelPaymentIntent(payment.stripePaymentIntentId);
           this.logger.log(
-            `Successfully cancelled Stripe PaymentIntent ${booking.payment.stripePaymentIntentId} during stale booking sweep.`,
+            `Successfully cancelled Stripe PaymentIntent ${payment.stripePaymentIntentId} during stale booking sweep.`,
           );
         } catch (stripeCancelError: unknown) {
           const err =
@@ -228,28 +241,41 @@ export class BookingRecoveryService {
           );
         }
 
-        const res = await this.prisma.booking.updateMany({
-          where: { id: booking.id, status: BookingStatus.PROCESSING },
-          data: { status: BookingStatus.FAILED, failureReason: 'CAPTURE_FAILED' },
-        });
-        if (res.count > 0) {
-          booking.status = BookingStatus.FAILED;
-          booking.failureReason = 'CAPTURE_FAILED';
-          // Advance Payment to CANCELLED so downstream guards don't attempt a second cancellation.
-          await this.prisma.payment.updateMany({
-            where: { id: booking.payment.id, status: { notIn: ['CANCELLED', 'REFUNDED'] } },
-            data: { status: 'CANCELLED' },
-          });
-          await this.bookingAgentProjectionService?.updateProjectionStatus(
+        let eventContext: TransactionEventContext | undefined;
+        let didTransition = false;
+        await this.prisma.$transaction(async (tx) => {
+          eventContext = this.publisher ? this.publisher.createContext(tx) : { tx, events: [] };
+          await this.bookingLifecycleService.failBooking(
             booking.id,
-            BookingStatus.FAILED,
+            BookingFailureReason.CAPTURE_FAILED,
+            undefined,
+            undefined,
+            undefined,
+            tx,
+            eventContext,
           );
+          didTransition = (eventContext?.events.length ?? 0) > 0;
+          if (didTransition) {
+            await tx.payment.updateMany({
+              where: { id: payment.id, status: { notIn: ['CANCELLED', 'REFUNDED'] } },
+              data: { status: 'CANCELLED' },
+            });
+          }
+        });
+
+        if (didTransition) {
+          booking.status = BookingStatus.FAILED;
+          booking.failureReason = BookingFailureReason.CAPTURE_FAILED;
+
+          if (eventContext && eventContext.events.length > 0 && this.publisher) {
+            await this.publisher.publish(eventContext.events);
+          }
         }
         return booking;
       }
 
       const duffelEvent = await this.prisma.paymentEvent.findFirst({
-        where: { paymentId: booking.payment.id, eventType: 'duffel_order_created' },
+        where: { paymentId: payment.id, eventType: 'duffel_order_created' },
         orderBy: { createdAt: 'desc' },
       });
 
@@ -274,58 +300,79 @@ export class BookingRecoveryService {
           ? new Date(flightSnapshot.segments[0].departureAt)
           : null;
 
-        const res = await this.prisma.booking.updateMany({
-          where: { id: booking.id, status: BookingStatus.PROCESSING },
-          data: {
-            status: BookingStatus.CONFIRMED,
-            pnrReference: order.booking_reference || null,
-            duffelOrderId: order.id,
-            flightSnapshot: flightSnapshot as any,
-            passengerSnapshot: passengerSnapshot as any,
-            departureAt: departureAt,
-          },
+        let eventContext: TransactionEventContext | undefined;
+        let didTransition = false;
+        await this.prisma.$transaction(async (tx) => {
+          eventContext = this.publisher ? this.publisher.createContext(tx) : { tx, events: [] };
+          await this.bookingLifecycleService.confirmBooking(
+            booking.id,
+            order.booking_reference || null,
+            order.id,
+            flightSnapshot,
+            passengerSnapshot,
+            tx,
+            eventContext,
+          );
+          didTransition = (eventContext?.events.length ?? 0) > 0;
+          if (didTransition) {
+            await tx.payment.updateMany({
+              where: {
+                id: payment.id,
+                status: { notIn: ['SUCCEEDED', 'REFUNDED', 'CANCELLED'] },
+              },
+              data: { status: 'SUCCEEDED' },
+            });
+          }
         });
-        if (res.count > 0) {
+
+        if (didTransition) {
           booking.status = BookingStatus.CONFIRMED;
           booking.pnrReference = order.booking_reference || null;
           booking.duffelOrderId = order.id;
-          booking.flightSnapshot = flightSnapshot as any;
-          booking.passengerSnapshot = passengerSnapshot as any;
+          booking.flightSnapshot = flightSnapshot as unknown as Prisma.JsonValue;
+          booking.passengerSnapshot = passengerSnapshot as unknown as Prisma.JsonValue;
           booking.departureAt = departureAt;
-          // Advance Payment to SUCCEEDED to match the captured Stripe intent.
-          await this.prisma.payment.updateMany({
-            where: {
-              id: booking.payment.id,
-              status: { notIn: ['SUCCEEDED', 'REFUNDED', 'CANCELLED'] },
-            },
-            data: { status: 'SUCCEEDED' },
-          });
-          await this.bookingAgentProjectionService?.createOrUpdateProjection(booking.id);
+
+          if (eventContext && eventContext.events.length > 0 && this.publisher) {
+            await this.publisher.publish(eventContext.events);
+          }
         }
       } else {
-        const res = await this.prisma.booking.updateMany({
-          where: { id: booking.id, status: BookingStatus.PROCESSING },
-          data: { status: BookingStatus.FAILED, failureReason: 'SYSTEM_ERROR' },
-        });
-        if (res.count > 0) {
-          booking.status = BookingStatus.FAILED;
-          booking.failureReason = 'SYSTEM_ERROR';
-          await this.bookingAgentProjectionService?.updateProjectionStatus(
+        let eventContext: TransactionEventContext | undefined;
+        let didTransition = false;
+        await this.prisma.$transaction(async (tx) => {
+          eventContext = this.publisher ? this.publisher.createContext(tx) : { tx, events: [] };
+          await this.bookingLifecycleService.failBooking(
             booking.id,
-            BookingStatus.FAILED,
+            BookingFailureReason.SYSTEM_ERROR,
+            undefined,
+            undefined,
+            undefined,
+            tx,
+            eventContext,
           );
+          didTransition = (eventContext?.events.length ?? 0) > 0;
+        });
+
+        if (didTransition) {
+          booking.status = BookingStatus.FAILED;
+          booking.failureReason = BookingFailureReason.SYSTEM_ERROR;
+
+          if (eventContext && eventContext.events.length > 0 && this.publisher) {
+            await this.publisher.publish(eventContext.events);
+          }
 
           try {
             await withTimeout(
               this.triggerAutomatedRefund(
-                booking.payment.id,
+                payment.id,
                 'Stale processing booking timeout without duffel order',
               ),
             );
           } catch (e: unknown) {
             const err = e instanceof Error ? e : new Error(String(e));
             this.logger.error(
-              `CRITICAL: Automated refund failed during stale booking reconciliation for payment ${booking.payment.id}: ${err.message}`,
+              `CRITICAL: Automated refund failed during stale booking reconciliation for payment ${payment.id}: ${err.message}`,
               err.stack,
             );
           }
