@@ -512,7 +512,7 @@ describe('BookingLifecycleService', () => {
       expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
 
-    it('supports custom transaction client without context and calls publisher.publish', async () => {
+    it('supports custom transaction client without context and does not call publisher.publish', async () => {
       const customTx: any = {
         booking: {
           updateMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -531,8 +531,7 @@ describe('BookingLifecycleService', () => {
 
       expect(customTx.booking.updateMany).toHaveBeenCalled();
       expect(mockProjectionService.createOrUpdateProjection).toHaveBeenCalledWith('b-1', customTx);
-      expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
-      expect(mockPublisher.publish).toHaveBeenCalledWith([expect.any(BookingConfirmedEvent)]);
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
 
     it('does not construct or emit event on rejected/no-op update (0 rows updated)', async () => {
