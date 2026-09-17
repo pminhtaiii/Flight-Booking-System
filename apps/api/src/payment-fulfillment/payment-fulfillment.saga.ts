@@ -153,7 +153,6 @@ export class PaymentFulfillmentSaga {
         });
 
         return {
-          success: true,
           status: 'PENDING',
           message: 'Booking is being confirmed. Please poll status.',
           pollUrl: `/api/bookings/payment/${dto.paymentId}/status`,
@@ -562,44 +561,44 @@ export class PaymentFulfillmentSaga {
           });
         }
 
-        let orderOutcome: Awaited<ReturnType<FulfillmentGatewayPort['createOrder']>>;
-        try {
-          const recheckedPayment = await this.prisma.payment.findUnique({
-            where: { id: payment.id },
-            include: {
-              bookingIntent: true,
-              ancillarySelection: {
-                include: {
-                  seatSelections: true,
-                  baggageSelections: true,
-                },
+        const recheckedPayment = await this.prisma.payment.findUnique({
+          where: { id: payment.id },
+          include: {
+            bookingIntent: true,
+            ancillarySelection: {
+              include: {
+                seatSelections: true,
+                baggageSelections: true,
               },
             },
-          });
+          },
+        });
 
-          if (!recheckedPayment) {
-            throw new InternalServerErrorException(
-              'Payment-bound ancillary selection could not be recovered',
-            );
-          }
+        if (!recheckedPayment) {
+          throw new InternalServerErrorException(
+            'Payment-bound ancillary selection could not be recovered',
+          );
+        }
 
-          const orderPayment = recheckedPayment;
-          const hasAncillaryBinding = payment.ancillarySelectionId !== null;
-          const hasExactBoundSelection =
-            orderPayment.ancillarySelectionId === payment.ancillarySelectionId &&
-            orderPayment.ancillarySelectionVersion === payment.ancillarySelectionVersion &&
-            (hasAncillaryBinding
-              ? orderPayment.ancillarySelection?.id === payment.ancillarySelectionId &&
-                orderPayment.ancillarySelection.version === payment.ancillarySelectionVersion &&
-                orderPayment.ancillarySelection.status === 'PAYMENT_BOUND'
-              : orderPayment.ancillarySelection === null);
+        const orderPayment = recheckedPayment;
+        const hasAncillaryBinding = payment.ancillarySelectionId !== null;
+        const hasExactBoundSelection =
+          orderPayment.ancillarySelectionId === payment.ancillarySelectionId &&
+          orderPayment.ancillarySelectionVersion === payment.ancillarySelectionVersion &&
+          (hasAncillaryBinding
+            ? orderPayment.ancillarySelection?.id === payment.ancillarySelectionId &&
+              orderPayment.ancillarySelection.version === payment.ancillarySelectionVersion &&
+              orderPayment.ancillarySelection.status === 'PAYMENT_BOUND'
+            : orderPayment.ancillarySelection === null);
 
-          if (!hasExactBoundSelection) {
-            throw new InternalServerErrorException(
-              'Payment-bound ancillary selection could not be recovered',
-            );
-          }
+        if (!hasExactBoundSelection) {
+          throw new InternalServerErrorException(
+            'Payment-bound ancillary selection could not be recovered',
+          );
+        }
 
+        let orderOutcome: Awaited<ReturnType<FulfillmentGatewayPort['createOrder']>>;
+        try {
           orderOutcome = await this.fulfillmentGateway.createOrder(
             {
               offerId: bookingIntent.duffelOfferId,

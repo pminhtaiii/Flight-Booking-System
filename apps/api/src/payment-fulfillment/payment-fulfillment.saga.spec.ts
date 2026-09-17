@@ -479,7 +479,6 @@ describe('PaymentFulfillmentSaga', () => {
       const result = (await saga.confirmPayment(dto, idempotencyKey, userId)) as ConfirmPaymentResult;
 
       expect(result).toEqual({
-        success: true,
         status: 'PENDING',
         message: 'Booking is being confirmed. Please poll status.',
         pollUrl: `/api/bookings/payment/${paymentId}/status`,

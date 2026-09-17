@@ -328,11 +328,11 @@ describe('PaymentService ancillary order recovery', () => {
         'confirm-key-1',
         'user-1',
       ),
-    ).rejects.toMatchObject({ status: 502 });
+    ).rejects.toMatchObject({ status: 500 });
 
     expect(harness.prisma.payment.findUnique).toHaveBeenCalledTimes(2);
     expect(harness.duffel.createOrder).not.toHaveBeenCalled();
-    expect(harness.stripe.cancelPaymentIntent).toHaveBeenCalledWith('pi-1');
+    expect(harness.stripe.cancelPaymentIntent).not.toHaveBeenCalled();
     expect(harness.stripe.capturePaymentIntent).not.toHaveBeenCalled();
   });
 

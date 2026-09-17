@@ -18,10 +18,15 @@
     - Restored strictly typed `handleBackgroundError` signature in saga, eliminating synthetic fallback ownership and type assertion.
     - Eliminated `as any` casting in order-recovery harness.
     - Migrated all 13 confirmation tests (5 passenger validator tests, 4 completed replay tests, 1 post-capture sync test, 3 background error tests) from payment service spec to `payment-fulfillment.saga.spec.ts`.
+  - Addressed Post-PR Review & CI E2E Feedback:
+    - Moved local `recheckedPayment` and `hasExactBoundSelection` validation outside `try` block wrapping `createOrder` in saga (Issue 1), ensuring local invariant errors throw directly without false provider compensation.
+    - Updated HTTP 202 timeout handoff response contract in saga (removed extraneous `success: true`).
+    - Aligned E2E cancel spy assertions with `StripePaymentAdapter.voidHold` idempotency voidKey (`<intentId>-stripe-void`).
   - **Verification**:
     - ESLint: `pnpm exec eslint "apps/api/**/*.ts" --max-warnings 0` passed (0 warnings, 0 errors).
     - Typecheck: `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` passed (0 errors).
-    - All payment & fulfillment unit test suites passed under network guard.
+    - All payment & fulfillment unit test suites passed under network guard (22 suites, 225 tests).
+    - All E2E test suites passed (`payment-fulfillment.e2e-spec.ts`, `booking-passenger-final-validation.e2e-spec.ts`).
 
 ### Feature 024 — Event-Driven Module Deepening: Phase 3 Slice 2 (Task T011) Completed (2026-09-17)
 
