@@ -23,6 +23,12 @@ import { StripePaymentAdapter } from '@/common/stripe-payment.adapter';
 import { DuffelFulfillmentAdapter } from '@/duffel/duffel-fulfillment.adapter';
 import { PaymentFulfillmentSaga } from '@/payment-fulfillment/payment-fulfillment.saga';
 import { BookingRecoveryService } from '@/booking-lifecycle/booking-recovery.service';
+import { BookingLifecycleModule } from '@/booking-lifecycle/booking-lifecycle.module';
+import { BookingStateModule } from '@/booking-lifecycle/booking-state.module';
+import { BookingLifecycleService } from '@/booking-lifecycle/booking-lifecycle.service';
+import { CancellationModule } from '@/cancellation/cancellation.module';
+import { DisruptionModule } from '@/disruption/disruption.module';
+import { RefundSettlementModule } from '@/refund-settlement/refund-settlement.module';
 import { StripeService } from '@/common/stripe.service';
 import { DuffelService } from '@/duffel/duffel.service';
 
@@ -331,8 +337,8 @@ describe('Nest Composition Architecture Gate (US1 - T014)', () => {
     });
   });
 
-  describe('5. Strict Phase Invariants (No Premature Phase 4 / US2 Leaks)', () => {
-    it('does not register EventEmitterModule or premature Phase 4 modules in AppModule for US1', () => {
+  describe('5. Strict Phase Invariants (No Premature Phase 4 Slice 3 Leaks)', () => {
+    it('does not register EventEmitterModule or premature Phase 4 Slice 3 modules in AppModule', () => {
       const container = (moduleFixture as unknown as { container: { getModules: () => Map<string, unknown> } })
         .container;
       const modulesMap = container.getModules();
@@ -348,11 +354,13 @@ describe('Nest Composition Architecture Gate (US1 - T014)', () => {
       expect(registeredModuleNames).not.toContain('EventEmitterModule');
       expect(registeredModuleNames).not.toContain('EventEmitterCoreModule');
       expect(registeredModuleNames).not.toContain('BookingProjectionModule');
-      expect(registeredModuleNames).not.toContain('DomainEventsModule');
-      expect(registeredModuleNames).not.toContain('BookingStateModule');
+
+      // US2 Slice 2 deliverables are valid active modules
+      expect(registeredModuleNames).toContain('BookingStateModule');
+      expect(registeredModuleNames).toContain('DomainEventsModule');
     });
 
-    it('does not register EventEmitter2 or premature Phase 4 provider tokens in AppModule for US1', () => {
+    it('does not register EventEmitter2 or premature Phase 4 Slice 3 provider tokens in AppModule', () => {
       const container = (moduleFixture as unknown as { container: { getModules: () => Map<string, unknown> } })
         .container;
       const modulesMap = container.getModules();
@@ -370,10 +378,167 @@ describe('Nest Composition Architecture Gate (US1 - T014)', () => {
       }
 
       expect(allProviderKeys).not.toContain('EventEmitter2');
-      expect(allProviderKeys).not.toContain('BookingEventPublisherService');
       expect(allProviderKeys).not.toContain('BookingProjectionListener');
       expect(allProviderKeys).not.toContain('BookingProjectionRepository');
       expect(allProviderKeys).not.toContain('BookingEventHydratorService');
+
+      // US2 Slice 2 deliverables are valid active providers
+      expect(allProviderKeys).toContain('BookingEventPublisherService');
+    });
+  });
+
+  describe('6. BookingStateModule Single Registration and Acyclic Extraction (US2 - T019)', () => {
+    it('registers BookingLifecycleService in exactly one module across all active modules in AppModule', () => {
+      const container = (moduleFixture as unknown as { container: { getModules: () => Map<string, unknown> } })
+        .container;
+      expect(container).toBeDefined();
+
+      const modulesMap = container.getModules();
+      expect(modulesMap.size).toBeGreaterThan(0);
+
+      const modulesRegisteringService: string[] = [];
+
+      for (const [, nestModule] of modulesMap) {
+        const typedModule = nestModule as {
+          metatype: Type<unknown>;
+          providers: Map<unknown, unknown>;
+        };
+
+        if (typedModule.providers && typedModule.providers.has(BookingLifecycleService)) {
+          const moduleName = typedModule.metatype ? typedModule.metatype.name : 'UnknownModule';
+          modulesRegisteringService.push(moduleName);
+        }
+      }
+
+      expect(modulesRegisteringService).toHaveLength(1);
+      expect(modulesRegisteringService[0]).toBe('BookingStateModule');
+    });
+
+    it('declares BookingLifecycleService in BookingStateModule providers metadata, and NOT in BookingLifecycleModule providers metadata', () => {
+      const stateProviders: unknown[] =
+        Reflect.getMetadata('providers', BookingStateModule) || [];
+      const lifecycleProviders: unknown[] =
+        Reflect.getMetadata('providers', BookingLifecycleModule) || [];
+
+      expect(stateProviders).toContain(BookingLifecycleService);
+      expect(lifecycleProviders).not.toContain(BookingLifecycleService);
+    });
+
+    it('declares BookingLifecycleModule metadata imports and re-exports BookingStateModule, and does NOT register BookingLifecycleService in providers', () => {
+      const lifecycleImports: unknown[] =
+        Reflect.getMetadata('imports', BookingLifecycleModule) || [];
+      const lifecycleExports: unknown[] =
+        Reflect.getMetadata('exports', BookingLifecycleModule) || [];
+      const lifecycleProviders: unknown[] =
+        Reflect.getMetadata('providers', BookingLifecycleModule) || [];
+
+      const unwrappedImports = lifecycleImports.map(unwrapModuleToken);
+      const unwrappedExports = lifecycleExports.map(unwrapModuleToken);
+
+      expect(unwrappedImports).toContain(BookingStateModule);
+      expect(unwrappedExports).toContain(BookingStateModule);
+      expect(lifecycleProviders).not.toContain(BookingLifecycleService);
+    });
+
+    it('resolves the identical singleton instance of BookingLifecycleService across AppModule, BookingLifecycleModule, and BookingStateModule', () => {
+      const rootInstance = moduleFixture.get(BookingLifecycleService);
+      const lifecycleInstance = moduleFixture
+        .select(BookingLifecycleModule)
+        .get(BookingLifecycleService);
+      const stateInstance = moduleFixture
+        .select(BookingStateModule)
+        .get(BookingLifecycleService);
+
+      expect(rootInstance).toBeDefined();
+      expect(rootInstance).toBe(lifecycleInstance);
+      expect(lifecycleInstance).toBe(stateInstance);
+    });
+
+    it('proves BookingStateModule has zero direct or transitive imports of BookingLifecycleModule, CancellationModule, DisruptionModule, or RefundSettlementModule', () => {
+      const transitiveImportsFromState = collectTransitiveStaticImports(BookingStateModule);
+
+      expect(transitiveImportsFromState.has(BookingStateModule)).toBe(true);
+      expect(transitiveImportsFromState.has(BookingLifecycleModule)).toBe(false);
+      expect(transitiveImportsFromState.has(CancellationModule)).toBe(false);
+      expect(transitiveImportsFromState.has(DisruptionModule)).toBe(false);
+      expect(transitiveImportsFromState.has(RefundSettlementModule)).toBe(false);
+    });
+
+    it('allows downstream modules (cancellation, disruption, refund-settlement) to import BookingStateModule without circular reference to BookingLifecycleModule', async () => {
+      const downstreamConsumerFixture = await Test.createTestingModule({
+        imports: [
+          ConfigModule.forRoot({
+            isGlobal: true,
+            validate: (config) => envSchema.parse(config),
+          }),
+          BookingStateModule,
+          RefundSettlementModule,
+        ],
+      }).compile();
+
+      const service = downstreamConsumerFixture.get(BookingLifecycleService);
+      expect(service).toBeDefined();
+
+      const container = (downstreamConsumerFixture as unknown as {
+        container: { getModules: () => Map<string, unknown> };
+      }).container;
+      const registeredModuleNames: string[] = [];
+      for (const [, nestModule] of container.getModules()) {
+        const typedModule = nestModule as { metatype?: Type<unknown> };
+        if (typedModule.metatype?.name) {
+          registeredModuleNames.push(typedModule.metatype.name);
+        }
+      }
+
+      expect(registeredModuleNames).toContain('BookingStateModule');
+      expect(registeredModuleNames).not.toContain('BookingLifecycleModule');
+
+      const downstreamPrisma = downstreamConsumerFixture.get(PrismaService, { strict: false });
+      if (downstreamPrisma) {
+        await downstreamPrisma.$disconnect();
+      }
+      await downstreamConsumerFixture.close();
+    });
+
+    it('verifies runtime NestContainer dependency graph has no link from BookingStateModule back to BookingLifecycleModule', () => {
+      const container = (moduleFixture as unknown as { container: { getModules: () => Map<string, unknown> } })
+        .container;
+      const modulesMap = container.getModules();
+
+      let stateNestModule: { imports?: Set<unknown>; relatedModules?: Set<unknown>; metatype: Type<unknown> } | null = null;
+      let lifecycleNestModule: { imports?: Set<unknown>; relatedModules?: Set<unknown>; metatype: Type<unknown> } | null = null;
+
+      for (const [, mod] of modulesMap) {
+        const typed = mod as { imports?: Set<unknown>; relatedModules?: Set<unknown>; metatype: Type<unknown> };
+        if (typed.metatype === BookingStateModule) stateNestModule = typed;
+        if (typed.metatype === BookingLifecycleModule) lifecycleNestModule = typed;
+      }
+
+      expect(stateNestModule).toBeDefined();
+      expect(lifecycleNestModule).toBeDefined();
+
+      const getRelated = (m: { imports?: Set<unknown>; relatedModules?: Set<unknown> }): Set<unknown> =>
+        m.relatedModules ?? m.imports ?? new Set();
+
+      const reachableFromState = new Set<unknown>();
+      const queue: unknown[] = [stateNestModule];
+
+      while (queue.length > 0) {
+        const curr = queue.shift() as { imports?: Set<unknown>; relatedModules?: Set<unknown>; metatype: Type<unknown> };
+        if (!curr || reachableFromState.has(curr)) continue;
+        reachableFromState.add(curr);
+
+        const related = getRelated(curr);
+        for (const rel of related) {
+          if (!reachableFromState.has(rel)) {
+            queue.push(rel);
+          }
+        }
+      }
+
+      // Assert runtime container reachability: BookingLifecycleModule is NOT reachable from BookingStateModule
+      expect(reachableFromState.has(lifecycleNestModule)).toBe(false);
     });
   });
 });
+

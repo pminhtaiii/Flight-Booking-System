@@ -1,5 +1,41 @@
 # Progress Tracker
 
+### Feature 024 — Event-Driven Module Deepening: Phase 4 Slice 2 (Tasks T018, T019, T020) Completed (2026-09-17)
+
+- **T018 [US2] Transaction Context & Safe Postcommit Publisher**:
+  - Implemented `BookingEventPublisherService` in `apps/api/src/domain-events/booking-event-publisher.service.ts`:
+    - Injected with `@Optional() EventEmitter2` falling back to `new EventEmitter2()`.
+    - Defined `TransactionEventContext` interface (`{ readonly tx: Prisma.TransactionClient; readonly events: DomainEventBase[]; }`) and `createContext(tx)` factory.
+    - Implemented safe `publish(events)` method mapping 11 booking events and `refund.settled` to exact contract event names via `resolveEventName`.
+    - Dispatch Error Isolation: Catches both synchronous and asynchronous listener rejections via `try/catch` and logs via NestJS `Logger`, guaranteeing listener errors never abort transactions or reject to callers.
+  - Created and exported `DomainEventsModule` in `apps/api/src/domain-events/domain-events.module.ts`.
+  - Re-exported publisher, context, and module in `apps/api/src/domain-events/index.ts`.
+  - Unit tests in `booking-event-publisher.service.spec.ts` (19/19 tests passed, 38/38 total in `domain-events`) asserting context isolation, rollback discard, retry collector isolation, dispatch error isolation, and payload forwarding.
+- **T019 [US2] `BookingStateModule` Acyclic Extraction**:
+  - Created `BookingStateModule` in `apps/api/src/booking-lifecycle/booking-state.module.ts` importing `PrismaModule` and `DomainEventsModule`, providing and exporting `BookingLifecycleService`.
+  - Rewired `BookingLifecycleModule` in `apps/api/src/booking-lifecycle/booking-lifecycle.module.ts` to import and re-export `BookingStateModule`, removing direct `BookingLifecycleService` provider registration while retaining `BookingRecoveryService` + Stripe/Duffel/refund dependencies.
+  - Updated `apps/api/test/module-deepening.e2e-spec.ts` with Section 6:
+    - Verifies `BookingLifecycleService` is registered strictly once across `AppModule` via `BookingStateModule`.
+    - Verifies identical singleton resolution across `AppModule`, `BookingLifecycleModule`, and `BookingStateModule`.
+    - Verifies acyclic DI dependency: downstream modules (`CancellationModule`, `DisruptionModule`, `RefundSettlementModule`) can import `BookingStateModule` without circular reference to `BookingLifecycleModule`.
+    - Updated Section 5 phase invariants: accepted Slice 2 deliverables, guarding Slice 3 tokens against premature leaks.
+- **T020 [US2] Versioned Lifecycle Mutations & Guarded Events**:
+  - Injected `BookingEventPublisherService` into `BookingLifecycleService`.
+  - Added `context?: TransactionEventContext` support across core lifecycle methods:
+    - `createBooking`: starts at `version = 1`, emits `BookingCreatedEvent`. Idempotency replay and `paymentId` attachment emit 0 events without version bump.
+    - `updateToConfirmed` / `confirmBooking`: guarded to `PROCESSING` or eligible `FAILED`; increments `Booking.version` atomically by 1 (`version: { increment: 1 }`), constructs `BookingConfirmedEvent`.
+    - `updateToFailed` / `failBooking`: guarded to `PROCESSING`; increments `Booking.version` atomically by 1, constructs `BookingFailedEvent`. Rejects mutations on already `CONFIRMED`/`COMPLETED` with 0 events.
+    - `checkAndCompleteBooking` / `completeBooking`: guarded to `CONFIRMED` and past departure/arrival; increments `Booking.version` atomically by 1, constructs `BookingCompletedEvent`.
+    - `applyPipelineOutcome`: dispatches to versioned confirmed/failed handlers with transaction context.
+  - Transaction Ownership Protocol: caller-provided `context` appends events to `context.events` without dispatching (caller flushes post-commit); standalone execution wraps in `prisma.$transaction` and immediately flushes post-commit via `publisher.publish(events)`.
+  - Unit tests in `booking-lifecycle.service.spec.ts` (33/33 tests passed, exit code 0).
+- **Verification**:
+  - Jest Unit: `apps/api/src/domain-events/` (38/38 passed)
+  - Jest Unit: `apps/api/src/booking-lifecycle/booking-lifecycle.service.spec.ts` (33/33 passed)
+  - Jest E2E: `apps/api/test/module-deepening.e2e-spec.ts` (22/22 passed, exit code 0)
+  - Typecheck: `tsc -p tsconfig.json --noEmit` passed (exit code 0)
+  - Linter: `eslint "src/**/*.ts" "../../packages/shared/**/*.ts" --max-warnings 0` passed (0 errors, 0 warnings)
+
 ### Feature 024 — Event-Driven Module Deepening: Phase 4 Slice 1 (Tasks T015, T016, T017) Completed (2026-09-17)
 
 - **T015 [US2] Resolve & Document `@nestjs/event-emitter`**:

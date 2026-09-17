@@ -6,6 +6,7 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import {
   Booking,
   BookingFailureReason,
@@ -17,7 +18,50 @@ import {
 import { PrismaService } from '@/prisma/prisma.service';
 import { FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
 import { BookingAgentProjectionService } from '@/agent-gateway/booking-agent-projection.service';
+import {
+  BookingCreatedEvent,
+  BookingConfirmedEvent,
+  BookingFailedEvent,
+  BookingCompletedEvent,
+  BookingEventPublisherService,
+  DomainEventBase,
+  TransactionEventContext,
+} from '@/domain-events';
 import { BookingPipelineOutcome, BookingWithRelations } from './booking-lifecycle.types';
+
+function isTransactionEventContext(
+  value: Prisma.TransactionClient | TransactionEventContext | undefined,
+): value is TransactionEventContext {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'tx' in value &&
+    'events' in value &&
+    Array.isArray(value.events)
+  );
+}
+
+function resolveTxAndContext(
+  txOrContext?: Prisma.TransactionClient | TransactionEventContext,
+  context?: TransactionEventContext,
+): { tx?: Prisma.TransactionClient; context?: TransactionEventContext } {
+  if (isTransactionEventContext(txOrContext)) {
+    return {
+      tx: txOrContext.tx,
+      context: txOrContext,
+    };
+  }
+  if (context) {
+    return {
+      tx: context.tx,
+      context,
+    };
+  }
+  return {
+    tx: txOrContext,
+    context: undefined,
+  };
+}
 
 @Injectable()
 export class BookingLifecycleService {
@@ -25,16 +69,46 @@ export class BookingLifecycleService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly publisher: BookingEventPublisherService,
     @Optional() private readonly bookingAgentProjectionService?: BookingAgentProjectionService,
   ) {}
+
+  private async executeMutation<T>(
+    resolvedContext: TransactionEventContext | undefined,
+    resolvedTx: Prisma.TransactionClient | undefined,
+    operation: (client: Prisma.TransactionClient, events: DomainEventBase[]) => Promise<T>,
+  ): Promise<T> {
+    if (resolvedContext) {
+      return operation(resolvedContext.tx, resolvedContext.events);
+    }
+
+    if (resolvedTx) {
+      const localEvents: DomainEventBase[] = [];
+      return operation(resolvedTx, localEvents);
+    }
+
+    const localEvents: DomainEventBase[] = [];
+    const result = await this.prisma.$transaction(async (tx) => {
+      return operation(tx, localEvents);
+    });
+
+    if (localEvents.length > 0) {
+      await this.publisher.publish(localEvents);
+    }
+
+    return result;
+  }
 
   async createBooking(
     userId: string,
     bookingId: string,
     bookingIntentId: string,
     paymentId?: string,
+    context?: TransactionEventContext,
   ): Promise<Booking> {
-    const intent = await this.prisma.bookingIntent.findUnique({
+    const client = context ? context.tx : this.prisma;
+
+    const intent = await client.bookingIntent.findUnique({
       where: { id: bookingIntentId },
     });
     if (!intent) {
@@ -43,8 +117,57 @@ export class BookingLifecycleService {
     if (intent.userId !== userId) {
       throw new ForbiddenException('You do not own this booking intent');
     }
+
+    const existingByIntent = await client.booking.findUnique({
+      where: { bookingIntentId },
+    });
+    if (existingByIntent) {
+      if (existingByIntent.userId !== userId) {
+        throw new ForbiddenException('You do not own this booking');
+      }
+      if (existingByIntent.id !== bookingId) {
+        const existingById = await client.booking.findUnique({
+          where: { id: bookingId },
+        });
+        if (existingById && existingById.bookingIntentId !== bookingIntentId) {
+          throw new BadRequestException(
+            'Booking ID is already associated with a different booking intent',
+          );
+        }
+      }
+      if (!existingByIntent.paymentId && paymentId) {
+        return await client.booking.update({
+          where: { id: existingByIntent.id },
+          data: { paymentId },
+        });
+      }
+      return existingByIntent;
+    }
+
+    const existingById = await client.booking.findUnique({
+      where: { id: bookingId },
+    });
+    if (existingById) {
+      if (existingById.userId !== userId) {
+        throw new ForbiddenException('You do not own this booking');
+      }
+      if (existingById.bookingIntentId !== bookingIntentId) {
+        throw new BadRequestException(
+          'Booking ID is already associated with a different booking intent',
+        );
+      }
+      if (!existingById.paymentId && paymentId) {
+        return await client.booking.update({
+          where: { id: existingById.id },
+          data: { paymentId },
+        });
+      }
+      return existingById;
+    }
+
+    let created: Booking;
     try {
-      return await this.prisma.booking.create({
+      created = await client.booking.create({
         data: {
           id: bookingId,
           userId,
@@ -53,49 +176,66 @@ export class BookingLifecycleService {
           currency: intent.currency,
           status: BookingStatus.PROCESSING,
           paymentId: paymentId || null,
+          version: 1,
         },
       });
     } catch (e: unknown) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
-        const existingByIntent = await this.prisma.booking.findUnique({
-          where: { bookingIntentId },
-        });
-        if (existingByIntent) {
-          if (existingByIntent.userId !== userId) {
-            throw new ForbiddenException('You do not own this booking');
-          }
-          if (!existingByIntent.paymentId && paymentId) {
-            return await this.prisma.booking.update({
-              where: { id: existingByIntent.id },
-              data: { paymentId },
-            });
-          }
-          return existingByIntent;
-        }
-
-        const existingById = await this.prisma.booking.findUnique({
+        const fallbackById = await this.prisma.booking.findUnique({
           where: { id: bookingId },
         });
-        if (existingById) {
-          if (existingById.userId !== userId) {
+        if (fallbackById) {
+          if (fallbackById.userId !== userId) {
             throw new ForbiddenException('You do not own this booking');
           }
-          if (existingById.bookingIntentId !== bookingIntentId) {
+          if (fallbackById.bookingIntentId !== bookingIntentId) {
             throw new BadRequestException(
               'Booking ID is already associated with a different booking intent',
             );
           }
-          if (!existingById.paymentId && paymentId) {
+          if (!fallbackById.paymentId && paymentId) {
             return await this.prisma.booking.update({
-              where: { id: existingById.id },
+              where: { id: fallbackById.id },
               data: { paymentId },
             });
           }
-          return existingById;
+          return fallbackById;
+        }
+
+        const fallbackByIntent = await this.prisma.booking.findUnique({
+          where: { bookingIntentId },
+        });
+        if (fallbackByIntent) {
+          if (fallbackByIntent.userId !== userId) {
+            throw new ForbiddenException('You do not own this booking');
+          }
+          if (!fallbackByIntent.paymentId && paymentId) {
+            return await this.prisma.booking.update({
+              where: { id: fallbackByIntent.id },
+              data: { paymentId },
+            });
+          }
+          return fallbackByIntent;
         }
       }
       throw e;
     }
+
+    const createdEvent = new BookingCreatedEvent({
+      bookingId: created.id,
+      eventId: randomUUID(),
+      sourceVersion: created.version ?? 1,
+      status: created.status,
+      timestamp: new Date(),
+    });
+
+    if (context) {
+      context.events.push(createdEvent);
+    } else {
+      await this.publisher.publish([createdEvent]);
+    }
+
+    return created;
   }
 
   async updateToConfirmed(
@@ -105,31 +245,71 @@ export class BookingLifecycleService {
     flightSnapshot: FlightSnapshot,
     passengerSnapshot: PassengerSnapshot,
     tx?: Prisma.TransactionClient,
+    context?: TransactionEventContext,
   ): Promise<Booking> {
     if (!flightSnapshot?.segments?.length) {
       throw new BadRequestException('Flight snapshot must contain at least one segment');
     }
-    const client = tx || this.prisma;
-    await client.booking.updateMany({
-      // A captured Stripe intent plus a Duffel order is authoritative. A concurrent
-      // stale-worker failure is therefore recoverable, but completed records remain immutable.
-      where: { id: bookingId, status: { in: [BookingStatus.PROCESSING, BookingStatus.FAILED] } },
-      data: {
-        status: BookingStatus.CONFIRMED,
-        failureReason: null,
-        pnrReference,
-        duffelOrderId,
-        flightSnapshot: flightSnapshot as unknown as Prisma.InputJsonValue,
-        passengerSnapshot: passengerSnapshot as unknown as Prisma.InputJsonValue,
-        departureAt: new Date(flightSnapshot.segments[0].departureAt),
-      },
+
+    const { tx: resolvedTx, context: resolvedContext } = resolveTxAndContext(tx, context);
+
+    return this.executeMutation(resolvedContext, resolvedTx, async (client, events) => {
+      const updateResult = await client.booking.updateMany({
+        // A captured Stripe intent plus a Duffel order is authoritative. A concurrent
+        // stale-worker failure is therefore recoverable, but completed records remain immutable.
+        where: { id: bookingId, status: { in: [BookingStatus.PROCESSING, BookingStatus.FAILED] } },
+        data: {
+          status: BookingStatus.CONFIRMED,
+          failureReason: null,
+          pnrReference,
+          duffelOrderId,
+          flightSnapshot: flightSnapshot as unknown as Prisma.InputJsonValue,
+          passengerSnapshot: passengerSnapshot as unknown as Prisma.InputJsonValue,
+          departureAt: new Date(flightSnapshot.segments[0].departureAt),
+          version: { increment: 1 },
+        },
+      });
+
+      const booking = await client.booking.findUnique({ where: { id: bookingId } });
+      if (!booking) {
+        throw new NotFoundException('Booking not found');
+      }
+
+      if (updateResult.count > 0) {
+        events.push(
+          new BookingConfirmedEvent({
+            bookingId: booking.id,
+            eventId: randomUUID(),
+            sourceVersion: booking.version,
+            status: booking.status,
+            timestamp: new Date(),
+          }),
+        );
+      }
+
+      await this.bookingAgentProjectionService?.createOrUpdateProjection(bookingId, client);
+      return booking;
     });
-    const booking = await client.booking.findUnique({ where: { id: bookingId } });
-    if (!booking) {
-      throw new NotFoundException('Booking not found');
-    }
-    await this.bookingAgentProjectionService?.createOrUpdateProjection(bookingId, client);
-    return booking;
+  }
+
+  async confirmBooking(
+    bookingId: string,
+    pnrReference: string,
+    duffelOrderId: string,
+    flightSnapshot: FlightSnapshot,
+    passengerSnapshot: PassengerSnapshot,
+    tx?: Prisma.TransactionClient,
+    context?: TransactionEventContext,
+  ): Promise<Booking> {
+    return this.updateToConfirmed(
+      bookingId,
+      pnrReference,
+      duffelOrderId,
+      flightSnapshot,
+      passengerSnapshot,
+      tx,
+      context,
+    );
   }
 
   async updateToFailed(
@@ -139,65 +319,128 @@ export class BookingLifecycleService {
     passengerSnapshot?: PassengerSnapshot,
     departureAt?: Date,
     tx?: Prisma.TransactionClient,
+    context?: TransactionEventContext,
   ): Promise<Booking> {
-    const client = tx || this.prisma;
-    await client.booking.updateMany({
-      where: { id: bookingId, status: BookingStatus.PROCESSING },
-      data: {
-        status: BookingStatus.FAILED,
-        failureReason,
-        ...(flightSnapshot
-          ? { flightSnapshot: flightSnapshot as unknown as Prisma.InputJsonValue }
-          : {}),
-        ...(passengerSnapshot
-          ? { passengerSnapshot: passengerSnapshot as unknown as Prisma.InputJsonValue }
-          : {}),
-        ...(departureAt ? { departureAt } : {}),
-      },
+    const { tx: resolvedTx, context: resolvedContext } = resolveTxAndContext(tx, context);
+
+    return this.executeMutation(resolvedContext, resolvedTx, async (client, events) => {
+      const updateResult = await client.booking.updateMany({
+        where: { id: bookingId, status: BookingStatus.PROCESSING },
+        data: {
+          status: BookingStatus.FAILED,
+          failureReason,
+          version: { increment: 1 },
+          ...(flightSnapshot
+            ? { flightSnapshot: flightSnapshot as unknown as Prisma.InputJsonValue }
+            : {}),
+          ...(passengerSnapshot
+            ? { passengerSnapshot: passengerSnapshot as unknown as Prisma.InputJsonValue }
+            : {}),
+          ...(departureAt ? { departureAt } : {}),
+        },
+      });
+
+      const booking = await client.booking.findUnique({ where: { id: bookingId } });
+      if (!booking) {
+        throw new NotFoundException('Booking not found');
+      }
+
+      if (updateResult.count > 0) {
+        events.push(
+          new BookingFailedEvent({
+            bookingId: booking.id,
+            eventId: randomUUID(),
+            sourceVersion: booking.version,
+            status: booking.status,
+            failureReason: booking.failureReason ?? failureReason,
+            timestamp: new Date(),
+          }),
+        );
+      }
+
+      await this.bookingAgentProjectionService?.updateProjectionStatus(
+        bookingId,
+        BookingStatus.FAILED,
+        client,
+      );
+      return booking;
     });
-    const booking = await client.booking.findUnique({ where: { id: bookingId } });
-    if (!booking) {
-      throw new NotFoundException('Booking not found');
-    }
-    await this.bookingAgentProjectionService?.updateProjectionStatus(
+  }
+
+  async failBooking(
+    bookingId: string,
+    failureReason: BookingFailureReason,
+    flightSnapshot?: FlightSnapshot,
+    passengerSnapshot?: PassengerSnapshot,
+    departureAt?: Date,
+    tx?: Prisma.TransactionClient,
+    context?: TransactionEventContext,
+  ): Promise<Booking> {
+    return this.updateToFailed(
       bookingId,
-      BookingStatus.FAILED,
-      client,
+      failureReason,
+      flightSnapshot,
+      passengerSnapshot,
+      departureAt,
+      tx,
+      context,
     );
-    return booking;
   }
 
   async applyPipelineOutcome(
     outcome: BookingPipelineOutcome,
     tx?: Prisma.TransactionClient,
+    context?: TransactionEventContext,
   ): Promise<Booking> {
     if (outcome.status === 'CONFIRMED') {
-      return this.updateToConfirmed(
-        outcome.bookingId,
-        outcome.pnrReference,
-        outcome.duffelOrderId,
-        outcome.flightSnapshot,
-        outcome.passengerSnapshot,
-        tx,
-      );
+      return context !== undefined
+        ? this.updateToConfirmed(
+            outcome.bookingId,
+            outcome.pnrReference,
+            outcome.duffelOrderId,
+            outcome.flightSnapshot,
+            outcome.passengerSnapshot,
+            tx,
+            context,
+          )
+        : this.updateToConfirmed(
+            outcome.bookingId,
+            outcome.pnrReference,
+            outcome.duffelOrderId,
+            outcome.flightSnapshot,
+            outcome.passengerSnapshot,
+            tx,
+          );
     } else {
-      return this.updateToFailed(
-        outcome.bookingId,
-        outcome.category,
-        outcome.partialState?.flightSnapshot,
-        outcome.partialState?.passengerSnapshot,
-        outcome.partialState?.departureAt,
-        tx,
-      );
+      return context !== undefined
+        ? this.updateToFailed(
+            outcome.bookingId,
+            outcome.category,
+            outcome.partialState?.flightSnapshot,
+            outcome.partialState?.passengerSnapshot,
+            outcome.partialState?.departureAt,
+            tx,
+            context,
+          )
+        : this.updateToFailed(
+            outcome.bookingId,
+            outcome.category,
+            outcome.partialState?.flightSnapshot,
+            outcome.partialState?.passengerSnapshot,
+            outcome.partialState?.departureAt,
+            tx,
+          );
     }
   }
 
   async checkAndCompleteBooking(
     bookingOrId: BookingWithRelations | string,
+    context?: TransactionEventContext,
   ): Promise<BookingWithRelations> {
     let booking: BookingWithRelations;
     if (typeof bookingOrId === 'string') {
-      const found = await this.prisma.booking.findUnique({
+      const client = context?.tx ?? this.prisma;
+      const found = await client.booking.findUnique({
         where: { id: bookingOrId },
         include: {
           payment: {
@@ -240,7 +483,10 @@ export class BookingLifecycleService {
     const targetTime = booking.currentFinalArrivalAt || booking.departureAt;
     if (booking.status === BookingStatus.CONFIRMED && targetTime && targetTime <= now) {
       try {
-        const didUpdate = await this.prisma.$transaction(async (tx) => {
+        const localEvents: DomainEventBase[] = [];
+        const eventSink: DomainEventBase[] = context ? context.events : localEvents;
+
+        const executeUpdate = async (tx: Prisma.TransactionClient): Promise<boolean> => {
           // Re-fetch the booking inside transaction to make it safe and atomic
           const dbBooking = await tx.booking.findUnique({
             where: { id: booking.id },
@@ -250,6 +496,7 @@ export class BookingLifecycleService {
               activeDisruptionRevisionId: true,
               currentFinalArrivalAt: true,
               departureAt: true,
+              version: true,
             },
           });
 
@@ -268,6 +515,7 @@ export class BookingLifecycleService {
 
           const updateData: Prisma.BookingUpdateInput = {
             status: BookingStatus.COMPLETED,
+            version: { increment: 1 },
           };
 
           if (hasActiveDisruption) {
@@ -315,12 +563,36 @@ export class BookingLifecycleService {
             });
           }
 
+          const committedVersion = (dbBooking.version ?? 1) + 1;
+          eventSink.push(
+            new BookingCompletedEvent({
+              bookingId: booking.id,
+              eventId: randomUUID(),
+              sourceVersion: committedVersion,
+              status: BookingStatus.COMPLETED,
+              timestamp: now,
+            }),
+          );
+
           return true;
-        });
+        };
+
+        let didUpdate = false;
+        if (context) {
+          didUpdate = await executeUpdate(context.tx);
+        } else {
+          didUpdate = await this.prisma.$transaction(async (tx) => {
+            return executeUpdate(tx);
+          });
+          if (didUpdate && localEvents.length > 0) {
+            await this.publisher.publish(localEvents);
+          }
+        }
 
         // Sync local object fields only if transaction successfully updated the record
         if (didUpdate) {
           booking.status = BookingStatus.COMPLETED;
+          booking.version = (booking.version ?? 1) + 1;
           if (
             booking.disruptionStatus === DisruptionStatus.DETECTED ||
             booking.disruptionStatus === DisruptionStatus.ACKNOWLEDGED
@@ -340,5 +612,12 @@ export class BookingLifecycleService {
       }
     }
     return booking;
+  }
+
+  async completeBooking(
+    bookingOrId: BookingWithRelations | string,
+    context?: TransactionEventContext,
+  ): Promise<BookingWithRelations> {
+    return this.checkAndCompleteBooking(bookingOrId, context);
   }
 }

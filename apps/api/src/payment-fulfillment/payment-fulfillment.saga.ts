@@ -22,6 +22,7 @@ import { PaymentMethodService } from '@/payment/payment-method.service';
 import { BookingLifecycleService } from '@/booking-lifecycle/booking-lifecycle.service';
 import { BookingPassengerFinalValidatorService } from '@/booking-intent/booking-passenger-final-validator.service';
 import { AuditService } from '@/audit/audit.service';
+import { BookingEventPublisherService, TransactionEventContext } from '@/domain-events';
 import { ConfirmPaymentDto } from '@/payment/dto/confirm-payment.dto';
 import { enforceTransition } from '@/payment/payment-state-machine';
 import { FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
@@ -59,6 +60,8 @@ export class PaymentFulfillmentSaga {
     private readonly auditService: AuditService,
     @Optional()
     private readonly bookingPassengerFinalValidator?: BookingPassengerFinalValidatorService,
+    @Optional()
+    private readonly publisher?: BookingEventPublisherService,
   ) {}
 
   async confirmPayment(
@@ -487,7 +490,9 @@ export class PaymentFulfillmentSaga {
             const nextBookingStatus =
               bookingIntent.paymentAttemptCount < 2 ? 'AWAITING_PAYMENT' : 'CANCELLED';
 
+            let eventContext: TransactionEventContext | undefined;
             await this.prisma.$transaction(async (tx) => {
+              eventContext = this.publisher ? this.publisher.createContext(tx) : { tx, events: [] };
               await tx.payment.update({
                 where: { id: payment.id },
                 data: { status: 'CANCELLED' },
@@ -514,8 +519,12 @@ export class PaymentFulfillmentSaga {
                 undefined,
                 undefined,
                 tx,
+                eventContext,
               );
             });
+            if (eventContext && eventContext.events.length > 0 && this.publisher) {
+              await this.publisher.publish(eventContext.events);
+            }
 
             const failureResponse = {
               success: false,
@@ -641,7 +650,9 @@ export class PaymentFulfillmentSaga {
           const nextBookingStatus =
             bookingIntent.paymentAttemptCount < 2 ? 'AWAITING_PAYMENT' : 'CANCELLED';
 
+          let eventContext: TransactionEventContext | undefined;
           await this.prisma.$transaction(async (tx) => {
+            eventContext = this.publisher ? this.publisher.createContext(tx) : { tx, events: [] };
             await tx.payment.update({
               where: { id: payment.id },
               data: { status: 'CANCELLED' },
@@ -668,8 +679,12 @@ export class PaymentFulfillmentSaga {
               undefined,
               undefined,
               tx,
+              eventContext,
             );
           });
+          if (eventContext && eventContext.events.length > 0 && this.publisher) {
+            await this.publisher.publish(eventContext.events);
+          }
 
           const failureResponse = {
             success: false,
@@ -872,7 +887,9 @@ export class PaymentFulfillmentSaga {
             let compensationAborted = false;
             let resolvedBookingStatus: string = nextBookingStatus;
             const previousPaymentStatus = payment.status;
+            let eventContext: TransactionEventContext | undefined;
             await this.prisma.$transaction(async (tx) => {
+              eventContext = this.publisher ? this.publisher.createContext(tx) : { tx, events: [] };
               const paymentUpdate = await tx.payment.updateMany({
                 where: {
                   id: payment.id,
@@ -935,8 +952,12 @@ export class PaymentFulfillmentSaga {
                 passSnap,
                 departAt,
                 tx,
+                eventContext,
               );
             });
+            if (eventContext && eventContext.events.length > 0 && this.publisher) {
+              await this.publisher.publish(eventContext.events);
+            }
 
             if (compensationAborted) {
               const duffelEvent = await this.prisma.paymentEvent.findFirst({
@@ -1020,7 +1041,9 @@ export class PaymentFulfillmentSaga {
           enforceTransition(previousPaymentStatus, 'SUCCEEDED');
           await this.idempotency.assertOwned(currentOwnership);
 
+          let eventContext: TransactionEventContext | undefined;
           await this.prisma.$transaction(async (tx) => {
+            eventContext = this.publisher ? this.publisher.createContext(tx) : { tx, events: [] };
             const updateResult = await tx.payment.updateMany({
               where: { id: payment.id, status: 'AUTHORIZED' },
               data: { status: 'SUCCEEDED' },
@@ -1056,6 +1079,7 @@ export class PaymentFulfillmentSaga {
               snapshotOutcome.flightSnapshot,
               snapshotOutcome.passengerSnapshot,
               tx,
+              eventContext,
             );
 
             await tx.ledgerEntry.createMany({
@@ -1079,6 +1103,9 @@ export class PaymentFulfillmentSaga {
               ],
             });
           });
+          if (eventContext && eventContext.events.length > 0 && this.publisher) {
+            await this.publisher.publish(eventContext.events);
+          }
 
           await this.auditService.createLog(this.prisma, {
             userId,
@@ -1344,7 +1371,9 @@ export class PaymentFulfillmentSaga {
       let compensationAborted = false;
       let resolvedBookingStatus: string = nextBookingStatus;
       const previousPaymentStatus = payment.status;
+      let eventContext: TransactionEventContext | undefined;
       await this.prisma.$transaction(async (tx) => {
+        eventContext = this.publisher ? this.publisher.createContext(tx) : { tx, events: [] };
         const paymentUpdate = await tx.payment.updateMany({
           where: {
             id: paymentId,
@@ -1408,9 +1437,13 @@ export class PaymentFulfillmentSaga {
             passSnap,
             departAt,
             tx,
+            eventContext,
           );
         }
       });
+      if (eventContext && eventContext.events.length > 0 && this.publisher) {
+        await this.publisher.publish(eventContext.events);
+      }
 
       if (compensationAborted) {
         return;

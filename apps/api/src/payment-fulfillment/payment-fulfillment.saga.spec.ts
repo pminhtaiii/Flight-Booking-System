@@ -408,6 +408,7 @@ describe('PaymentFulfillmentSaga', () => {
         baseSnapshots.flightSnapshot,
         baseSnapshots.passengerSnapshot,
         expect.anything(),
+        expect.anything(),
       );
       expect(mockPrisma.ledgerEntry.createMany).toHaveBeenCalled();
       expect(mockPaymentMethod.saveMethod).toHaveBeenCalledWith(userId, 'cus-123', 'pi-123');
@@ -738,6 +739,7 @@ describe('PaymentFulfillmentSaga', () => {
         undefined,
         undefined,
         mockPrisma,
+        expect.anything(),
       );
 
       expect(mockAudit.createLog).toHaveBeenCalledWith(
@@ -891,6 +893,7 @@ describe('PaymentFulfillmentSaga', () => {
         undefined,
         undefined,
         expect.anything(),
+        expect.anything(),
       );
       expect(mockIdempotency.completeSagaKeyAtomic).toHaveBeenCalledWith(
         expect.objectContaining({ key: idempotencyKey }),
@@ -920,6 +923,7 @@ describe('PaymentFulfillmentSaga', () => {
         undefined,
         undefined,
         undefined,
+        expect.anything(),
         expect.anything(),
       );
       expect(mockIdempotency.completeSagaKeyAtomic).toHaveBeenCalledWith(
@@ -990,6 +994,7 @@ describe('PaymentFulfillmentSaga', () => {
         baseSnapshots.flightSnapshot,
         baseSnapshots.passengerSnapshot,
         baseSnapshots.departureAt,
+        expect.anything(),
         expect.anything(),
       );
       expect(mockIdempotency.completeSagaKeyAtomic).toHaveBeenCalledWith(

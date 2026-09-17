@@ -6,6 +6,14 @@ import {
   DisruptionStatus,
   Prisma,
 } from '@prisma/client';
+import {
+  BookingCreatedEvent,
+  BookingConfirmedEvent,
+  BookingFailedEvent,
+  BookingCompletedEvent,
+  BookingEventPublisherService,
+  TransactionEventContext,
+} from '@/domain-events';
 import { BookingLifecycleService } from './booking-lifecycle.service';
 import { BookingPipelineOutcome } from './booking-lifecycle.types';
 import { FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
@@ -13,6 +21,7 @@ import { FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
 describe('BookingLifecycleService', () => {
   let service: BookingLifecycleService;
   let mockPrisma: any;
+  let mockPublisher: jest.Mocked<BookingEventPublisherService>;
   let mockProjectionService: any;
 
   beforeEach(() => {
@@ -32,16 +41,24 @@ describe('BookingLifecycleService', () => {
       $transaction: jest.fn(async (cb) => cb(mockPrisma)),
     };
 
+    // Type assertion is required because BookingEventPublisherService contains private members
+    // (logger, emitter) preventing raw object literal structural assignment in test doubles.
+    mockPublisher = {
+      createContext: jest.fn((tx) => ({ tx, events: [] })),
+      publish: jest.fn().mockResolvedValue(undefined),
+      resolveEventName: jest.fn().mockReturnValue(null),
+    } as unknown as jest.Mocked<BookingEventPublisherService>;
+
     mockProjectionService = {
       createOrUpdateProjection: jest.fn().mockResolvedValue(null),
       updateProjectionStatus: jest.fn().mockResolvedValue(null),
     };
 
-    service = new BookingLifecycleService(mockPrisma, mockProjectionService);
+    service = new BookingLifecycleService(mockPrisma, mockPublisher, mockProjectionService);
   });
 
   describe('createBooking', () => {
-    it('creates a processing booking when valid intent exists and user owns it', async () => {
+    it('creates version 1 booking and emits BookingCreatedEvent standalone post-commit', async () => {
       mockPrisma.bookingIntent.findUnique.mockResolvedValue({
         id: 'intent-1',
         userId: 'user-1',
@@ -56,6 +73,7 @@ describe('BookingLifecycleService', () => {
         currency: 'GBP',
         status: BookingStatus.PROCESSING,
         paymentId: 'pay-1',
+        version: 1,
       });
 
       const result = await service.createBooking('user-1', 'booking-1', 'intent-1', 'pay-1');
@@ -64,6 +82,7 @@ describe('BookingLifecycleService', () => {
         expect.objectContaining({
           id: 'booking-1',
           status: BookingStatus.PROCESSING,
+          version: 1,
         }),
       );
       expect(mockPrisma.booking.create).toHaveBeenCalledWith({
@@ -75,8 +94,66 @@ describe('BookingLifecycleService', () => {
           currency: 'GBP',
           status: BookingStatus.PROCESSING,
           paymentId: 'pay-1',
+          version: 1,
         },
       });
+      expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
+      const emittedEvents = mockPublisher.publish.mock.calls[0][0];
+      expect(emittedEvents).toBeDefined();
+      if (!emittedEvents) {
+        throw new Error('Expected events to be published');
+      }
+      expect(emittedEvents).toHaveLength(1);
+      expect(emittedEvents[0]).toBeInstanceOf(BookingCreatedEvent);
+      expect(emittedEvents[0]).toEqual(
+        expect.objectContaining({
+          bookingId: 'booking-1',
+          sourceVersion: 1,
+          status: BookingStatus.PROCESSING,
+        }),
+      );
+    });
+
+    it('appends BookingCreatedEvent to context.events and does NOT call publisher.publish when context provided', async () => {
+      mockPrisma.bookingIntent.findUnique.mockResolvedValue({
+        id: 'intent-1',
+        userId: 'user-1',
+        confirmedPrice: '450.00',
+        currency: 'GBP',
+      });
+      mockPrisma.booking.create.mockResolvedValue({
+        id: 'booking-1',
+        userId: 'user-1',
+        bookingIntentId: 'intent-1',
+        totalAmount: '450.00',
+        currency: 'GBP',
+        status: BookingStatus.PROCESSING,
+        version: 1,
+      });
+
+      const context: TransactionEventContext = {
+        tx: mockPrisma,
+        events: [],
+      };
+
+      const result = await service.createBooking(
+        'user-1',
+        'booking-1',
+        'intent-1',
+        undefined,
+        context,
+      );
+
+      expect(result.id).toBe('booking-1');
+      expect(context.events).toHaveLength(1);
+      expect(context.events[0]).toBeInstanceOf(BookingCreatedEvent);
+      expect(context.events[0]).toEqual(
+        expect.objectContaining({
+          bookingId: 'booking-1',
+          sourceVersion: 1,
+        }),
+      );
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundException if booking intent does not exist', async () => {
@@ -85,6 +162,7 @@ describe('BookingLifecycleService', () => {
       await expect(service.createBooking('user-1', 'booking-1', 'intent-1')).rejects.toThrow(
         NotFoundException,
       );
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
 
     it('throws ForbiddenException if booking intent belongs to another user', async () => {
@@ -98,9 +176,10 @@ describe('BookingLifecycleService', () => {
       await expect(service.createBooking('user-1', 'booking-1', 'intent-1')).rejects.toThrow(
         ForbiddenException,
       );
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
 
-    it('handles P2002 error and returns existing booking by intent for same user', async () => {
+    it('handles P2002 error, attaches paymentId to existing booking without version increment, and emits ZERO events', async () => {
       mockPrisma.bookingIntent.findUnique.mockResolvedValue({
         id: 'intent-1',
         userId: 'user-1',
@@ -117,12 +196,14 @@ describe('BookingLifecycleService', () => {
         userId: 'user-1',
         bookingIntentId: 'intent-1',
         paymentId: null,
+        version: 1,
       });
       mockPrisma.booking.update.mockResolvedValueOnce({
         id: 'booking-existing',
         userId: 'user-1',
         bookingIntentId: 'intent-1',
         paymentId: 'pay-new',
+        version: 1,
       });
 
       const result = await service.createBooking('user-1', 'booking-1', 'intent-1', 'pay-new');
@@ -132,9 +213,10 @@ describe('BookingLifecycleService', () => {
         where: { id: 'booking-existing' },
         data: { paymentId: 'pay-new' },
       });
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
 
-    it('handles P2002 error and returns existing booking without update if paymentId already present', async () => {
+    it('handles P2002 duplicate replay when paymentId already present, returns existing booking without increment, and emits ZERO events', async () => {
       mockPrisma.bookingIntent.findUnique.mockResolvedValue({
         id: 'intent-1',
         userId: 'user-1',
@@ -151,12 +233,26 @@ describe('BookingLifecycleService', () => {
         userId: 'user-1',
         bookingIntentId: 'intent-1',
         paymentId: 'pay-existing',
+        version: 1,
       });
 
-      const result = await service.createBooking('user-1', 'booking-1', 'intent-1', 'pay-new');
+      const context: TransactionEventContext = {
+        tx: mockPrisma,
+        events: [],
+      };
+
+      const result = await service.createBooking(
+        'user-1',
+        'booking-1',
+        'intent-1',
+        'pay-new',
+        context,
+      );
 
       expect(result.id).toBe('booking-existing');
       expect(mockPrisma.booking.update).not.toHaveBeenCalled();
+      expect(context.events).toHaveLength(0);
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
 
     it('throws ForbiddenException on P2002 if existing booking by intent belongs to another user', async () => {
@@ -180,9 +276,10 @@ describe('BookingLifecycleService', () => {
       await expect(
         service.createBooking('user-1', 'booking-1', 'intent-1', 'pay-1'),
       ).rejects.toThrow(ForbiddenException);
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
 
-    it('handles P2002 error when booking by ID exists for same user and intent', async () => {
+    it('handles P2002 error when booking by ID exists for same user and intent, attaching paymentId without increment and zero events', async () => {
       mockPrisma.bookingIntent.findUnique.mockResolvedValue({
         id: 'intent-1',
         userId: 'user-1',
@@ -194,20 +291,20 @@ describe('BookingLifecycleService', () => {
         clientVersion: '5.0.0',
       });
       mockPrisma.booking.create.mockRejectedValue(p2002);
-      // First findUnique by bookingIntentId returns null
       mockPrisma.booking.findUnique.mockResolvedValueOnce(null);
-      // Second findUnique by bookingId returns existing
       mockPrisma.booking.findUnique.mockResolvedValueOnce({
         id: 'booking-1',
         userId: 'user-1',
         bookingIntentId: 'intent-1',
         paymentId: null,
+        version: 1,
       });
       mockPrisma.booking.update.mockResolvedValueOnce({
         id: 'booking-1',
         userId: 'user-1',
         bookingIntentId: 'intent-1',
         paymentId: 'pay-1',
+        version: 1,
       });
 
       const result = await service.createBooking('user-1', 'booking-1', 'intent-1', 'pay-1');
@@ -217,6 +314,7 @@ describe('BookingLifecycleService', () => {
         where: { id: 'booking-1' },
         data: { paymentId: 'pay-1' },
       });
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
 
     it('throws ForbiddenException on P2002 when existing by ID belongs to another user', async () => {
@@ -241,6 +339,7 @@ describe('BookingLifecycleService', () => {
       await expect(
         service.createBooking('user-1', 'booking-1', 'intent-1', 'pay-1'),
       ).rejects.toThrow(ForbiddenException);
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
 
     it('throws BadRequestException on P2002 when existing by ID has different bookingIntentId', async () => {
@@ -265,9 +364,48 @@ describe('BookingLifecycleService', () => {
       await expect(
         service.createBooking('user-1', 'booking-1', 'intent-1', 'pay-1'),
       ).rejects.toThrow(BadRequestException);
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
 
-    it('rethrows generic errors', async () => {
+    it('throws BadRequestException on P2002 when concurrent inserts leave requested booking ID on different intent even if requested intent row exists', async () => {
+      mockPrisma.bookingIntent.findUnique.mockResolvedValue({
+        id: 'intent-1',
+        userId: 'user-1',
+        confirmedPrice: '450.00',
+        currency: 'GBP',
+      });
+      const p2002 = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '5.0.0',
+      });
+      mockPrisma.booking.create.mockRejectedValue(p2002);
+      mockPrisma.booking.findUnique.mockImplementation(
+        async ({ where }: { where: { id?: string; bookingIntentId?: string } }) => {
+          if (where.id === 'booking-1') {
+            return {
+              id: 'booking-1',
+              userId: 'user-1',
+              bookingIntentId: 'intent-other',
+            };
+          }
+          if (where.bookingIntentId === 'intent-1') {
+            return {
+              id: 'booking-concurrent-other',
+              userId: 'user-1',
+              bookingIntentId: 'intent-1',
+            };
+          }
+          return null;
+        },
+      );
+
+      await expect(
+        service.createBooking('user-1', 'booking-1', 'intent-1', 'pay-1'),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
+    });
+
+    it('rethrows generic errors and emits zero events', async () => {
       mockPrisma.bookingIntent.findUnique.mockResolvedValue({
         id: 'intent-1',
         userId: 'user-1',
@@ -279,10 +417,11 @@ describe('BookingLifecycleService', () => {
       await expect(service.createBooking('user-1', 'booking-1', 'intent-1')).rejects.toThrow(
         'DB connection failed',
       );
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
   });
 
-  describe('updateToConfirmed', () => {
+  describe('updateToConfirmed & confirmBooking', () => {
     const flightSnapshot: FlightSnapshot = {
       segments: [
         {
@@ -316,15 +455,17 @@ describe('BookingLifecycleService', () => {
       await expect(
         service.updateToConfirmed('b-1', 'PNR1', 'ord-1', invalidSnapshot, passengerSnapshot),
       ).rejects.toThrow(BadRequestException);
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
 
-    it('updates booking to CONFIRMED and updates projection', async () => {
+    it('updates booking to CONFIRMED, increments version by 1, and produces BookingConfirmedEvent standalone', async () => {
       mockPrisma.booking.updateMany.mockResolvedValue({ count: 1 });
       mockPrisma.booking.findUnique.mockResolvedValue({
         id: 'b-1',
         status: BookingStatus.CONFIRMED,
         pnrReference: 'PNR1',
         duffelOrderId: 'ord-1',
+        version: 2,
       });
 
       const result = await service.updateToConfirmed(
@@ -336,6 +477,7 @@ describe('BookingLifecycleService', () => {
       );
 
       expect(result.status).toBe(BookingStatus.CONFIRMED);
+      expect(result.version).toBe(2);
       expect(mockPrisma.booking.updateMany).toHaveBeenCalledWith({
         where: { id: 'b-1', status: { in: [BookingStatus.PROCESSING, BookingStatus.FAILED] } },
         data: {
@@ -346,19 +488,85 @@ describe('BookingLifecycleService', () => {
           flightSnapshot: flightSnapshot as any,
           passengerSnapshot: passengerSnapshot as any,
           departureAt: new Date('2026-09-01T10:00:00.000Z'),
+          version: { increment: 1 },
         },
       });
       expect(mockProjectionService.createOrUpdateProjection).toHaveBeenCalledWith(
         'b-1',
         mockPrisma,
       );
+      expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
+      const emitted = mockPublisher.publish.mock.calls[0][0];
+      expect(emitted).toBeDefined();
+      if (!emitted) {
+        throw new Error('Expected events to be published');
+      }
+      expect(emitted[0]).toBeInstanceOf(BookingConfirmedEvent);
+      expect(emitted[0]).toEqual(
+        expect.objectContaining({
+          bookingId: 'b-1',
+          sourceVersion: 2,
+          status: BookingStatus.CONFIRMED,
+        }),
+      );
     });
 
-    it('supports custom transaction client', async () => {
+    it('confirmBooking alias delegates to updateToConfirmed and behaves identically', async () => {
+      mockPrisma.booking.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.booking.findUnique.mockResolvedValue({
+        id: 'b-1',
+        status: BookingStatus.CONFIRMED,
+        pnrReference: 'PNR1',
+        duffelOrderId: 'ord-1',
+        version: 2,
+      });
+
+      const result = await service.confirmBooking(
+        'b-1',
+        'PNR1',
+        'ord-1',
+        flightSnapshot,
+        passengerSnapshot,
+      );
+
+      expect(result.status).toBe(BookingStatus.CONFIRMED);
+      expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
+    });
+
+    it('appends event to context.events and does NOT call publisher.publish when context provided', async () => {
+      mockPrisma.booking.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.booking.findUnique.mockResolvedValue({
+        id: 'b-1',
+        status: BookingStatus.CONFIRMED,
+        version: 2,
+      });
+
+      const context: TransactionEventContext = {
+        tx: mockPrisma,
+        events: [],
+      };
+
+      const result = await service.updateToConfirmed(
+        'b-1',
+        'PNR1',
+        'ord-1',
+        flightSnapshot,
+        passengerSnapshot,
+        undefined,
+        context,
+      );
+
+      expect(result.id).toBe('b-1');
+      expect(context.events).toHaveLength(1);
+      expect(context.events[0]).toBeInstanceOf(BookingConfirmedEvent);
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
+    });
+
+    it('supports custom transaction client without context and does not call publisher.publish', async () => {
       const customTx: any = {
         booking: {
           updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-          findUnique: jest.fn().mockResolvedValue({ id: 'b-1', status: BookingStatus.CONFIRMED }),
+          findUnique: jest.fn().mockResolvedValue({ id: 'b-1', status: BookingStatus.CONFIRMED, version: 2 }),
         },
       };
 
@@ -373,6 +581,35 @@ describe('BookingLifecycleService', () => {
 
       expect(customTx.booking.updateMany).toHaveBeenCalled();
       expect(mockProjectionService.createOrUpdateProjection).toHaveBeenCalledWith('b-1', customTx);
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
+    });
+
+    it('does not construct or emit event on rejected/no-op update (0 rows updated)', async () => {
+      mockPrisma.booking.updateMany.mockResolvedValue({ count: 0 });
+      mockPrisma.booking.findUnique.mockResolvedValue({
+        id: 'b-1',
+        status: BookingStatus.CONFIRMED,
+        version: 2,
+      });
+
+      const context: TransactionEventContext = {
+        tx: mockPrisma,
+        events: [],
+      };
+
+      const result = await service.updateToConfirmed(
+        'b-1',
+        'PNR1',
+        'ord-1',
+        flightSnapshot,
+        passengerSnapshot,
+        undefined,
+        context,
+      );
+
+      expect(result.id).toBe('b-1');
+      expect(context.events).toHaveLength(0);
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundException if booking not found after update', async () => {
@@ -382,26 +619,30 @@ describe('BookingLifecycleService', () => {
       await expect(
         service.updateToConfirmed('b-1', 'PNR1', 'ord-1', flightSnapshot, passengerSnapshot),
       ).rejects.toThrow(NotFoundException);
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
   });
 
-  describe('updateToFailed', () => {
-    it('updates booking to FAILED with failureReason and updates projection status', async () => {
+  describe('updateToFailed & failBooking', () => {
+    it('updates booking to FAILED with failureReason, increments version, and emits BookingFailedEvent', async () => {
       mockPrisma.booking.updateMany.mockResolvedValue({ count: 1 });
       mockPrisma.booking.findUnique.mockResolvedValue({
         id: 'b-1',
         status: BookingStatus.FAILED,
         failureReason: BookingFailureReason.CAPTURE_FAILED,
+        version: 2,
       });
 
       const result = await service.updateToFailed('b-1', BookingFailureReason.CAPTURE_FAILED);
 
       expect(result.status).toBe(BookingStatus.FAILED);
+      expect(result.version).toBe(2);
       expect(mockPrisma.booking.updateMany).toHaveBeenCalledWith({
         where: { id: 'b-1', status: BookingStatus.PROCESSING },
         data: {
           status: BookingStatus.FAILED,
           failureReason: BookingFailureReason.CAPTURE_FAILED,
+          version: { increment: 1 },
         },
       });
       expect(mockProjectionService.updateProjectionStatus).toHaveBeenCalledWith(
@@ -409,6 +650,80 @@ describe('BookingLifecycleService', () => {
         BookingStatus.FAILED,
         mockPrisma,
       );
+      expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
+      const emitted = mockPublisher.publish.mock.calls[0][0];
+      expect(emitted).toBeDefined();
+      if (!emitted) {
+        throw new Error('Expected events to be published');
+      }
+      expect(emitted[0]).toBeInstanceOf(BookingFailedEvent);
+      expect(emitted[0]).toEqual(
+        expect.objectContaining({
+          bookingId: 'b-1',
+          sourceVersion: 2,
+          status: BookingStatus.FAILED,
+          failureReason: BookingFailureReason.CAPTURE_FAILED,
+        }),
+      );
+    });
+
+    it('failBooking alias delegates to updateToFailed and behaves identically', async () => {
+      mockPrisma.booking.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.booking.findUnique.mockResolvedValue({
+        id: 'b-1',
+        status: BookingStatus.FAILED,
+        failureReason: BookingFailureReason.CAPTURE_FAILED,
+        version: 2,
+      });
+
+      const result = await service.failBooking('b-1', BookingFailureReason.CAPTURE_FAILED);
+
+      expect(result.status).toBe(BookingStatus.FAILED);
+      expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
+    });
+
+    it('appends event to context.events and does NOT call publisher.publish when context provided', async () => {
+      mockPrisma.booking.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.booking.findUnique.mockResolvedValue({
+        id: 'b-1',
+        status: BookingStatus.FAILED,
+        failureReason: BookingFailureReason.CAPTURE_FAILED,
+        version: 2,
+      });
+
+      const context: TransactionEventContext = {
+        tx: mockPrisma,
+        events: [],
+      };
+
+      const result = await service.updateToFailed(
+        'b-1',
+        BookingFailureReason.CAPTURE_FAILED,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        context,
+      );
+
+      expect(result.id).toBe('b-1');
+      expect(context.events).toHaveLength(1);
+      expect(context.events[0]).toBeInstanceOf(BookingFailedEvent);
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
+    });
+
+    it('emits ZERO events on rejected/no-op fail on already CONFIRMED or COMPLETED booking', async () => {
+      mockPrisma.booking.updateMany.mockResolvedValue({ count: 0 });
+      mockPrisma.booking.findUnique.mockResolvedValue({
+        id: 'b-1',
+        status: BookingStatus.CONFIRMED,
+        version: 2,
+      });
+
+      const result = await service.updateToFailed('b-1', BookingFailureReason.SYSTEM_ERROR);
+
+      expect(result.status).toBe(BookingStatus.CONFIRMED);
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundException if booking not found', async () => {
@@ -418,6 +733,7 @@ describe('BookingLifecycleService', () => {
       await expect(
         service.updateToFailed('b-1', BookingFailureReason.SYSTEM_ERROR),
       ).rejects.toThrow(NotFoundException);
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
   });
 
@@ -499,8 +815,8 @@ describe('BookingLifecycleService', () => {
     });
   });
 
-  describe('checkAndCompleteBooking', () => {
-    it('fetches booking with relations when given a string bookingId and completes it', async () => {
+  describe('checkAndCompleteBooking & completeBooking', () => {
+    it('fetches booking with relations when given a string bookingId, completes it with version increment and BookingCompletedEvent standalone', async () => {
       const pastDeparture = new Date(Date.now() - 3600 * 1000);
       const bookingData: any = {
         id: 'b-1',
@@ -509,6 +825,7 @@ describe('BookingLifecycleService', () => {
         currentFinalArrivalAt: null,
         disruptionStatus: null,
         activeDisruptionRevisionId: null,
+        version: 1,
       };
 
       mockPrisma.booking.findUnique
@@ -519,11 +836,91 @@ describe('BookingLifecycleService', () => {
       const result = await service.checkAndCompleteBooking('b-1');
 
       expect(result.status).toBe(BookingStatus.COMPLETED);
+      expect(result.version).toBe(2);
+      expect(mockPrisma.booking.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'b-1',
+          status: BookingStatus.CONFIRMED,
+          currentFinalArrivalAt: null,
+          departureAt: pastDeparture,
+        },
+        data: {
+          status: BookingStatus.COMPLETED,
+          version: { increment: 1 },
+        },
+      });
       expect(mockProjectionService.updateProjectionStatus).toHaveBeenCalledWith(
         'b-1',
         BookingStatus.COMPLETED,
         mockPrisma,
       );
+      expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
+      const emitted = mockPublisher.publish.mock.calls[0][0];
+      expect(emitted).toBeDefined();
+      if (!emitted) {
+        throw new Error('Expected events to be published');
+      }
+      expect(emitted[0]).toBeInstanceOf(BookingCompletedEvent);
+      expect(emitted[0]).toEqual(
+        expect.objectContaining({
+          bookingId: 'b-1',
+          sourceVersion: 2,
+          status: BookingStatus.COMPLETED,
+        }),
+      );
+    });
+
+    it('completeBooking alias delegates to checkAndCompleteBooking and behaves identically', async () => {
+      const pastDeparture = new Date(Date.now() - 3600 * 1000);
+      const bookingData: any = {
+        id: 'b-1',
+        status: BookingStatus.CONFIRMED,
+        departureAt: pastDeparture,
+        currentFinalArrivalAt: null,
+        disruptionStatus: null,
+        activeDisruptionRevisionId: null,
+        version: 1,
+      };
+
+      mockPrisma.booking.findUnique
+        .mockResolvedValueOnce(bookingData)
+        .mockResolvedValueOnce(bookingData);
+      mockPrisma.booking.updateMany.mockResolvedValue({ count: 1 });
+
+      const result = await service.completeBooking('b-1');
+
+      expect(result.status).toBe(BookingStatus.COMPLETED);
+      expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
+    });
+
+    it('appends BookingCompletedEvent to context.events and does NOT call publisher.publish when context provided', async () => {
+      const pastDeparture = new Date(Date.now() - 3600 * 1000);
+      const bookingData: any = {
+        id: 'b-1',
+        status: BookingStatus.CONFIRMED,
+        departureAt: pastDeparture,
+        currentFinalArrivalAt: null,
+        disruptionStatus: null,
+        activeDisruptionRevisionId: null,
+        version: 1,
+      };
+
+      mockPrisma.booking.findUnique
+        .mockResolvedValueOnce(bookingData)
+        .mockResolvedValueOnce(bookingData);
+      mockPrisma.booking.updateMany.mockResolvedValue({ count: 1 });
+
+      const context: TransactionEventContext = {
+        tx: mockPrisma,
+        events: [],
+      };
+
+      const result = await service.checkAndCompleteBooking('b-1', context);
+
+      expect(result.status).toBe(BookingStatus.COMPLETED);
+      expect(context.events).toHaveLength(1);
+      expect(context.events[0]).toBeInstanceOf(BookingCompletedEvent);
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundException when string bookingId is not found', async () => {
@@ -532,9 +929,10 @@ describe('BookingLifecycleService', () => {
       await expect(service.checkAndCompleteBooking('non-existent')).rejects.toThrow(
         NotFoundException,
       );
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
 
-    it('does not complete booking if status is not CONFIRMED', async () => {
+    it('does not complete booking or emit events if status is not CONFIRMED', async () => {
       const booking: any = {
         id: 'b-1',
         status: BookingStatus.PROCESSING,
@@ -545,9 +943,10 @@ describe('BookingLifecycleService', () => {
 
       expect(result.status).toBe(BookingStatus.PROCESSING);
       expect(mockPrisma.booking.updateMany).not.toHaveBeenCalled();
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
 
-    it('does not complete booking if departure time is in the future', async () => {
+    it('does not complete booking or emit events if departure time is in the future', async () => {
       const booking: any = {
         id: 'b-1',
         status: BookingStatus.CONFIRMED,
@@ -558,6 +957,7 @@ describe('BookingLifecycleService', () => {
 
       expect(result.status).toBe(BookingStatus.CONFIRMED);
       expect(mockPrisma.booking.updateMany).not.toHaveBeenCalled();
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
 
     it('completes booking and resolves active disruption when present', async () => {
@@ -569,6 +969,7 @@ describe('BookingLifecycleService', () => {
         currentFinalArrivalAt: pastArrival,
         disruptionStatus: DisruptionStatus.DETECTED,
         activeDisruptionRevisionId: 'rev-1',
+        version: 1,
       };
 
       mockPrisma.booking.findUnique.mockResolvedValue(booking);
@@ -589,14 +990,22 @@ describe('BookingLifecycleService', () => {
           actorType: DisruptionActorType.SYSTEM,
         }),
       });
+      expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
+      const emitted = mockPublisher.publish.mock.calls[0][0];
+      expect(emitted).toBeDefined();
+      if (!emitted) {
+        throw new Error('Expected events to be published');
+      }
+      expect(emitted[0]).toBeInstanceOf(BookingCompletedEvent);
     });
 
-    it('handles race condition when booking status was changed concurrently in tx', async () => {
+    it('handles race condition when booking status was changed concurrently in tx and emits zero events', async () => {
       const pastDeparture = new Date(Date.now() - 3600 * 1000);
       const booking: any = {
         id: 'b-1',
         status: BookingStatus.CONFIRMED,
         departureAt: pastDeparture,
+        version: 1,
       };
 
       // db returns booking already changed to COMPLETED
@@ -604,12 +1013,14 @@ describe('BookingLifecycleService', () => {
         id: 'b-1',
         status: BookingStatus.COMPLETED,
         departureAt: pastDeparture,
+        version: 2,
       });
 
       const result = await service.checkAndCompleteBooking(booking);
 
       expect(mockPrisma.booking.updateMany).not.toHaveBeenCalled();
       expect(result.status).toBe(BookingStatus.CONFIRMED); // local untouched because tx did not update
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
   });
 });
