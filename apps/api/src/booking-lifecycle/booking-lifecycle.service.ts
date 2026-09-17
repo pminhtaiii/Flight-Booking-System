@@ -29,20 +29,26 @@ import {
 } from '@/domain-events';
 import { BookingPipelineOutcome, BookingWithRelations } from './booking-lifecycle.types';
 
+function isTransactionEventContext(
+  value: Prisma.TransactionClient | TransactionEventContext | undefined,
+): value is TransactionEventContext {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'tx' in value &&
+    'events' in value &&
+    Array.isArray(value.events)
+  );
+}
+
 function resolveTxAndContext(
   txOrContext?: Prisma.TransactionClient | TransactionEventContext,
   context?: TransactionEventContext,
 ): { tx?: Prisma.TransactionClient; context?: TransactionEventContext } {
-  if (
-    txOrContext &&
-    typeof txOrContext === 'object' &&
-    'events' in txOrContext &&
-    'tx' in txOrContext &&
-    Array.isArray((txOrContext as unknown as TransactionEventContext).events)
-  ) {
+  if (isTransactionEventContext(txOrContext)) {
     return {
-      tx: (txOrContext as unknown as TransactionEventContext).tx,
-      context: txOrContext as unknown as TransactionEventContext,
+      tx: txOrContext.tx,
+      context: txOrContext,
     };
   }
   if (context) {
@@ -52,7 +58,7 @@ function resolveTxAndContext(
     };
   }
   return {
-    tx: txOrContext as Prisma.TransactionClient | undefined,
+    tx: txOrContext,
     context: undefined,
   };
 }
@@ -60,15 +66,12 @@ function resolveTxAndContext(
 @Injectable()
 export class BookingLifecycleService {
   private readonly logger = new Logger(BookingLifecycleService.name);
-  private readonly publisher: BookingEventPublisherService;
 
   constructor(
     private readonly prisma: PrismaService,
-    @Optional() publisher?: BookingEventPublisherService,
+    private readonly publisher: BookingEventPublisherService,
     @Optional() private readonly bookingAgentProjectionService?: BookingAgentProjectionService,
-  ) {
-    this.publisher = publisher ?? new BookingEventPublisherService();
-  }
+  ) {}
 
   private async executeMutation<T>(
     resolvedContext: TransactionEventContext | undefined,
@@ -76,7 +79,7 @@ export class BookingLifecycleService {
     operation: (client: Prisma.TransactionClient, events: DomainEventBase[]) => Promise<T>,
   ): Promise<T> {
     if (resolvedContext) {
-      return operation(resolvedContext.tx, resolvedContext.events as DomainEventBase[]);
+      return operation(resolvedContext.tx, resolvedContext.events);
     }
 
     if (resolvedTx) {
@@ -115,7 +118,6 @@ export class BookingLifecycleService {
       throw new ForbiddenException('You do not own this booking intent');
     }
 
-    // Check existing before attempting create to prevent 25P02 aborted transaction in Postgres
     const existingByIntent = await client.booking.findUnique({
       where: { bookingIntentId },
     });
@@ -123,14 +125,22 @@ export class BookingLifecycleService {
       if (existingByIntent.userId !== userId) {
         throw new ForbiddenException('You do not own this booking');
       }
+      if (existingByIntent.id !== bookingId) {
+        const existingById = await client.booking.findUnique({
+          where: { id: bookingId },
+        });
+        if (existingById && existingById.bookingIntentId !== bookingIntentId) {
+          throw new BadRequestException(
+            'Booking ID is already associated with a different booking intent',
+          );
+        }
+      }
       if (!existingByIntent.paymentId && paymentId) {
-        // Bookkeeping Exclusion: Attaching paymentId must NOT increment version and emits ZERO events.
         return await client.booking.update({
           where: { id: existingByIntent.id },
           data: { paymentId },
         });
       }
-      // Idempotency Replay Invariant: existing booking returned, do NOT increment version, emit ZERO events.
       return existingByIntent;
     }
 
@@ -171,26 +181,41 @@ export class BookingLifecycleService {
       });
     } catch (e: unknown) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
-        // Fallback for concurrent race condition
-        const fallback = await this.prisma.booking.findFirst({
-          where: { OR: [{ bookingIntentId }, { id: bookingId }] },
+        const fallbackById = await this.prisma.booking.findUnique({
+          where: { id: bookingId },
         });
-        if (fallback) {
-          if (fallback.userId !== userId) {
+        if (fallbackById) {
+          if (fallbackById.userId !== userId) {
             throw new ForbiddenException('You do not own this booking');
           }
-          if (fallback.id === bookingId && fallback.bookingIntentId !== bookingIntentId) {
+          if (fallbackById.bookingIntentId !== bookingIntentId) {
             throw new BadRequestException(
               'Booking ID is already associated with a different booking intent',
             );
           }
-          if (!fallback.paymentId && paymentId) {
+          if (!fallbackById.paymentId && paymentId) {
             return await this.prisma.booking.update({
-              where: { id: fallback.id },
+              where: { id: fallbackById.id },
               data: { paymentId },
             });
           }
-          return fallback;
+          return fallbackById;
+        }
+
+        const fallbackByIntent = await this.prisma.booking.findUnique({
+          where: { bookingIntentId },
+        });
+        if (fallbackByIntent) {
+          if (fallbackByIntent.userId !== userId) {
+            throw new ForbiddenException('You do not own this booking');
+          }
+          if (!fallbackByIntent.paymentId && paymentId) {
+            return await this.prisma.booking.update({
+              where: { id: fallbackByIntent.id },
+              data: { paymentId },
+            });
+          }
+          return fallbackByIntent;
         }
       }
       throw e;
@@ -459,7 +484,7 @@ export class BookingLifecycleService {
     if (booking.status === BookingStatus.CONFIRMED && targetTime && targetTime <= now) {
       try {
         const localEvents: DomainEventBase[] = [];
-        const eventSink = context ? (context.events as DomainEventBase[]) : localEvents;
+        const eventSink: DomainEventBase[] = context ? context.events : localEvents;
 
         const executeUpdate = async (tx: Prisma.TransactionClient): Promise<boolean> => {
           // Re-fetch the booking inside transaction to make it safe and atomic

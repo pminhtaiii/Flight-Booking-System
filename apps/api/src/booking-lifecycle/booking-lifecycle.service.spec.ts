@@ -359,6 +359,44 @@ describe('BookingLifecycleService', () => {
       expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
 
+    it('throws BadRequestException on P2002 when concurrent inserts leave requested booking ID on different intent even if requested intent row exists', async () => {
+      mockPrisma.bookingIntent.findUnique.mockResolvedValue({
+        id: 'intent-1',
+        userId: 'user-1',
+        confirmedPrice: '450.00',
+        currency: 'GBP',
+      });
+      const p2002 = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '5.0.0',
+      });
+      mockPrisma.booking.create.mockRejectedValue(p2002);
+      mockPrisma.booking.findUnique.mockImplementation(
+        async ({ where }: { where: { id?: string; bookingIntentId?: string } }) => {
+          if (where.id === 'booking-1') {
+            return {
+              id: 'booking-1',
+              userId: 'user-1',
+              bookingIntentId: 'intent-other',
+            };
+          }
+          if (where.bookingIntentId === 'intent-1') {
+            return {
+              id: 'booking-concurrent-other',
+              userId: 'user-1',
+              bookingIntentId: 'intent-1',
+            };
+          }
+          return null;
+        },
+      );
+
+      await expect(
+        service.createBooking('user-1', 'booking-1', 'intent-1', 'pay-1'),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
+    });
+
     it('rethrows generic errors and emits zero events', async () => {
       mockPrisma.bookingIntent.findUnique.mockResolvedValue({
         id: 'intent-1',
