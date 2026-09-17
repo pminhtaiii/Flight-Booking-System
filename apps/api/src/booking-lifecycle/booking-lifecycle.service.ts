@@ -103,88 +103,114 @@ export class BookingLifecycleService {
     paymentId?: string,
     context?: TransactionEventContext,
   ): Promise<Booking> {
-    return this.executeMutation(context, undefined, async (client, events) => {
-      const intent = await client.bookingIntent.findUnique({
-        where: { id: bookingIntentId },
-      });
-      if (!intent) {
-        throw new NotFoundException('Booking intent not found');
-      }
-      if (intent.userId !== userId) {
-        throw new ForbiddenException('You do not own this booking intent');
-      }
+    const client = context ? context.tx : this.prisma;
 
-      try {
-        const created = await client.booking.create({
-          data: {
-            id: bookingId,
-            userId,
-            bookingIntentId,
-            totalAmount: intent.confirmedPrice.toString(),
-            currency: intent.currency,
-            status: BookingStatus.PROCESSING,
-            paymentId: paymentId || null,
-            version: 1,
-          },
-        });
-
-        events.push(
-          new BookingCreatedEvent({
-            bookingId: created.id,
-            eventId: randomUUID(),
-            sourceVersion: created.version ?? 1,
-            status: created.status,
-            timestamp: new Date(),
-          }),
-        );
-
-        return created;
-      } catch (e: unknown) {
-        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
-          const existingByIntent = await client.booking.findUnique({
-            where: { bookingIntentId },
-          });
-          if (existingByIntent) {
-            if (existingByIntent.userId !== userId) {
-              throw new ForbiddenException('You do not own this booking');
-            }
-            if (!existingByIntent.paymentId && paymentId) {
-              // Bookkeeping Exclusion: Attaching paymentId must NOT increment version and emits ZERO events.
-              return await client.booking.update({
-                where: { id: existingByIntent.id },
-                data: { paymentId },
-              });
-            }
-            // Idempotency Replay Invariant: existing booking returned, do NOT increment version, emit ZERO events.
-            return existingByIntent;
-          }
-
-          const existingById = await client.booking.findUnique({
-            where: { id: bookingId },
-          });
-          if (existingById) {
-            if (existingById.userId !== userId) {
-              throw new ForbiddenException('You do not own this booking');
-            }
-            if (existingById.bookingIntentId !== bookingIntentId) {
-              throw new BadRequestException(
-                'Booking ID is already associated with a different booking intent',
-              );
-            }
-            if (!existingById.paymentId && paymentId) {
-              // Bookkeeping Exclusion: Attaching paymentId must NOT increment version and emits ZERO events.
-              return await client.booking.update({
-                where: { id: existingById.id },
-                data: { paymentId },
-              });
-            }
-            // Idempotency Replay Invariant: emit ZERO events.
-            return existingById;
-          }
-        }
-        throw e;
-      }
+    const intent = await client.bookingIntent.findUnique({
+      where: { id: bookingIntentId },
     });
+    if (!intent) {
+      throw new NotFoundException('Booking intent not found');
+    }
+    if (intent.userId !== userId) {
+      throw new ForbiddenException('You do not own this booking intent');
+    }
+
+    // Check existing before attempting create to prevent 25P02 aborted transaction in Postgres
+    const existingByIntent = await client.booking.findUnique({
+      where: { bookingIntentId },
+    });
+    if (existingByIntent) {
+      if (existingByIntent.userId !== userId) {
+        throw new ForbiddenException('You do not own this booking');
+      }
+      if (!existingByIntent.paymentId && paymentId) {
+        // Bookkeeping Exclusion: Attaching paymentId must NOT increment version and emits ZERO events.
+        return await client.booking.update({
+          where: { id: existingByIntent.id },
+          data: { paymentId },
+        });
+      }
+      // Idempotency Replay Invariant: existing booking returned, do NOT increment version, emit ZERO events.
+      return existingByIntent;
+    }
+
+    const existingById = await client.booking.findUnique({
+      where: { id: bookingId },
+    });
+    if (existingById) {
+      if (existingById.userId !== userId) {
+        throw new ForbiddenException('You do not own this booking');
+      }
+      if (existingById.bookingIntentId !== bookingIntentId) {
+        throw new BadRequestException(
+          'Booking ID is already associated with a different booking intent',
+        );
+      }
+      if (!existingById.paymentId && paymentId) {
+        return await client.booking.update({
+          where: { id: existingById.id },
+          data: { paymentId },
+        });
+      }
+      return existingById;
+    }
+
+    let created: Booking;
+    try {
+      created = await client.booking.create({
+        data: {
+          id: bookingId,
+          userId,
+          bookingIntentId,
+          totalAmount: intent.confirmedPrice.toString(),
+          currency: intent.currency,
+          status: BookingStatus.PROCESSING,
+          paymentId: paymentId || null,
+          version: 1,
+        },
+      });
+    } catch (e: unknown) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        // Fallback for concurrent race condition
+        const fallback = await this.prisma.booking.findFirst({
+          where: { OR: [{ bookingIntentId }, { id: bookingId }] },
+        });
+        if (fallback) {
+          if (fallback.userId !== userId) {
+            throw new ForbiddenException('You do not own this booking');
+          }
+          if (fallback.id === bookingId && fallback.bookingIntentId !== bookingIntentId) {
+            throw new BadRequestException(
+              'Booking ID is already associated with a different booking intent',
+            );
+          }
+          if (!fallback.paymentId && paymentId) {
+            return await this.prisma.booking.update({
+              where: { id: fallback.id },
+              data: { paymentId },
+            });
+          }
+          return fallback;
+        }
+      }
+      throw e;
+    }
+
+    const createdEvent = new BookingCreatedEvent({
+      bookingId: created.id,
+      eventId: randomUUID(),
+      sourceVersion: created.version ?? 1,
+      status: created.status,
+      timestamp: new Date(),
+    });
+
+    if (context) {
+      context.events.push(createdEvent);
+    } else {
+      await this.publisher.publish([createdEvent]);
+    }
+
+    return created;
   }
 
   async updateToConfirmed(
