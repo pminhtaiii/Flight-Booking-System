@@ -67,9 +67,28 @@ Planning artifacts: [specification](../specs/024-event-driven-module-deepening/s
   - Verifies provider uniqueness: `PaymentMethodService` is registered strictly once in `PaymentMethodsModule` across all modules in `AppModule`, resolving identical singleton references across all consumer modules.
   - Enforces acyclic architecture: `PaymentModule` imports `PaymentFulfillmentModule`, while `PaymentFulfillmentModule` contains zero direct or transitive imports of `PaymentModule` in both static metadata and runtime NestContainer dependency graph.
   - Verifies direct SDK wrapper retention: `BookingRecoveryService` directly injects `StripeService` and `DuffelService` without routing through saga ports.
-  - Enforces strict phase separation: Phase 4 items (`EventEmitterModule`, `BookingProjectionModule`, `DomainEventsModule`) do not leak into US1 runtime composition.
+  - Enforces strict phase separation: Phase 4 Slice 3 items (`BookingProjectionModule`, `BookingProjectionListener`, `BookingProjectionRepository`, `BookingEventHydratorService`) do not leak prematurely.
 
-### Remaining Architecture (Phases 3–6)
+#### Implemented Architecture (Phase 4 Slice 2: US2 Event Publisher & Acyclic State Module)
+
+- **DomainEventsModule & BookingEventPublisherService (`apps/api/src/domain-events/`) (T018)**:
+  - Provides and exports `BookingEventPublisherService`, injected with `EventEmitter2`.
+  - Defines `TransactionEventContext` (`{ tx, events }`) and `createContext(tx)` factory for collecting domain events across transactions.
+  - Post-Commit Dispatch: Events are dispatched via `EventEmitter2.emitAsync` strictly after transaction commit. Discarding uncommitted contexts emits zero events.
+  - Dispatch Error Isolation: Listener rejections are logged via NestJS `Logger` and never re-thrown, protecting committed database transactions and caller HTTP response codes from downstream failures.
+- **BookingStateModule (`apps/api/src/booking-lifecycle/booking-state.module.ts`) (T019)**:
+  - Acyclic extraction: Imports `PrismaModule` and `DomainEventsModule`, provides and exports `BookingLifecycleService`.
+  - Decoupling: `BookingLifecycleModule` imports and re-exports `BookingStateModule`, while removing direct registration of `BookingLifecycleService` from its providers.
+  - Downstream modules (`CancellationModule`, `DisruptionModule`, `RefundSettlementModule`) can import `BookingStateModule` to access `BookingLifecycleService` without circular dependency on `BookingLifecycleModule`.
+- **Versioned Lifecycle Mutations (`apps/api/src/booking-lifecycle/booking-lifecycle.service.ts`) (T020)**:
+  - Injected with `BookingEventPublisherService`.
+  - Added optional `context?: TransactionEventContext` to `createBooking`, `updateToConfirmed`/`confirmBooking`, `updateToFailed`/`failBooking`, and `checkAndCompleteBooking`/`completeBooking`.
+  - Atomic Version Increment: Valid state transitions advance `Booking.version` atomically by 1 (`version: { increment: 1 }`).
+  - Event Emission: Emits `BookingCreatedEvent`, `BookingConfirmedEvent`, `BookingFailedEvent`, and `BookingCompletedEvent` stamped with the new committed version.
+  - Idempotency & Bookkeeping: Duplicate creation returns existing record with 0 events. Attaching `paymentId` updates record with 0 events and no version increment.
+  - Transaction Ownership: Standalone execution wraps mutation in `prisma.$transaction` and flushes events post-commit. Caller context appends to `context.events` for outer flush.
+
+### Remaining Architecture (Phases 4–6)
 
 - Extract payment confirmation into PaymentFulfillmentSaga, SDK-local adapters and IdempotencyModule; retain public HTTP behavior and financial transaction/recovery semantics.
 - Extract BookingProjectionModule with passive postcommit events, coherent versioned hydration, guarded persistence and bounded reconciliation (100 candidates, five repairs concurrently).
