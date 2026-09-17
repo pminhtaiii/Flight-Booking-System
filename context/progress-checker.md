@@ -1,5 +1,46 @@
 # Progress Tracker
 
+### Feature 024 — Event-Driven Module Deepening: Phase 3 Slice 3 (Task T012) Completed (2026-09-17)
+
+- **T012 [US1] Payment Confirmation Extraction & Test Suite Convergence**:
+  - Fully removed extracted payment confirmation orchestration from `apps/api/src/payment/payment.service.ts`.
+  - Migrated confirmation test suites to `PaymentFulfillmentSaga` ownership:
+    - `apps/api/src/payment/payment-ancillary-order-recovery.spec.ts` (13/13 tests pass)
+    - `apps/api/src/payment/payment-ancillary-final-fixes.spec.ts` (13/13 tests pass)
+    - `apps/api/src/payment/payment-ancillary-pipeline.spec.ts` (passed)
+    - Full payment suite: `apps/api/src/payment/` (20 suites, 137 tests pass)
+    - Full fulfillment suite: `apps/api/src/payment-fulfillment/` (2 suites, 88 tests pass)
+  - Resolved state machine transition and reference aliasing issues in `apps/api/src/payment-fulfillment/payment-fulfillment.saga.ts` and `apps/api/src/payment/payment-ancillary-order-recovery.spec.ts`:
+    - Captured `previousPaymentStatus` prior to database mutations and transactions in compensation and captured flows.
+    - Used shallow clone copies in test harness to isolate in-memory state mutations from saga internal references.
+    - Cleaned up unused imports/variables across test specs satisfying strict zero-warning lint gate.
+  - Addressed all Standards and Spec code review findings:
+    - Restored strictly typed `handleBackgroundError` signature in saga, eliminating synthetic fallback ownership and type assertion.
+    - Eliminated `as any` casting in order-recovery harness.
+    - Migrated all 13 confirmation tests (5 passenger validator tests, 4 completed replay tests, 1 post-capture sync test, 3 background error tests) from payment service spec to `payment-fulfillment.saga.spec.ts`.
+  - **Verification**:
+    - ESLint: `pnpm exec eslint "apps/api/**/*.ts" --max-warnings 0` passed (0 warnings, 0 errors).
+    - Typecheck: `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` passed (0 errors).
+    - All payment & fulfillment unit test suites passed under network guard.
+
+### Feature 024 — Event-Driven Module Deepening: Phase 3 Slice 2 (Task T011) Completed (2026-09-17)
+
+- **T011 [US1] PaymentFulfillmentModule Creation & PaymentController Delegation**:
+  - Created `PaymentFulfillmentModule` in `apps/api/src/payment-fulfillment/payment-fulfillment.module.ts`:
+    - Imports: `IdempotencyModule`, `StripeModule`, `DuffelModule`, `PaymentMethodsModule`, `BookingLifecycleModule`, `BookingIntentModule`, `PrismaModule`, `AuditModule`.
+    - Providers: `PaymentFulfillmentSaga`.
+    - Exports: `PaymentFulfillmentSaga`.
+    - Preserved critical architectural invariant: `PaymentFulfillmentModule` never imports `PaymentModule`.
+  - Updated `PaymentModule` in `apps/api/src/payment/payment.module.ts`:
+    - Imported `PaymentFulfillmentModule` and added to `imports` array.
+  - Updated `PaymentController` in `apps/api/src/payment/payment.controller.ts`:
+    - Injected `PaymentFulfillmentSaga` into constructor.
+    - Updated `confirmPayment` to delegate directly to `paymentFulfillmentSaga.confirmPayment(dto, idempotencyKey, req.user.id)` with HTTP 202 status on `PENDING` response.
+  - **Verification**:
+    - TypeScript compilation: `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` passed with 0 errors.
+    - Linter: `pnpm exec eslint` on modified files passed with 0 warnings/errors.
+    - Unit specs: 31/31 passed in `payment-fulfillment.saga.spec.ts`.
+
 ### Feature 024 — Event-Driven Module Deepening: Phase 3 Slice 2 (Tasks T009, T010) Completed (2026-09-16)
 
 - **T009 [US1] PaymentMethodsModule Extraction**:

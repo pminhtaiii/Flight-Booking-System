@@ -3,6 +3,7 @@ import {
   ConflictException,
   HttpException,
   HttpStatus,
+  InternalServerErrorException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { BookingFailureReason } from '@prisma/client';
@@ -630,6 +631,245 @@ describe('PaymentFulfillmentSaga', () => {
     });
   });
 
+  describe('BookingPassengerFinalValidatorService', () => {
+    it('valid passenger snapshot passes validation and allows fulfillmentGateway.createOrder() to proceed', async () => {
+      const ephemeralDto = [
+        {
+          id: 'p-1',
+          givenName: 'Ada',
+          familyName: 'Lovelace',
+          bornOn: '1990-01-01',
+          gender: 'female',
+          title: 'ms',
+          email: 'ada@example.com',
+          phoneNumber: '+15551234567',
+        },
+      ];
+      mockValidator.validateAndMapPassengers.mockReturnValue(ephemeralDto);
+
+      await saga.confirmPayment(dto, idempotencyKey, userId, {
+        traceId: 'trace-123',
+        correlationId: 'corr-123',
+      });
+
+      expect(mockValidator.validateAndMapPassengers).toHaveBeenCalledTimes(1);
+      expect(mockValidator.validateAndMapPassengers).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'intent-123' }),
+        { traceId: 'trace-123', correlationId: 'corr-123' },
+      );
+
+      expect(mockAudit.createLog).toHaveBeenCalledWith(
+        mockPrisma,
+        expect.objectContaining({
+          userId,
+          action: 'final_passenger_validation_succeeded',
+          resourceType: 'BookingIntent',
+          resourceId: 'intent-123',
+          metadata: expect.objectContaining({
+            paymentId,
+            passengerCount: 1,
+          }),
+          traceId: 'trace-123',
+          correlationId: 'corr-123',
+        }),
+      );
+
+      expect(mockFulfillmentGateway.createOrder).toHaveBeenCalledTimes(1);
+      expect(mockFulfillmentGateway.createOrder).toHaveBeenCalledWith(
+        expect.objectContaining({
+          offerId: 'off-123',
+          passengers: ephemeralDto,
+          metadata: { bookingIntentId: 'intent-123', paymentId },
+          idempotencyKey,
+        }),
+        expect.anything(),
+      );
+
+      expect(mockIdempotency.advanceSagaCheckpoint).toHaveBeenCalledWith(
+        expect.objectContaining({ key: idempotencyKey }),
+        'duffel_order_created',
+      );
+    });
+
+    it('invalid passenger snapshot (SNAPSHOT_INTEGRITY_FAILURE) prevents createOrder, voids Stripe hold, cancels payment, and logs safe audit', async () => {
+      mockValidator.validateAndMapPassengers.mockImplementation(() => {
+        throw new UnprocessableEntityException({
+          code: 'SNAPSHOT_INTEGRITY_FAILURE',
+          message: 'Passenger snapshot integrity failure',
+        });
+      });
+
+      await expect(
+        saga.confirmPayment(dto, idempotencyKey, userId, {
+          traceId: 'trace-fail',
+          correlationId: 'corr-fail',
+        }),
+      ).rejects.toThrow(HttpException);
+
+      expect(mockFulfillmentGateway.createOrder).not.toHaveBeenCalled();
+      expect(mockPaymentGateway.voidHold).toHaveBeenCalledWith('pi-123', expect.anything());
+
+      expect(mockPrisma.payment.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: paymentId },
+          data: { status: 'CANCELLED' },
+        }),
+      );
+      expect(mockPrisma.paymentEvent.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            paymentId,
+            eventType: 'payment_cancelled',
+            newStatus: 'CANCELLED',
+          }),
+        }),
+      );
+
+      expect(mockPrisma.bookingIntent.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'intent-123' },
+          data: { status: 'AWAITING_PAYMENT' },
+        }),
+      );
+
+      expect(mockBookingLifecycle.updateToFailed).toHaveBeenCalledWith(
+        bookingId,
+        BookingFailureReason.SYSTEM_ERROR,
+        undefined,
+        undefined,
+        undefined,
+        mockPrisma,
+      );
+
+      expect(mockAudit.createLog).toHaveBeenCalledWith(
+        mockPrisma,
+        expect.objectContaining({
+          userId,
+          action: 'final_passenger_validation_failed',
+          resourceType: 'BookingIntent',
+          resourceId: 'intent-123',
+          metadata: expect.objectContaining({
+            reasonCode: 'SNAPSHOT_INTEGRITY_FAILURE',
+            intentId: 'intent-123',
+            paymentId,
+            passengerCount: 1,
+          }),
+          traceId: 'trace-fail',
+          correlationId: 'corr-fail',
+        }),
+      );
+
+      expect(mockIdempotency.completeSagaKeyAtomic).toHaveBeenCalledWith(
+        expect.objectContaining({ key: idempotencyKey }),
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        expect.objectContaining({
+          success: false,
+          code: 'SNAPSHOT_INTEGRITY_FAILURE',
+          bookingStatus: 'AWAITING_PAYMENT',
+        }),
+      );
+    });
+
+    it('invalid passenger snapshot (DOCUMENT_EXPIRED) with exhausted attempts cancels booking intent', async () => {
+      mockPrisma.bookingIntent.findUnique.mockResolvedValueOnce({
+        ...baseBookingIntent,
+        paymentAttemptCount: 2,
+      });
+
+      mockValidator.validateAndMapPassengers.mockImplementation(() => {
+        throw new UnprocessableEntityException({
+          code: 'DOCUMENT_EXPIRED',
+          message: 'Travel document has expired',
+        });
+      });
+
+      await expect(
+        saga.confirmPayment(dto, idempotencyKey, userId),
+      ).rejects.toThrow(HttpException);
+
+      expect(mockFulfillmentGateway.createOrder).not.toHaveBeenCalled();
+      expect(mockPaymentGateway.voidHold).toHaveBeenCalledWith('pi-123', expect.anything());
+
+      expect(mockPrisma.bookingIntent.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'intent-123' },
+          data: { status: 'CANCELLED' },
+        }),
+      );
+
+      expect(mockAudit.createLog).toHaveBeenCalledWith(
+        mockPrisma,
+        expect.objectContaining({
+          action: 'final_passenger_validation_failed',
+          metadata: expect.objectContaining({
+            reasonCode: 'DOCUMENT_EXPIRED',
+          }),
+        }),
+      );
+
+      expect(mockIdempotency.completeSagaKeyAtomic).toHaveBeenCalledWith(
+        expect.objectContaining({ key: idempotencyKey }),
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        expect.objectContaining({
+          success: false,
+          code: 'DOCUMENT_EXPIRED',
+          bookingStatus: 'CANCELLED',
+        }),
+      );
+    });
+
+    it('offer expired failure (OFFER_EXPIRED 409) completes key with 409 status and voids Stripe hold', async () => {
+      mockValidator.validateAndMapPassengers.mockImplementation(() => {
+        throw new HttpException(
+          { code: 'OFFER_EXPIRED', message: 'Flight offer has expired' },
+          HttpStatus.CONFLICT,
+        );
+      });
+
+      await expect(
+        saga.confirmPayment(dto, idempotencyKey, userId),
+      ).rejects.toThrow(HttpException);
+
+      expect(mockFulfillmentGateway.createOrder).not.toHaveBeenCalled();
+      expect(mockPaymentGateway.voidHold).toHaveBeenCalledWith('pi-123', expect.anything());
+
+      expect(mockIdempotency.completeSagaKeyAtomic).toHaveBeenCalledWith(
+        expect.objectContaining({ key: idempotencyKey }),
+        HttpStatus.CONFLICT,
+        expect.objectContaining({
+          success: false,
+          code: 'OFFER_EXPIRED',
+        }),
+      );
+    });
+
+    it('fallback when bookingPassengerFinalValidator is not injected', async () => {
+      const fallbackSaga = new PaymentFulfillmentSaga(
+        mockPaymentGateway as unknown as PaymentGatewayPort,
+        mockFulfillmentGateway as unknown as FulfillmentGatewayPort,
+        mockIdempotency as unknown as PaymentIdempotencyService,
+        mockPaymentMethod as unknown as PaymentMethodService,
+        mockBookingLifecycle as unknown as BookingLifecycleService,
+        mockPrisma as unknown as PrismaService,
+        mockAudit as unknown as AuditService,
+      );
+      fallbackSaga.timeoutMs = 1000;
+
+      await fallbackSaga.confirmPayment(dto, idempotencyKey, userId);
+
+      expect(mockFulfillmentGateway.createOrder).toHaveBeenCalledWith(
+        expect.objectContaining({
+          offerId: 'off-123',
+          passengers: expect.arrayContaining([
+            expect.objectContaining({ givenName: 'Ada', familyName: 'Lovelace' }),
+          ]),
+          idempotencyKey,
+        }),
+        expect.anything(),
+      );
+    });
+  });
+
   describe('Compensation Matrix', () => {
     it('compensates via voidHold and marks booking FAILED when final passenger validation throws', async () => {
       mockValidator.validateAndMapPassengers.mockImplementationOnce(() => {
@@ -938,6 +1178,139 @@ describe('PaymentFulfillmentSaga', () => {
         expect.objectContaining({ status: 'SUCCEEDED' }),
       );
     });
+
+    it('syncs the payment method after a successful capture', async () => {
+      mockPrisma.payment.findUnique.mockResolvedValueOnce({
+        ...basePayment,
+        stripeCustomerId: 'cus-123',
+        stripePaymentIntentId: 'pi-123',
+        status: 'AUTHORIZED',
+      });
+      mockIdempotency.getResumePoint.mockResolvedValueOnce('captured');
+
+      await saga.confirmPayment(dto, idempotencyKey, userId);
+
+      expect(mockPaymentMethod.saveMethod).toHaveBeenCalledWith(
+        userId,
+        'cus-123',
+        'pi-123',
+      );
+    });
+  });
+
+  describe('confirmPayment recoveryPoint === completed', () => {
+    it('returns successResponse and completes key when payment.status is SUCCEEDED', async () => {
+      mockPrisma.payment.findUnique.mockResolvedValueOnce({
+        ...basePayment,
+        status: 'SUCCEEDED',
+      });
+      mockIdempotency.getResumePoint.mockResolvedValueOnce('completed');
+      mockPrisma.paymentEvent.findFirst.mockResolvedValueOnce({
+        metadata: {
+          id: 'duffel-order-abc',
+          booking_reference: 'PNR123',
+        },
+      });
+
+      const response = (await saga.confirmPayment(dto, idempotencyKey, userId)) as ConfirmPaymentResult;
+
+      expect(mockIdempotency.completeSagaKeyAtomic).toHaveBeenCalledWith(
+        expect.objectContaining({ key: idempotencyKey }),
+        HttpStatus.OK,
+        expect.objectContaining({
+          success: true,
+          paymentId,
+          status: 'SUCCEEDED',
+          bookingReference: 'PNR123',
+          duffelOrderId: 'duffel-order-abc',
+        }),
+      );
+
+      expect(response).toEqual({
+        success: true,
+        paymentId,
+        status: 'SUCCEEDED',
+        bookingReference: 'PNR123',
+        duffelOrderId: 'duffel-order-abc',
+      });
+    });
+
+    it('throws InternalServerErrorException if payment is SUCCEEDED but duffel event metadata is missing', async () => {
+      mockPrisma.payment.findUnique.mockResolvedValueOnce({
+        ...basePayment,
+        status: 'SUCCEEDED',
+      });
+      mockIdempotency.getResumePoint.mockResolvedValueOnce('completed');
+      mockPrisma.paymentEvent.findFirst.mockResolvedValueOnce(null);
+
+      await expect(
+        saga.confirmPayment(dto, idempotencyKey, userId),
+      ).rejects.toThrow(InternalServerErrorException);
+    });
+
+    it('returns failureResponse and completes key with BAD_GATEWAY if status is CANCELLED and duffel event exists', async () => {
+      mockPrisma.payment.findUnique.mockResolvedValueOnce({
+        ...basePayment,
+        status: 'CANCELLED',
+      });
+      mockIdempotency.getResumePoint.mockResolvedValueOnce('completed');
+      mockPrisma.paymentEvent.findFirst.mockResolvedValueOnce({
+        metadata: { id: 'duffel-order-abc' },
+      });
+      mockPrisma.bookingIntent.findUnique.mockResolvedValueOnce({
+        ...baseBookingIntent,
+        status: 'CANCELLED',
+      });
+
+      const response = (await saga.confirmPayment(dto, idempotencyKey, userId)) as ConfirmPaymentResult;
+
+      expect(mockIdempotency.completeSagaKeyAtomic).toHaveBeenCalledWith(
+        expect.objectContaining({ key: idempotencyKey }),
+        HttpStatus.BAD_GATEWAY,
+        expect.objectContaining({
+          success: false,
+          error: 'Stripe capture failed or background processing failed. Duffel order cancelled and hold released.',
+          bookingStatus: 'CANCELLED',
+        }),
+      );
+
+      expect(response).toEqual({
+        success: false,
+        error: 'Stripe capture failed or background processing failed. Duffel order cancelled and hold released.',
+        bookingStatus: 'CANCELLED',
+      });
+    });
+
+    it('returns failureResponse and completes key with BAD_GATEWAY if status is CANCELLED and duffel event does not exist', async () => {
+      mockPrisma.payment.findUnique.mockResolvedValueOnce({
+        ...basePayment,
+        status: 'CANCELLED',
+      });
+      mockIdempotency.getResumePoint.mockResolvedValueOnce('completed');
+      mockPrisma.paymentEvent.findFirst.mockResolvedValueOnce(null);
+      mockPrisma.bookingIntent.findUnique.mockResolvedValueOnce({
+        ...baseBookingIntent,
+        status: 'AWAITING_PAYMENT',
+      });
+
+      const response = (await saga.confirmPayment(dto, idempotencyKey, userId)) as ConfirmPaymentResult;
+
+      expect(mockIdempotency.completeSagaKeyAtomic).toHaveBeenCalledWith(
+        expect.objectContaining({ key: idempotencyKey }),
+        HttpStatus.BAD_GATEWAY,
+        expect.objectContaining({
+          success: false,
+          error: 'Duffel booking failed. Payment hold released.',
+          bookingStatus: 'AWAITING_PAYMENT',
+        }),
+      );
+
+      expect(response).toEqual({
+        success: false,
+        error: 'Duffel booking failed. Payment hold released.',
+        bookingStatus: 'AWAITING_PAYMENT',
+      });
+    });
   });
 
   describe('Checkpoint Resume Capabilities', () => {
@@ -998,7 +1371,7 @@ describe('PaymentFulfillmentSaga', () => {
       expect(mockPaymentGateway.voidHold).not.toHaveBeenCalled();
     });
 
-    it('advances checkpoint to captured and halts destructive actions if paymentIntent is already captured', async () => {
+    it('when Stripe retrieval returns status === succeeded, logs/updates recovery point to captured, returns early, and does NOT compensate', async () => {
       mockPrisma.payment.findUnique.mockResolvedValueOnce({
         ...basePayment,
         status: 'AUTHORIZED',
@@ -1007,15 +1380,23 @@ describe('PaymentFulfillmentSaga', () => {
         status: 'captured',
         intentId: 'pi-123',
       });
+      mockIdempotency.getResumePoint.mockResolvedValueOnce(null);
 
-      await saga.handleBackgroundError(paymentId, idempotencyKey, userId, ownership, new Error('error'));
+      await saga.handleBackgroundError(
+        paymentId,
+        idempotencyKey,
+        userId,
+        ownership,
+        new Error('Some background error'),
+      );
 
       expect(mockIdempotency.advanceSagaCheckpoint).toHaveBeenCalledWith(ownership, 'captured');
       expect(mockFulfillmentGateway.cancelOrder).not.toHaveBeenCalled();
       expect(mockPaymentGateway.voidHold).not.toHaveBeenCalled();
+      expect(mockPrisma.payment.updateMany).not.toHaveBeenCalled();
     });
 
-    it('compensates via cancelOrder and voidHold when paymentIntent is authorized', async () => {
+    it('when Stripe retrieval returns status !== succeeded, continues compensation', async () => {
       mockPrisma.payment.findUnique.mockResolvedValueOnce({
         ...basePayment,
         status: 'AUTHORIZED',
@@ -1024,9 +1405,24 @@ describe('PaymentFulfillmentSaga', () => {
         status: 'authorized',
         intentId: 'pi-123',
       });
+      mockIdempotency.getResumePoint.mockResolvedValueOnce(null);
+      mockPrisma.paymentEvent.findFirst.mockResolvedValueOnce({
+        metadata: { id: 'ord-123' },
+      });
+      mockPrisma.bookingIntent.findUnique.mockResolvedValueOnce({
+        ...baseBookingIntent,
+        paymentAttemptCount: 1,
+      });
 
-      await saga.handleBackgroundError(paymentId, idempotencyKey, userId, ownership, new Error('background crash'));
+      await saga.handleBackgroundError(
+        paymentId,
+        idempotencyKey,
+        userId,
+        ownership,
+        new Error('Some background error'),
+      );
 
+      expect(mockIdempotency.advanceSagaCheckpoint).not.toHaveBeenCalledWith(ownership, 'captured');
       expect(mockFulfillmentGateway.cancelOrder).toHaveBeenCalledWith(
         'ord-123',
         expect.objectContaining({ beforeInvoke: expect.any(Function) }),
@@ -1041,9 +1437,29 @@ describe('PaymentFulfillmentSaga', () => {
         HttpStatus.BAD_GATEWAY,
         expect.objectContaining({
           success: false,
-          error: expect.stringContaining('background crash'),
+          error: expect.stringContaining('Some background error'),
         }),
       );
+    });
+
+    it('when Stripe retrieval fails (throws), it logs the error and returns early (recoverable)', async () => {
+      mockPrisma.payment.findUnique.mockResolvedValueOnce({
+        ...basePayment,
+        status: 'AUTHORIZED',
+      });
+      mockPaymentGateway.authorizeHold.mockRejectedValueOnce(new Error('Stripe API error'));
+
+      await saga.handleBackgroundError(
+        paymentId,
+        idempotencyKey,
+        userId,
+        ownership,
+        new Error('Some background error'),
+      );
+
+      expect(mockFulfillmentGateway.cancelOrder).not.toHaveBeenCalled();
+      expect(mockPaymentGateway.voidHold).not.toHaveBeenCalled();
+      expect(mockPrisma.payment.updateMany).not.toHaveBeenCalled();
     });
 
     it('halts without action if assertOwned rejects during background recovery', async () => {

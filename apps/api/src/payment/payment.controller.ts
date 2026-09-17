@@ -19,6 +19,7 @@ import { Roles } from '@/auth/decorators/roles.decorator';
 import { PaymentService } from './payment.service';
 import { PaymentRefundService } from './payment-refund.service';
 import { PaymentMethodService } from './payment-method.service';
+import { PaymentFulfillmentSaga } from '@/payment-fulfillment/payment-fulfillment.saga';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { ConfirmPaymentDto } from './dto/confirm-payment.dto';
 import { PaymentResponseDto } from './dto/payment-response.dto';
@@ -40,6 +41,7 @@ export class PaymentController {
     private readonly paymentService: PaymentService,
     private readonly paymentRefundService: PaymentRefundService,
     private readonly paymentMethodService: PaymentMethodService,
+    private readonly paymentFulfillmentSaga: PaymentFulfillmentSaga,
   ) {}
 
   @Post('create')
@@ -71,7 +73,7 @@ export class PaymentController {
       throw new BadRequestException('Idempotency-Key header is required');
     }
 
-    const result = await this.paymentService.confirmPayment(dto, idempotencyKey, req.user.id);
+    const result = await this.paymentFulfillmentSaga.confirmPayment(dto, idempotencyKey, req.user.id);
     if (
       result &&
       typeof result === 'object' &&
