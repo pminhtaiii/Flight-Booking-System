@@ -275,14 +275,14 @@ PASS test/module-deepening.e2e-spec.ts (56.295 s)
   pnpm --filter @api/backend test:e2e -- payment-fulfillment.e2e-spec.ts
   ```
 - **Exit Code**: `0`
-- **Duration**: 45.903s (test suite), 50.183s (wall clock)
+- **Duration**: 48.363s (test suite), 52.115s (wall clock)
 - **Summary**:
   - Test Suites: **1 passed, 1 total**
-  - Tests: **25 passed, 25 total**
+  - Tests: **26 passed, 26 total**
   - Snapshots: **0 total**
 
 ```text
-PASS test/payment-fulfillment.e2e-spec.ts (45.903 s)
+PASS test/payment-fulfillment.e2e-spec.ts (48.363 s)
   Payment Fulfillment (E2E Characterization)
     Scenario 1: HTTP 200 Immediate Success
       √ successfully confirms payment, creates duffel order, captures payment intent and marks booking CONFIRMED
@@ -315,7 +315,8 @@ PASS test/payment-fulfillment.e2e-spec.ts (45.903 s)
       √ aborts gracefully in background execution after 25s handoff when ownership is taken over
     Scenario 10: Capture Throw Matrix
       √ proceeds to complete canonical booking when capture throws but subsequent status check reveals captured (succeeded)
-      √ cancels Duffel order, voids hold, and marks booking FAILED when capture throws and subsequent status check reveals authorized or voided
+      √ cancels Duffel order, voids hold, and marks booking FAILED when capture throws and subsequent status check reveals authorized (requires_capture)
+      √ cancels Duffel order, voids hold, and marks booking FAILED when capture throws and subsequent status check reveals voided (canceled)
       √ leaves state recoverable without canceling order or payment when capture throws and status check is unavailable
     Scenario 11: Failed Compensation & DB Failure Handling
       √ safely handles failed hold voiding during Duffel failure compensation without leaking internal stack traces

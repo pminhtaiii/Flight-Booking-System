@@ -1207,10 +1207,33 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
         status: 'succeeded',
       } as unknown as Stripe.PaymentIntent);
 
-      // Simulate failure inside post-capture confirmation transaction
-      jest
-        .spyOn(bookingLifecycleService, 'updateToConfirmed')
-        .mockRejectedValue(new Error('Simulated DB constraint/deadlock during confirmation'));
+      const origTransaction = prisma.$transaction.bind(prisma);
+      jest.spyOn(prisma, '$transaction').mockImplementation(async (cb: any, ...args: any[]) => {
+        if (typeof cb === 'function') {
+          return origTransaction(async (tx: any) => {
+            let isConfirmationTx = false;
+            const origCreateMany = tx.ledgerEntry?.createMany?.bind(tx.ledgerEntry);
+            if (origCreateMany) {
+              tx.ledgerEntry.createMany = async (...ledgerArgs: any[]) => {
+                isConfirmationTx = true;
+                return origCreateMany(...ledgerArgs);
+              };
+            }
+            await cb(tx);
+            if (isConfirmationTx) {
+              // At this point in tx:
+              // 1. tx.payment.updateMany (status: SUCCEEDED)
+              // 2. tx.paymentEvent.create (payment_captured)
+              // 3. tx.bookingIntent.update (status: CONFIRMED)
+              // 4. bookingLifecycleService.updateToConfirmed (real booking update to CONFIRMED with PNR)
+              // 5. tx.ledgerEntry.createMany (real creation of debit/credit ledger rows)
+              // Now throw to force full PostgreSQL transaction rollback:
+              throw new Error('Simulated DB constraint/deadlock during confirmation commit');
+            }
+          }, ...args);
+        }
+        return origTransaction(cb, ...args);
+      });
 
       const cancelHoldSpy = jest.spyOn(stripeService, 'cancelPaymentIntent');
       const cancelOrderSpy = jest.spyOn(duffelService, 'cancelOrder');
@@ -1228,6 +1251,14 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
 
       const dbBooking = await prisma.booking.findUnique({ where: { id: bookingId } });
       expect(dbBooking?.status).not.toBe(BookingStatus.CONFIRMED);
+
+      const dbBookingIntent = await prisma.bookingIntent.findUnique({ where: { id: intent.id } });
+      expect(dbBookingIntent?.status).not.toBe('CONFIRMED');
+
+      const paymentEvents = await prisma.paymentEvent.findMany({
+        where: { paymentId: payment.id, eventType: 'payment_captured' },
+      });
+      expect(paymentEvents.length).toBe(0);
 
       const ledgers = await prisma.ledgerEntry.findMany({ where: { paymentId: payment.id } });
       expect(ledgers.length).toBe(0);
@@ -1568,7 +1599,7 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
       expect(dbBooking?.status).toBe(BookingStatus.CONFIRMED);
     });
 
-    it('cancels Duffel order, voids hold, and marks booking FAILED when capture throws and subsequent status check reveals authorized or voided', async () => {
+    it('cancels Duffel order, voids hold, and marks booking FAILED when capture throws and subsequent status check reveals authorized (requires_capture)', async () => {
       const offer = await createFlightOffer();
       const intent = await createBookingIntent(testUser.id, offer.id);
       const payment = await createPaymentFixture(testUser.id, intent.id);
@@ -1607,6 +1638,61 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
         .post('/api/bookings/payment/confirm')
         .set('Authorization', `Bearer ${testToken}`)
         .set('Idempotency-Key', `idem-throw-auth-${crypto.randomUUID()}`)
+        .send({ paymentId: payment.id, bookingId })
+        .expect(502);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error).toContain('Duffel order cancelled and hold released');
+
+      expect(cancelOrderSpy).toHaveBeenCalledTimes(1);
+      expect(cancelHoldSpy).toHaveBeenCalledTimes(1);
+
+      const dbPayment = await prisma.payment.findUnique({ where: { id: payment.id } });
+      expect(dbPayment?.status).toBe(PaymentStatus.CANCELLED);
+
+      const dbBooking = await prisma.booking.findUnique({ where: { id: bookingId } });
+      expect(dbBooking?.status).toBe(BookingStatus.FAILED);
+    });
+
+    it('cancels Duffel order, voids hold, and marks booking FAILED when capture throws and subsequent status check reveals voided (canceled)', async () => {
+      const offer = await createFlightOffer();
+      const intent = await createBookingIntent(testUser.id, offer.id);
+      const payment = await createPaymentFixture(testUser.id, intent.id);
+      const bookingId = crypto.randomUUID();
+      const mockOrder = getMockDuffelOrder('ord_throw_void', 'REFTHROWVOID');
+
+      jest
+        .spyOn(stripeService, 'retrievePaymentIntent')
+        .mockResolvedValueOnce({
+          id: payment.stripePaymentIntentId,
+          status: 'requires_capture',
+        } as unknown as Stripe.PaymentIntent)
+        .mockResolvedValueOnce({
+          id: payment.stripePaymentIntentId,
+          status: 'canceled',
+        } as unknown as Stripe.PaymentIntent);
+
+      jest
+        .spyOn(duffelService, 'createOrder')
+        .mockResolvedValue(mockOrder as unknown as Record<string, unknown>);
+      jest
+        .spyOn(duffelService, 'retrieveCompleteOrder')
+        .mockResolvedValue(mockOrder as unknown as DuffelOrder);
+
+      jest
+        .spyOn(stripeService, 'capturePaymentIntent')
+        .mockRejectedValue(new Error('Card declined on capture'));
+
+      const cancelOrderSpy = jest.spyOn(duffelService, 'cancelOrder').mockResolvedValue({});
+      const cancelHoldSpy = jest.spyOn(stripeService, 'cancelPaymentIntent').mockResolvedValue({
+        id: payment.stripePaymentIntentId,
+        status: 'canceled',
+      } as unknown as Stripe.PaymentIntent);
+
+      const res = await request(app.getHttpServer())
+        .post('/api/bookings/payment/confirm')
+        .set('Authorization', `Bearer ${testToken}`)
+        .set('Idempotency-Key', `idem-throw-void-${crypto.randomUUID()}`)
         .send({ paymentId: payment.id, bookingId })
         .expect(502);
 

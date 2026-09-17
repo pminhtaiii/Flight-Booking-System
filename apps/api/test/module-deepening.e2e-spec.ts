@@ -332,18 +332,7 @@ describe('Nest Composition Architecture Gate (US1 - T014)', () => {
   });
 
   describe('5. Strict Phase Invariants (No Premature Phase 4 / US2 Leaks)', () => {
-    it('does not register EventEmitterModule or EventEmitter2 in AppModule for US1', () => {
-      let resolvedEventEmitter: unknown = null;
-      try {
-        resolvedEventEmitter = moduleFixture.get('EventEmitter2', { strict: false });
-      } catch {
-        resolvedEventEmitter = null;
-      }
-
-      expect(resolvedEventEmitter).toBeNull();
-    });
-
-    it('does not register BookingProjectionModule or BookingEventPublisherService in AppModule for US1', () => {
+    it('does not register EventEmitterModule or premature Phase 4 modules in AppModule for US1', () => {
       const container = (moduleFixture as unknown as { container: { getModules: () => Map<string, unknown> } })
         .container;
       const modulesMap = container.getModules();
@@ -356,9 +345,35 @@ describe('Nest Composition Architecture Gate (US1 - T014)', () => {
         }
       }
 
+      expect(registeredModuleNames).not.toContain('EventEmitterModule');
+      expect(registeredModuleNames).not.toContain('EventEmitterCoreModule');
       expect(registeredModuleNames).not.toContain('BookingProjectionModule');
       expect(registeredModuleNames).not.toContain('DomainEventsModule');
       expect(registeredModuleNames).not.toContain('BookingStateModule');
+    });
+
+    it('does not register EventEmitter2 or premature Phase 4 provider tokens in AppModule for US1', () => {
+      const container = (moduleFixture as unknown as { container: { getModules: () => Map<string, unknown> } })
+        .container;
+      const modulesMap = container.getModules();
+
+      const allProviderKeys: string[] = [];
+      for (const [, nestModule] of modulesMap) {
+        const providers = (nestModule as { providers?: Map<unknown, unknown> }).providers;
+        if (providers) {
+          for (const [key] of providers) {
+            if (typeof key === 'string') allProviderKeys.push(key);
+            else if (typeof key === 'function' && key.name) allProviderKeys.push(key.name);
+            else if (typeof key === 'symbol') allProviderKeys.push(key.toString());
+          }
+        }
+      }
+
+      expect(allProviderKeys).not.toContain('EventEmitter2');
+      expect(allProviderKeys).not.toContain('BookingEventPublisherService');
+      expect(allProviderKeys).not.toContain('BookingProjectionListener');
+      expect(allProviderKeys).not.toContain('BookingProjectionRepository');
+      expect(allProviderKeys).not.toContain('BookingEventHydratorService');
     });
   });
 });
