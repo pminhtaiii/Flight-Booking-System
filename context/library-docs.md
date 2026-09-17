@@ -621,6 +621,85 @@ export class FlightsService {
 
 ---
 
+## @nestjs/event-emitter
+
+### Service Setup & Root Module Registration
+
+```typescript
+// src/app.module.ts
+import { Module } from '@nestjs/common';
+import { EventEmitterModule } from '@nestjs/event-emitter';
+
+@Module({
+  imports: [
+    EventEmitterModule.forRoot({
+      wildcard: false,
+      delimiter: '.',
+      maxListeners: 20,
+    }),
+    // ...
+  ],
+})
+export class AppModule {}
+```
+
+### Usage Patterns
+
+```typescript
+// Domain Event Envelope
+export class BookingConfirmedEvent {
+  constructor(
+    public readonly bookingId: string,
+    public readonly pnr: string,
+    public readonly timestamp: string,
+  ) {}
+}
+
+// Emitting (Post-Commit Only)
+@Injectable()
+export class BookingService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
+
+  async confirmBooking(bookingId: string) {
+    // 1. Commit database transaction
+    await this.prisma.$transaction([...]);
+
+    // 2. Dispatch domain event post-commit
+    this.eventEmitter.emit('booking.confirmed', new BookingConfirmedEvent(bookingId, pnr, new Date().toISOString()));
+  }
+}
+
+// Listening (Isolated Async Handling)
+@Injectable()
+export class NotificationListener {
+  private readonly logger = new Logger(NotificationListener.name);
+
+  @OnEvent('booking.confirmed')
+  async handleBookingConfirmed(event: BookingConfirmedEvent) {
+    try {
+      // Async side effects (e.g. notifications, indexing)
+    } catch (error) {
+      // Must catch async exceptions; never fail committed commands or trigger compensations
+      this.logger.error(`[handleBookingConfirmed] Failed for ${event.bookingId}`, error);
+    }
+  }
+}
+```
+
+**Rules:**
+
+- **Version**: Compatible 2.x range (^2.1.1) for NestJS 10 (@nestjs/core: ^10.0.0) compatibility (must remain <3.0.0 as v3+ requires NestJS 11).
+- **Single-Root Registration**: Registered exclusively once in `AppModule` using `EventEmitterModule.forRoot({ wildcard: false, delimiter: '.', maxListeners: 20 })`. Never re-register in feature or submodules.
+- **In-Process Delivery**: Non-durable, in-process event delivery. Events do not survive process crashes or restarts.
+- **Post-Commit Dispatch Only**: Emit domain events only after database transactions have successfully committed. Never emit inside an uncommitted transaction.
+- **Isolated Listener Exceptions**: Listeners must catch their own async exceptions without failing committed commands or triggering compensations.
+- **Passive DTO Envelopes**: Event classes must be behavior-free passive DTO envelopes containing typed primitive/readonly attributes.
+
+---
+
 ## class-validator
 
 ### DTO Pattern
