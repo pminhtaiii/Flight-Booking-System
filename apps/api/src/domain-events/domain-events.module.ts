@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { PrismaModule } from '@/prisma/prisma.module';
 import { BookingEventPublisherService } from './booking-event-publisher.service';
 
 /**
@@ -9,6 +10,7 @@ import { BookingEventPublisherService } from './booking-event-publisher.service'
  * root EventEmitterModule is registered.
  */
 @Module({
+  imports: [PrismaModule],
   providers: [BookingEventPublisherService],
   exports: [BookingEventPublisherService],
 })
