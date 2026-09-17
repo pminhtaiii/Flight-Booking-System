@@ -20,10 +20,15 @@ export class BookingEventHydratorService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  hydrate(bookingId: string): Promise<CoherentBookingSnapshot | null> {
+  async hydrate(bookingId: string, minVersion?: number): Promise<CoherentBookingSnapshot | null> {
     const existing = this.inFlight.get(bookingId);
     if (existing) {
-      return existing;
+      const snapshot = await existing;
+      if (!minVersion || (snapshot && snapshot.version >= minVersion)) {
+        return snapshot;
+      }
+      // If snapshot has lower version than minVersion, pending query was started before commit.
+      // Fall through to query database freshly.
     }
 
     const promise = this.prisma.booking
@@ -42,7 +47,9 @@ export class BookingEventHydratorService {
         },
       })
       .finally(() => {
-        this.inFlight.delete(bookingId);
+        if (this.inFlight.get(bookingId) === promise) {
+          this.inFlight.delete(bookingId);
+        }
       });
 
     this.inFlight.set(bookingId, promise);

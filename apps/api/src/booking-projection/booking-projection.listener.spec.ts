@@ -124,7 +124,7 @@ describe('BookingProjectionListener', () => {
 
       await listener.handleBookingEvent(event);
 
-      expect(hydrator.hydrate).toHaveBeenCalledWith('bk_valid_001');
+      expect(hydrator.hydrate).toHaveBeenCalledWith('bk_valid_001', 2);
       expect(projectionService.extractProjectionData).toHaveBeenCalledWith(snapshot);
       expect(repository.upsertGuarded).toHaveBeenCalledWith({
         bookingId: 'bk_valid_001',
@@ -152,6 +152,7 @@ describe('BookingProjectionListener', () => {
 
       await listener.handleBookingEvent(event);
 
+      expect(hydrator.hydrate).toHaveBeenCalledWith('bk_valid_002', 3);
       expect(repository.upsertGuarded).toHaveBeenCalledWith({
         bookingId: 'bk_valid_002',
         status: 'CONFIRMED',
@@ -169,8 +170,14 @@ describe('BookingProjectionListener', () => {
       expect(Array.isArray(metadata)).toBe(true);
       expect(metadata.length).toBeGreaterThan(0);
 
-      const subscribedPatterns = metadata.map((m: any) => m.event);
+      const subscribedPatterns = metadata.flatMap((m: any) =>
+        Array.isArray(m.event) ? m.event : [m.event],
+      );
       expect(subscribedPatterns).toContain('booking.*');
+      expect(subscribedPatterns).toContain('booking.**');
+      expect(subscribedPatterns).toContain('booking.created');
+      expect(subscribedPatterns).toContain('booking.recovery.resolved');
+      expect(subscribedPatterns).toContain('booking.disruption.synced');
 
       // Assert no subscription to refund.settled or refund.*
       for (const pattern of subscribedPatterns) {
@@ -179,14 +186,17 @@ describe('BookingProjectionListener', () => {
       }
     });
 
-    it('dispatches only booking.* through EventEmitter2 and ignores refund.settled', async () => {
-      const emitter = new EventEmitter2({ wildcard: true });
+    it('dispatches only booking events including multi-segment through EventEmitter2 and ignores refund.settled', async () => {
+      const emitter = new EventEmitter2({ wildcard: false });
       const spy = jest.spyOn(listener, 'handleBookingEvent').mockResolvedValue(undefined);
 
       // Register listener methods with emitter based on decorator metadata
       const metadata = Reflect.getMetadata('EVENT_LISTENER_METADATA', BookingProjectionListener.prototype.handleBookingEvent);
       for (const item of metadata) {
-        emitter.on(item.event, (data) => listener.handleBookingEvent(data));
+        const events = Array.isArray(item.event) ? item.event : [item.event];
+        for (const evt of events) {
+          emitter.on(evt, (data) => listener.handleBookingEvent(data));
+        }
       }
 
       // Emitting refund.settled
@@ -211,6 +221,30 @@ describe('BookingProjectionListener', () => {
 
       expect(spy).toHaveBeenCalledTimes(1);
       expect(spy).toHaveBeenCalledWith(bookingEvent);
+
+      // Emitting multi-segment booking.recovery.resolved
+      const recoveryEvent = {
+        eventName: 'booking.recovery.resolved',
+        bookingId: 'bk_valid_001',
+        eventId: 'evt_rec_001',
+        sourceVersion: 2,
+      };
+      emitter.emit('booking.recovery.resolved', recoveryEvent as any);
+
+      expect(spy).toHaveBeenCalledTimes(2);
+      expect(spy).toHaveBeenLastCalledWith(recoveryEvent);
+
+      // Emitting multi-segment booking.disruption.synced
+      const disruptionEvent = {
+        eventName: 'booking.disruption.synced',
+        bookingId: 'bk_valid_001',
+        eventId: 'evt_disrupt_001',
+        sourceVersion: 3,
+      };
+      emitter.emit('booking.disruption.synced', disruptionEvent as any);
+
+      expect(spy).toHaveBeenCalledTimes(3);
+      expect(spy).toHaveBeenLastCalledWith(disruptionEvent);
     });
   });
 

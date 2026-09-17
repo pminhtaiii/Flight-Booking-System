@@ -5,6 +5,13 @@ import { BookingEventHydratorService } from '@/domain-events/booking-event-hydra
 import { BookingProjectionService } from './booking-projection.service';
 import { BookingProjectionRepository } from './booking-projection.repository';
 import { BookingProjectionMetrics } from './booking-projection.metrics';
+import { BOOKING_EVENTS } from '@/domain-events/booking.events';
+
+export const PROJECTION_BOOKING_EVENTS = [
+  ...Object.values(BOOKING_EVENTS),
+  'booking.*',
+  'booking.**',
+];
 
 @Injectable()
 export class BookingProjectionListener {
@@ -50,7 +57,7 @@ export class BookingProjectionListener {
     return 'booking.unknown';
   }
 
-  @OnEvent('booking.*')
+  @OnEvent(PROJECTION_BOOKING_EVENTS)
   async handleBookingEvent(event: DomainEventBase): Promise<void> {
     const startTime = Date.now();
     const eventName = this.resolveEventName(event);
@@ -66,7 +73,7 @@ export class BookingProjectionListener {
         return;
       }
 
-      const snapshot = await this.hydrator.hydrate(event.bookingId);
+      const snapshot = await this.hydrator.hydrate(event.bookingId, event.sourceVersion);
       if (!snapshot) {
         this.logger.warn({
           message: 'Booking snapshot could not be hydrated for event',

@@ -4,7 +4,7 @@ import {
   BookingEventHydratorService,
   CoherentBookingSnapshot,
 } from './booking-event-hydrator.service';
-import { DomainEventsModule } from './domain-events.module';
+import { BookingProjectionModule } from '@/booking-projection/booking-projection.module';
 
 describe('BookingEventHydratorService', () => {
   let service: BookingEventHydratorService;
@@ -200,6 +200,81 @@ describe('BookingEventHydratorService', () => {
       expect(resA).toBe(snapA);
       expect(resB).toBe(snapB);
     });
+
+    it('shares a single database query when concurrent calls have the same or satisfied minVersion', async () => {
+      let resolveQuery: (value: any) => void;
+      const delayedPromise = new Promise((resolve) => {
+        resolveQuery = resolve;
+      });
+
+      prisma.booking.findUnique.mockReturnValue(delayedPromise);
+
+      const snapshotV2 = {
+        ...createSampleSnapshot('book_concurrent_min'),
+        version: 2,
+      };
+
+      const promise1 = service.hydrate('book_concurrent_min');
+      const promise2 = service.hydrate('book_concurrent_min', 1);
+      const promise3 = service.hydrate('book_concurrent_min', 2);
+
+      resolveQuery!(snapshotV2);
+
+      const [res1, res2, res3] = await Promise.all([promise1, promise2, promise3]);
+
+      expect(prisma.booking.findUnique).toHaveBeenCalledTimes(1);
+      expect(res1).toBe(snapshotV2);
+      expect(res2).toBe(snapshotV2);
+      expect(res3).toBe(snapshotV2);
+    });
+
+    it('triggers a fresh query and receives version 2 when pending query returns version 1 and caller needs minVersion 2', async () => {
+      let resolveQuery1: (value: any) => void;
+      const delayedPromise1 = new Promise((resolve) => {
+        resolveQuery1 = resolve;
+      });
+
+      let resolveQuery2: (value: any) => void;
+      const delayedPromise2 = new Promise((resolve) => {
+        resolveQuery2 = resolve;
+      });
+
+      prisma.booking.findUnique
+        .mockReturnValueOnce(delayedPromise1)
+        .mockReturnValueOnce(delayedPromise2);
+
+      const snapshotV1 = {
+        ...createSampleSnapshot('book_min_ver_01'),
+        version: 1,
+      };
+      const snapshotV2 = {
+        ...createSampleSnapshot('book_min_ver_01'),
+        version: 2,
+      };
+
+      // Call 1 begins first query (in-flight)
+      const p1 = service.hydrate('book_min_ver_01', 1);
+
+      // Call 2 arrives while query 1 is in-flight, but requires minVersion 2
+      const p2 = service.hydrate('book_min_ver_01', 2);
+
+      // Release first query
+      resolveQuery1!(snapshotV1);
+
+      const res1 = await p1;
+      expect(res1).toBe(snapshotV1);
+
+      // Wait a microtask turn so p2 resumes and initiates second query
+      await Promise.resolve();
+
+      expect(prisma.booking.findUnique).toHaveBeenCalledTimes(2);
+
+      // Release second query
+      resolveQuery2!(snapshotV2);
+
+      const res2 = await p2;
+      expect(res2).toBe(snapshotV2);
+    });
   });
 
   describe('b) Subsequent calls trigger fresh database read after previous resolves', () => {
@@ -313,9 +388,9 @@ describe('BookingEventHydratorService', () => {
   });
 
   describe('e) Module integration and DI resolution', () => {
-    it('is registered, provided, and exported cleanly by DomainEventsModule', async () => {
+    it('is registered, provided, and exported cleanly by BookingProjectionModule', async () => {
       const module: TestingModule = await Test.createTestingModule({
-        imports: [DomainEventsModule],
+        imports: [BookingProjectionModule],
       })
         .overrideProvider(PrismaService)
         .useValue(prisma)

@@ -10,6 +10,7 @@ import { BookingProjectionMetrics } from './booking-projection.metrics';
 @Module({
   imports: [PrismaModule, DomainEventsModule],
   providers: [
+    BookingEventHydratorService,
     BookingProjectionService,
     BookingProjectionRepository,
     BookingProjectionListener,
