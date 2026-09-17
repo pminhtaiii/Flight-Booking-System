@@ -162,7 +162,9 @@ function buildHarness(options: HarnessOptions = {}) {
   const booking = {
     createBooking: jest.fn().mockResolvedValue({ id: 'booking-1', userId: 'user-1' }),
     updateToConfirmed: jest.fn().mockResolvedValue(undefined),
+    confirmBooking: jest.fn().mockResolvedValue(undefined),
     updateToFailed: jest.fn().mockResolvedValue(undefined),
+    failBooking: jest.fn().mockResolvedValue(undefined),
   };
   const audit = { createLog: jest.fn().mockResolvedValue(undefined) };
 

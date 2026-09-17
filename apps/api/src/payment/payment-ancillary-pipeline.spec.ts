@@ -105,7 +105,9 @@ describe('PaymentService - Ancillary Pipeline', () => {
     mockBookingLifecycleService = {
       createBooking: jest.fn().mockResolvedValue({ id: 'booking-123', userId: 'user-123' }),
       updateToConfirmed: jest.fn(),
+      confirmBooking: jest.fn(),
       updateToFailed: jest.fn(),
+      failBooking: jest.fn(),
     };
 
     mockAncillaryValidation = {

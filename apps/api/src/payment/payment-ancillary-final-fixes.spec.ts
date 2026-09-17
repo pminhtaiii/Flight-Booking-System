@@ -121,8 +121,10 @@ describe('PaymentService - Final Fixes Spec', () => {
     };
     bookingService = {
       updateToFailed: jest.fn(),
+      failBooking: jest.fn(),
       createBooking: jest.fn().mockResolvedValue({ id: 'booking-1', userId: 'user-1' }),
       updateToConfirmed: jest.fn().mockResolvedValue(undefined),
+      confirmBooking: jest.fn().mockResolvedValue(undefined),
     };
     validation = {
       validateForPayment: jest.fn(),
