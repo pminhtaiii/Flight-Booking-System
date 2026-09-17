@@ -199,3 +199,169 @@ Snapshots:   0 total
 - Standards Review: 0 blocking violations; explicit logging added on order retrieval fallback; parameter types and return values fully typed.
 - Spec Review: Status normalization includes `'invalid'` for `requires_payment_method` / unknown; void idempotency key (`${intentId}-stripe-void`) passed; positive integer validation on environment parameters verified.
 
+---
+
+## Phase 3 Slice 4 Verification: Task T014 (Nest Composition Architecture Gate)
+
+**Execution Date**: 2026-09-17  
+**Scope**: NestJS runtime composition tests verifying dependency injection tokens, provider uniqueness, acyclic module boundaries, direct SDK wrapper retention, and strict phase invariants in `apps/api/test/module-deepening.e2e-spec.ts`.
+
+### 1. Composition Gate E2E Test Results (CI Network Guard)
+
+- **Command**:
+  ```powershell
+  $env:NODE_OPTIONS = "--require=`"$($PWD.Path.Replace('\', '/'))/tests/ci/node-network-guard.cjs`""
+  pnpm --filter @api/backend test:e2e -- module-deepening.e2e-spec.ts
+  ```
+- **Exit Code**: `0`
+- **Duration**: 56.295s (test suite), 57.816s (wall clock)
+- **Summary**:
+  - Test Suites: **1 passed, 1 total**
+  - Tests: **15 passed, 15 total**
+  - Snapshots: **0 total**
+
+```text
+PASS test/module-deepening.e2e-spec.ts (56.295 s)
+  Nest Composition Architecture Gate (US1 - T014)
+    1. Gateway Port Resolution to Concrete Adapters
+      √ resolves PAYMENT_GATEWAY_PORT to StripePaymentAdapter in AppModule (9 ms)
+      √ resolves FULFILLMENT_GATEWAY_PORT to DuffelFulfillmentAdapter in AppModule (5 ms)
+      √ resolves both ports within PaymentFulfillmentModule scope (3 ms)
+      √ injects concrete adapters into PaymentFulfillmentSaga (1 ms)
+      √ compiles standalone PaymentFulfillmentModule with ConfigModule and resolves ports (174 ms)
+    2. Single Registration of PaymentMethodService
+      √ registers PaymentMethodService in exactly one module across all active modules in AppModule (5 ms)
+      √ declares PaymentMethodService in PaymentMethodsModule metadata, and NOT in PaymentModule or PaymentFulfillmentModule (2 ms)
+      √ resolves the identical singleton instance of PaymentMethodService across all consuming modules (2 ms)
+    3. Zero Circular Dependencies Between PaymentModule and PaymentFulfillmentModule
+      √ verifies static module metadata: PaymentModule imports PaymentFulfillmentModule, PaymentFulfillmentModule does NOT import PaymentModule (25 ms)
+      √ verifies zero direct or transitive import of PaymentModule from PaymentFulfillmentModule (1 ms)
+      √ verifies runtime NestContainer dependency graph has no reverse link or cycle (2 ms)
+    4. BookingRecoveryService Retains Direct SDK Wrappers
+      √ injects direct StripeService and DuffelService into BookingRecoveryService constructor metadata (1 ms)
+      √ holds direct SDK instances at runtime and does NOT expose saga ports or adapter instances (7 ms)
+    5. Strict Phase Invariants (No Premature Phase 4 / US2 Leaks)
+      √ does not register EventEmitterModule or EventEmitter2 in AppModule for US1 (1 ms)
+      √ does not register BookingProjectionModule or BookingEventPublisherService in AppModule for US1 (1 ms)
+```
+
+### 2. Static Type & Linter Verification
+
+- `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`: **Exit code 0** (0 errors)
+- `pnpm exec eslint "apps/api/test/module-deepening.e2e-spec.ts"`: **Exit code 0** (0 errors)
+
+### 3. Architecture Invariants Verified
+
+| Invariant | Test Verification | Status |
+|---|---|---|
+| **Port Resolution** | `PAYMENT_GATEWAY_PORT` and `FULFILLMENT_GATEWAY_PORT` resolve to `StripePaymentAdapter` and `DuffelFulfillmentAdapter` across `AppModule`, scoped `PaymentFulfillmentModule`, and standalone fixture. | **PASSED** |
+| **Provider Uniqueness** | `PaymentMethodService` registered exactly once across all active modules in `AppModule`, declared only in `PaymentMethodsModule`, resolving identical singleton instance across all consumers. | **PASSED** |
+| **Acyclic Architecture** | `PaymentModule` imports `PaymentFulfillmentModule`. `PaymentFulfillmentModule` does NOT import `PaymentModule` directly or transitively (zero cycles in runtime NestContainer graph). | **PASSED** |
+| **Direct Wrapper Retention** | `BookingRecoveryService` directly injects `StripeService` and `DuffelService` without routing through saga ports (`PAYMENT_GATEWAY_PORT`, `FULFILLMENT_GATEWAY_PORT`). | **PASSED** |
+| **Strict Phase Invariants** | Zero Phase 4 items (`EventEmitterModule`, `BookingProjectionModule`, `DomainEventsModule`) present in `AppModule`. | **PASSED** |
+
+---
+
+## Phase 3 Slice 5 Verification: Task T013 (Comprehensive PostgreSQL E2E Failure, Resumption & Compensation Suite)
+
+**Execution Date**: 2026-09-17  
+**Scope**: Full PostgreSQL E2E failure, resumption, compensation, and idempotency suite in `apps/api/test/payment-fulfillment.e2e-spec.ts` and `apps/api/test/payment-idempotency.e2e-spec.ts`.
+
+### 1. Payment Fulfillment E2E Suite Results
+
+- **Command**:
+  ```powershell
+  $env:NODE_OPTIONS = "--require=`"$($PWD.Path.Replace('\', '/'))/tests/ci/node-network-guard.cjs`""
+  pnpm --filter @api/backend test:e2e -- payment-fulfillment.e2e-spec.ts
+  ```
+- **Exit Code**: `0`
+- **Duration**: 48.363s (test suite), 52.115s (wall clock)
+- **Summary**:
+  - Test Suites: **1 passed, 1 total**
+  - Tests: **26 passed, 26 total**
+  - Snapshots: **0 total**
+
+```text
+PASS test/payment-fulfillment.e2e-spec.ts (48.363 s)
+  Payment Fulfillment (E2E Characterization)
+    Scenario 1: HTTP 200 Immediate Success
+      √ successfully confirms payment, creates duffel order, captures payment intent and marks booking CONFIRMED
+    Scenario 2: HTTP 202 Tier 2 Handoff
+      √ returns HTTP 202 with PENDING status and polling URL when execution exceeds 25s threshold
+    Scenario 3: Idempotency Replay Asymmetry
+      √ replays cached HTTP 200 response without duplicating Stripe or Duffel calls
+      √ replays a completed failure with HTTP 200 and preserved failure body
+      √ reconstructs legacy completed success row without cached responseBody with HTTP 200
+      √ reconstructs legacy completed failure row without cached responseBody with HTTP 200
+    Scenario 4: Validation Rejection
+      √ rejects with 400 when Idempotency-Key header is missing
+      √ rejects with 400 when request payload is invalid or missing paymentId
+    Scenario 5: Controlled Compensation
+      √ cancels Stripe hold, sets payment CANCELLED and booking FAILED on Duffel order failure
+    Scenario 6: Fenced Checkpoint Resumption
+      √ resumes from CHECKPOINT_AUTHORIZED (stripe_authorized): skips hold authorization and proceeds to Duffel order, Stripe capture, and confirmation
+      √ resumes from CHECKPOINT_ORDER_CREATED (duffel_order_created): skips hold auth and Duffel order, proceeds to capture and confirmation
+      √ resumes from CHECKPOINT_CAPTURED (captured): completes canonical confirmation without re-invoking capture or Duffel order
+    Scenario 7: Duplicate Remote Effects & Replay Invariants
+      √ returns 409 Conflict when payment confirmation is already in-flight under active lease without duplicate provider calls
+    Scenario 8: Atomic Completion & Transaction Rollback
+      √ verifies that Booking CONFIRMED, Payment SUCCEEDED, and balanced ledger entries commit atomically in one transaction
+      √ rolls back completely on DB failure during post-capture confirmation without canceling payment or order
+    Scenario 9: Stale Owner Takeover & CAS Eviction
+      √ aborts and prevents provider call when ownership is lost before hold authorization
+      √ aborts and prevents Duffel order creation when ownership is lost before createOrder
+      √ aborts and prevents Stripe capture when ownership is lost before capturePayment
+      √ aborts compensation and prevents voidHold when ownership is lost during compensation
+      √ aborts gracefully in background execution after 25s handoff when ownership is taken over
+    Scenario 10: Capture Throw Matrix
+      √ proceeds to complete canonical booking when capture throws but subsequent status check reveals captured (succeeded)
+      √ cancels Duffel order, voids hold, and marks booking FAILED when capture throws and subsequent status check reveals authorized (requires_capture)
+      √ cancels Duffel order, voids hold, and marks booking FAILED when capture throws and subsequent status check reveals voided (canceled)
+      √ leaves state recoverable without canceling order or payment when capture throws and status check is unavailable
+    Scenario 11: Failed Compensation & DB Failure Handling
+      √ safely handles failed hold voiding during Duffel failure compensation without leaking internal stack traces
+      √ preserves capture and does not cancel payment when post-capture DB confirmation fails
+```
+
+### 2. Payment Idempotency E2E Suite Results
+
+- **Command**:
+  ```powershell
+  $env:NODE_OPTIONS = "--require=`"$($PWD.Path.Replace('\', '/'))/tests/ci/node-network-guard.cjs`""
+  pnpm --filter @api/backend test:e2e -- payment-idempotency.e2e-spec.ts
+  ```
+- **Exit Code**: `0`
+- **Duration**: 36.839s (test suite), 38.315s (wall clock)
+- **Summary**:
+  - Test Suites: **1 passed, 1 total**
+  - Tests: **8 passed, 8 total**
+  - Snapshots: **0 total**
+
+```text
+PASS test/payment-idempotency.e2e-spec.ts (36.839 s)
+  Payment Idempotency (E2E)
+    POST /api/bookings/payment/create - Idempotency
+      √ replays cached response when same idempotency key is used (only 1 Payment in DB)
+      √ returns 422 when same key is used with different payload
+      √ returns 400 when Idempotency-Key header is missing
+    Recovery point resumption - POST /api/bookings/payment/confirm
+      √ resumes from stripe_authorized recovery point
+      √ replays completed result without calling Stripe or Duffel again
+    Acquisition Edge Cases and Stale Lock CAS Eviction
+      √ returns 409 Conflict when request is actively in progress within 5-minute lease
+      √ successfully acquires and takes over stale lock when existing lockedAt is older than 5 minutes
+      √ returns 409 Conflict when key is used across different customers (customerId mismatch)
+```
+
+### 3. Strict Invariants Verified
+
+| Invariant | Test Verification | Status |
+|---|---|---|
+| **Zero DB locks across provider calls** | No financial database transactions held during Stripe or Duffel invocations. | **PASSED** |
+| **Known capture never cancels** | Capture failures reconciled as captured or DB errors after capture never cancel Duffel order or void payment hold. | **PASSED** |
+| **Same-promise handoff** | 25s threshold returns 202 while same promise completes in background. | **PASSED** |
+| **CAS Eviction & Stale Owner Fencing** | Lease takeover before any provider call or during compensation causes immediate abort with zero subsequent effects. | **PASSED** |
+| **Atomic Completion & Rollback** | Payment SUCCEEDED, Booking CONFIRMED, and dual ledger entries commit together; post-capture DB errors rollback completely without orphan state. | **PASSED** |
+| **Capture Throw Matrix** | All 3 paths (`captured`, `authorized/voided`, `unavailable/unknown`) follow strict safety contracts. | **PASSED** |
+
+

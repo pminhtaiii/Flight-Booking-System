@@ -1,5 +1,49 @@
 # Progress Tracker
 
+### Feature 024 — Event-Driven Module Deepening: Phase 3 Slice 5 (Task T013) Completed (2026-09-17)
+
+- **T013 [US1] Comprehensive PostgreSQL E2E Failure, Resumption & Compensation Suite**:
+  - Implemented comprehensive real PostgreSQL/HTTP tests in `apps/api/test/payment-fulfillment.e2e-spec.ts` (25/25 tests passing, 0 failures, exit code 0) and extended `apps/api/test/payment-idempotency.e2e-spec.ts` (8/8 tests passing, 0 failures, exit code 0).
+  - Covered all required test scenarios and failure matrices:
+    1. **Fenced Checkpoint Resumption**:
+       - `stripe_authorized`: skips hold auth (`retrievePaymentIntent` called 0 times), proceeds to Duffel order, Stripe capture, and canonical booking confirmation.
+       - `duffel_order_created`: skips hold auth and Duffel order, proceeds to Stripe capture and canonical booking confirmation.
+       - `captured`: completes canonical booking confirmation with dual ledger entries without re-invoking Stripe capture or Duffel order.
+    2. **Duplicate Remote Effects & Replay Invariants**:
+       - Active in-flight payment request returns 409 Conflict with zero provider calls.
+       - Completed payment request replays identical cached response with HTTP 200 and zero duplicate provider calls.
+    3. **Atomic Completion & Transaction Rollback**:
+       - Verified Payment `SUCCEEDED`, Booking `CONFIRMED`, and balanced `CUSTOMER_RECEIVABLE` (DEBIT) / `PLATFORM_REVENUE` (CREDIT) ledger entries commit together in one transaction.
+       - Post-capture DB error rolls back transaction completely; capture is NEVER canceled and state remains recoverable.
+    4. **Stale Owner Takeover & CAS Eviction**:
+       - Lease takeover before hold authorization, before Duffel order, before payment capture, during compensation, and after 25s background handoff.
+       - Losing ownership immediately halts execution and prevents further provider calls or state mutation.
+    5. **Capture Throw Matrix**:
+       - Capture throws, status check reveals `captured`: proceeds to complete canonical booking.
+       - Capture throws, status check reveals `authorized` or `voided`: cancels Duffel order, voids hold, marks booking `FAILED`.
+       - Capture throws, status check unavailable / timed out: returns HTTP 502 with `bookingStatus: 'PROCESSING'`; does NOT cancel Duffel order or void hold, leaving state recoverable.
+    6. **Failed Compensation & DB Failure**:
+       - Duffel order fails, hold voiding fails: logs error, safely completes cancellation without leaking internal stack traces.
+       - DB failure after capture: capture is preserved, state remains recoverable at `captured` checkpoint.
+  - **Verification**:
+    - `pnpm --filter @api/backend test:e2e -- payment-fulfillment.e2e-spec.ts` passed (25/25 tests, exit code 0).
+    - `pnpm --filter @api/backend test:e2e -- payment-idempotency.e2e-spec.ts` passed (8/8 tests, exit code 0).
+
+### Feature 024 — Event-Driven Module Deepening: Phase 3 Slice 4 (Task T014) Completed (2026-09-17)
+
+- **T014 [US1] Nest Composition Architecture Gate**:
+  - Implemented comprehensive NestJS composition and dependency injection architecture gate in `apps/api/test/module-deepening.e2e-spec.ts`.
+  - Verified 5 core architecture invariants:
+    1. **Gateway Port Resolution**: `PAYMENT_GATEWAY_PORT` and `FULFILLMENT_GATEWAY_PORT` resolve to `StripePaymentAdapter` and `DuffelFulfillmentAdapter` across `AppModule`, scoped `PaymentFulfillmentModule`, and standalone fixtures.
+    2. **Single Provider Registration**: `PaymentMethodService` is registered strictly once in `PaymentMethodsModule` across all active modules in `AppModule`, with identical singleton resolution across all consumers.
+    3. **Zero Circular Dependencies**: `PaymentModule` imports `PaymentFulfillmentModule`, while `PaymentFulfillmentModule` contains zero direct or transitive imports of `PaymentModule` (verified via static metadata and runtime NestContainer graph).
+    4. **Direct Wrapper Retention**: `BookingRecoveryService` directly injects `StripeService` and `DuffelService` without routing through saga ports.
+    5. **Strict Phase Invariants**: Zero Phase 4 items (`EventEmitterModule`, `BookingProjectionModule`, `DomainEventsModule`) present in US1 runtime composition.
+  - **Verification**:
+    - E2E Test Suite: `pnpm --filter @api/backend test:e2e -- module-deepening.e2e-spec.ts` passed (15/15 tests, 56.3s, exit code 0).
+    - Typecheck: `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` passed (exit code 0).
+    - Linter: `pnpm exec eslint` passed (0 errors, exit code 0).
+
 ### Feature 024 — Event-Driven Module Deepening: Phase 3 Slice 3 (Task T012) Completed (2026-09-17)
 
 - **T012 [US1] Payment Confirmation Extraction & Test Suite Convergence**:

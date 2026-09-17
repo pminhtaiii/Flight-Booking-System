@@ -363,6 +363,27 @@ describe('Payment Idempotency (E2E)', () => {
         ],
       } as any);
 
+      jest.spyOn(duffelService, 'retrieveCompleteOrder').mockResolvedValue({
+        id: `order_${Date.now()}`,
+        booking_reference: 'ABC123',
+        slices: [
+          {
+            segments: [
+              {
+                origin: { iata_code: 'SGN' },
+                destination: { iata_code: 'HAN' },
+                departing_at: '2026-08-01T10:00:00Z',
+                arriving_at: '2026-08-01T12:00:00Z',
+                operating_carrier: { iata_code: 'VN' },
+                marketing_carrier: { iata_code: 'VN' },
+                operating_carrier_flight_number: '123',
+              },
+            ],
+          },
+        ],
+        passengers: [],
+      } as any);
+
       const res = await request(app.getHttpServer())
         .post('/api/bookings/payment/confirm')
         .set('Authorization', `Bearer ${testToken}`)
@@ -450,6 +471,112 @@ describe('Payment Idempotency (E2E)', () => {
       // Neither external service should have been called
       expect(stripeSpy).not.toHaveBeenCalled();
       expect(duffelSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Acquisition Edge Cases and Stale Lock CAS Eviction', () => {
+    it('returns 409 Conflict when request is actively in progress within 5-minute lease', async () => {
+      const offer = await createFlightOffer();
+      const intent = await createBookingIntent(testUser.id, offer.id);
+      const key = `idem-active-lock-${Date.now()}`;
+      const payload = { bookingIntentId: intent.id, saveCard: false };
+
+      await prisma.idempotencyKey.create({
+        data: {
+          key,
+          requestHash: computeHash(payload),
+          customerId: testUser.id,
+          requestPath: '/api/bookings/payment/create',
+          recoveryPoint: 'started',
+          lockedAt: new Date(Date.now() - 30 * 1000),
+          responseBody: Prisma.DbNull,
+          expiresAt: new Date(Date.now() + 86400000),
+        },
+      });
+
+      const res = await request(app.getHttpServer())
+        .post('/api/bookings/payment/create')
+        .set('Authorization', `Bearer ${testToken}`)
+        .set('Idempotency-Key', key)
+        .send(payload)
+        .expect(409);
+
+      expect(res.body.message).toContain('Request is already in progress');
+    });
+
+    it('successfully acquires and takes over stale lock when existing lockedAt is older than 5 minutes', async () => {
+      const offer = await createFlightOffer();
+      const intent = await createBookingIntent(testUser.id, offer.id);
+      const key = `idem-stale-takeover-${Date.now()}`;
+      const payload = { bookingIntentId: intent.id, saveCard: false };
+      const staleTimestamp = new Date(Date.now() - 6 * 60 * 1000);
+
+      await prisma.idempotencyKey.create({
+        data: {
+          key,
+          requestHash: computeHash(payload),
+          customerId: testUser.id,
+          requestPath: '/api/bookings/payment/create',
+          recoveryPoint: 'started',
+          lockedAt: staleTimestamp,
+          responseBody: Prisma.DbNull,
+          expiresAt: new Date(Date.now() + 86400000),
+        },
+      });
+
+      mockStripeCreate();
+
+      const res = await request(app.getHttpServer())
+        .post('/api/bookings/payment/create')
+        .set('Authorization', `Bearer ${testToken}`)
+        .set('Idempotency-Key', key)
+        .send(payload)
+        .expect(201);
+
+      expect(res.body.paymentId).toBeDefined();
+
+      const updatedKey = await prisma.idempotencyKey.findUnique({
+        where: { key },
+      });
+      expect(updatedKey?.responseCode).toBe(201);
+      expect(updatedKey?.responseBody).not.toBeNull();
+    });
+
+    it('returns 409 Conflict when key is used across different customers (customerId mismatch)', async () => {
+      const offer = await createFlightOffer();
+      const intent = await createBookingIntent(testUser.id, offer.id);
+      const key = `idem-scope-mismatch-${Date.now()}`;
+      const payload = { bookingIntentId: intent.id, saveCard: false };
+
+      const otherUser = await prisma.user.create({
+        data: {
+          email: `other-user-${Date.now()}@example.com`,
+          password: 'Password123!',
+          status: 'ACTIVE',
+        },
+      });
+
+      await prisma.idempotencyKey.create({
+        data: {
+          key,
+          requestHash: computeHash(payload),
+          customerId: otherUser.id,
+          requestPath: '/api/bookings/payment/create',
+          recoveryPoint: 'started',
+          lockedAt: null,
+          responseBody: Prisma.DbNull,
+          expiresAt: new Date(Date.now() + 86400000),
+        },
+      });
+
+      const res = await request(app.getHttpServer())
+        .post('/api/bookings/payment/create')
+        .set('Authorization', `Bearer ${testToken}`)
+        .set('Idempotency-Key', key)
+        .send(payload)
+        .expect(409);
+
+      expect(res.body.message).toContain('Idempotency key is not valid for this request');
     });
   });
 });
