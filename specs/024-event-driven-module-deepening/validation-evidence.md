@@ -437,5 +437,76 @@ PASS test/payment-idempotency.e2e-spec.ts (36.839 s)
 | **Legacy-writer compatibility** | Legacy updates (Prisma and raw SQL) omitting `version` leave `Booking.version` intact and unchanged at `1`. | **PASSED** |
 | **Typecheck & ESLint Gate** | Zero TypeScript compilation errors and zero ESLint warnings across backend. | **PASSED** |
 
+---
+
+## Phase 4 Slice 3 — Projection Consumer Subsystem (Tasks T021–T023)
+
+### Overview
+This section records verification evidence for the asynchronous projection consumer pipeline implemented in Slice 3:
+1. `BookingEventHydratorService` (`apps/api/src/domain-events/`): cycle-scoped promise deduplication cache.
+2. `BookingProjectionService` & `BookingProjectionRepository` (`apps/api/src/booking-projection/`): safe flight extraction with strict no-stale-fallback invariant and atomic guarded upsert.
+3. `BookingProjectionListener`, `BookingProjectionMetrics`, and `BookingProjectionModule` (`apps/api/src/booking-projection/`): `@OnEvent('booking.*')` subscription, complete error isolation, and bounded telemetry.
+
+---
+
+### Verification Commands & Execution Logs
+
+#### 1. ESLint Gate
+- **Command**:
+  ```powershell
+  pnpm exec eslint "apps/api/**/*.ts" --max-warnings 0
+  ```
+- **Exit Code**: `0`
+- **Output**: Clean pass, 0 errors, 0 warnings.
+
+#### 2. TypeScript Compiler Gate
+- **Command**:
+  ```powershell
+  pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit
+  ```
+- **Exit Code**: `0`
+- **Output**: Clean pass, 0 errors.
+
+#### 3. Hydrator & Projection Unit Test Suites
+- **Command**:
+  ```powershell
+  $env:NODE_OPTIONS = '--require="c:/Booking Systems/tests/ci/node-network-guard.cjs"'; pnpm --filter @api/backend test -- apps/api/src/domain-events/booking-event-hydrator.service.spec.ts apps/api/src/booking-projection/
+  ```
+- **Exit Code**: `0`
+- **Duration**: ~55s
+- **Suite Summary**:
+  - Test Suites: **5 passed, 5 total**
+  - Tests: **55 passed, 55 total**
+  - Snapshots: **0 total**
+- **Terminal Output**:
+  ```text
+  PASS src/booking-projection/booking-projection.metrics.spec.ts
+  PASS src/domain-events/booking-event-hydrator.service.spec.ts
+  PASS src/booking-projection/booking-projection.service.spec.ts
+  PASS src/booking-projection/booking-projection.listener.spec.ts
+  PASS src/booking-projection/booking-projection.repository.spec.ts
+
+  Test Suites: 5 passed, 5 total
+  Tests:       55 passed, 55 total
+  Snapshots:   0 total
+  Time:        55.244 s
+  ```
+
+---
+
+### Invariants Verified
+
+| Invariant | Test Verification | Status |
+|---|---|---|
+| **Booking Events Only** | Listener subscribes strictly to `@OnEvent('booking.*')`. Does NOT subscribe to `refund.settled`. | **PASSED** |
+| **Cycle-Scoped Deduplication** | Concurrent calls share single DB fetch; cache clears via `.finally()`. Subsequent cycles trigger fresh read. | **PASSED** |
+| **No Stale Fallback** | Malformed/empty authoritative revision throws `MalformedRevisionError`; never falls back to initial `flightSnapshot`. | **PASSED** |
+| **Monotonic Version Guard** | Repository conditionally upserts only when `source_version < EXCLUDED.source_version`. Out-of-order writes safely ignored. | **PASSED** |
+| **Stable Agent Reference** | Concurrent winner's `agentReference` is immutable across updates. | **PASSED** |
+| **Listener Error Isolation** | Hydrator, mapping, or database exceptions caught and logged with structured context without bubbling or crashing. | **PASSED** |
+| **Bounded Telemetry** | Metrics use safe labels without PII, booking IDs, or user IDs. | **PASSED** |
+| **Untouched Slice 4 Callers** | Producers (Saga, Recovery, Cancellation, Disruption, Settlement) remain untouched. | **PASSED** |
+
+
 
 

@@ -1,5 +1,48 @@
 # Progress Tracker
 
+### Feature 024 — Event-Driven Module Deepening: Phase 4 Slice 3 (Tasks T021, T022, T023) Completed (2026-09-17)
+
+- **T021 [US2] Cycle-Scoped Promise Hydrator**:
+  - Implemented `BookingEventHydratorService` in `apps/api/src/domain-events/booking-event-hydrator.service.ts`:
+    - Cycle-scoped in-flight deduplication cache (`Map<string, Promise<CoherentBookingSnapshot | null>>`) keyed by `bookingId`.
+    - Concurrent callers in the same tick / cycle share single database query promise to `prisma.booking.findUnique`.
+    - Automatically cleans up via `.finally()` upon resolution or rejection, preventing memory leaks or stale cross-cycle caches.
+    - Hydrates coherent snapshot: booking row, latest active itinerary revision (`orderBy: { version: 'desc' }, take: 1`), ordered flight segments (`orderBy: { globalOrder: 'asc' }`), and passenger snapshot.
+  - Exported from `domain-events/index.ts` and provided/exported in `DomainEventsModule`.
+  - Unit tests in `apps/api/src/domain-events/booking-event-hydrator.service.spec.ts` (7/7 passed, exit code 0).
+- **T022 [US2] Safe Projection Service & Guarded Repository**:
+  - Implemented `BookingProjectionService` in `apps/api/src/booking-projection/booking-projection.service.ts`:
+    - Extracted safe mapping logic from legacy `BookingAgentProjectionService`.
+    - Enforces strict invariant **No Stale Fallback**: Throws `MalformedRevisionError` when authoritative revision is empty or malformed; strictly prohibits silent fallback to stale initial `flightSnapshot`. Fallback to `flightSnapshot` is permitted only when no itinerary revision exists.
+    - Sanitizes PII allowlist: outputs only public assistant-safe flight fields.
+  - Implemented `BookingProjectionRepository` in `apps/api/src/booking-projection/booking-projection.repository.ts`:
+    - Atomic PostgreSQL upsert via `$executeRaw`: `INSERT INTO booking_agent_projections ... ON CONFLICT ("bookingId") DO UPDATE ... WHERE booking_agent_projections.source_version < EXCLUDED.source_version`.
+    - Stale or out-of-order deliveries (`newSourceVersion <= storedSourceVersion`) are ignored, returning `{ outcome: 'STALE_IGNORED' }`.
+    - Winner `agentReference` is immutable: updates never alter existing `agentReference`.
+    - Added helper query methods: `findByBookingId` and `findByReferenceAndUserId`.
+  - Unit tests in `booking-projection.service.spec.ts` (17/17 passed) and `booking-projection.repository.spec.ts` (10/10 passed).
+- **T023 [US2] Thin Booking Listener, Metrics & Module Composition**:
+  - Implemented `BookingProjectionMetrics` in `apps/api/src/booking-projection/booking-projection.metrics.ts`:
+    - Bounded counters: `booking_projection_events_total` with `eventName` and outcome status (`SUCCESS`, `ERROR`, `STALE_IGNORED`).
+    - Latency tracker: `booking_projection_duration_ms` measuring processing latency.
+    - Safe labels: strictly zero PII, zero booking IDs, zero user IDs.
+  - Implemented `BookingProjectionListener` in `apps/api/src/booking-projection/booking-projection.listener.ts`:
+    - Subscribes via `@OnEvent('booking.*')` (strictly ignores `refund.settled`).
+    - Flow: hydrate snapshot -> extract safe projection -> atomic guarded upsert with hydrated `snapshot.version`.
+    - Listener Error Isolation: wraps execution in `try/catch`, logs structured errors (`bookingId`, `eventId`, `sourceVersion`), records `ERROR` metric, never throws or bubbles unhandled rejections to Node process.
+    - Records latency in `finally`.
+  - Created `BookingProjectionModule` in `apps/api/src/booking-projection/booking-projection.module.ts`:
+    - Imports `PrismaModule`, `DomainEventsModule`.
+    - Provides: `BookingEventHydratorService`, `BookingProjectionService`, `BookingProjectionRepository`, `BookingProjectionListener`, `BookingProjectionMetrics`.
+    - Exports: `BookingProjectionService`, `BookingProjectionRepository`, `BookingEventHydratorService`.
+  - Unit tests in `booking-projection.listener.spec.ts` (13/13 passed) and `booking-projection.metrics.spec.ts` (8/8 passed).
+- **Verification**:
+  - ESLint: `pnpm exec eslint "apps/api/**/*.ts" --max-warnings 0` passed (exit code 0).
+  - Typecheck: `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` passed (exit code 0).
+  - Jest Unit: `booking-event-hydrator.service.spec.ts` passed (7/7 passed, exit code 0).
+  - Jest Unit: `apps/api/src/booking-projection/` passed (48/48 passed, exit code 0).
+  - Producer files (`PaymentFulfillmentSaga`, `BookingRecoveryService`, `CancellationService`, etc.) remain untouched for Slice 4.
+
 ### Feature 024 — Event-Driven Module Deepening: Phase 4 Slice 2 (Tasks T018, T019, T020) Completed (2026-09-17)
 
 - **T018 [US2] Transaction Context & Safe Postcommit Publisher**:
