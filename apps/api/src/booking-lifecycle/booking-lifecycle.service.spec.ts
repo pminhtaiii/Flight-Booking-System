@@ -11,6 +11,7 @@ import {
   BookingConfirmedEvent,
   BookingFailedEvent,
   BookingCompletedEvent,
+  BookingEventPublisherService,
   TransactionEventContext,
 } from '@/domain-events';
 import { BookingLifecycleService } from './booking-lifecycle.service';
@@ -20,7 +21,7 @@ import { FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
 describe('BookingLifecycleService', () => {
   let service: BookingLifecycleService;
   let mockPrisma: any;
-  let mockPublisher: any;
+  let mockPublisher: jest.Mocked<BookingEventPublisherService>;
   let mockProjectionService: any;
 
   beforeEach(() => {
@@ -40,10 +41,13 @@ describe('BookingLifecycleService', () => {
       $transaction: jest.fn(async (cb) => cb(mockPrisma)),
     };
 
+    // Type assertion is required because BookingEventPublisherService contains private members
+    // (logger, emitter) preventing raw object literal structural assignment in test doubles.
     mockPublisher = {
       createContext: jest.fn((tx) => ({ tx, events: [] })),
       publish: jest.fn().mockResolvedValue(undefined),
-    };
+      resolveEventName: jest.fn().mockReturnValue(null),
+    } as unknown as jest.Mocked<BookingEventPublisherService>;
 
     mockProjectionService = {
       createOrUpdateProjection: jest.fn().mockResolvedValue(null),
@@ -95,6 +99,10 @@ describe('BookingLifecycleService', () => {
       });
       expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
       const emittedEvents = mockPublisher.publish.mock.calls[0][0];
+      expect(emittedEvents).toBeDefined();
+      if (!emittedEvents) {
+        throw new Error('Expected events to be published');
+      }
       expect(emittedEvents).toHaveLength(1);
       expect(emittedEvents[0]).toBeInstanceOf(BookingCreatedEvent);
       expect(emittedEvents[0]).toEqual(
@@ -489,6 +497,10 @@ describe('BookingLifecycleService', () => {
       );
       expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
       const emitted = mockPublisher.publish.mock.calls[0][0];
+      expect(emitted).toBeDefined();
+      if (!emitted) {
+        throw new Error('Expected events to be published');
+      }
       expect(emitted[0]).toBeInstanceOf(BookingConfirmedEvent);
       expect(emitted[0]).toEqual(
         expect.objectContaining({
@@ -640,6 +652,10 @@ describe('BookingLifecycleService', () => {
       );
       expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
       const emitted = mockPublisher.publish.mock.calls[0][0];
+      expect(emitted).toBeDefined();
+      if (!emitted) {
+        throw new Error('Expected events to be published');
+      }
       expect(emitted[0]).toBeInstanceOf(BookingFailedEvent);
       expect(emitted[0]).toEqual(
         expect.objectContaining({
@@ -840,6 +856,10 @@ describe('BookingLifecycleService', () => {
       );
       expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
       const emitted = mockPublisher.publish.mock.calls[0][0];
+      expect(emitted).toBeDefined();
+      if (!emitted) {
+        throw new Error('Expected events to be published');
+      }
       expect(emitted[0]).toBeInstanceOf(BookingCompletedEvent);
       expect(emitted[0]).toEqual(
         expect.objectContaining({
@@ -971,7 +991,12 @@ describe('BookingLifecycleService', () => {
         }),
       });
       expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
-      expect(mockPublisher.publish.mock.calls[0][0][0]).toBeInstanceOf(BookingCompletedEvent);
+      const emitted = mockPublisher.publish.mock.calls[0][0];
+      expect(emitted).toBeDefined();
+      if (!emitted) {
+        throw new Error('Expected events to be published');
+      }
+      expect(emitted[0]).toBeInstanceOf(BookingCompletedEvent);
     });
 
     it('handles race condition when booking status was changed concurrently in tx and emits zero events', async () => {
