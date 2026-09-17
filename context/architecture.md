@@ -4,7 +4,7 @@
 
 Planning artifacts: [specification](../specs/024-event-driven-module-deepening/spec.md), [plan](../specs/024-event-driven-module-deepening/plan.md), and [tasks](../specs/024-event-driven-module-deepening/tasks.md).
 
-#### Implemented Architecture (Phase 3 Slice 1 Foundation Completed)
+#### Implemented Architecture (Phase 3 Completed: US1 Safe Payment Orchestration)
 
 - **IdempotencyModule (`apps/api/src/idempotency/`)**:
   - Independent domain module extracted from `PaymentModule`, providing and exporting `PaymentIdempotencyService` and `@IdempotencyKey()` parameter decorator.
@@ -53,6 +53,21 @@ Planning artifacts: [specification](../specs/024-event-driven-module-deepening/s
 - **PaymentModule Clean Composition (`apps/api/src/payment/`)**:
   - `PaymentModule` imports and re-exports `IdempotencyModule` and `PaymentMethodsModule` without duplicate provider registrations, and imports `PaymentFulfillmentModule`.
   - All payment services, controllers, and spec files directly import from `@/idempotency/payment-idempotency.service`.
+- **Comprehensive PostgreSQL E2E Failure, Resumption & Compensation Suite (`apps/api/test/payment-fulfillment.e2e-spec.ts`, `apps/api/test/payment-idempotency.e2e-spec.ts`) (T013)**:
+  - Validated all saga boundary conditions and edge cases in real PostgreSQL and Supertest environments (25/25 tests in `payment-fulfillment.e2e-spec.ts`, 8/8 tests in `payment-idempotency.e2e-spec.ts`):
+    1. **Fenced Checkpoint Resumption**: Resuming from `stripe_authorized` skips hold auth and creates order/captures; resuming from `duffel_order_created` skips order and captures/confirms; resuming from `captured` completes canonical booking without re-invoking capture.
+    2. **Duplicate Remote Effects**: Replay of active or completed payments returns cached/reconstructed response with 0 extra calls to Stripe or Duffel.
+    3. **Atomic Completion & Rollback**: Booking `CONFIRMED`, Payment `SUCCEEDED`, and dual ledger entries commit together in a single transaction; post-capture DB errors rollback completely without orphan state or canceling capture.
+    4. **Stale Owner Takeover & CAS Eviction**: Lease takeover before hold auth, before Duffel order, before payment capture, during compensation, and after 25s background handoff immediately halts execution and prevents further provider calls or state mutation.
+    5. **Capture Throw Matrix**: Thrown capture with subsequent `captured` status proceeds to complete canonical booking; thrown capture with `authorized`/`voided` status cancels order, voids hold, and marks booking `FAILED`; thrown capture with unavailable status returns HTTP 502 with `bookingStatus: 'PROCESSING'` without canceling order or hold, keeping state recoverable.
+    6. **Failed Compensation & DB Failure**: Duffel order failure with subsequent hold-void failure logs audit error and returns safe HTTP 502 without leaking internal stack traces; DB failure after capture preserves capture and marks state recoverable.
+    7. **Replay Asymmetry**: Cached replay returns expected response body with HTTP 200 without altering HTTP status codes.
+- **Nest Composition Architecture Gate (`apps/api/test/module-deepening.e2e-spec.ts`) (T014)**:
+  - Verifies runtime DI token resolution: `PAYMENT_GATEWAY_PORT` resolves to `StripePaymentAdapter` and `FULFILLMENT_GATEWAY_PORT` resolves to `DuffelFulfillmentAdapter` across `AppModule`, scoped `PaymentFulfillmentModule`, and standalone fixtures.
+  - Verifies provider uniqueness: `PaymentMethodService` is registered strictly once in `PaymentMethodsModule` across all modules in `AppModule`, resolving identical singleton references across all consumer modules.
+  - Enforces acyclic architecture: `PaymentModule` imports `PaymentFulfillmentModule`, while `PaymentFulfillmentModule` contains zero direct or transitive imports of `PaymentModule` in both static metadata and runtime NestContainer dependency graph.
+  - Verifies direct SDK wrapper retention: `BookingRecoveryService` directly injects `StripeService` and `DuffelService` without routing through saga ports.
+  - Enforces strict phase separation: Phase 4 items (`EventEmitterModule`, `BookingProjectionModule`, `DomainEventsModule`) do not leak into US1 runtime composition.
 
 ### Remaining Architecture (Phases 3–6)
 
