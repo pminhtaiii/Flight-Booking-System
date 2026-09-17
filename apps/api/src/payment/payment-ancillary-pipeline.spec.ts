@@ -1,15 +1,24 @@
 import 'reflect-metadata';
 import { PaymentService } from './payment.service';
+import { PaymentFulfillmentSaga } from '@/payment-fulfillment/payment-fulfillment.saga';
+import {
+  PaymentGatewayPort,
+  FulfillmentGatewayPort,
+  PortInvocationControl,
+  CreateOrderInput,
+} from '@/payment-fulfillment/ports';
 import { PrismaService } from '@/prisma/prisma.service';
 import { StripeService } from '@/common/stripe.service';
 import { PaymentIdempotencyService } from '@/idempotency/payment-idempotency.service';
-import { DuffelService } from '@/duffel/duffel.service';
 import { AuditService } from '@/audit/audit.service';
 import { PaymentMethodService } from '@/payment/payment-method.service';
 import { AncillaryPaymentValidationService } from './ancillary-payment-validation.service';
 
 describe('PaymentService - Ancillary Pipeline', () => {
   let service: PaymentService;
+  let saga: PaymentFulfillmentSaga;
+  let mockPaymentGateway: any;
+  let mockFulfillmentGateway: any;
   let mockPrisma: any;
   let mockStripe: any;
   let mockIdempotency: any;
@@ -37,6 +46,11 @@ describe('PaymentService - Ancillary Pipeline', () => {
         findUnique: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      booking: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        findFirst: jest.fn().mockResolvedValue({ id: 'booking-123', paymentId: 'payment-123' }),
       },
       ancillarySelection: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -64,8 +78,11 @@ describe('PaymentService - Ancillary Pipeline', () => {
     mockIdempotency = {
       computeHash: jest.fn().mockReturnValue('mock-hash'),
       acquireOrReplay: jest.fn().mockResolvedValue({ status: 'acquired' }),
+      assertOwned: jest.fn().mockResolvedValue(undefined),
       getResumePoint: jest.fn(),
+      advanceSagaCheckpoint: jest.fn().mockResolvedValue(undefined),
       updateRecoveryPoint: jest.fn(),
+      completeSagaKeyAtomic: jest.fn().mockResolvedValue(undefined),
       completeKey: jest.fn(),
     };
 
@@ -95,15 +112,104 @@ describe('PaymentService - Ancillary Pipeline', () => {
       validateForPayment: jest.fn(),
     };
 
+    mockPaymentGateway = {
+      authorizeHold: jest.fn(async (intentId: string, control?: PortInvocationControl) => {
+        if (control?.beforeInvoke) await control.beforeInvoke();
+        const pi = await mockStripe.retrievePaymentIntent(intentId);
+        return {
+          status:
+            pi?.status === 'requires_capture'
+              ? 'authorized'
+              : pi?.status === 'succeeded'
+                ? 'captured'
+                : 'authorized',
+          intentId,
+          amount: pi?.amount ?? 25000,
+          currency: pi?.currency ?? 'usd',
+        };
+      }),
+      capturePayment: jest.fn(
+        async (intentId: string, captureKey: string, control?: PortInvocationControl) => {
+          if (control?.beforeInvoke) await control.beforeInvoke();
+          await mockStripe.capturePaymentIntent(intentId, undefined, captureKey);
+          return {
+            success: true,
+            intentId,
+            status: 'succeeded',
+          };
+        },
+      ),
+      voidHold: jest.fn(async (intentId: string, control?: PortInvocationControl) => {
+        if (control?.beforeInvoke) await control.beforeInvoke();
+        await mockStripe.cancelPaymentIntent(intentId);
+        return {
+          success: true,
+          intentId,
+          status: 'canceled',
+        };
+      }),
+    };
+
+    mockFulfillmentGateway = {
+      createOrder: jest.fn(async (input: CreateOrderInput, control?: PortInvocationControl) => {
+        if (control?.beforeInvoke) await control.beforeInvoke();
+        const services =
+          input.services && input.services.length > 0
+            ? input.services.map((s) => ({ id: s.serviceId, quantity: s.quantity }))
+            : undefined;
+        const res = await mockDuffel.createOrder(
+          input.offerId,
+          input.passengers,
+          services,
+          input.metadata,
+          input.idempotencyKey,
+        );
+        return {
+          orderId: res?.id ?? 'ord_123',
+          bookingReference: res?.booking_reference ?? 'PNR789',
+          evidence: res ?? { id: 'ord_123', booking_reference: 'PNR789' },
+        };
+      }),
+      cancelOrder: jest.fn().mockResolvedValue({
+        success: true,
+        orderId: 'ord_123',
+        status: 'CANCELLED',
+      }),
+      retrieveOrderSnapshot: jest.fn(
+        async (
+          _id: string,
+          evidence: any,
+          _enrichment: any,
+          _email: string,
+          control?: PortInvocationControl,
+        ) => {
+          if (control?.beforeInvoke) await control.beforeInvoke();
+          const snaps = mockDuffel.mapDuffelOrderToSnapshots(evidence);
+          return {
+            flightSnapshot: snaps.flightSnapshot,
+            passengerSnapshot: snaps.passengerSnapshot,
+            departureAt: new Date('2026-08-01T10:00:00Z'),
+          };
+        },
+      ),
+    };
+
     service = new PaymentService(
       mockPrisma as unknown as PrismaService,
       mockStripe as unknown as StripeService,
       mockIdempotency as unknown as PaymentIdempotencyService,
-      mockDuffel as unknown as DuffelService,
       mockAudit as unknown as AuditService,
+      mockAncillaryValidation as unknown as AncillaryPaymentValidationService,
+    );
+
+    saga = new PaymentFulfillmentSaga(
+      mockPaymentGateway as unknown as PaymentGatewayPort,
+      mockFulfillmentGateway as unknown as FulfillmentGatewayPort,
+      mockIdempotency as unknown as PaymentIdempotencyService,
       mockPaymentMethod as unknown as PaymentMethodService,
       mockBookingLifecycleService,
-      mockAncillaryValidation as unknown as AncillaryPaymentValidationService,
+      mockPrisma as unknown as PrismaService,
+      mockAudit as unknown as AuditService,
     );
   });
 
@@ -616,8 +722,7 @@ describe('PaymentService - Ancillary Pipeline', () => {
     const userId = 'user-123';
 
     it('constructs service list from payment.ancillarySelection and passes services to duffelService.createOrder', async () => {
-      // 1. Mock payment lookup with included ancillarySelection
-      mockPrisma.payment.findUnique.mockResolvedValue({
+      const paymentRecord = {
         id: 'payment-123',
         bookingIntentId: 'intent-123',
         stripePaymentIntentId: 'pi_123',
@@ -638,6 +743,13 @@ describe('PaymentService - Ancillary Pipeline', () => {
           seatSelections: [{ serviceId: 'srv-seat-1' }, { serviceId: 'srv-seat-2' }],
           baggageSelections: [{ serviceId: 'srv-bag-1', quantity: 2 }],
         },
+      };
+      mockPrisma.payment.findUnique.mockImplementation(() => Promise.resolve(paymentRecord));
+      mockPrisma.payment.updateMany = jest.fn().mockImplementation((args: any) => {
+        if (args?.data?.status) {
+          paymentRecord.status = args.data.status;
+        }
+        return Promise.resolve({ count: 1 });
       });
 
       mockIdempotency.getResumePoint.mockResolvedValueOnce('started');
@@ -661,7 +773,7 @@ describe('PaymentService - Ancillary Pipeline', () => {
         metadata: { id: 'ord_123', booking_reference: 'PNR789' },
       });
 
-      const response = await service.executeConfirmPayment(dto, idempotencyKey, userId);
+      const response = await saga.executeConfirmPayment(dto, idempotencyKey, userId);
 
       // Verify createOrder was called with services summarized from seatSelections & baggageSelections
       expect(mockDuffel.createOrder).toHaveBeenCalledWith(
@@ -773,7 +885,7 @@ describe('PaymentService - Ancillary Pipeline', () => {
     it('processes executeConfirmPayment with undefined services for createOrder', async () => {
       const confirmDto = { paymentId: 'payment-base-123', bookingId: 'booking-base-123' };
 
-      mockPrisma.payment.findUnique.mockResolvedValue({
+      const paymentBaseRecord = {
         id: 'payment-base-123',
         bookingIntentId: 'intent-base-123',
         stripePaymentIntentId: 'pi_base_123',
@@ -788,6 +900,13 @@ describe('PaymentService - Ancillary Pipeline', () => {
           passengers: [{ id: 'pas_1', type: 'adult' }],
         },
         ancillarySelection: null,
+      };
+      mockPrisma.payment.findUnique.mockImplementation(() => Promise.resolve(paymentBaseRecord));
+      mockPrisma.payment.updateMany = jest.fn().mockImplementation((args: any) => {
+        if (args?.data?.status) {
+          paymentBaseRecord.status = args.data.status;
+        }
+        return Promise.resolve({ count: 1 });
       });
 
       mockIdempotency.getResumePoint.mockResolvedValueOnce('started');
@@ -811,7 +930,7 @@ describe('PaymentService - Ancillary Pipeline', () => {
         metadata: { id: 'ord_base_123', booking_reference: 'PNRBASE' },
       });
 
-      const response = await service.executeConfirmPayment(confirmDto, idempotencyKey, userId);
+      const response = await saga.executeConfirmPayment(confirmDto, idempotencyKey, userId);
 
       // Verify createOrder called with undefined services
       expect(mockDuffel.createOrder).toHaveBeenCalledWith(

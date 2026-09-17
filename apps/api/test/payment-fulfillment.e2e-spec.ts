@@ -795,7 +795,10 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
 
       expect(res.body.success).toBe(false);
       expect(cancelSpy).toHaveBeenCalledTimes(1);
-      expect(cancelSpy).toHaveBeenCalledWith(payment.stripePaymentIntentId);
+      expect(cancelSpy).toHaveBeenCalledWith(
+        payment.stripePaymentIntentId,
+        `${payment.stripePaymentIntentId}-stripe-void`,
+      );
 
       const dbPayment = await prisma.payment.findUnique({ where: { id: payment.id } });
       expect(dbPayment?.status).toBe(PaymentStatus.CANCELLED);

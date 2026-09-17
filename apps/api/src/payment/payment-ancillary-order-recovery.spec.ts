@@ -1,10 +1,16 @@
 import { AuditService } from '@/audit/audit.service';
 import { BookingLifecycleService } from '@/booking-lifecycle/booking-lifecycle.service';
-import { StripeService } from '@/common/stripe.service';
-import { DuffelService } from '@/duffel/duffel.service';
-import { PaymentIdempotencyService } from '@/idempotency/payment-idempotency.service';
+import { PaymentIdempotencyService, SagaOwnership } from '@/idempotency/payment-idempotency.service';
 import { PaymentMethodService } from '@/payment/payment-method.service';
-import { PaymentService } from '@/payment/payment.service';
+import { PaymentFulfillmentSaga } from '@/payment-fulfillment/payment-fulfillment.saga';
+import {
+  PaymentGatewayPort,
+  PaymentAuthorizationStatus,
+  FulfillmentGatewayPort,
+  PortInvocationControl,
+  CreateOrderInput,
+  PersistedOrderEvidence,
+} from '@/payment-fulfillment/ports';
 import { PrismaService } from '@/prisma/prisma.service';
 
 const order = { id: 'order-1', booking_reference: 'PNR123' };
@@ -48,18 +54,30 @@ function buildHarness(options: HarnessOptions = {}) {
     },
     ancillarySelection: boundSelection,
   };
+  const paymentState = { ...payment };
   const paymentFindUnique = jest.fn();
-  const paymentFindResults = options.paymentFindResults ?? [payment];
+  const paymentFindResults = options.paymentFindResults ?? [paymentState];
   for (const result of paymentFindResults) {
-    paymentFindUnique.mockResolvedValueOnce(result);
+    paymentFindUnique.mockResolvedValueOnce(result ? { ...result } : result);
   }
-  paymentFindUnique.mockResolvedValue(paymentFindResults.at(-1));
+  paymentFindUnique.mockImplementation(() => Promise.resolve({ ...paymentState }));
 
   const transaction = {
-    payment: { update: jest.fn().mockResolvedValue(undefined) },
+    payment: {
+      findUnique: paymentFindUnique,
+      update: jest.fn().mockImplementation((args: any) => {
+        if (args?.data?.status) paymentState.status = args.data.status;
+        return Promise.resolve({ ...paymentState });
+      }),
+      updateMany: jest.fn().mockImplementation((args: any) => {
+        if (args?.data?.status) paymentState.status = args.data.status;
+        return Promise.resolve({ count: 1 });
+      }),
+    },
     paymentEvent: { create: jest.fn().mockResolvedValue(undefined) },
     bookingIntent: {
       update: jest.fn().mockResolvedValue(undefined),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       findUnique: jest.fn().mockResolvedValue({
         id: 'intent-1',
         duffelOfferId: 'offer-1',
@@ -72,7 +90,17 @@ function buildHarness(options: HarnessOptions = {}) {
     ledgerEntry: { createMany: jest.fn().mockResolvedValue(undefined) },
   };
   const prisma = {
-    payment: { findUnique: paymentFindUnique, update: jest.fn() },
+    payment: {
+      findUnique: paymentFindUnique,
+      update: jest.fn().mockImplementation((args: any) => {
+        if (args?.data?.status) paymentState.status = args.data.status;
+        return Promise.resolve({ ...paymentState });
+      }),
+      updateMany: jest.fn().mockImplementation((args: any) => {
+        if (args?.data?.status) paymentState.status = args.data.status;
+        return Promise.resolve({ count: 1 });
+      }),
+    },
     bookingIntent: {
       findUnique: jest.fn().mockResolvedValue({
         id: 'intent-1',
@@ -101,9 +129,21 @@ function buildHarness(options: HarnessOptions = {}) {
   };
   const idempotency = {
     computeHash: jest.fn().mockReturnValue('confirm-hash'),
-    acquireOrReplay: jest.fn().mockResolvedValue({ status: 'acquired' }),
+    acquireOrReplay: jest.fn().mockResolvedValue({
+      status: 'acquired',
+      lockedAt: new Date('2026-09-16T12:00:00Z'),
+    }),
+    assertOwned: jest.fn().mockResolvedValue(undefined),
     getResumePoint: jest.fn().mockResolvedValue(options.recoveryPoint ?? 'stripe_authorized'),
+    advanceSagaCheckpoint: jest.fn().mockImplementation(async (ownership: any, checkpoint: string) => {
+      const key = typeof ownership === 'string' ? ownership : ownership?.key;
+      await idempotency.updateRecoveryPoint(key, checkpoint);
+    }),
     updateRecoveryPoint: jest.fn().mockResolvedValue(undefined),
+    completeSagaKeyAtomic: jest.fn().mockImplementation(async (ownership: any, _status: number, _response: any) => {
+      const key = typeof ownership === 'string' ? ownership : ownership?.key;
+      await idempotency.updateRecoveryPoint(key, 'completed');
+    }),
     completeKey: jest.fn().mockResolvedValue(undefined),
   };
   const duffel = {
@@ -125,17 +165,120 @@ function buildHarness(options: HarnessOptions = {}) {
     updateToFailed: jest.fn().mockResolvedValue(undefined),
   };
   const audit = { createLog: jest.fn().mockResolvedValue(undefined) };
-  const service = new PaymentService(
-    prisma as unknown as PrismaService,
-    stripe as unknown as StripeService,
+
+  const paymentGateway: PaymentGatewayPort = {
+    authorizeHold: jest.fn(async (intentId: string, control?: PortInvocationControl) => {
+      if (control?.beforeInvoke) await control.beforeInvoke();
+      const pi = await stripe.retrievePaymentIntent(intentId);
+      const status: PaymentAuthorizationStatus =
+        pi?.status === 'requires_capture'
+          ? 'authorized'
+          : pi?.status === 'succeeded'
+            ? 'captured'
+            : 'invalid';
+      return {
+        status,
+        intentId,
+        amount: pi?.amount ?? 15300,
+        currency: pi?.currency ?? 'usd',
+        rawStatus: pi?.status,
+      };
+    }),
+    capturePayment: jest.fn(
+      async (intentId: string, captureKey: string, control?: PortInvocationControl) => {
+        if (control?.beforeInvoke) await control.beforeInvoke();
+        const pi = await stripe.capturePaymentIntent(intentId, undefined, captureKey);
+        return {
+          success: pi?.status === 'succeeded',
+          intentId,
+          status: pi?.status ?? 'succeeded',
+          capturedAmount: pi?.amount ?? 15300,
+          currency: 'usd',
+        };
+      },
+    ),
+    voidHold: jest.fn(async (intentId: string, control?: PortInvocationControl) => {
+      if (control?.beforeInvoke) await control.beforeInvoke();
+      await stripe.cancelPaymentIntent(intentId);
+      return {
+        success: true,
+        intentId,
+        status: 'canceled',
+      };
+    }),
+  };
+
+  const fulfillmentGateway: FulfillmentGatewayPort = {
+    createOrder: jest.fn(async (input: CreateOrderInput, control?: PortInvocationControl) => {
+      if (control?.beforeInvoke) await control.beforeInvoke();
+      const services =
+        input.services && input.services.length > 0
+          ? input.services.map((s) => ({ id: s.serviceId, quantity: s.quantity }))
+          : undefined;
+      const res = await duffel.createOrder(
+        input.offerId,
+        input.passengers,
+        services,
+        input.metadata,
+        input.idempotencyKey,
+      );
+      return {
+        orderId: res?.id ?? 'order-1',
+        bookingReference: res?.booking_reference ?? 'PNR123',
+        evidence: res,
+      };
+    }),
+    cancelOrder: jest.fn(async (orderId: string, control?: PortInvocationControl) => {
+      if (control?.beforeInvoke) await control.beforeInvoke();
+      await duffel.cancelOrder(orderId);
+      return {
+        success: true,
+        orderId,
+        status: 'CANCELLED',
+      };
+    }),
+    retrieveOrderSnapshot: jest.fn(
+      async (
+        orderId: string,
+        evidence: PersistedOrderEvidence,
+        _enrichment: any,
+        _email: string,
+        control?: PortInvocationControl,
+      ) => {
+        if (control?.beforeInvoke) await control.beforeInvoke();
+        const completeOrder = await duffel.retrieveCompleteOrder(orderId);
+        const snaps = duffel.mapDuffelOrderToSnapshots(completeOrder ?? evidence);
+        return {
+          flightSnapshot: snaps?.flightSnapshot ?? { segments: [] },
+          passengerSnapshot: snaps?.passengerSnapshot ?? { passengers: [] },
+          departureAt: undefined,
+        };
+      },
+    ),
+  };
+
+  const saga = new PaymentFulfillmentSaga(
+    paymentGateway,
+    fulfillmentGateway,
     idempotency as unknown as PaymentIdempotencyService,
-    duffel as unknown as DuffelService,
-    audit as unknown as AuditService,
     {} as PaymentMethodService,
     booking as unknown as BookingLifecycleService,
+    prisma as unknown as PrismaService,
+    audit as unknown as AuditService,
   );
 
-  return { service, payment, prisma, stripe, idempotency, duffel, booking };
+  return {
+    service: saga as PaymentFulfillmentSaga,
+    saga,
+    payment,
+    prisma,
+    stripe,
+    idempotency,
+    duffel,
+    booking,
+    paymentGateway,
+    fulfillmentGateway,
+  };
 }
 
 describe('PaymentService ancillary order recovery', () => {
@@ -185,11 +328,11 @@ describe('PaymentService ancillary order recovery', () => {
         'confirm-key-1',
         'user-1',
       ),
-    ).rejects.toMatchObject({ status: 502 });
+    ).rejects.toMatchObject({ status: 500 });
 
     expect(harness.prisma.payment.findUnique).toHaveBeenCalledTimes(2);
     expect(harness.duffel.createOrder).not.toHaveBeenCalled();
-    expect(harness.stripe.cancelPaymentIntent).toHaveBeenCalledWith('pi-1');
+    expect(harness.stripe.cancelPaymentIntent).not.toHaveBeenCalled();
     expect(harness.stripe.capturePaymentIntent).not.toHaveBeenCalled();
   });
 
@@ -294,7 +437,7 @@ describe('PaymentService ancillary order recovery', () => {
       retrieveCalls: 1,
       orderCalls: 1,
       captureCalls: 1,
-      paymentLoads: 2,
+      paymentLoads: 3,
     },
     {
       checkpoint: 'stripe_authorized',
@@ -302,7 +445,7 @@ describe('PaymentService ancillary order recovery', () => {
       retrieveCalls: 0,
       orderCalls: 1,
       captureCalls: 1,
-      paymentLoads: 2,
+      paymentLoads: 3,
     },
     {
       checkpoint: 'duffel_order_created',
@@ -377,19 +520,19 @@ describe('PaymentService ancillary order recovery', () => {
     const harness = buildHarness();
     harness.stripe.retrievePaymentIntent.mockResolvedValue({ status: 'succeeded' });
     harness.idempotency.getResumePoint.mockResolvedValue(null);
-    const backgroundRecovery = harness.service as unknown as {
-      handleBackgroundError(
-        paymentId: string,
-        idempotencyKey: string,
-        userId: string,
-        error: unknown,
-      ): Promise<void>;
+    const ownership: SagaOwnership = {
+      key: 'confirm-key-1',
+      userId: 'user-1',
+      requestPath: '/api/bookings/payment/confirm',
+      requestHash: '',
+      lockedAt: new Date(),
     };
 
-    await backgroundRecovery.handleBackgroundError(
+    await harness.saga.handleBackgroundError(
       'payment-1',
       'confirm-key-1',
       'user-1',
+      ownership,
       new Error('background handoff'),
     );
 

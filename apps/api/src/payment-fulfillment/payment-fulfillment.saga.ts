@@ -153,7 +153,6 @@ export class PaymentFulfillmentSaga {
         });
 
         return {
-          success: true,
           status: 'PENDING',
           message: 'Booking is being confirmed. Please poll status.',
           pollUrl: `/api/bookings/payment/${dto.paymentId}/status`,
@@ -483,7 +482,8 @@ export class PaymentFulfillmentSaga {
               );
             }
 
-            enforceTransition(payment.status, 'CANCELLED');
+            const previousPaymentStatus = payment.status;
+            enforceTransition(previousPaymentStatus, 'CANCELLED');
             const nextBookingStatus =
               bookingIntent.paymentAttemptCount < 2 ? 'AWAITING_PAYMENT' : 'CANCELLED';
 
@@ -496,7 +496,7 @@ export class PaymentFulfillmentSaga {
                 data: {
                   paymentId: payment.id,
                   eventType: 'payment_cancelled',
-                  previousStatus: payment.status,
+                  previousStatus: previousPaymentStatus,
                   newStatus: 'CANCELLED',
                   amount: payment.amount,
                   source: 'API',
@@ -636,7 +636,8 @@ export class PaymentFulfillmentSaga {
             );
           }
 
-          enforceTransition(payment.status, 'CANCELLED');
+          const previousPaymentStatus = payment.status;
+          enforceTransition(previousPaymentStatus, 'CANCELLED');
           const nextBookingStatus =
             bookingIntent.paymentAttemptCount < 2 ? 'AWAITING_PAYMENT' : 'CANCELLED';
 
@@ -649,7 +650,7 @@ export class PaymentFulfillmentSaga {
               data: {
                 paymentId: payment.id,
                 eventType: 'payment_cancelled',
-                previousStatus: payment.status,
+                previousStatus: previousPaymentStatus,
                 newStatus: 'CANCELLED',
                 amount: payment.amount,
                 source: 'API',
@@ -870,6 +871,7 @@ export class PaymentFulfillmentSaga {
 
             let compensationAborted = false;
             let resolvedBookingStatus: string = nextBookingStatus;
+            const previousPaymentStatus = payment.status;
             await this.prisma.$transaction(async (tx) => {
               const paymentUpdate = await tx.payment.updateMany({
                 where: {
@@ -907,12 +909,12 @@ export class PaymentFulfillmentSaga {
                 return;
               }
 
-              enforceTransition(payment.status, 'CANCELLED');
+              enforceTransition(previousPaymentStatus, 'CANCELLED');
               await tx.paymentEvent.create({
                 data: {
                   paymentId: payment.id,
                   eventType: 'payment_cancelled',
-                  previousStatus: payment.status,
+                  previousStatus: previousPaymentStatus,
                   newStatus: 'CANCELLED',
                   amount: payment.amount,
                   source: 'API',
@@ -1014,7 +1016,8 @@ export class PaymentFulfillmentSaga {
 
         const transactionId = crypto.randomUUID();
         if (payment.status !== 'SUCCEEDED') {
-          enforceTransition(payment.status, 'SUCCEEDED');
+          const previousPaymentStatus = payment.status;
+          enforceTransition(previousPaymentStatus, 'SUCCEEDED');
           await this.idempotency.assertOwned(currentOwnership);
 
           await this.prisma.$transaction(async (tx) => {
@@ -1032,7 +1035,7 @@ export class PaymentFulfillmentSaga {
               data: {
                 paymentId: payment.id,
                 eventType: 'payment_captured',
-                previousStatus: payment.status === 'AUTHORIZED' ? 'AUTHORIZED' : payment.status,
+                previousStatus: previousPaymentStatus,
                 newStatus: 'SUCCEEDED',
                 amount: payment.amount,
                 source: 'API',
@@ -1340,6 +1343,7 @@ export class PaymentFulfillmentSaga {
 
       let compensationAborted = false;
       let resolvedBookingStatus: string = nextBookingStatus;
+      const previousPaymentStatus = payment.status;
       await this.prisma.$transaction(async (tx) => {
         const paymentUpdate = await tx.payment.updateMany({
           where: {
@@ -1377,12 +1381,12 @@ export class PaymentFulfillmentSaga {
           return;
         }
 
-        enforceTransition(payment.status, 'CANCELLED');
+        enforceTransition(previousPaymentStatus, 'CANCELLED');
         await tx.paymentEvent.create({
           data: {
             paymentId,
             eventType: 'payment_cancelled',
-            previousStatus: payment.status,
+            previousStatus: previousPaymentStatus,
             newStatus: 'CANCELLED',
             amount: payment.amount,
             source: 'API',

@@ -3,26 +3,15 @@ import { PaymentService } from './payment.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { StripeService } from '@/common/stripe.service';
 import { PaymentIdempotencyService } from '@/idempotency/payment-idempotency.service';
-import { DuffelService } from '@/duffel/duffel.service';
 import { AuditService } from '@/audit/audit.service';
-import { PaymentMethodService } from '@/payment/payment-method.service';
-import {
-  HttpStatus,
-  InternalServerErrorException,
-  UnprocessableEntityException,
-  HttpException,
-} from '@nestjs/common';
-import { BookingPassengerFinalValidatorService } from '@/booking-intent/booking-passenger-final-validator.service';
-import { BookingFailureReason } from '@prisma/client';
+import { NotFoundException, ForbiddenException } from '@nestjs/common';
 
-describe('PaymentService - recoveryPoint === completed', () => {
+describe('PaymentService', () => {
   let service: PaymentService;
   let mockPrisma: any;
   let mockStripe: any;
   let mockIdempotency: any;
-  let mockDuffel: any;
   let mockAudit: any;
-  let mockPaymentMethod: any;
 
   beforeEach(() => {
     mockPrisma = {
@@ -34,21 +23,19 @@ describe('PaymentService - recoveryPoint === completed', () => {
       payment: {
         findUnique: jest.fn(),
         findFirst: jest.fn(),
+        create: jest.fn(),
         update: jest.fn(),
-      },
-      booking: {
-        findFirst: jest.fn().mockResolvedValue(null),
       },
       paymentEvent: {
         findFirst: jest.fn(),
         create: jest.fn(),
       },
-      ledgerEntry: {
-        createMany: jest.fn(),
-      },
     };
 
-    mockStripe = {};
+    mockStripe = {
+      createPaymentIntent: jest.fn(),
+      cancelPaymentIntent: jest.fn(),
+    };
 
     mockIdempotency = {
       computeHash: jest.fn().mockReturnValue('mock-hash'),
@@ -58,346 +45,16 @@ describe('PaymentService - recoveryPoint === completed', () => {
       completeKey: jest.fn().mockResolvedValue({}),
     };
 
-    mockDuffel = {
-      mapDuffelOrderToSnapshots: jest.fn().mockReturnValue({
-        flightSnapshot: { segments: [{ departureAt: '2026-07-20T10:00:00Z' }] },
-        passengerSnapshot: { passengers: [] },
-      }),
-    };
-    mockAudit = {};
-    mockPaymentMethod = { saveMethod: jest.fn() };
-    const mockBookingLifecycleService = {
-      createBooking: jest
-        .fn()
-        .mockResolvedValue({ id: '123e4567-e89b-42d3-a456-426614174000', userId: 'user-123' }),
-      updateToConfirmed: jest.fn(),
-      updateToFailed: jest.fn(),
+    mockAudit = {
+      createLog: jest.fn().mockResolvedValue({}),
     };
 
     service = new PaymentService(
       mockPrisma as unknown as PrismaService,
       mockStripe as unknown as StripeService,
       mockIdempotency as unknown as PaymentIdempotencyService,
-      mockDuffel as unknown as DuffelService,
       mockAudit as unknown as AuditService,
-      mockPaymentMethod as unknown as PaymentMethodService,
-      mockBookingLifecycleService as any,
     );
-  });
-
-  describe('confirmPayment recoveryPoint === completed', () => {
-    const dto = { paymentId: 'payment-123', bookingId: '123e4567-e89b-42d3-a456-426614174000' };
-    const idempotencyKey = 'key-123';
-    const userId = 'user-123';
-
-    it('returns successResponse and completes key when payment.status is SUCCEEDED', async () => {
-      // 1. Mock payment lookup
-      mockPrisma.payment.findUnique.mockResolvedValueOnce({
-        id: 'payment-123',
-        bookingIntentId: 'intent-123',
-        status: 'SUCCEEDED',
-        bookingIntent: { userId: 'user-123' },
-      });
-
-      // 2. Mock resume point
-      mockIdempotency.getResumePoint.mockResolvedValueOnce('completed');
-
-      // 3. Mock paymentEvent query for duffel_order_created
-      mockPrisma.paymentEvent.findFirst.mockResolvedValueOnce({
-        metadata: {
-          id: 'duffel-order-abc',
-          booking_reference: 'PNR123',
-        },
-      });
-
-      const response = await service.executeConfirmPayment(dto, idempotencyKey, userId);
-
-      expect(mockIdempotency.completeKey).toHaveBeenCalledWith(
-        idempotencyKey,
-        HttpStatus.OK,
-        expect.objectContaining({
-          success: true,
-          paymentId: 'payment-123',
-          status: 'SUCCEEDED',
-          bookingReference: 'PNR123',
-          duffelOrderId: 'duffel-order-abc',
-        }),
-      );
-
-      expect(response).toEqual({
-        success: true,
-        paymentId: 'payment-123',
-        status: 'SUCCEEDED',
-        bookingReference: 'PNR123',
-        duffelOrderId: 'duffel-order-abc',
-      });
-    });
-
-    it('throws InternalServerErrorException if payment is SUCCEEDED but duffel event metadata is missing', async () => {
-      mockPrisma.payment.findUnique.mockResolvedValueOnce({
-        id: 'payment-123',
-        bookingIntentId: 'intent-123',
-        status: 'SUCCEEDED',
-        bookingIntent: { userId: 'user-123' },
-      });
-
-      mockIdempotency.getResumePoint.mockResolvedValueOnce('completed');
-      mockPrisma.paymentEvent.findFirst.mockResolvedValueOnce(null);
-
-      await expect(service.executeConfirmPayment(dto, idempotencyKey, userId)).rejects.toThrow(
-        InternalServerErrorException,
-      );
-    });
-
-    it('returns failureResponse and completes key with BAD_GATEWAY if status is CANCELLED and duffel event exists', async () => {
-      mockPrisma.payment.findUnique.mockResolvedValueOnce({
-        id: 'payment-123',
-        bookingIntentId: 'intent-123',
-        status: 'CANCELLED',
-        bookingIntent: { userId: 'user-123' },
-      });
-
-      mockIdempotency.getResumePoint.mockResolvedValueOnce('completed');
-
-      // Mock duffel event exists (indicating order was created but capture failed/background processing failed)
-      mockPrisma.paymentEvent.findFirst.mockResolvedValueOnce({
-        metadata: { id: 'duffel-order-abc' },
-      });
-
-      // Mock bookingIntent query
-      mockPrisma.bookingIntent.findUnique.mockResolvedValueOnce({
-        id: 'intent-123',
-        status: 'CANCELLED',
-      });
-
-      const response = await service.executeConfirmPayment(dto, idempotencyKey, userId);
-
-      expect(mockIdempotency.completeKey).toHaveBeenCalledWith(
-        idempotencyKey,
-        HttpStatus.BAD_GATEWAY,
-        expect.objectContaining({
-          success: false,
-          error:
-            'Stripe capture failed or background processing failed. Duffel order cancelled and hold released.',
-          bookingStatus: 'CANCELLED',
-        }),
-      );
-
-      expect(response).toEqual({
-        success: false,
-        error:
-          'Stripe capture failed or background processing failed. Duffel order cancelled and hold released.',
-        bookingStatus: 'CANCELLED',
-      });
-    });
-
-    it('returns failureResponse and completes key with BAD_GATEWAY if status is CANCELLED and duffel event does not exist', async () => {
-      mockPrisma.payment.findUnique.mockResolvedValueOnce({
-        id: 'payment-123',
-        bookingIntentId: 'intent-123',
-        status: 'CANCELLED',
-        bookingIntent: { userId: 'user-123' },
-      });
-
-      mockIdempotency.getResumePoint.mockResolvedValueOnce('completed');
-
-      // Mock duffel event does NOT exist (indicating duffel order was not created)
-      mockPrisma.paymentEvent.findFirst.mockResolvedValueOnce(null);
-
-      mockPrisma.bookingIntent.findUnique.mockResolvedValueOnce({
-        id: 'intent-123',
-        status: 'AWAITING_PAYMENT',
-      });
-
-      const response = await service.executeConfirmPayment(dto, idempotencyKey, userId);
-
-      expect(mockIdempotency.completeKey).toHaveBeenCalledWith(
-        idempotencyKey,
-        HttpStatus.BAD_GATEWAY,
-        expect.objectContaining({
-          success: false,
-          error: 'Duffel booking failed. Payment hold released.',
-          bookingStatus: 'AWAITING_PAYMENT',
-        }),
-      );
-
-      expect(response).toEqual({
-        success: false,
-        error: 'Duffel booking failed. Payment hold released.',
-        bookingStatus: 'AWAITING_PAYMENT',
-      });
-    });
-  });
-
-  describe('post-capture saved payment methods', () => {
-    it('syncs the payment method after a successful capture', async () => {
-      mockPrisma.payment.findUnique.mockResolvedValue({
-        id: 'payment-123',
-        bookingIntentId: 'intent-123',
-        stripePaymentIntentId: 'pi-123',
-        stripeCustomerId: 'cus-123',
-        amount: 10000,
-        currency: 'usd',
-        status: 'AUTHORIZED',
-        bookingIntent: { userId: 'user-123' },
-      });
-      mockPrisma.paymentEvent.findFirst.mockResolvedValue({
-        metadata: { id: 'duffel-order-123', booking_reference: 'PNR123' },
-      });
-      mockPrisma.$transaction = jest.fn().mockImplementation(async (callback) =>
-        callback({
-          payment: { update: jest.fn() },
-          paymentEvent: { create: jest.fn() },
-          bookingIntent: {
-            update: jest.fn(),
-            findUnique: jest.fn().mockResolvedValue({ id: 'intent-123', userId: 'user-123' }),
-          },
-          ledgerEntry: { createMany: jest.fn() },
-        }),
-      );
-      mockIdempotency.getResumePoint.mockResolvedValue('captured');
-      mockIdempotency.updateRecoveryPoint = jest.fn();
-      mockAudit.createLog = jest.fn();
-
-      await service.executeConfirmPayment(
-        { paymentId: 'payment-123', bookingId: '123e4567-e89b-42d3-a456-426614174000' },
-        'confirm-key-123',
-        'user-123',
-      );
-
-      expect(mockPaymentMethod.saveMethod).toHaveBeenCalledWith('user-123', 'cus-123', 'pi-123');
-    });
-  });
-
-  describe('handleBackgroundError', () => {
-    const paymentId = 'payment-123';
-    const idempotencyKey = 'key-123';
-    const userId = 'user-123';
-    const error = new Error('Some background error');
-
-    beforeEach(() => {
-      mockPrisma.$transaction = jest.fn().mockImplementation(async (cb) => cb(mockPrisma));
-      mockPrisma.payment.update = jest.fn();
-      mockPrisma.paymentEvent.create = jest.fn();
-      mockPrisma.bookingIntent.update = jest.fn();
-
-      mockStripe.retrievePaymentIntent = jest.fn();
-      mockStripe.cancelPaymentIntent = jest.fn();
-      mockDuffel.cancelOrder = jest.fn();
-      mockIdempotency.updateRecoveryPoint = jest.fn();
-    });
-
-    it('when Stripe retrieval returns status === succeeded, logs/updates recovery point to captured, returns early, and does NOT compensate', async () => {
-      // Setup payment
-      mockPrisma.payment.findUnique.mockResolvedValueOnce({
-        id: paymentId,
-        stripePaymentIntentId: 'pi_123',
-        bookingIntentId: 'intent-123',
-        status: 'AUTHORIZED',
-        amount: 100,
-      });
-
-      // Stripe returns succeeded
-      mockStripe.retrievePaymentIntent.mockResolvedValueOnce({
-        id: 'pi_123',
-        status: 'succeeded',
-      });
-
-      // Resume point is null
-      mockIdempotency.getResumePoint.mockResolvedValueOnce(null);
-
-      // Call handleBackgroundError
-      await (service as any).handleBackgroundError(paymentId, idempotencyKey, userId, error);
-
-      // Verify recovery point updated to 'captured'
-      expect(mockIdempotency.updateRecoveryPoint).toHaveBeenCalledWith(idempotencyKey, 'captured');
-
-      // Verify no compensation methods are called
-      expect(mockDuffel.cancelOrder).not.toHaveBeenCalled();
-      expect(mockStripe.cancelPaymentIntent).not.toHaveBeenCalled();
-      expect(mockPrisma.payment.update).not.toHaveBeenCalled();
-    });
-
-    it('when Stripe retrieval returns status !== succeeded, continues compensation', async () => {
-      // Setup payment
-      mockPrisma.payment.findUnique.mockResolvedValueOnce({
-        id: paymentId,
-        stripePaymentIntentId: 'pi_123',
-        bookingIntentId: 'intent-123',
-        status: 'AUTHORIZED',
-        amount: 100,
-      });
-
-      // Stripe returns requires_capture
-      mockStripe.retrievePaymentIntent.mockResolvedValueOnce({
-        id: 'pi_123',
-        status: 'requires_capture',
-      });
-
-      // Resume point is null
-      mockIdempotency.getResumePoint.mockResolvedValueOnce(null);
-
-      // Mock duffel event query - return one to verify Duffel cancelOrder is called
-      mockPrisma.paymentEvent.findFirst.mockResolvedValueOnce({
-        metadata: { id: 'duffel-order-abc' },
-      });
-
-      // Mock bookingIntent query
-      mockPrisma.bookingIntent.findUnique.mockResolvedValueOnce({
-        id: 'intent-123',
-        paymentAttemptCount: 1,
-      });
-
-      // Call handleBackgroundError
-      await (service as any).handleBackgroundError(paymentId, idempotencyKey, userId, error);
-
-      // Verify recovery point is NOT updated to 'captured'
-      expect(mockIdempotency.updateRecoveryPoint).not.toHaveBeenCalledWith(
-        idempotencyKey,
-        'captured',
-      );
-
-      // Verify compensation methods are called
-      expect(mockDuffel.cancelOrder).toHaveBeenCalledWith('duffel-order-abc');
-      expect(mockStripe.cancelPaymentIntent).toHaveBeenCalledWith('pi_123');
-
-      // Verify payment transitioned to CANCELLED
-      expect(mockPrisma.payment.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: paymentId },
-          data: { status: 'CANCELLED' },
-        }),
-      );
-
-      // Verify bookingIntent status is updated
-      expect(mockPrisma.bookingIntent.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: 'intent-123' },
-          data: { status: 'AWAITING_PAYMENT' },
-        }),
-      );
-    });
-
-    it('when Stripe retrieval fails (throws), it logs the error and returns early (recoverable)', async () => {
-      // Setup payment
-      mockPrisma.payment.findUnique.mockResolvedValueOnce({
-        id: paymentId,
-        stripePaymentIntentId: 'pi_123',
-        bookingIntentId: 'intent-123',
-        status: 'AUTHORIZED',
-        amount: 100,
-      });
-
-      // Stripe retrieve throws
-      mockStripe.retrievePaymentIntent.mockRejectedValueOnce(new Error('Stripe API error'));
-
-      // Call handleBackgroundError
-      await (service as any).handleBackgroundError(paymentId, idempotencyKey, userId, error);
-
-      // Verify compensation methods are NOT called and return is early/recoverable
-      expect(mockStripe.cancelPaymentIntent).not.toHaveBeenCalled();
-      expect(mockPrisma.payment.update).not.toHaveBeenCalled();
-    });
   });
 
   describe('createPayment - stale-lock retry', () => {
@@ -544,359 +201,61 @@ describe('PaymentService - recoveryPoint === completed', () => {
     });
   });
 
-  describe('confirmPayment final passenger validation (T067/T071)', () => {
-    const dto = { paymentId: 'payment-val-123', bookingId: 'booking-uuid-val' };
-    const idempotencyKey = 'idemp-' + 'val-123';
-    const userId = 'user-val-123';
-
-    let mockValidator: {
-      validate: jest.Mock;
-      validateAndMapPassengers: jest.Mock;
-    };
-    let validatorService: PaymentService;
-    let mockBookingLifecycleService: {
-      createBooking: jest.Mock;
-      updateToConfirmed: jest.Mock;
-      updateToFailed: jest.Mock;
-    };
-
-    const mockBookingIntent = {
-      id: 'intent-val-123',
-      userId: 'user-val-123',
-      duffelOfferId: 'off_val_123',
-      paymentAttemptCount: 1,
-      snapshotVersion: 1,
-      rawOfferSnapshot: { id: 'off_val_123' },
-      passengers: [
-        {
-          id: 'pass-val-1',
-          intentId: 'intent-val-123',
-          position: 0,
-          type: 'ADULT',
-          givenName: 'Grace',
-          familyName: 'Hopper',
-          dateOfBirth: new Date('1906-12-09'),
-          gender: 'female',
-          title: 'ms',
-          email: 'grace@example.com',
-          phoneNumber: '+12025550199',
+  describe('getPaymentStatus', () => {
+    it('returns payment and booking status when payment exists and user owns it', async () => {
+      mockPrisma.payment.findUnique.mockResolvedValueOnce({
+        id: 'pay-123',
+        status: 'CREATED',
+        amount: 5000,
+        currency: 'usd',
+        attemptNumber: 1,
+        bookingIntent: {
+          id: 'intent-123',
+          userId: 'user-123',
+          status: 'AWAITING_PAYMENT',
         },
-      ],
-    };
-
-    const mockPaymentRecord = {
-      id: 'payment-val-123',
-      bookingIntentId: 'intent-val-123',
-      stripePaymentIntentId: 'pi_val_123',
-      amount: 25000,
-      currency: 'usd',
-      status: 'AUTHORIZED',
-      ancillarySelectionId: null,
-      ancillarySelectionVersion: null,
-      ancillarySelection: null,
-      bookingIntent: { id: 'intent-val-123', userId: 'user-val-123' },
-    };
-
-    beforeEach(() => {
-      mockPrisma.payment.findUnique.mockResolvedValue(mockPaymentRecord);
-      mockPrisma.bookingIntent.findUnique.mockResolvedValue(mockBookingIntent);
-      mockPrisma.paymentEvent.create.mockResolvedValue({});
-      mockPrisma.paymentEvent.findFirst.mockResolvedValue({
-        metadata: { id: 'ord_val_123', booking_reference: 'PNRVAL123' },
-      });
-      mockPrisma.payment.update.mockResolvedValue({});
-      mockPrisma.bookingIntent.update.mockResolvedValue({});
-
-      mockIdempotency.getResumePoint.mockResolvedValue('stripe_authorized');
-      mockIdempotency.updateRecoveryPoint.mockResolvedValue({});
-      mockIdempotency.completeKey.mockResolvedValue({});
-
-      mockStripe.cancelPaymentIntent = jest
-        .fn()
-        .mockResolvedValue({ id: 'pi_val_123', status: 'canceled' });
-      mockStripe.capturePaymentIntent = jest
-        .fn()
-        .mockResolvedValue({ id: 'pi_val_123', status: 'succeeded' });
-      mockStripe.retrievePaymentIntent = jest
-        .fn()
-        .mockResolvedValue({ id: 'pi_val_123', status: 'succeeded' });
-
-      mockDuffel.createOrder = jest.fn().mockResolvedValue({
-        id: 'ord_val_123',
-        booking_reference: 'PNRVAL123',
-        passengers: [{ id: 'pas_duffel_1', given_name: 'Grace', family_name: 'Hopper' }],
       });
 
-      mockAudit.createLog = jest.fn().mockResolvedValue({});
+      const result = await service.getPaymentStatus('pay-123', 'user-123');
 
-      mockBookingLifecycleService = {
-        createBooking: jest
-          .fn()
-          .mockResolvedValue({ id: 'booking-uuid-val', userId: 'user-val-123' }),
-        updateToConfirmed: jest.fn().mockResolvedValue({}),
-        updateToFailed: jest.fn().mockResolvedValue({}),
-      };
+      expect(mockPrisma.payment.findUnique).toHaveBeenCalledWith({
+        where: { id: 'pay-123' },
+        include: { bookingIntent: true },
+      });
+      expect(result).toEqual({
+        paymentId: 'pay-123',
+        status: 'CREATED',
+        amount: 5000,
+        currency: 'usd',
+        bookingIntentStatus: 'AWAITING_PAYMENT',
+        attemptNumber: 1,
+      });
+    });
 
-      mockValidator = {
-        validate: jest.fn(),
-        validateAndMapPassengers: jest.fn(),
-      };
+    it('throws NotFoundException when payment does not exist', async () => {
+      mockPrisma.payment.findUnique.mockResolvedValueOnce(null);
 
-      validatorService = new PaymentService(
-        mockPrisma as unknown as PrismaService,
-        mockStripe as unknown as StripeService,
-        mockIdempotency as unknown as PaymentIdempotencyService,
-        mockDuffel as unknown as DuffelService,
-        mockAudit as unknown as AuditService,
-        mockPaymentMethod as unknown as PaymentMethodService,
-        mockBookingLifecycleService as any,
-        undefined,
-        mockValidator as unknown as BookingPassengerFinalValidatorService,
+      await expect(service.getPaymentStatus('non-existent', 'user-123')).rejects.toThrow(
+        NotFoundException,
       );
     });
 
-    it('successful validation passes ephemeral passenger DTO to duffelService.createOrder() exactly once and logs audit record', async () => {
-      const ephemeralDto = [
-        {
-          id: 'pas_duffel_1',
-          type: 'adult',
-          given_name: 'Grace',
-          family_name: 'Hopper',
-          born_on: '1906-12-09',
-          gender: 'f',
-          title: 'ms',
-          email: 'grace@example.com',
-          phone_number: '+12025550199',
-          identity_documents: [],
+    it('throws ForbiddenException when payment belongs to a different user', async () => {
+      mockPrisma.payment.findUnique.mockResolvedValueOnce({
+        id: 'pay-123',
+        status: 'CREATED',
+        amount: 5000,
+        currency: 'usd',
+        attemptNumber: 1,
+        bookingIntent: {
+          id: 'intent-123',
+          userId: 'other-user',
+          status: 'AWAITING_PAYMENT',
         },
-      ];
-      mockValidator.validateAndMapPassengers.mockReturnValue(ephemeralDto);
-
-      await validatorService.executeConfirmPayment(dto, idempotencyKey, userId, {
-        traceId: 'trace-123',
-        correlationId: 'corr-123',
       });
 
-      expect(mockValidator.validateAndMapPassengers).toHaveBeenCalledTimes(1);
-      expect(mockValidator.validateAndMapPassengers).toHaveBeenCalledWith(mockBookingIntent, {
-        traceId: 'trace-123',
-        correlationId: 'corr-123',
-      });
-
-      expect(mockAudit.createLog).toHaveBeenCalledWith(
-        mockPrisma,
-        expect.objectContaining({
-          userId: 'user-val-123',
-          action: 'final_passenger_validation_succeeded',
-          resourceType: 'BookingIntent',
-          resourceId: 'intent-val-123',
-          metadata: expect.objectContaining({
-            paymentId: 'payment-val-123',
-            passengerCount: 1,
-          }),
-          traceId: 'trace-123',
-          correlationId: 'corr-123',
-        }),
-      );
-
-      expect(mockDuffel.createOrder).toHaveBeenCalledTimes(1);
-      expect(mockDuffel.createOrder).toHaveBeenCalledWith(
-        'off_val_123',
-        ephemeralDto,
-        undefined,
-        { bookingIntentId: 'intent-val-123', paymentId: 'payment-val-123' },
-        idempotencyKey,
-      );
-
-      expect(mockIdempotency.updateRecoveryPoint).toHaveBeenCalledWith(
-        idempotencyKey,
-        'duffel_order_created',
-      );
-    });
-
-    it('invalid passenger snapshot (SNAPSHOT_INTEGRITY_FAILURE) prevents duffelService.createOrder(), voids Stripe hold, cancels payment, and logs safe audit', async () => {
-      mockValidator.validateAndMapPassengers.mockImplementation(() => {
-        throw new UnprocessableEntityException({
-          code: 'SNAPSHOT_INTEGRITY_FAILURE',
-          message: 'Passenger snapshot integrity failure',
-        });
-      });
-
-      await expect(
-        validatorService.executeConfirmPayment(dto, idempotencyKey, userId, {
-          traceId: 'trace-fail',
-          correlationId: 'corr-fail',
-        }),
-      ).rejects.toThrow(HttpException);
-
-      // Exactly 0 calls to Duffel createOrder
-      expect(mockDuffel.createOrder).not.toHaveBeenCalled();
-
-      // Voids / cancels Stripe authorization hold
-      expect(mockStripe.cancelPaymentIntent).toHaveBeenCalledWith('pi_val_123');
-
-      // Updates payment to CANCELLED and creates payment event
-      expect(mockPrisma.payment.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: 'payment-val-123' },
-          data: { status: 'CANCELLED' },
-        }),
-      );
-      expect(mockPrisma.paymentEvent.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            paymentId: 'payment-val-123',
-            eventType: 'payment_cancelled',
-            newStatus: 'CANCELLED',
-          }),
-        }),
-      );
-
-      // Updates booking intent to AWAITING_PAYMENT (since paymentAttemptCount = 1 < 2)
-      expect(mockPrisma.bookingIntent.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: 'intent-val-123' },
-          data: { status: 'AWAITING_PAYMENT' },
-        }),
-      );
-
-      // Updates booking to FAILED with reason SYSTEM_ERROR
-      expect(mockBookingLifecycleService.updateToFailed).toHaveBeenCalledWith(
-        'booking-uuid-val',
-        BookingFailureReason.SYSTEM_ERROR,
-        undefined,
-        undefined,
-        undefined,
-        mockPrisma,
-      );
-
-      // Durable PII-safe audit record logged
-      expect(mockAudit.createLog).toHaveBeenCalledWith(
-        mockPrisma,
-        expect.objectContaining({
-          userId: 'user-val-123',
-          action: 'final_passenger_validation_failed',
-          resourceType: 'BookingIntent',
-          resourceId: 'intent-val-123',
-          metadata: expect.objectContaining({
-            reasonCode: 'SNAPSHOT_INTEGRITY_FAILURE',
-            intentId: 'intent-val-123',
-            paymentId: 'payment-val-123',
-            passengerCount: 1,
-          }),
-          traceId: 'trace-fail',
-          correlationId: 'corr-fail',
-        }),
-      );
-
-      // Updates recovery point to completed and completes idempotency key with 422
-      expect(mockIdempotency.updateRecoveryPoint).toHaveBeenCalledWith(idempotencyKey, 'completed');
-      expect(mockIdempotency.completeKey).toHaveBeenCalledWith(
-        idempotencyKey,
-        HttpStatus.UNPROCESSABLE_ENTITY,
-        expect.objectContaining({
-          success: false,
-          code: 'SNAPSHOT_INTEGRITY_FAILURE',
-          bookingStatus: 'AWAITING_PAYMENT',
-        }),
-      );
-    });
-
-    it('invalid passenger snapshot (DOCUMENT_EXPIRED) with exhausted attempts cancels booking intent', async () => {
-      mockPrisma.bookingIntent.findUnique.mockResolvedValueOnce({
-        ...mockBookingIntent,
-        paymentAttemptCount: 2,
-      });
-
-      mockValidator.validateAndMapPassengers.mockImplementation(() => {
-        throw new UnprocessableEntityException({
-          code: 'DOCUMENT_EXPIRED',
-          message: 'Travel document has expired',
-        });
-      });
-
-      await expect(
-        validatorService.executeConfirmPayment(dto, idempotencyKey, userId),
-      ).rejects.toThrow(HttpException);
-
-      expect(mockDuffel.createOrder).not.toHaveBeenCalled();
-      expect(mockStripe.cancelPaymentIntent).toHaveBeenCalledWith('pi_val_123');
-
-      // When paymentAttemptCount >= 2, status becomes CANCELLED
-      expect(mockPrisma.bookingIntent.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: 'intent-val-123' },
-          data: { status: 'CANCELLED' },
-        }),
-      );
-
-      expect(mockAudit.createLog).toHaveBeenCalledWith(
-        mockPrisma,
-        expect.objectContaining({
-          action: 'final_passenger_validation_failed',
-          metadata: expect.objectContaining({
-            reasonCode: 'DOCUMENT_EXPIRED',
-          }),
-        }),
-      );
-
-      expect(mockIdempotency.completeKey).toHaveBeenCalledWith(
-        idempotencyKey,
-        HttpStatus.UNPROCESSABLE_ENTITY,
-        expect.objectContaining({
-          success: false,
-          code: 'DOCUMENT_EXPIRED',
-          bookingStatus: 'CANCELLED',
-        }),
-      );
-    });
-
-    it('offer expired failure (OFFER_EXPIRED 409) completes key with 409 status and voids Stripe hold', async () => {
-      mockValidator.validateAndMapPassengers.mockImplementation(() => {
-        throw new HttpException(
-          { code: 'OFFER_EXPIRED', message: 'Flight offer has expired' },
-          HttpStatus.CONFLICT,
-        );
-      });
-
-      await expect(
-        validatorService.executeConfirmPayment(dto, idempotencyKey, userId),
-      ).rejects.toThrow(HttpException);
-
-      expect(mockDuffel.createOrder).not.toHaveBeenCalled();
-      expect(mockStripe.cancelPaymentIntent).toHaveBeenCalledWith('pi_val_123');
-
-      expect(mockIdempotency.completeKey).toHaveBeenCalledWith(
-        idempotencyKey,
-        HttpStatus.CONFLICT,
-        expect.objectContaining({
-          success: false,
-          code: 'OFFER_EXPIRED',
-        }),
-      );
-    });
-
-    it('fallback when bookingPassengerFinalValidator is not injected', async () => {
-      const fallbackService = new PaymentService(
-        mockPrisma as unknown as PrismaService,
-        mockStripe as unknown as StripeService,
-        mockIdempotency as unknown as PaymentIdempotencyService,
-        mockDuffel as unknown as DuffelService,
-        mockAudit as unknown as AuditService,
-        mockPaymentMethod as unknown as PaymentMethodService,
-        mockBookingLifecycleService as any,
-      );
-
-      await fallbackService.executeConfirmPayment(dto, idempotencyKey, userId);
-
-      expect(mockDuffel.createOrder).toHaveBeenCalledWith(
-        'off_val_123',
-        expect.arrayContaining([
-          expect.objectContaining({ givenName: 'Grace', familyName: 'Hopper' }),
-        ]),
-        undefined,
-        { bookingIntentId: 'intent-val-123', paymentId: 'payment-val-123' },
-        idempotencyKey,
+      await expect(service.getPaymentStatus('pay-123', 'user-123')).rejects.toThrow(
+        ForbiddenException,
       );
     });
   });

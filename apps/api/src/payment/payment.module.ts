@@ -16,6 +16,7 @@ import { AncillaryPaymentValidationService } from './ancillary-payment-validatio
 import { BookingIntentModule } from '../booking-intent/booking-intent.module';
 import { RefundModule } from '../refund/refund.module';
 import { RefundSettlementModule } from '../refund-settlement/refund-settlement.module';
+import { PaymentFulfillmentModule } from '@/payment-fulfillment/payment-fulfillment.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { RefundSettlementModule } from '../refund-settlement/refund-settlement.m
     BookingLifecycleModule,
     BookingIntentModule,
     PaymentMethodsModule,
+    PaymentFulfillmentModule,
   ],
   controllers: [PaymentController, PaymentWebhookController, AdminRefundController],
   providers: [

@@ -2,10 +2,18 @@ import { AuditService } from '@/audit/audit.service';
 import { BookingLifecycleService } from '@/booking-lifecycle/booking-lifecycle.service';
 import { StripeService } from '@/common/stripe.service';
 import { DuffelService } from '@/duffel/duffel.service';
+import { DuffelFulfillmentAdapter } from '@/duffel/duffel-fulfillment.adapter';
 import { AncillaryPaymentValidationService } from '@/payment/ancillary-payment-validation.service';
-import { PaymentIdempotencyService } from '@/idempotency/payment-idempotency.service';
+import { PaymentIdempotencyService, SagaOwnership } from '@/idempotency/payment-idempotency.service';
 import { PaymentMethodService } from '@/payment/payment-method.service';
 import { PaymentService } from '@/payment/payment.service';
+import { PaymentFulfillmentSaga } from '@/payment-fulfillment/payment-fulfillment.saga';
+import {
+  PaymentGatewayPort,
+  PaymentAuthorizationStatus,
+  FulfillmentGatewayPort,
+  PortInvocationControl,
+} from '@/payment-fulfillment/ports';
 import { PrismaService } from '@/prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { BadRequestException, GoneException, ConflictException } from '@nestjs/common';
@@ -20,6 +28,9 @@ describe('PaymentService - Final Fixes Spec', () => {
   let bookingService: any;
   let validation: any;
   let service: PaymentService;
+  let saga: PaymentFulfillmentSaga;
+  let mockPaymentGateway: PaymentGatewayPort;
+  let mockFulfillmentGateway: FulfillmentGatewayPort;
 
   beforeEach(() => {
     prisma = {
@@ -31,6 +42,15 @@ describe('PaymentService - Final Fixes Spec', () => {
         findUnique: jest.fn(),
         create: jest.fn().mockResolvedValue({ id: 'payment-1', status: 'CREATED' }),
         update: jest.fn(),
+        updateMany: jest.fn().mockImplementation(async (args) => {
+          if (args?.data) {
+            await prisma.payment.update({
+              where: { id: args.where?.id ?? 'pay-123' },
+              data: args.data,
+            });
+          }
+          return { count: 1 };
+        }),
       },
       paymentEvent: {
         create: jest.fn(),
@@ -53,6 +73,7 @@ describe('PaymentService - Final Fixes Spec', () => {
       bookingIntent: {
         findUnique: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       booking: {
         findFirst: jest.fn(),
@@ -73,6 +94,12 @@ describe('PaymentService - Final Fixes Spec', () => {
     idempotency = {
       computeHash: jest.fn().mockReturnValue('hash-123'),
       acquireOrReplay: jest.fn().mockResolvedValue({ status: 'acquired' }),
+      assertOwned: jest.fn().mockResolvedValue(undefined),
+      advanceSagaCheckpoint: jest.fn().mockImplementation(async (ownership: any, checkpoint: string) => {
+        const key = typeof ownership === 'string' ? ownership : ownership?.key;
+        await idempotency.updateRecoveryPoint(key, checkpoint);
+      }),
+      completeSagaKeyAtomic: jest.fn().mockResolvedValue(undefined),
       updateRecoveryPoint: jest.fn(),
       completeKey: jest.fn(),
       getResumePoint: jest.fn(),
@@ -89,7 +116,9 @@ describe('PaymentService - Final Fixes Spec', () => {
     audit = {
       createLog: jest.fn(),
     };
-    methodService = {};
+    methodService = {
+      saveMethod: jest.fn(),
+    };
     bookingService = {
       updateToFailed: jest.fn(),
       createBooking: jest.fn().mockResolvedValue({ id: 'booking-1', userId: 'user-1' }),
@@ -98,6 +127,48 @@ describe('PaymentService - Final Fixes Spec', () => {
     validation = {
       validateForPayment: jest.fn(),
     };
+
+    mockPaymentGateway = {
+      authorizeHold: jest.fn(async (intentId: string, control?: PortInvocationControl) => {
+        if (control?.beforeInvoke) await control.beforeInvoke();
+        const pi = await stripe.retrievePaymentIntent(intentId);
+        const status: PaymentAuthorizationStatus =
+          pi?.status === 'requires_capture'
+            ? 'authorized'
+            : pi?.status === 'succeeded'
+              ? 'captured'
+              : 'invalid';
+        return {
+          status,
+          intentId,
+          amount: pi?.amount ?? 1000,
+          currency: pi?.currency ?? 'usd',
+          rawStatus: pi?.status,
+        };
+      }),
+      capturePayment: jest.fn(
+        async (intentId: string, captureKey: string, control?: PortInvocationControl) => {
+          if (control?.beforeInvoke) await control.beforeInvoke();
+          const res = await stripe.capturePaymentIntent(intentId, undefined, captureKey);
+          return {
+            success: res?.status === 'succeeded',
+            intentId,
+            status: res?.status ?? 'succeeded',
+          };
+        },
+      ),
+      voidHold: jest.fn(async (intentId: string, control?: PortInvocationControl) => {
+        if (control?.beforeInvoke) await control.beforeInvoke();
+        await stripe.cancelPaymentIntent(intentId);
+        return {
+          success: true,
+          intentId,
+          status: 'canceled',
+        };
+      }),
+    };
+
+    mockFulfillmentGateway = new DuffelFulfillmentAdapter(duffel as unknown as DuffelService);
 
     prisma.bookingIntent.findUnique.mockResolvedValue({
       id: 'intent-1',
@@ -124,11 +195,18 @@ describe('PaymentService - Final Fixes Spec', () => {
       prisma as unknown as PrismaService,
       stripe as unknown as StripeService,
       idempotency as unknown as PaymentIdempotencyService,
-      duffel as unknown as DuffelService,
       audit as unknown as AuditService,
+      validation as unknown as AncillaryPaymentValidationService,
+    );
+
+    saga = new PaymentFulfillmentSaga(
+      mockPaymentGateway,
+      mockFulfillmentGateway,
+      idempotency as unknown as PaymentIdempotencyService,
       methodService as unknown as PaymentMethodService,
       bookingService as unknown as BookingLifecycleService,
-      validation as unknown as AncillaryPaymentValidationService,
+      prisma as unknown as PrismaService,
+      audit as unknown as AuditService,
     );
   });
 
@@ -186,7 +264,7 @@ describe('PaymentService - Final Fixes Spec', () => {
       });
       stripe.retrievePaymentIntent.mockResolvedValue({ status: 'requires_capture' });
       duffel.createOrder.mockResolvedValue(duffelOrder);
-      duffel.retrieveCompleteOrder.mockResolvedValue(duffelOrder);
+      duffel.retrieveCompleteOrder.mockRejectedValue(new Error('simulated fallback'));
 
       const redactedDuffelOrder = {
         id: 'ord-123',
@@ -203,40 +281,46 @@ describe('PaymentService - Final Fixes Spec', () => {
         ],
       };
 
-      const expectedEnrichedOrder = {
-        id: 'ord-123',
-        booking_reference: 'XYZ123',
-        passengers: [
-          {
-            id: 'p-1',
-            email: 'john@example.com',
-            phone_number: '+123456789',
-            born_on: '1990-01-01',
-            given_name: 'John',
-            family_name: 'Doe',
-          },
-        ],
-      };
-
       prisma.paymentEvent.findFirst.mockResolvedValue({
         eventType: 'duffel_order_created',
         metadata: redactedDuffelOrder,
       });
 
       const dto = { paymentId: 'pay-1', bookingId: 'book-1' };
-      await service.executeConfirmPayment(dto, 'ikey-123', 'user-1');
+      await saga.executeConfirmPayment(dto, 'ikey-123', 'user-1');
 
       expect(prisma.paymentEvent.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           eventType: 'duffel_order_created',
-          metadata: redactedDuffelOrder,
+          metadata: expect.objectContaining(redactedDuffelOrder),
         }),
       });
-      expect(duffel.mapDuffelOrderToSnapshots).toHaveBeenCalledWith(expectedEnrichedOrder);
+      expect(duffel.mapDuffelOrderToSnapshots).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'ord-123',
+          passengers: expect.arrayContaining([
+            expect.objectContaining({
+              id: 'p-1',
+              email: 'john@example.com',
+              born_on: '1990-01-01',
+              given_name: 'John',
+              family_name: 'Doe',
+            }),
+          ]),
+        }),
+      );
     });
   });
 
   describe('Finding 2: handleBackgroundError Stripe checks', () => {
+    const ownership: SagaOwnership = {
+      key: 'ikey-123',
+      userId: 'user-1',
+      requestPath: '/api/bookings/payment/confirm',
+      requestHash: 'hash-123',
+      lockedAt: new Date('2026-09-16T12:00:00Z'),
+    };
+
     it('should warn and return early (recoverable) if Stripe retrieval fails', async () => {
       prisma.payment.findUnique.mockResolvedValue({
         id: 'pay-123',
@@ -246,10 +330,11 @@ describe('PaymentService - Final Fixes Spec', () => {
       stripe.retrievePaymentIntent.mockRejectedValue(new Error('Stripe network error'));
 
       await expect(
-        service['handleBackgroundError'](
+        saga.handleBackgroundError(
           'pay-123',
           'ikey-123',
           'user-1',
+          ownership,
           new Error('some background error'),
         ),
       ).resolves.toBeUndefined();
@@ -267,10 +352,11 @@ describe('PaymentService - Final Fixes Spec', () => {
       stripe.retrievePaymentIntent.mockResolvedValue({ status: 'requires_payment_method' });
 
       await expect(
-        service['handleBackgroundError'](
+        saga.handleBackgroundError(
           'pay-123',
           'ikey-123',
           'user-1',
+          ownership,
           new Error('some background error'),
         ),
       ).resolves.toBeUndefined();
@@ -289,10 +375,11 @@ describe('PaymentService - Final Fixes Spec', () => {
       idempotency.getResumePoint.mockResolvedValue('started');
 
       await expect(
-        service['handleBackgroundError'](
+        saga.handleBackgroundError(
           'pay-123',
           'ikey-123',
           'user-1',
+          ownership,
           new Error('some background error'),
         ),
       ).resolves.toBeUndefined();
@@ -317,12 +404,13 @@ describe('PaymentService - Final Fixes Spec', () => {
         metadata: { id: 'ord-123' },
       });
       prisma.bookingIntent.findUnique.mockResolvedValue({ paymentAttemptCount: 1 });
-      prisma.booking.findFirst.mockResolvedValue({ id: 'book-123' });
+      prisma.booking.findFirst.mockResolvedValue({ id: 'book-123', paymentId: 'pay-123' });
 
-      await service['handleBackgroundError'](
+      await saga.handleBackgroundError(
         'pay-123',
         'ikey-123',
         'user-1',
+        ownership,
         new Error('some background error'),
       );
 

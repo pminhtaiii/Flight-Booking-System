@@ -35,11 +35,23 @@ Planning artifacts: [specification](../specs/024-event-driven-module-deepening/s
   - Implements 25-second handoff returning HTTP 202 (`PENDING`) with pollUrl, continuing the same in-flight execution promise in the background and executing `handleBackgroundError` under retained lease ownership upon failure.
   - Manages 4-stage checkpointed pipeline: `started` -> `stripe_authorized` -> `duffel_order_created` -> `captured` -> `completed` with atomic terminal completion via `completeSagaKeyAtomic`.
   - Comprehensive compensation matrix: Duffel failure triggers `voidHold`; capture failure reconciles intent and performs clean rollback (`voidHold` + `cancelOrder`) if known failed, or safely preserves for recovery if nonfinal/unknown. Database transactions never span remote provider calls.
+- **PaymentFulfillmentModule (`apps/api/src/payment-fulfillment/payment-fulfillment.module.ts`) (T011)**:
+  - Registers and exports `PaymentFulfillmentSaga`.
+  - Imports `IdempotencyModule`, `StripeModule`, `DuffelModule`, `PaymentMethodsModule`, `BookingLifecycleModule`, `BookingIntentModule`, `PrismaModule`, and `AuditModule`.
+  - Strict circular dependency prevention invariant: `PaymentFulfillmentModule` never imports `PaymentModule`.
+- **PaymentController Delegation (`apps/api/src/payment/payment.controller.ts`) (T011)**:
+  - `PaymentModule` imports `PaymentFulfillmentModule`.
+  - `PaymentController` injects `PaymentFulfillmentSaga` and delegates `confirmPayment` directly to `paymentFulfillmentSaga.confirmPayment(dto, idempotencyKey, req.user.id)`, returning HTTP 202 Accepted if result status is `PENDING`.
+- **Payment Fulfillment Orchestration Extraction & Test Migration (`apps/api/src/payment/`) (T012)**:
+  - Extracted confirmation orchestration entirely from `PaymentService` into `PaymentFulfillmentSaga`.
+  - Migrated confirmation portions of `payment.service.spec.ts`, `payment-ancillary-order-recovery.spec.ts`, and `payment-ancillary-pipeline.spec.ts` to saga ownership while preserving payment creation and status verification in `PaymentService`.
+  - Captured `previousPaymentStatus` before database mutation and transaction transitions in compensation and terminal success flows to preserve state machine validation semantics under all test harness mocks.
+  - Decoupled test harnesses with shallow state cloning preventing in-memory object reference aliasing.
 - **AncillariesModule Decoupling (`apps/api/src/ancillaries/`)**:
   - `AncillariesModule` now imports `IdempotencyModule` directly with zero imports from `PaymentModule`.
   - Decoupling verified with unit/compilation tests in `apps/api/src/ancillaries/ancillaries.module.spec.ts`.
 - **PaymentModule Clean Composition (`apps/api/src/payment/`)**:
-  - `PaymentModule` imports and re-exports `IdempotencyModule` and `PaymentMethodsModule` without duplicate provider registrations.
+  - `PaymentModule` imports and re-exports `IdempotencyModule` and `PaymentMethodsModule` without duplicate provider registrations, and imports `PaymentFulfillmentModule`.
   - All payment services, controllers, and spec files directly import from `@/idempotency/payment-idempotency.service`.
 
 ### Remaining Architecture (Phases 3–6)

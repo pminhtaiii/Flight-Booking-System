@@ -1,0 +1,26 @@
+﻿import { Module } from '@nestjs/common';
+import { IdempotencyModule } from '@/idempotency/idempotency.module';
+import { StripeModule } from '@/common/stripe.module';
+import { DuffelModule } from '@/duffel/duffel.module';
+import { PaymentMethodsModule } from '@/payment/payment-methods.module';
+import { BookingLifecycleModule } from '@/booking-lifecycle/booking-lifecycle.module';
+import { BookingIntentModule } from '@/booking-intent/booking-intent.module';
+import { PrismaModule } from '@/prisma/prisma.module';
+import { AuditModule } from '@/audit/audit.module';
+import { PaymentFulfillmentSaga } from './payment-fulfillment.saga';
+
+@Module({
+  imports: [
+    IdempotencyModule,
+    StripeModule,
+    DuffelModule,
+    PaymentMethodsModule,
+    BookingLifecycleModule,
+    BookingIntentModule,
+    PrismaModule,
+    AuditModule,
+  ],
+  providers: [PaymentFulfillmentSaga],
+  exports: [PaymentFulfillmentSaga],
+})
+export class PaymentFulfillmentModule {}
