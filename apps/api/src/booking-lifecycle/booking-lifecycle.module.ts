@@ -6,11 +6,12 @@ import { DuffelModule } from '@/duffel/duffel.module';
 import { RefundModule } from '@/refund/refund.module';
 import { RefundSettlementModule } from '@/refund-settlement/refund-settlement.module';
 import { StripeModule } from '@/common/stripe.module';
-import { BookingLifecycleService } from './booking-lifecycle.service';
+import { BookingStateModule } from './booking-state.module';
 import { BookingRecoveryService } from './booking-recovery.service';
 
 @Module({
   imports: [
+    BookingStateModule,
     PrismaModule,
     AgentGatewayModule,
     DuffelModule,
@@ -19,7 +20,7 @@ import { BookingRecoveryService } from './booking-recovery.service';
     ScheduleModule,
     StripeModule,
   ],
-  providers: [BookingLifecycleService, BookingRecoveryService],
-  exports: [BookingLifecycleService, BookingRecoveryService],
+  providers: [BookingRecoveryService],
+  exports: [BookingStateModule, BookingRecoveryService],
 })
 export class BookingLifecycleModule {}
