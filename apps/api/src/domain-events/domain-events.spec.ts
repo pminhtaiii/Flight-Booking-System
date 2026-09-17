@@ -4,6 +4,7 @@ import {
   BookingEventType,
   REFUND_EVENTS,
   RefundEventType,
+  MinorUnitAmount,
   BookingCreatedEvent,
   BookingConfirmedEvent,
   BookingFailedEvent,
@@ -397,29 +398,50 @@ describe('Domain Events Contract & Invariants', () => {
       expect(event.timestamp.getTime()).toBeLessThanOrEqual(after);
     });
 
-    it('supports positional constructor arguments for booking events', () => {
-      const event = new BookingConfirmedEvent('book_pos_001', 'evt_pos_001', 2, sampleDate);
+    it('constructs booking events with typed init object', () => {
+      const event = new BookingConfirmedEvent({
+        bookingId: 'book_pos_001',
+        eventId: 'evt_pos_001',
+        sourceVersion: 2,
+        timestamp: sampleDate,
+      });
       expect(event.bookingId).toBe('book_pos_001');
       expect(event.eventId).toBe('evt_pos_001');
       expect(event.sourceVersion).toBe(2);
       expect(event.timestamp).toEqual(sampleDate);
     });
 
-    it('supports positional constructor arguments for refund events', () => {
-      const event = new RefundSettledEvent(
-        'evt_pos_ref',
-        'ref_pos_001',
-        1500,
-        'USD',
-        sampleDate,
-        'book_pos_001',
-      );
+    it('constructs refund events with typed init object', () => {
+      const event = new RefundSettledEvent({
+        eventId: 'evt_pos_ref',
+        refundId: 'ref_pos_001',
+        amount: 1500,
+        currency: 'USD',
+        timestamp: sampleDate,
+        bookingId: 'book_pos_001',
+      });
       expect(event.eventId).toBe('evt_pos_ref');
       expect(event.refundId).toBe('ref_pos_001');
       expect(event.amount).toBe(1500);
+      expect(Number.isInteger(event.amount)).toBe(true);
       expect(event.currency).toBe('USD');
       expect(event.timestamp).toEqual(sampleDate);
       expect(event.bookingId).toBe('book_pos_001');
+    });
+
+    it('explicitly verifies integer minor-unit amount contract (e.g. 1500 minor units)', () => {
+      const minorAmount: MinorUnitAmount = 1500;
+      const event = new RefundSettledEvent({
+        eventId: 'evt_minor_001',
+        refundId: 'ref_minor_001',
+        amount: minorAmount,
+        currency: 'USD',
+        timestamp: sampleDate,
+      });
+
+      expect(event.amount).toBe(1500);
+      expect(Number.isInteger(event.amount)).toBe(true);
+      expect(event.amount).not.toBe(15);
     });
   });
 });

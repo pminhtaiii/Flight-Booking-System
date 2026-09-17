@@ -11,10 +11,21 @@ export const REFUND_EVENTS = {
 
 export type RefundEventType = (typeof REFUND_EVENTS)[keyof typeof REFUND_EVENTS];
 
+/**
+ * Representation of monetary amount in integer minor currency units (e.g., cents, pence).
+ * Uses the smallest currency unit (e.g., 1050 for $10.50, matching Refund.amount in the Prisma schema).
+ * Strictly integer minor units; decimal major units are prohibited.
+ */
+export type MinorUnitAmount = number;
+
 export type RefundSettledEventInit = {
   eventId: string;
   refundId: string;
-  amount: number;
+  /**
+   * Amount in integer minor currency units (e.g., cents, pence; 1050 represents $10.50).
+   * Strictly uses integer minor units matching Refund.amount; decimal major units prohibited.
+   */
+  amount: MinorUnitAmount;
   currency: string;
   timestamp?: Date;
   bookingId?: string;
@@ -24,36 +35,22 @@ export class RefundSettledEvent {
   readonly eventId: string;
   readonly refundId: string;
   readonly timestamp: Date;
-  readonly amount: number;
+  /**
+   * Amount in integer minor currency units (e.g., cents, pence; 1050 represents $10.50).
+   * Strictly uses integer minor units matching Refund.amount; decimal major units prohibited.
+   */
+  readonly amount: MinorUnitAmount;
   readonly currency: string;
   readonly bookingId?: string;
 
-  constructor(
-    initOrEventId: RefundSettledEventInit | string,
-    refundId?: string,
-    amount?: number,
-    currency?: string,
-    timestamp?: Date,
-    bookingId?: string,
-  ) {
-    if (typeof initOrEventId === 'string') {
-      this.eventId = initOrEventId;
-      this.refundId = refundId ?? '';
-      this.amount = amount ?? 0;
-      this.currency = currency ?? '';
-      this.timestamp = timestamp ?? new Date();
-      if (bookingId !== undefined) {
-        this.bookingId = bookingId;
-      }
-    } else {
-      this.eventId = initOrEventId.eventId;
-      this.refundId = initOrEventId.refundId;
-      this.amount = initOrEventId.amount;
-      this.currency = initOrEventId.currency;
-      this.timestamp = initOrEventId.timestamp ?? new Date();
-      if (initOrEventId.bookingId !== undefined) {
-        this.bookingId = initOrEventId.bookingId;
-      }
+  constructor(init: RefundSettledEventInit) {
+    this.eventId = init.eventId;
+    this.refundId = init.refundId;
+    this.amount = init.amount;
+    this.currency = init.currency;
+    this.timestamp = init.timestamp ?? new Date();
+    if (init.bookingId !== undefined) {
+      this.bookingId = init.bookingId;
     }
   }
 }

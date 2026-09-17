@@ -691,7 +691,7 @@ export class NotificationListener {
 
 **Rules:**
 
-- **Version**: `@nestjs/event-emitter@^2.1.1` strictly pinned for compatibility with NestJS 10 (`@nestjs/core: ^10.0.0`).
+- **Version**: Compatible 2.x range (^2.1.1) for NestJS 10 (@nestjs/core: ^10.0.0) compatibility (must remain <3.0.0 as v3+ requires NestJS 11).
 - **Single-Root Registration**: Registered exclusively once in `AppModule` using `EventEmitterModule.forRoot({ wildcard: false, delimiter: '.', maxListeners: 20 })`. Never re-register in feature or submodules.
 - **In-Process Delivery**: Non-durable, in-process event delivery. Events do not survive process crashes or restarts.
 - **Post-Commit Dispatch Only**: Emit domain events only after database transactions have successfully committed. Never emit inside an uncommitted transaction.

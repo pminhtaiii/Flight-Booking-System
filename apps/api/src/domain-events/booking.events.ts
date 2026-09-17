@@ -36,29 +36,13 @@ export class BookingCreatedEvent implements DomainEventBase {
   readonly timestamp: Date;
   readonly status?: string;
 
-  constructor(
-    initOrBookingId: BookingCreatedEventInit | string,
-    eventId?: string,
-    sourceVersion?: number,
-    timestamp?: Date,
-    status?: string,
-  ) {
-    if (typeof initOrBookingId === 'string') {
-      this.bookingId = initOrBookingId;
-      this.eventId = eventId ?? '';
-      this.sourceVersion = sourceVersion ?? 1;
-      this.timestamp = timestamp ?? new Date();
-      if (status !== undefined) {
-        this.status = status;
-      }
-    } else {
-      this.bookingId = initOrBookingId.bookingId;
-      this.eventId = initOrBookingId.eventId;
-      this.sourceVersion = initOrBookingId.sourceVersion;
-      this.timestamp = initOrBookingId.timestamp ?? new Date();
-      if (initOrBookingId.status !== undefined) {
-        this.status = initOrBookingId.status;
-      }
+  constructor(init: BookingCreatedEventInit) {
+    this.bookingId = init.bookingId;
+    this.eventId = init.eventId;
+    this.sourceVersion = init.sourceVersion;
+    this.timestamp = init.timestamp ?? new Date();
+    if (init.status !== undefined) {
+      this.status = init.status;
     }
   }
 }
@@ -78,29 +62,13 @@ export class BookingConfirmedEvent implements DomainEventBase {
   readonly timestamp: Date;
   readonly status?: string;
 
-  constructor(
-    initOrBookingId: BookingConfirmedEventInit | string,
-    eventId?: string,
-    sourceVersion?: number,
-    timestamp?: Date,
-    status?: string,
-  ) {
-    if (typeof initOrBookingId === 'string') {
-      this.bookingId = initOrBookingId;
-      this.eventId = eventId ?? '';
-      this.sourceVersion = sourceVersion ?? 1;
-      this.timestamp = timestamp ?? new Date();
-      if (status !== undefined) {
-        this.status = status;
-      }
-    } else {
-      this.bookingId = initOrBookingId.bookingId;
-      this.eventId = initOrBookingId.eventId;
-      this.sourceVersion = initOrBookingId.sourceVersion;
-      this.timestamp = initOrBookingId.timestamp ?? new Date();
-      if (initOrBookingId.status !== undefined) {
-        this.status = initOrBookingId.status;
-      }
+  constructor(init: BookingConfirmedEventInit) {
+    this.bookingId = init.bookingId;
+    this.eventId = init.eventId;
+    this.sourceVersion = init.sourceVersion;
+    this.timestamp = init.timestamp ?? new Date();
+    if (init.status !== undefined) {
+      this.status = init.status;
     }
   }
 }
@@ -122,36 +90,16 @@ export class BookingFailedEvent implements DomainEventBase {
   readonly status?: string;
   readonly failureReason?: string;
 
-  constructor(
-    initOrBookingId: BookingFailedEventInit | string,
-    eventId?: string,
-    sourceVersion?: number,
-    timestamp?: Date,
-    status?: string,
-    failureReason?: string,
-  ) {
-    if (typeof initOrBookingId === 'string') {
-      this.bookingId = initOrBookingId;
-      this.eventId = eventId ?? '';
-      this.sourceVersion = sourceVersion ?? 1;
-      this.timestamp = timestamp ?? new Date();
-      if (status !== undefined) {
-        this.status = status;
-      }
-      if (failureReason !== undefined) {
-        this.failureReason = failureReason;
-      }
-    } else {
-      this.bookingId = initOrBookingId.bookingId;
-      this.eventId = initOrBookingId.eventId;
-      this.sourceVersion = initOrBookingId.sourceVersion;
-      this.timestamp = initOrBookingId.timestamp ?? new Date();
-      if (initOrBookingId.status !== undefined) {
-        this.status = initOrBookingId.status;
-      }
-      if (initOrBookingId.failureReason !== undefined) {
-        this.failureReason = initOrBookingId.failureReason;
-      }
+  constructor(init: BookingFailedEventInit) {
+    this.bookingId = init.bookingId;
+    this.eventId = init.eventId;
+    this.sourceVersion = init.sourceVersion;
+    this.timestamp = init.timestamp ?? new Date();
+    if (init.status !== undefined) {
+      this.status = init.status;
+    }
+    if (init.failureReason !== undefined) {
+      this.failureReason = init.failureReason;
     }
   }
 }
@@ -171,29 +119,13 @@ export class BookingCompletedEvent implements DomainEventBase {
   readonly timestamp: Date;
   readonly status?: string;
 
-  constructor(
-    initOrBookingId: BookingCompletedEventInit | string,
-    eventId?: string,
-    sourceVersion?: number,
-    timestamp?: Date,
-    status?: string,
-  ) {
-    if (typeof initOrBookingId === 'string') {
-      this.bookingId = initOrBookingId;
-      this.eventId = eventId ?? '';
-      this.sourceVersion = sourceVersion ?? 1;
-      this.timestamp = timestamp ?? new Date();
-      if (status !== undefined) {
-        this.status = status;
-      }
-    } else {
-      this.bookingId = initOrBookingId.bookingId;
-      this.eventId = initOrBookingId.eventId;
-      this.sourceVersion = initOrBookingId.sourceVersion;
-      this.timestamp = initOrBookingId.timestamp ?? new Date();
-      if (initOrBookingId.status !== undefined) {
-        this.status = initOrBookingId.status;
-      }
+  constructor(init: BookingCompletedEventInit) {
+    this.bookingId = init.bookingId;
+    this.eventId = init.eventId;
+    this.sourceVersion = init.sourceVersion;
+    this.timestamp = init.timestamp ?? new Date();
+    if (init.status !== undefined) {
+      this.status = init.status;
     }
   }
 }
@@ -215,36 +147,16 @@ export class BookingRecoveryResolvedEvent implements DomainEventBase {
   readonly status?: string;
   readonly recoveryOutcome?: string;
 
-  constructor(
-    initOrBookingId: BookingRecoveryResolvedEventInit | string,
-    eventId?: string,
-    sourceVersion?: number,
-    timestamp?: Date,
-    status?: string,
-    recoveryOutcome?: string,
-  ) {
-    if (typeof initOrBookingId === 'string') {
-      this.bookingId = initOrBookingId;
-      this.eventId = eventId ?? '';
-      this.sourceVersion = sourceVersion ?? 1;
-      this.timestamp = timestamp ?? new Date();
-      if (status !== undefined) {
-        this.status = status;
-      }
-      if (recoveryOutcome !== undefined) {
-        this.recoveryOutcome = recoveryOutcome;
-      }
-    } else {
-      this.bookingId = initOrBookingId.bookingId;
-      this.eventId = initOrBookingId.eventId;
-      this.sourceVersion = initOrBookingId.sourceVersion;
-      this.timestamp = initOrBookingId.timestamp ?? new Date();
-      if (initOrBookingId.status !== undefined) {
-        this.status = initOrBookingId.status;
-      }
-      if (initOrBookingId.recoveryOutcome !== undefined) {
-        this.recoveryOutcome = initOrBookingId.recoveryOutcome;
-      }
+  constructor(init: BookingRecoveryResolvedEventInit) {
+    this.bookingId = init.bookingId;
+    this.eventId = init.eventId;
+    this.sourceVersion = init.sourceVersion;
+    this.timestamp = init.timestamp ?? new Date();
+    if (init.status !== undefined) {
+      this.status = init.status;
+    }
+    if (init.recoveryOutcome !== undefined) {
+      this.recoveryOutcome = init.recoveryOutcome;
     }
   }
 }
@@ -266,36 +178,16 @@ export class BookingCancellationPendingEvent implements DomainEventBase {
   readonly status?: string;
   readonly reason?: string;
 
-  constructor(
-    initOrBookingId: BookingCancellationPendingEventInit | string,
-    eventId?: string,
-    sourceVersion?: number,
-    timestamp?: Date,
-    status?: string,
-    reason?: string,
-  ) {
-    if (typeof initOrBookingId === 'string') {
-      this.bookingId = initOrBookingId;
-      this.eventId = eventId ?? '';
-      this.sourceVersion = sourceVersion ?? 1;
-      this.timestamp = timestamp ?? new Date();
-      if (status !== undefined) {
-        this.status = status;
-      }
-      if (reason !== undefined) {
-        this.reason = reason;
-      }
-    } else {
-      this.bookingId = initOrBookingId.bookingId;
-      this.eventId = initOrBookingId.eventId;
-      this.sourceVersion = initOrBookingId.sourceVersion;
-      this.timestamp = initOrBookingId.timestamp ?? new Date();
-      if (initOrBookingId.status !== undefined) {
-        this.status = initOrBookingId.status;
-      }
-      if (initOrBookingId.reason !== undefined) {
-        this.reason = initOrBookingId.reason;
-      }
+  constructor(init: BookingCancellationPendingEventInit) {
+    this.bookingId = init.bookingId;
+    this.eventId = init.eventId;
+    this.sourceVersion = init.sourceVersion;
+    this.timestamp = init.timestamp ?? new Date();
+    if (init.status !== undefined) {
+      this.status = init.status;
+    }
+    if (init.reason !== undefined) {
+      this.reason = init.reason;
     }
   }
 }
@@ -317,36 +209,16 @@ export class BookingCancelledEvent implements DomainEventBase {
   readonly status?: string;
   readonly reason?: string;
 
-  constructor(
-    initOrBookingId: BookingCancelledEventInit | string,
-    eventId?: string,
-    sourceVersion?: number,
-    timestamp?: Date,
-    status?: string,
-    reason?: string,
-  ) {
-    if (typeof initOrBookingId === 'string') {
-      this.bookingId = initOrBookingId;
-      this.eventId = eventId ?? '';
-      this.sourceVersion = sourceVersion ?? 1;
-      this.timestamp = timestamp ?? new Date();
-      if (status !== undefined) {
-        this.status = status;
-      }
-      if (reason !== undefined) {
-        this.reason = reason;
-      }
-    } else {
-      this.bookingId = initOrBookingId.bookingId;
-      this.eventId = initOrBookingId.eventId;
-      this.sourceVersion = initOrBookingId.sourceVersion;
-      this.timestamp = initOrBookingId.timestamp ?? new Date();
-      if (initOrBookingId.status !== undefined) {
-        this.status = initOrBookingId.status;
-      }
-      if (initOrBookingId.reason !== undefined) {
-        this.reason = initOrBookingId.reason;
-      }
+  constructor(init: BookingCancelledEventInit) {
+    this.bookingId = init.bookingId;
+    this.eventId = init.eventId;
+    this.sourceVersion = init.sourceVersion;
+    this.timestamp = init.timestamp ?? new Date();
+    if (init.status !== undefined) {
+      this.status = init.status;
+    }
+    if (init.reason !== undefined) {
+      this.reason = init.reason;
     }
   }
 }
@@ -368,36 +240,16 @@ export class BookingDisruptionSyncedEvent implements DomainEventBase {
   readonly status?: string;
   readonly revisionId?: string;
 
-  constructor(
-    initOrBookingId: BookingDisruptionSyncedEventInit | string,
-    eventId?: string,
-    sourceVersion?: number,
-    timestamp?: Date,
-    status?: string,
-    revisionId?: string,
-  ) {
-    if (typeof initOrBookingId === 'string') {
-      this.bookingId = initOrBookingId;
-      this.eventId = eventId ?? '';
-      this.sourceVersion = sourceVersion ?? 1;
-      this.timestamp = timestamp ?? new Date();
-      if (status !== undefined) {
-        this.status = status;
-      }
-      if (revisionId !== undefined) {
-        this.revisionId = revisionId;
-      }
-    } else {
-      this.bookingId = initOrBookingId.bookingId;
-      this.eventId = initOrBookingId.eventId;
-      this.sourceVersion = initOrBookingId.sourceVersion;
-      this.timestamp = initOrBookingId.timestamp ?? new Date();
-      if (initOrBookingId.status !== undefined) {
-        this.status = initOrBookingId.status;
-      }
-      if (initOrBookingId.revisionId !== undefined) {
-        this.revisionId = initOrBookingId.revisionId;
-      }
+  constructor(init: BookingDisruptionSyncedEventInit) {
+    this.bookingId = init.bookingId;
+    this.eventId = init.eventId;
+    this.sourceVersion = init.sourceVersion;
+    this.timestamp = init.timestamp ?? new Date();
+    if (init.status !== undefined) {
+      this.status = init.status;
+    }
+    if (init.revisionId !== undefined) {
+      this.revisionId = init.revisionId;
     }
   }
 }
@@ -419,36 +271,16 @@ export class BookingDisruptionAcknowledgedEvent implements DomainEventBase {
   readonly status?: string;
   readonly disruptionId?: string;
 
-  constructor(
-    initOrBookingId: BookingDisruptionAcknowledgedEventInit | string,
-    eventId?: string,
-    sourceVersion?: number,
-    timestamp?: Date,
-    status?: string,
-    disruptionId?: string,
-  ) {
-    if (typeof initOrBookingId === 'string') {
-      this.bookingId = initOrBookingId;
-      this.eventId = eventId ?? '';
-      this.sourceVersion = sourceVersion ?? 1;
-      this.timestamp = timestamp ?? new Date();
-      if (status !== undefined) {
-        this.status = status;
-      }
-      if (disruptionId !== undefined) {
-        this.disruptionId = disruptionId;
-      }
-    } else {
-      this.bookingId = initOrBookingId.bookingId;
-      this.eventId = initOrBookingId.eventId;
-      this.sourceVersion = initOrBookingId.sourceVersion;
-      this.timestamp = initOrBookingId.timestamp ?? new Date();
-      if (initOrBookingId.status !== undefined) {
-        this.status = initOrBookingId.status;
-      }
-      if (initOrBookingId.disruptionId !== undefined) {
-        this.disruptionId = initOrBookingId.disruptionId;
-      }
+  constructor(init: BookingDisruptionAcknowledgedEventInit) {
+    this.bookingId = init.bookingId;
+    this.eventId = init.eventId;
+    this.sourceVersion = init.sourceVersion;
+    this.timestamp = init.timestamp ?? new Date();
+    if (init.status !== undefined) {
+      this.status = init.status;
+    }
+    if (init.disruptionId !== undefined) {
+      this.disruptionId = init.disruptionId;
     }
   }
 }
@@ -470,36 +302,16 @@ export class BookingDisruptionAcceptedEvent implements DomainEventBase {
   readonly status?: string;
   readonly disruptionId?: string;
 
-  constructor(
-    initOrBookingId: BookingDisruptionAcceptedEventInit | string,
-    eventId?: string,
-    sourceVersion?: number,
-    timestamp?: Date,
-    status?: string,
-    disruptionId?: string,
-  ) {
-    if (typeof initOrBookingId === 'string') {
-      this.bookingId = initOrBookingId;
-      this.eventId = eventId ?? '';
-      this.sourceVersion = sourceVersion ?? 1;
-      this.timestamp = timestamp ?? new Date();
-      if (status !== undefined) {
-        this.status = status;
-      }
-      if (disruptionId !== undefined) {
-        this.disruptionId = disruptionId;
-      }
-    } else {
-      this.bookingId = initOrBookingId.bookingId;
-      this.eventId = initOrBookingId.eventId;
-      this.sourceVersion = initOrBookingId.sourceVersion;
-      this.timestamp = initOrBookingId.timestamp ?? new Date();
-      if (initOrBookingId.status !== undefined) {
-        this.status = initOrBookingId.status;
-      }
-      if (initOrBookingId.disruptionId !== undefined) {
-        this.disruptionId = initOrBookingId.disruptionId;
-      }
+  constructor(init: BookingDisruptionAcceptedEventInit) {
+    this.bookingId = init.bookingId;
+    this.eventId = init.eventId;
+    this.sourceVersion = init.sourceVersion;
+    this.timestamp = init.timestamp ?? new Date();
+    if (init.status !== undefined) {
+      this.status = init.status;
+    }
+    if (init.disruptionId !== undefined) {
+      this.disruptionId = init.disruptionId;
     }
   }
 }
@@ -523,43 +335,19 @@ export class BookingRefundUpdatedEvent implements DomainEventBase {
   readonly refundStatus?: string;
   readonly reason?: string;
 
-  constructor(
-    initOrBookingId: BookingRefundUpdatedEventInit | string,
-    eventId?: string,
-    sourceVersion?: number,
-    timestamp?: Date,
-    status?: string,
-    refundStatus?: string,
-    reason?: string,
-  ) {
-    if (typeof initOrBookingId === 'string') {
-      this.bookingId = initOrBookingId;
-      this.eventId = eventId ?? '';
-      this.sourceVersion = sourceVersion ?? 1;
-      this.timestamp = timestamp ?? new Date();
-      if (status !== undefined) {
-        this.status = status;
-      }
-      if (refundStatus !== undefined) {
-        this.refundStatus = refundStatus;
-      }
-      if (reason !== undefined) {
-        this.reason = reason;
-      }
-    } else {
-      this.bookingId = initOrBookingId.bookingId;
-      this.eventId = initOrBookingId.eventId;
-      this.sourceVersion = initOrBookingId.sourceVersion;
-      this.timestamp = initOrBookingId.timestamp ?? new Date();
-      if (initOrBookingId.status !== undefined) {
-        this.status = initOrBookingId.status;
-      }
-      if (initOrBookingId.refundStatus !== undefined) {
-        this.refundStatus = initOrBookingId.refundStatus;
-      }
-      if (initOrBookingId.reason !== undefined) {
-        this.reason = initOrBookingId.reason;
-      }
+  constructor(init: BookingRefundUpdatedEventInit) {
+    this.bookingId = init.bookingId;
+    this.eventId = init.eventId;
+    this.sourceVersion = init.sourceVersion;
+    this.timestamp = init.timestamp ?? new Date();
+    if (init.status !== undefined) {
+      this.status = init.status;
+    }
+    if (init.refundStatus !== undefined) {
+      this.refundStatus = init.refundStatus;
+    }
+    if (init.reason !== undefined) {
+      this.reason = init.reason;
     }
   }
 }
