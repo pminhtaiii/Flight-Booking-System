@@ -1,6 +1,8 @@
 import { BookingFailureReason, BookingStatus, Prisma } from '@prisma/client';
 import { FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
 
+export type { TransactionEventContext } from '@/domain-events';
+
 export type BookingPipelineOutcome =
   | {
       status: 'CONFIRMED';
