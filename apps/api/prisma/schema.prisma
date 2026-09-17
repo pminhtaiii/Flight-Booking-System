@@ -214,6 +214,7 @@ model Booking {
   duffelCancellationQuoteId String?
   createdAt                 DateTime              @default(now())
   updatedAt                 DateTime              @updatedAt
+  version                   Int                   @default(1)
 
   user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   bookingIntent      BookingIntent @relation(fields: [bookingIntentId], references: [id], onDelete: Cascade)
@@ -976,6 +977,7 @@ model BookingAgentProjection {
   baggageSummary  String?
   refundable      Boolean?
   changeable      Boolean?
+  sourceVersion   Int      @default(0) @map("source_version")
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

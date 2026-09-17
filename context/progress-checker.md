@@ -1,6 +1,28 @@
 # Progress Tracker
 
-### Feature 024 — Event-Driven Module Deepening: Phase 3 Slice 5 (Task T013) Completed (2026-09-17)
+### Feature 024 — Event-Driven Module Deepening: Phase 4 Slice 1 (Tasks T015, T016, T017) Completed (2026-09-17)
+
+- **T015 [US2] Resolve & Document `@nestjs/event-emitter`**:
+  - Installed `@nestjs/event-emitter@^2.1.1` in `apps/api/package.json` compatible with installed `@nestjs/core: ^10.0.0` and `@nestjs/common: ^10.0.0` without upgrading core NestJS packages.
+  - Documented single-root `EventEmitterModule.forRoot()` configuration and execution constraints (in-process, non-durable event delivery, post-commit dispatch only, listener exception isolation) in `context/library-docs.md` and `context/code-standards.md`.
+- **T016 [US2] Prisma Schema Versioning, Migration & E2E Test**:
+  - Added `version Int @default(1)` to `Booking` and `sourceVersion Int @default(0) @map("source_version")` to `BookingAgentProjection` in `apps/api/prisma/schema.prisma`.
+  - Created migration `20260915000000_booking_projection_versions/migration.sql` with non-null defaults for both tables.
+  - Deployed migration and verified against real PostgreSQL in `apps/api/test/booking-projection-version-migration.e2e-spec.ts` (5/5 passed, exit code 0).
+  - Verified default values on newly created rows, existing foreign key/one-to-one reference preservation, and legacy-writer update compatibility leaving `Booking.version` intact.
+  - Recorded migration test exit codes in `specs/024-event-driven-module-deepening/validation-evidence.md`.
+- **T017 [US2] Passive Domain Event Base & Catalog**:
+  - Defined passive, behavior-free `DomainEventBase` in `apps/api/src/domain-events/domain-event.base.ts`.
+  - Defined all 11 booking domain event classes and constants in `apps/api/src/domain-events/booking.events.ts` (`booking.created`, `booking.confirmed`, `booking.failed`, `booking.completed`, `booking.recovery.resolved`, `booking.cancellation.pending`, `booking.cancelled`, `booking.disruption.synced`, `booking.disruption.acknowledged`, `booking.disruption.accepted`, `booking.refund.updated`).
+  - Defined `refund.settled` event and constants in `apps/api/src/domain-events/refund.events.ts` without fabricating `bookingId` for unlinked refunds.
+  - Exported all event types and constants via `apps/api/src/domain-events/index.ts`.
+  - Implemented comprehensive unit tests in `apps/api/src/domain-events/domain-events.spec.ts` (19/19 passed, exit code 0) verifying zero methods, plain JSON serializability, zero customer PII, zero supplier payloads, and exact naming contracts.
+- **Verification**:
+  - Jest E2E (`booking-projection-version-migration.e2e-spec.ts`): 5/5 passed.
+  - Jest Unit (`domain-events.spec.ts`): 19/19 passed.
+  - Typecheck: `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` passed (exit code 0).
+  - Linter: `pnpm exec eslint "apps/api/**/*.ts" --max-warnings 0` passed (0 errors, 0 warnings).
+
 
 - **T013 [US1] Comprehensive PostgreSQL E2E Failure, Resumption & Compensation Suite**:
   - Implemented comprehensive real PostgreSQL/HTTP tests in `apps/api/test/payment-fulfillment.e2e-spec.ts` (25/25 tests passing, 0 failures, exit code 0) and extended `apps/api/test/payment-idempotency.e2e-spec.ts` (8/8 tests passing, 0 failures, exit code 0).

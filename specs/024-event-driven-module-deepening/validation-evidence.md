@@ -364,4 +364,78 @@ PASS test/payment-idempotency.e2e-spec.ts (36.839 s)
 | **Atomic Completion & Rollback** | Payment SUCCEEDED, Booking CONFIRMED, and dual ledger entries commit together; post-capture DB errors rollback completely without orphan state. | **PASSED** |
 | **Capture Throw Matrix** | All 3 paths (`captured`, `authorized/voided`, `unavailable/unknown`) follow strict safety contracts. | **PASSED** |
 
+---
+
+## Phase 4 — US2: Event-Driven Safe Booking Projection (T016)
+
+### 1. Schema Migration & Prisma Generation Evidence
+
+- **Migration**: `20260915000000_booking_projection_versions`
+- **Columns Added**:
+  - `bookings.version`: `INTEGER NOT NULL DEFAULT 1`
+  - `booking_agent_projections.source_version`: `INTEGER NOT NULL DEFAULT 0`
+- **Deployment Command**:
+  ```powershell
+  Push-Location apps/api
+  & '.\node_modules\.bin\prisma.CMD' generate
+  & '.\node_modules\.bin\prisma.CMD' migrate deploy
+  Pop-Location
+  ```
+- **Exit Code**: `0`
+- **Output**:
+  ```text
+  ✔ Generated Prisma Client (v5.22.0) to .\..\..\node_modules\.pnpm\@prisma+client@5.22.0_prisma@5.22.0\node_modules\@prisma\client in 904ms
+  Applying migration `20260915000000_booking_projection_versions`
+  All migrations have been successfully applied.
+  ```
+
+---
+
+### 2. Booking & Projection Version Migration E2E Suite Results
+
+- **Command**:
+  ```powershell
+  $env:NODE_OPTIONS = "--require=`"$($PWD.Path.Replace('\', '/'))/tests/ci/node-network-guard.cjs`""
+  pnpm --filter @api/backend test:e2e -- booking-projection-version-migration.e2e-spec.ts
+  ```
+- **Exit Code**: `0`
+- **Duration**: 26.635s (test suite), 27.87s (wall clock)
+- **Suite Summary**:
+  - Test Suites: **1 passed, 1 total**
+  - Tests: **5 passed, 5 total**
+  - Snapshots: **0 total**
+
+- **Terminal Output**:
+  ```text
+  PASS test/booking-projection-version-migration.e2e-spec.ts (26.635 s)
+    Booking & BookingAgentProjection Version Migration (E2E)
+      Default Values Verification
+        √ verifies new Booking row has default version = 1 (46 ms)
+        √ verifies new BookingAgentProjection row has default sourceVersion = 0 (20 ms)
+        √ verifies PostgreSQL column defaults apply when inserted via raw SQL without specifying version columns (111 ms)
+      Foreign Key & Relation Preservation
+        √ verifies existing foreign keys and one-to-one references are preserved with new columns present (71 ms)
+      Legacy-Writer Compatibility Fixture
+        √ verifies that updates omitting version leave Booking.version intact, unchanged (1), and valid (49 ms)
+
+  Test Suites: 1 passed, 1 total
+  Tests:       5 passed, 5 total
+  Snapshots:   0 total
+  Time:        27.87 s
+  Ran all test suites matching /booking-projection-version-migration.e2e-spec.ts/i.
+  ```
+
+---
+
+### 3. Migration Invariants Verified
+
+| Invariant | Test Verification | Status |
+|---|---|---|
+| **Booking default version** | New and raw SQL inserted `Booking` rows default to `version = 1`. | **PASSED** |
+| **BookingAgentProjection default sourceVersion** | New and raw SQL inserted `BookingAgentProjection` rows default to `source_version = 0`. | **PASSED** |
+| **Foreign key & relation preservation** | One-to-one relations (`Booking.agentProjection`, `BookingAgentProjection.booking`, `Booking.user`, `Booking.bookingIntent`) remain intact. | **PASSED** |
+| **Legacy-writer compatibility** | Legacy updates (Prisma and raw SQL) omitting `version` leave `Booking.version` intact and unchanged at `1`. | **PASSED** |
+| **Typecheck & ESLint Gate** | Zero TypeScript compilation errors and zero ESLint warnings across backend. | **PASSED** |
+
+
 
