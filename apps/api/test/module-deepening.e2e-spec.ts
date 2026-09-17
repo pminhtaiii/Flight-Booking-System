@@ -466,7 +466,14 @@ describe('Nest Composition Architecture Gate (US1 - T014)', () => {
 
     it('allows downstream modules (cancellation, disruption, refund-settlement) to import BookingStateModule without circular reference to BookingLifecycleModule', async () => {
       const downstreamConsumerFixture = await Test.createTestingModule({
-        imports: [BookingStateModule, RefundSettlementModule],
+        imports: [
+          ConfigModule.forRoot({
+            isGlobal: true,
+            validate: (config) => envSchema.parse(config),
+          }),
+          BookingStateModule,
+          RefundSettlementModule,
+        ],
       }).compile();
 
       const service = downstreamConsumerFixture.get(BookingLifecycleService);

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '@/prisma/prisma.module';
 import { DomainEventsModule } from '@/domain-events/domain-events.module';
+import { AgentGatewayModule } from '@/agent-gateway/agent-gateway.module';
 import { BookingLifecycleService } from './booking-lifecycle.service';
 
 /**
@@ -12,7 +13,7 @@ import { BookingLifecycleService } from './booking-lifecycle.service';
  * with booking state transitions without introducing circular dependencies.
  */
 @Module({
-  imports: [PrismaModule, DomainEventsModule],
+  imports: [PrismaModule, DomainEventsModule, AgentGatewayModule],
   providers: [BookingLifecycleService],
   exports: [BookingLifecycleService],
 })

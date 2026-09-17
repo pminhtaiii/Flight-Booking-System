@@ -81,7 +81,11 @@ export class BookingLifecycleService {
 
     if (resolvedTx) {
       const localEvents: DomainEventBase[] = [];
-      return operation(resolvedTx, localEvents);
+      const res = await operation(resolvedTx, localEvents);
+      if (localEvents.length > 0) {
+        await this.publisher.publish(localEvents);
+      }
+      return res;
     }
 
     const localEvents: DomainEventBase[] = [];

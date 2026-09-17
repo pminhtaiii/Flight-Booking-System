@@ -320,6 +320,7 @@ describe('ReconciliationService & Booking Completion', () => {
         },
         data: {
           status: 'COMPLETED',
+          version: { increment: 1 },
           disruptionStatus: DisruptionStatus.RESOLVED,
           disruptionResolvedReason: 'DEPARTURE_PASSED',
           disruptionResolvedAt: expect.any(Date),
@@ -408,6 +409,7 @@ describe('ReconciliationService & Booking Completion', () => {
         },
         data: {
           status: 'COMPLETED',
+          version: { increment: 1 },
         },
       });
       expect(mockPrisma.disruptionAuditEvent.create).not.toHaveBeenCalled();
