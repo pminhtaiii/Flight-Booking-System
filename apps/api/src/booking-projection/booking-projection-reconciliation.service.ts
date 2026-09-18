@@ -35,7 +35,7 @@ export class BookingProjectionReconciliationService {
     return this.cursor;
   }
 
-  @Cron(CronExpression.EVERY_MINUTE)
+  @Cron(CronExpression.EVERY_MINUTE, { name: 'BookingProjectionReconciliationService' })
   async reconcileBatch(batchSize = 100): Promise<ReconciliationPassSummary | null> {
     if (this.isReconciling) {
       this.logger.warn({

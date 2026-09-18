@@ -270,5 +270,61 @@ describe('BookingProjectionMetrics', () => {
       expect(metrics.getFailureTotal()).toBe(5);
     });
   });
+
+  describe('Health snapshot: getHealthSnapshot()', () => {
+    it('returns status ok with empty/zero metrics on initial state', () => {
+      const snapshot = metrics.getHealthSnapshot();
+      expect(snapshot.status).toBe('ok');
+      expect(snapshot.metrics.reconciliation.passes).toEqual({
+        success: 0,
+        error: 0,
+      });
+      expect(snapshot.metrics.reconciliation.candidates).toEqual({
+        staleFound: 0,
+        repaired: 0,
+        failed: 0,
+        skipped: 0,
+        current: 0,
+      });
+      expect(snapshot.metrics.failures).toEqual({});
+      expect(snapshot.metrics.events).toEqual({});
+      expect(snapshot.metrics.reconciliation.duration.count).toBe(0);
+    });
+
+    it('returns status ok with populated metrics when no failures or pass errors exist', () => {
+      metrics.incrementEventsTotal('booking.created', 'SUCCESS');
+      metrics.incrementReconciliationPassTotal('SUCCESS');
+      metrics.incrementReconciliationStaleFoundTotal(2);
+      metrics.incrementReconciliationRepairedTotal(2);
+      metrics.recordReconciliationDuration(150);
+
+      const snapshot = metrics.getHealthSnapshot();
+      expect(snapshot.status).toBe('ok');
+      expect(snapshot.metrics.reconciliation.passes.success).toBe(1);
+      expect(snapshot.metrics.reconciliation.passes.error).toBe(0);
+      expect(snapshot.metrics.reconciliation.candidates.staleFound).toBe(2);
+      expect(snapshot.metrics.reconciliation.candidates.repaired).toBe(2);
+      expect(snapshot.metrics.reconciliation.duration.count).toBe(1);
+      expect(snapshot.metrics.events['booking.created:SUCCESS']).toBe(1);
+      expect(snapshot.metrics.failures).toEqual({});
+    });
+
+    it('returns status degraded when failure counters are non-zero', () => {
+      metrics.incrementFailureTotal('HYDRATION_FAILED', 1);
+
+      const snapshot = metrics.getHealthSnapshot();
+      expect(snapshot.status).toBe('degraded');
+      expect(snapshot.metrics.failures['HYDRATION_FAILED']).toBe(1);
+    });
+
+    it('returns status degraded when reconciliation pass has errors', () => {
+      metrics.incrementReconciliationPassTotal('ERROR', 1);
+
+      const snapshot = metrics.getHealthSnapshot();
+      expect(snapshot.status).toBe('degraded');
+      expect(snapshot.metrics.reconciliation.passes.error).toBe(1);
+    });
+  });
 });
+
 

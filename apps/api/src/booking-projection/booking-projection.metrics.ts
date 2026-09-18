@@ -38,6 +38,28 @@ export interface ProjectionDurationStats {
   p99: number;
 }
 
+export interface BookingProjectionHealthSnapshot {
+  status: 'ok' | 'degraded';
+  metrics: {
+    reconciliation: {
+      passes: {
+        success: number;
+        error: number;
+      };
+      candidates: {
+        staleFound: number;
+        repaired: number;
+        failed: number;
+        skipped: number;
+        current: number;
+      };
+      duration: ProjectionDurationStats;
+    };
+    failures: Record<string, number>;
+    events: Record<string, number>;
+  };
+}
+
 const VALID_STATUSES: Set<string> = new Set<ProjectionMetricStatus>([
   'SUCCESS',
   'ERROR',
@@ -377,6 +399,38 @@ export class BookingProjectionMetrics {
       total += val;
     }
     return total;
+  }
+
+  getHealthSnapshot(): BookingProjectionHealthSnapshot {
+    const isDegraded =
+      this.getFailureTotal() > 0 || this.getReconciliationPassTotal('ERROR') > 0;
+
+    const failures: Record<string, number> = {};
+    for (const [key, value] of this.failureCounters.entries()) {
+      failures[key] = value;
+    }
+
+    return {
+      status: isDegraded ? 'degraded' : 'ok',
+      metrics: {
+        reconciliation: {
+          passes: {
+            success: this.getReconciliationPassTotal('SUCCESS'),
+            error: this.getReconciliationPassTotal('ERROR'),
+          },
+          candidates: {
+            staleFound: this.reconciliationStaleFoundTotal,
+            repaired: this.reconciliationRepairedTotal,
+            failed: this.reconciliationFailedTotal,
+            skipped: this.reconciliationSkippedTotal,
+            current: this.reconciliationCurrentTotal,
+          },
+          duration: this.getReconciliationDurationStats(),
+        },
+        failures,
+        events: this.getAllEventTotals(),
+      },
+    };
   }
 
   reset(): void {

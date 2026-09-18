@@ -23,6 +23,7 @@ import { BookingProjectionReconciliationService } from './booking-projection-rec
     BookingProjectionRepository,
     BookingEventHydratorService,
     BookingProjectionReconciliationService,
+    BookingProjectionMetrics,
   ],
 })
 export class BookingProjectionModule {}

@@ -4,6 +4,7 @@ import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from '@/prisma/prisma.module';
 import { DomainEventsModule } from '@/domain-events/domain-events.module';
 import { BookingProjectionModule } from '@/booking-projection/booking-projection.module';
+import { BookingProjectionService } from '@/booking-projection/booking-projection.service';
 import { BookingProjectionReconciliationService } from '@/booking-projection/booking-projection-reconciliation.service';
 import { BookingProjectionRepository } from '@/booking-projection/booking-projection.repository';
 import { BookingProjectionMetrics } from '@/booking-projection/booking-projection.metrics';
@@ -19,6 +20,7 @@ describe('Booking Projection Reconciliation (E2E - T038)', () => {
   let prisma: PrismaService;
   let reconciliationService: BookingProjectionReconciliationService;
   let repository: BookingProjectionRepository;
+  let projectionService: BookingProjectionService;
   let metrics: BookingProjectionMetrics;
   let hydrator: BookingEventHydratorService;
 
@@ -108,6 +110,7 @@ describe('Booking Projection Reconciliation (E2E - T038)', () => {
       BookingProjectionReconciliationService,
     );
     repository = testingModule.get<BookingProjectionRepository>(BookingProjectionRepository);
+    projectionService = testingModule.get<BookingProjectionService>(BookingProjectionService);
     metrics = testingModule.get<BookingProjectionMetrics>(BookingProjectionMetrics);
     hydrator = testingModule.get<BookingEventHydratorService>(BookingEventHydratorService);
 
@@ -255,12 +258,6 @@ describe('Booking Projection Reconciliation (E2E - T038)', () => {
 
   describe('b) Large Backlog Keyset Pagination', () => {
     it('paginates across >100 candidates with 100 batch limit, advances cursor and resets on reachedEnd', async () => {
-      // Drain any existing stale backlog to establish clean baseline
-      while (true) {
-        const drain = await reconciliationService.reconcileBatch(500);
-        if (!drain || drain.reachedEnd || drain.processed === 0) break;
-      }
-
       const userId = await createTestUser('pagination');
       const count = 105;
 
@@ -309,23 +306,49 @@ describe('Booking Projection Reconciliation (E2E - T038)', () => {
       await prisma.booking.createMany({ data: bookingData });
       for (const b of bookingData) trackedBookingIds.add(b.id);
 
+      const seededIds = bookingData.map((b) => b.id);
+      const scopedRepo = Object.create(repository);
+      scopedRepo.findStaleOrMissingBookingIds = async (limit: number, afterBookingId?: string) => {
+        const cursor = afterBookingId?.trim() ? afterBookingId.trim() : null;
+        const rows = await prisma.$queryRaw<{ id: string }[]>`
+          SELECT b."id"
+          FROM "bookings" b
+          LEFT JOIN "booking_agent_projections" p ON p."bookingId" = b."id"
+          WHERE b."id" IN (${Prisma.join(seededIds)})
+            AND (p."bookingId" IS NULL OR p."source_version" < b."version")
+            AND (${cursor}::text IS NULL OR b."id" > ${cursor}::text)
+          ORDER BY b."id" ASC
+          LIMIT ${limit};
+        `;
+        const bookingIds = rows.map((r) => r.id);
+        const reachedEnd = bookingIds.length < limit;
+        const nextCursor = bookingIds.length > 0 ? bookingIds[bookingIds.length - 1] : null;
+        return { bookingIds, nextCursor, reachedEnd };
+      };
+      const scopedReconciler = new BookingProjectionReconciliationService(
+        scopedRepo,
+        projectionService,
+        hydrator,
+        metrics,
+      );
+
       // Pass 1: reconcileBatch(100) -> processes 100, returns nextCursor non-null, reachedEnd === false
-      const pass1 = await reconciliationService.reconcileBatch(100);
+      const pass1 = await scopedReconciler.reconcileBatch(100);
       expect(pass1).not.toBeNull();
       expect(pass1!.processed).toBe(100);
       expect(pass1!.repaired).toBe(100);
       expect(pass1!.reachedEnd).toBe(false);
       expect(pass1!.nextCursor).not.toBeNull();
-      expect(reconciliationService.getCursor()).toBe(pass1!.nextCursor);
+      expect(scopedReconciler.getCursor()).toBe(pass1!.nextCursor);
 
       // Pass 2: reconcileBatch(100) -> processes remaining 5, reachedEnd === true
-      const pass2 = await reconciliationService.reconcileBatch(100);
+      const pass2 = await scopedReconciler.reconcileBatch(100);
       expect(pass2).not.toBeNull();
       expect(pass2!.processed).toBe(5);
       expect(pass2!.repaired).toBe(5);
       expect(pass2!.reachedEnd).toBe(true);
       // Cursor resets to undefined for subsequent passes
-      expect(reconciliationService.getCursor()).toBeUndefined();
+      expect(scopedReconciler.getCursor()).toBeUndefined();
 
       // Verify all 105 projections are repaired
       const projectionsCount = await prisma.bookingAgentProjection.count({
@@ -334,12 +357,12 @@ describe('Booking Projection Reconciliation (E2E - T038)', () => {
       expect(projectionsCount).toBe(105);
 
       // Subsequent pass returns 0 processed, reachedEnd === true, nextCursor === null, cursor remains undefined
-      const pass3 = await reconciliationService.reconcileBatch(100);
+      const pass3 = await scopedReconciler.reconcileBatch(100);
       expect(pass3).not.toBeNull();
       expect(pass3!.processed).toBe(0);
       expect(pass3!.reachedEnd).toBe(true);
       expect(pass3!.nextCursor).toBeNull();
-      expect(reconciliationService.getCursor()).toBeUndefined();
+      expect(scopedReconciler.getCursor()).toBeUndefined();
     });
   });
 
@@ -547,7 +570,7 @@ describe('Booking Projection Reconciliation (E2E - T038)', () => {
     });
   });
 
-  describe('e) Live Concurrent Mutations', () => {
+  describe('e) Live Concurrent Mutations & Multi-Replica Safety', () => {
     it('monotonic version fencing prevents older hydrated snapshot from overwriting newer live write', async () => {
       const userId = await createTestUser('live-write');
       const intentId = await createTestIntent(userId);
@@ -653,6 +676,109 @@ describe('Booking Projection Reconciliation (E2E - T038)', () => {
       expect(projection!.sourceVersion).toBe(2);
       expect(projection!.flightNumber).toBe('BA 200');
       expect(projection!.status).toBe(BookingStatus.CONFIRMED);
+    });
+
+    it('verifies multi-replica reconciliation safety when two reconciler instances process the same candidate, confirming second reconciler returns STALE_IGNORED and counts outcome as current', async () => {
+      const userId = await createTestUser('multi-replica');
+      const intentId = await createTestIntent(userId);
+
+      const flightSnapshot = {
+        stops: 0,
+        segments: [
+          {
+            departureAirport: { iataCode: 'LHR' },
+            arrivalAirport: { iataCode: 'JFK' },
+            departureAt: '2026-11-01T10:00:00.000Z',
+            arrivalAt: '2026-11-01T18:00:00.000Z',
+            airline: { name: 'British Airways', iataCode: 'BA' },
+            flightNumber: '175',
+          },
+        ],
+      };
+
+      const booking = await prisma.booking.create({
+        data: {
+          userId,
+          bookingIntentId: intentId,
+          status: BookingStatus.CONFIRMED,
+          totalAmount: new Prisma.Decimal('200.00'),
+          currency: 'GBP',
+          version: 2,
+          flightSnapshot,
+        },
+      });
+      trackedBookingIds.add(booking.id);
+
+      // Seed stale projection at sourceVersion 0 with known agentReference
+      const initialAgentRef = `bkref_${randomUUID()}`;
+      await repository.upsertGuarded({
+        bookingId: booking.id,
+        status: 'CONFIRMED',
+        sourceVersion: 0,
+        airline: 'British Airways',
+        flightNumber: '175',
+        origin: 'LHR',
+        destination: 'JFK',
+        departureAt: new Date('2026-11-01T10:00:00.000Z'),
+        arrivalAt: new Date('2026-11-01T18:00:00.000Z'),
+        agentReference: initialAgentRef,
+      });
+
+      // Two reconciler instances representing Replica A and Replica B
+      const replicaA = new BookingProjectionReconciliationService(
+        repository,
+        projectionService,
+        hydrator,
+        new BookingProjectionMetrics(),
+      );
+      const replicaB = new BookingProjectionReconciliationService(
+        repository,
+        projectionService,
+        hydrator,
+        new BookingProjectionMetrics(),
+      );
+
+      // Scoped repository for this candidate ID
+      const scopedRepo = Object.create(repository);
+      scopedRepo.findStaleOrMissingBookingIds = async () => ({
+        bookingIds: [booking.id],
+        nextCursor: null,
+        reachedEnd: true,
+      });
+
+      const reconcilerA = new BookingProjectionReconciliationService(
+        scopedRepo,
+        projectionService,
+        hydrator,
+        new BookingProjectionMetrics(),
+      );
+      const reconcilerB = new BookingProjectionReconciliationService(
+        scopedRepo,
+        projectionService,
+        hydrator,
+        new BookingProjectionMetrics(),
+      );
+
+      // Replica A reconciles the candidate -> repairs it to sourceVersion 2
+      const resA = await reconcilerA.reconcileBatch(10);
+      expect(resA).not.toBeNull();
+      expect(resA!.repaired).toBe(1);
+      expect(resA!.current).toBe(0);
+
+      // Replica B concurrently/sequentially reconciles the same candidate -> projection already at sourceVersion 2
+      // Upsert returns STALE_IGNORED, classified as 'current'
+      const resB = await reconcilerB.reconcileBatch(10);
+      expect(resB).not.toBeNull();
+      expect(resB!.repaired).toBe(0);
+      expect(resB!.current).toBe(1);
+      expect(resB!.failed).toBe(0);
+      expect(resB!.skipped).toBe(0);
+
+      // Verify projection remains intact with stable agentReference
+      const projection = await repository.findByBookingId(booking.id);
+      expect(projection).not.toBeNull();
+      expect(projection!.sourceVersion).toBe(2);
+      expect(projection!.agentReference).toBe(initialAgentRef);
     });
   });
 

@@ -228,7 +228,7 @@ SELECT
   COUNT(s."id") AS segment_count
 FROM "bookings" b
 LEFT JOIN "itinerary_revisions" r ON r."bookingId" = b."id"
-LEFT JOIN "flight_segments" s ON s."revisionId" = r."id"
+LEFT JOIN "itinerary_revision_segments" s ON s."revisionId" = r."id"
 LEFT JOIN "booking_agent_projections" p ON p."bookingId" = b."id"
 WHERE (p."bookingId" IS NULL OR p."source_version" < b."version")
 GROUP BY b."id", b."status", b."version"
