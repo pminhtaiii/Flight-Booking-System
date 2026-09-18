@@ -318,7 +318,7 @@ export class RefundSettlementService {
           }
 
           if (finalBookingStatus) {
-            await this.bookingLifecycleService.updateBookingRefundStatus(
+            const bookingUpdate = await this.bookingLifecycleService.updateBookingRefundStatus(
               obligation.bookingId,
               finalBookingStatus,
               RefundStatus.SUCCEEDED,
@@ -326,6 +326,7 @@ export class RefundSettlementService {
               tx,
               context,
             );
+            finalBookingStatus = bookingUpdate.updatedBooking?.status ?? finalBookingStatus;
           }
         }
 
@@ -380,7 +381,7 @@ export class RefundSettlementService {
         finalBookingStatus = BookingStatus.REFUND_FAILED_NEEDS_ATTENTION;
         const bookingId = refund.cancellationRefundObligation?.bookingId;
         if (bookingId) {
-          await this.bookingLifecycleService.updateBookingRefundStatus(
+          const bookingUpdate = await this.bookingLifecycleService.updateBookingRefundStatus(
             bookingId,
             BookingStatus.REFUND_FAILED_NEEDS_ATTENTION,
             RefundStatus.REFUND_FAILED_NEEDS_ATTENTION,
@@ -388,6 +389,7 @@ export class RefundSettlementService {
             tx,
             context,
           );
+          finalBookingStatus = bookingUpdate.updatedBooking?.status ?? finalBookingStatus;
         }
       }
 

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -794,7 +795,7 @@ export class BookingLifecycleService {
     const { tx: resolvedTx, context: resolvedContext } = resolveTxAndContext(tx, context);
 
     return this.executeMutation(resolvedContext, resolvedTx, async (client, events) => {
-      const current = await client.booking.findUnique({
+      let current = await client.booking.findUnique({
         where: { id: bookingId },
       });
 
@@ -802,44 +803,59 @@ export class BookingLifecycleService {
         throw new NotFoundException('Booking not found');
       }
 
-      if (current.status === targetStatus) {
-        return { count: 0, updatedBooking: current };
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        if (current.status === targetStatus) {
+          return { count: 0, updatedBooking: current };
+        }
+
+        const updateResult = await client.booking.updateMany({
+          where: {
+            id: bookingId,
+            status: current.status,
+            version: current.version,
+          },
+          data: {
+            status: targetStatus,
+            version: { increment: 1 },
+          },
+        });
+
+        if (updateResult.count === 0) {
+          const reloaded = await client.booking.findUnique({ where: { id: bookingId } });
+          if (reloaded?.status === targetStatus) {
+            return { count: 0, updatedBooking: reloaded };
+          }
+          if (attempt < 3 && reloaded) {
+            current = reloaded;
+            continue;
+          }
+          throw new ConflictException(
+            'Concurrent booking mutation detected during refund status update',
+          );
+        }
+
+        const updatedBooking = await client.booking.findUnique({
+          where: { id: bookingId },
+        });
+
+        events.push(
+          new BookingRefundUpdatedEvent({
+            bookingId,
+            eventId: randomUUID(),
+            sourceVersion: updatedBooking?.version ?? (current.version ?? 1) + 1,
+            status: targetStatus,
+            refundStatus,
+            reason,
+            timestamp: new Date(),
+          }),
+        );
+
+        return { count: 1, updatedBooking: updatedBooking ?? undefined };
       }
 
-      const updateResult = await client.booking.updateMany({
-        where: {
-          id: bookingId,
-          status: current.status,
-          version: current.version,
-        },
-        data: {
-          status: targetStatus,
-          version: { increment: 1 },
-        },
-      });
-
-      if (updateResult.count === 0) {
-        const reloaded = await client.booking.findUnique({ where: { id: bookingId } });
-        return { count: 0, updatedBooking: reloaded ?? current };
-      }
-
-      const updatedBooking = await client.booking.findUnique({
-        where: { id: bookingId },
-      });
-
-      events.push(
-        new BookingRefundUpdatedEvent({
-          bookingId,
-          eventId: randomUUID(),
-          sourceVersion: updatedBooking?.version ?? (current.version ?? 1) + 1,
-          status: targetStatus,
-          refundStatus,
-          reason,
-          timestamp: new Date(),
-        }),
+      throw new ConflictException(
+        'Concurrent booking mutation detected during refund status update',
       );
-
-      return { count: 1, updatedBooking: updatedBooking ?? undefined };
     });
   }
 }

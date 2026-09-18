@@ -634,7 +634,7 @@ export class PaymentRefundService {
         if (claim.count !== 1) {
           throw new ConflictException('Refund is not awaiting manual resolution');
         }
-        await this.bookingLifecycleService.updateBookingRefundStatus(
+        const bookingUpdate = await this.bookingLifecycleService.updateBookingRefundStatus(
           bookingId,
           BookingStatus.CANCELLED_PENDING_REFUND,
           RefundStatus.REFUND_RETRY_SCHEDULED,
@@ -645,7 +645,8 @@ export class PaymentRefundService {
         eventsToPublish = [...context.events];
         return {
           refundStatus: RefundStatus.REFUND_RETRY_SCHEDULED,
-          bookingStatus: BookingStatus.CANCELLED_PENDING_REFUND,
+          bookingStatus:
+            bookingUpdate.updatedBooking?.status ?? BookingStatus.CANCELLED_PENDING_REFUND,
         };
       });
 
