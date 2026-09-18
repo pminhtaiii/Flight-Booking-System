@@ -11,6 +11,8 @@ import {
   BookingConfirmedEvent,
   BookingFailedEvent,
   BookingCompletedEvent,
+  BookingCancellationPendingEvent,
+  BookingCancelledEvent,
   BookingEventPublisherService,
   TransactionEventContext,
 } from '@/domain-events';
@@ -1020,6 +1022,238 @@ describe('BookingLifecycleService', () => {
 
       expect(mockPrisma.booking.updateMany).not.toHaveBeenCalled();
       expect(result.status).toBe(BookingStatus.CONFIRMED); // local untouched because tx did not update
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('claimCancellation', () => {
+    const staleThreshold = new Date(Date.now() - 2 * 60 * 1000);
+
+    it('transitions CONFIRMED booking to CANCELLATION_PENDING, increments version, and emits BookingCancellationPendingEvent', async () => {
+      mockPrisma.booking.updateMany
+        .mockResolvedValueOnce({ count: 1 }); // transition attempt succeeds
+      mockPrisma.booking.findUnique.mockResolvedValue({
+        id: 'b-1',
+        status: BookingStatus.CANCELLATION_PENDING,
+        version: 2,
+      });
+
+      const result = await service.claimCancellation('b-1', 'user-1', staleThreshold);
+
+      expect(result).toEqual({ count: 1 });
+      expect(mockPrisma.booking.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'b-1',
+          userId: 'user-1',
+          status: { in: [BookingStatus.CONFIRMED, BookingStatus.COMPLETED] },
+        },
+        data: {
+          status: BookingStatus.CANCELLATION_PENDING,
+          version: { increment: 1 },
+        },
+      });
+      expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
+      const emitted = mockPublisher.publish.mock.calls[0]?.[0];
+      expect(emitted).toBeDefined();
+      if (!emitted) {
+        throw new Error('Expected events to be published');
+      }
+      expect(emitted).toHaveLength(1);
+      expect(emitted[0]).toBeInstanceOf(BookingCancellationPendingEvent);
+      expect((emitted[0] as BookingCancellationPendingEvent).bookingId).toBe('b-1');
+      expect((emitted[0] as BookingCancellationPendingEvent).sourceVersion).toBe(2);
+    });
+
+    it('refreshes stale CANCELLATION_PENDING lease without incrementing version and without emitting event', async () => {
+      mockPrisma.booking.updateMany
+        .mockResolvedValueOnce({ count: 0 }) // transition attempt finds not in CONFIRMED/COMPLETED
+        .mockResolvedValueOnce({ count: 1 }); // refresh stale lease succeeds
+
+      const result = await service.claimCancellation('b-1', 'user-1', staleThreshold);
+
+      expect(result).toEqual({ count: 1 });
+      expect(mockPrisma.booking.updateMany).toHaveBeenNthCalledWith(2, {
+        where: {
+          id: 'b-1',
+          userId: 'user-1',
+          status: BookingStatus.CANCELLATION_PENDING,
+          updatedAt: { lte: staleThreshold },
+        },
+        data: {
+          status: BookingStatus.CANCELLATION_PENDING,
+        },
+      });
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
+    });
+
+    it('returns count: 0 and emits no event when claim cannot be acquired', async () => {
+      mockPrisma.booking.updateMany
+        .mockResolvedValueOnce({ count: 0 })
+        .mockResolvedValueOnce({ count: 0 });
+
+      const result = await service.claimCancellation('b-1', 'user-1', staleThreshold);
+
+      expect(result).toEqual({ count: 0 });
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
+    });
+
+    it('collects event into provided context without publishing directly', async () => {
+      mockPrisma.booking.updateMany.mockResolvedValueOnce({ count: 1 });
+      mockPrisma.booking.findUnique.mockResolvedValue({
+        id: 'b-1',
+        status: BookingStatus.CANCELLATION_PENDING,
+        version: 3,
+      });
+
+      const context: TransactionEventContext = {
+        tx: mockPrisma,
+        events: [],
+      };
+
+      const result = await service.claimCancellation('b-1', 'user-1', staleThreshold, mockPrisma, context);
+
+      expect(result).toEqual({ count: 1 });
+      expect(context.events).toHaveLength(1);
+      expect(context.events[0]).toBeInstanceOf(BookingCancellationPendingEvent);
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('cancelBooking', () => {
+    it('cancels CANCELLATION_PENDING booking, increments version, and emits BookingCancelledEvent', async () => {
+      mockPrisma.booking.findUnique
+        .mockResolvedValueOnce({
+          id: 'b-1',
+          status: BookingStatus.CANCELLATION_PENDING,
+          disruptionStatus: null,
+          activeDisruptionRevisionId: null,
+          version: 2,
+        })
+        .mockResolvedValueOnce({
+          id: 'b-1',
+          version: 3,
+        });
+      mockPrisma.booking.updateMany.mockResolvedValue({ count: 1 });
+
+      const result = await service.cancelBooking(
+        'b-1',
+        BookingStatus.CANCELLED_PENDING_REFUND,
+        '150.00',
+      );
+
+      expect(result.count).toBe(1);
+      expect(result.hasActiveDisruption).toBe(false);
+      expect(mockPrisma.booking.updateMany).toHaveBeenCalledWith({
+        where: { id: 'b-1', status: BookingStatus.CANCELLATION_PENDING },
+        data: expect.objectContaining({
+          status: BookingStatus.CANCELLED_PENDING_REFUND,
+          airlineRefundAmount: '150.00',
+          customerRefundAmount: '150.00',
+          version: { increment: 1 },
+        }),
+      });
+      expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
+      const emitted = mockPublisher.publish.mock.calls[0]?.[0];
+      expect(emitted).toBeDefined();
+      if (!emitted) {
+        throw new Error('Expected events to be published');
+      }
+      expect(emitted).toHaveLength(1);
+      expect(emitted[0]).toBeInstanceOf(BookingCancelledEvent);
+      expect((emitted[0] as BookingCancelledEvent).sourceVersion).toBe(3);
+      expect((emitted[0] as BookingCancelledEvent).status).toBe(BookingStatus.CANCELLED_PENDING_REFUND);
+    });
+
+    it('resolves active disruption on cancellation and populates disruption metadata', async () => {
+      mockPrisma.booking.findUnique
+        .mockResolvedValueOnce({
+          id: 'b-1',
+          status: BookingStatus.CANCELLATION_PENDING,
+          disruptionStatus: DisruptionStatus.DETECTED,
+          activeDisruptionRevisionId: 'rev-42',
+          version: 1,
+        })
+        .mockResolvedValueOnce({
+          id: 'b-1',
+          version: 2,
+        });
+      mockPrisma.booking.updateMany.mockResolvedValue({ count: 1 });
+
+      const result = await service.cancelBooking(
+        'b-1',
+        BookingStatus.CANCELLED_NO_REFUND,
+        '0.00',
+        {
+          resolvedByType: DisruptionActorType.TRAVELLER,
+          resolvedById: 'user-1',
+        },
+      );
+
+      expect(result.count).toBe(1);
+      expect(result.hasActiveDisruption).toBe(true);
+      expect(result.activeDisruptionRevisionId).toBe('rev-42');
+      expect(result.previousDisruptionStatus).toBe(DisruptionStatus.DETECTED);
+      expect(mockPrisma.booking.updateMany).toHaveBeenCalledWith({
+        where: { id: 'b-1', status: BookingStatus.CANCELLATION_PENDING },
+        data: expect.objectContaining({
+          status: BookingStatus.CANCELLED_NO_REFUND,
+          disruptionStatus: DisruptionStatus.RESOLVED,
+          disruptionResolvedReason: 'BOOKING_CANCELLED',
+          disruptionResolvedByType: DisruptionActorType.TRAVELLER,
+          disruptionResolvedById: 'user-1',
+        }),
+      });
+    });
+
+    it('returns count: 0 and emits no events if booking not in CANCELLATION_PENDING', async () => {
+      mockPrisma.booking.findUnique.mockResolvedValue({
+        id: 'b-1',
+        status: BookingStatus.CONFIRMED,
+        version: 1,
+      });
+
+      const result = await service.cancelBooking(
+        'b-1',
+        BookingStatus.CANCELLED_PENDING_REFUND,
+        '100.00',
+      );
+
+      expect(result.count).toBe(0);
+      expect(mockPrisma.booking.updateMany).not.toHaveBeenCalled();
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
+    });
+
+    it('collects event into provided context without publishing directly', async () => {
+      mockPrisma.booking.findUnique
+        .mockResolvedValueOnce({
+          id: 'b-1',
+          status: BookingStatus.CANCELLATION_PENDING,
+          disruptionStatus: null,
+          version: 5,
+        })
+        .mockResolvedValueOnce({
+          id: 'b-1',
+          version: 6,
+        });
+      mockPrisma.booking.updateMany.mockResolvedValue({ count: 1 });
+
+      const context: TransactionEventContext = {
+        tx: mockPrisma,
+        events: [],
+      };
+
+      const result = await service.cancelBooking(
+        'b-1',
+        BookingStatus.CANCELLED_PENDING_REFUND,
+        '200.00',
+        undefined,
+        mockPrisma,
+        context,
+      );
+
+      expect(result.count).toBe(1);
+      expect(context.events).toHaveLength(1);
+      expect(context.events[0]).toBeInstanceOf(BookingCancelledEvent);
       expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
   });

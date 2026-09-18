@@ -1503,15 +1503,27 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
           return origSetTimeout(fn, ms);
         });
 
+      let orderStolenPromise: Promise<void>;
+      let resolveOrderStolen: () => void;
+      orderStolenPromise = new Promise((resolve) => {
+        resolveOrderStolen = resolve;
+      });
+
       jest.spyOn(duffelService, 'createOrder').mockImplementation(
         () =>
           new Promise((resolve) => {
             origSetTimeout(async () => {
-              await prisma.idempotencyKey.update({
-                where: { key: idempotencyKey },
-                data: { lockedAt: new Date(Date.now() + 60000) },
-              });
-              resolve(mockOrder as unknown as Record<string, unknown>);
+              try {
+                await prisma.idempotencyKey.updateMany({
+                  where: { key: idempotencyKey },
+                  data: { lockedAt: new Date(Date.now() + 60000) },
+                });
+              } catch {
+                // Ignore teardown races
+              } finally {
+                resolveOrderStolen();
+                resolve(mockOrder as unknown as Record<string, unknown>);
+              }
             }, 50);
           }),
       );
@@ -1528,7 +1540,8 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
 
         expect(res.body.status).toBe('PENDING');
 
-        await new Promise((resolve) => origSetTimeout(resolve, 150));
+        await orderStolenPromise;
+        await new Promise((resolve) => origSetTimeout(resolve, 200));
 
         expect(captureSpy).toHaveBeenCalledTimes(0);
 

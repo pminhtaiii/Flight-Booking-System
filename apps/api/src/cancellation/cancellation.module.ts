@@ -2,11 +2,12 @@ import { Module } from '@nestjs/common';
 import { PrismaModule } from '@/prisma/prisma.module';
 import { DuffelModule } from '@/duffel/duffel.module';
 import { PaymentModule } from '@/payment/payment.module';
-import { AgentGatewayModule } from '@/agent-gateway/agent-gateway.module';
+import { BookingStateModule } from '@/booking-lifecycle/booking-state.module';
+import { DomainEventsModule } from '@/domain-events/domain-events.module';
 import { CancellationService } from './cancellation.service';
 
 @Module({
-  imports: [PrismaModule, DuffelModule, PaymentModule, AgentGatewayModule],
+  imports: [PrismaModule, DuffelModule, PaymentModule, BookingStateModule, DomainEventsModule],
   providers: [CancellationService],
   exports: [CancellationService],
 })

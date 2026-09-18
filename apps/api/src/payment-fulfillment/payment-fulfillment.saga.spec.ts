@@ -19,6 +19,7 @@ import { BookingLifecycleService } from '@/booking-lifecycle/booking-lifecycle.s
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
 import { BookingPassengerFinalValidatorService } from '@/booking-intent/booking-passenger-final-validator.service';
+import { BookingEventPublisherService } from '@/domain-events';
 import { ConfirmPaymentDto } from '@/payment/dto/confirm-payment.dto';
 
 interface ConfirmPaymentResult {
@@ -85,7 +86,12 @@ describe('PaymentFulfillmentSaga', () => {
   let mockBookingLifecycle: {
     createBooking: jest.Mock;
     updateToConfirmed: jest.Mock;
+    confirmBooking: jest.Mock;
     updateToFailed: jest.Mock;
+  };
+  let mockPublisher: {
+    createContext: jest.Mock;
+    publish: jest.Mock;
   };
   let mockPrisma: MockPrisma;
   let mockAudit: {
@@ -248,10 +254,18 @@ describe('PaymentFulfillmentSaga', () => {
         id: bookingId,
         status: 'CONFIRMED',
       }),
+      confirmBooking: jest.fn().mockImplementation(async (...args: unknown[]) => {
+        return mockBookingLifecycle.updateToConfirmed(...args);
+      }),
       updateToFailed: jest.fn().mockResolvedValue({
         id: bookingId,
         status: 'FAILED',
       }),
+    };
+
+    mockPublisher = {
+      createContext: jest.fn((tx) => ({ tx, events: [] })),
+      publish: jest.fn().mockResolvedValue(undefined),
     };
 
     currentPaymentState = JSON.parse(JSON.stringify(basePayment));
@@ -337,6 +351,7 @@ describe('PaymentFulfillmentSaga', () => {
       mockPrisma as unknown as PrismaService,
       mockAudit as unknown as AuditService,
       mockValidator as unknown as BookingPassengerFinalValidatorService,
+      mockPublisher as unknown as BookingEventPublisherService,
     );
     saga.timeoutMs = 1000;
   });
@@ -1610,6 +1625,124 @@ describe('PaymentFulfillmentSaga', () => {
       expect(mockBookingLifecycle.updateToFailed).not.toHaveBeenCalled();
       expect(mockPrisma.payment.updateMany).not.toHaveBeenCalled();
       expect(mockIdempotency.completeSagaKeyAtomic).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Saga Post-Commit Event Dispatch (T024)', () => {
+    it('asserts publisher.publish is called with collected events only after outer transaction resolves', async () => {
+      const executionOrder: string[] = [];
+      mockPrisma.$transaction.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => {
+        executionOrder.push('transaction:start');
+        const result = await callback(mockPrisma);
+        executionOrder.push('transaction:commit');
+        return result;
+      });
+
+      const mockEvent = {
+        name: 'booking.confirmed',
+        bookingId,
+        eventId: 'evt-123',
+        timestamp: new Date(),
+      };
+
+      mockBookingLifecycle.confirmBooking.mockImplementation(
+        async (
+          _id: string,
+          _pnr: string,
+          _orderId: string,
+          _flight: unknown,
+          _pass: unknown,
+          _tx: unknown,
+          eventContext?: { events: unknown[] },
+        ) => {
+          if (eventContext) {
+            eventContext.events.push(mockEvent);
+          }
+          return mockBookingLifecycle.updateToConfirmed(
+            _id,
+            _pnr,
+            _orderId,
+            _flight,
+            _pass,
+            _tx,
+            eventContext,
+          );
+        },
+      );
+
+      mockPublisher.publish.mockImplementation(async () => {
+        executionOrder.push('publisher:publish');
+      });
+
+      const result = (await saga.confirmPayment(dto, idempotencyKey, userId)) as ConfirmPaymentResult;
+
+      expect(result.status).toBe('SUCCEEDED');
+      expect(mockBookingLifecycle.confirmBooking).toHaveBeenCalledWith(
+        bookingId,
+        'PNR123',
+        'ord-123',
+        baseSnapshots.flightSnapshot,
+        baseSnapshots.passengerSnapshot,
+        expect.anything(),
+        expect.anything(),
+      );
+      expect(mockPublisher.publish).toHaveBeenCalledWith([mockEvent]);
+      const txCommitIndex = executionOrder.lastIndexOf('transaction:commit');
+      const publishIndex = executionOrder.indexOf('publisher:publish');
+      expect(txCommitIndex).toBeGreaterThan(-1);
+      expect(publishIndex).toBeGreaterThan(txCommitIndex);
+    });
+
+    it('proves that if publisher.publish rejects or throws an error, payment confirmation still succeeds and does NOT trigger compensation', async () => {
+      const mockEvent = {
+        name: 'booking.confirmed',
+        bookingId,
+        eventId: 'evt-123',
+        timestamp: new Date(),
+      };
+
+      mockBookingLifecycle.confirmBooking.mockImplementation(
+        async (
+          _id: string,
+          _pnr: string,
+          _orderId: string,
+          _flight: unknown,
+          _pass: unknown,
+          _tx: unknown,
+          eventContext?: { events: unknown[] },
+        ) => {
+          if (eventContext) {
+            eventContext.events.push(mockEvent);
+          }
+          return mockBookingLifecycle.updateToConfirmed(
+            _id,
+            _pnr,
+            _orderId,
+            _flight,
+            _pass,
+            _tx,
+            eventContext,
+          );
+        },
+      );
+
+      mockPublisher.publish.mockRejectedValue(new Error('Event bus dispatch failure'));
+
+      const result = (await saga.confirmPayment(dto, idempotencyKey, userId)) as ConfirmPaymentResult;
+
+      expect(result.status).toBe('SUCCEEDED');
+      expect(mockPublisher.publish).toHaveBeenCalledWith([mockEvent]);
+      expect(mockPaymentGateway.voidHold).not.toHaveBeenCalled();
+      expect(mockFulfillmentGateway.cancelOrder).not.toHaveBeenCalled();
+      expect(mockBookingLifecycle.updateToFailed).not.toHaveBeenCalled();
+      expect(mockIdempotency.completeSagaKeyAtomic).toHaveBeenCalledWith(
+        expect.anything(),
+        HttpStatus.OK,
+        expect.objectContaining({
+          success: true,
+          status: 'SUCCEEDED',
+        }),
+      );
     });
   });
 });
