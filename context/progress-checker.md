@@ -1,5 +1,30 @@
 # Progress Tracker
 
+### Feature 024 — Event-Driven Module Deepening: Phase 5 Slice 1 (Tasks T035, T036, T037) Completed (2026-09-18)
+
+- **T035 [US3] Keyset Scan for Stale & Missing Projections**:
+  - Implemented `findStaleOrMissingBookingIds(limit: number, afterBookingId?: string): Promise<KeysetScanResult>` in `apps/api/src/booking-projection/booking-projection.repository.ts`.
+  - Executes raw SQL keyset scan with LEFT JOIN `"booking_agent_projections"` on `p."bookingId" = b."id"`, selecting candidates where `(p."bookingId" IS NULL OR p."source_version" < b."version")` with cursor pagination ordered by `b."id" ASC LIMIT ${limit}`.
+  - Returns `bookingIds`, `nextCursor` (last ID in batch or null), and `reachedEnd` (`bookingIds.length < limit`).
+  - Added unit tests in `booking-projection.repository.spec.ts` covering empty results, partial page, full page, and cursor pagination.
+- **T036 [US3] 100/5 Scheduled Reconciliation Service**:
+  - Implemented `BookingProjectionReconciliationService` in `apps/api/src/booking-projection/booking-projection-reconciliation.service.ts`.
+  - Runs once per minute (`@Cron(CronExpression.EVERY_MINUTE)`) with local in-memory execution lock (`isReconciling`) preventing overlapping cycles.
+  - Bounded 100-item batching with 5-worker concurrency pool processing candidates concurrently without external dependencies.
+  - Safely classifies candidate outcomes: `repaired` (successful upsert), `current` (stale ignored), `skipped` (no source snapshot/flight data), `failed` (malformed revision or thrown exception).
+  - Poison-pill progression: logs and advances cursor on unprocessable rows to prevent deadlocks; resets cursor to `undefined` when `reachedEnd === true` without scanning an extra empty page.
+  - Exported and registered in `BookingProjectionModule` and `booking-projection/index.ts`. Added comprehensive unit tests in `booking-projection-reconciliation.service.spec.ts`.
+- **T037 [US3] Prisma Backfill Script Unification**:
+  - Refactored `apps/api/prisma/scripts/backfill-booking-agent-projections.ts` to reuse shared `BookingProjectionService` and `BookingProjectionRepository.upsertGuarded`.
+  - Preserves existing `agentReference` values and enforces monotonic version fencing (`source_version < EXCLUDED.source_version`).
+  - Bypasses malformed/missing flight records safely without throwing fatal process exits.
+  - Extended `apps/api/test/booking-projection-backfill.e2e-spec.ts` with tests for rerun idempotency, stable references, version fencing, and malformed flight data handling.
+- **Verification**:
+  - `pnpm exec eslint "apps/api/src/booking-projection/**/*.ts" "apps/api/prisma/scripts/**/*.ts" --max-warnings 0` passed (0 errors, 0 warnings).
+  - `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` passed (0 errors).
+  - `pnpm --filter @api/backend test -- apps/api/src/booking-projection/` passed (5 suites, 61/61 passed).
+  - `pnpm --filter @api/backend test:e2e -- booking-projection-backfill.e2e-spec.ts` passed (4/4 passed).
+
 ### Feature 024 — Event-Driven Module Deepening: Phase 4 (Tasks T031 & T034 - US2 Completed) (2026-09-18)
 
 - **T031 [US2] Obsolete Service Removal & Module Decoupling**:

@@ -6,6 +6,7 @@ import { BookingProjectionService } from './booking-projection.service';
 import { BookingProjectionRepository } from './booking-projection.repository';
 import { BookingProjectionListener } from './booking-projection.listener';
 import { BookingProjectionMetrics } from './booking-projection.metrics';
+import { BookingProjectionReconciliationService } from './booking-projection-reconciliation.service';
 
 @Module({
   imports: [PrismaModule, DomainEventsModule],
@@ -15,11 +16,13 @@ import { BookingProjectionMetrics } from './booking-projection.metrics';
     BookingProjectionRepository,
     BookingProjectionListener,
     BookingProjectionMetrics,
+    BookingProjectionReconciliationService,
   ],
   exports: [
     BookingProjectionService,
     BookingProjectionRepository,
     BookingEventHydratorService,
+    BookingProjectionReconciliationService,
   ],
 })
 export class BookingProjectionModule {}
