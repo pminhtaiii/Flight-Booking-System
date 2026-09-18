@@ -4,6 +4,31 @@
 
 Planning artifacts: [specification](../specs/024-event-driven-module-deepening/spec.md), [plan](../specs/024-event-driven-module-deepening/plan.md), and [tasks](../specs/024-event-driven-module-deepening/tasks.md).
 
+#### Implemented Architecture (Phase 5 Slice 2: US3 Completed — Reconciliation E2E Suite, Observability Telemetry & Operational Runbook)
+
+- **Comprehensive Reconciliation E2E Suite (`apps/api/test/booking-projection-reconciliation.e2e-spec.ts`) (T038)**:
+  - Real PostgreSQL E2E suite validating self-healing reconciliation under CI network guard.
+  - Proves 6 critical invariants:
+    1. *Suppressed Events / Lost Messages*: Repaired missing projections and stale `sourceVersion < version` records to authoritative state.
+    2. *Large Backlog Keyset Pagination*: Fair keyset pagination across >100 records (105 seeded) in batches of 100 with `reachedEnd` reset.
+    3. *Poison Pill Isolation*: Corrupted rows (0 segments, missing flight details) marked failed/skipped and bypassed without crashing the process.
+    4. *5-Worker Concurrency Bound*: Active worker parallelism strictly bounded to at most 5 concurrent tasks.
+    5. *Live Concurrent Mutations*: Monotonic version fencing in `upsertGuarded` protects against out-of-order writes from older snapshots.
+    6. *Zero Provider Calls*: Verified zero external HTTP/HTTPS calls to Stripe, Duffel, or external providers during background repair.
+  - Completed legacy-writer compatibility fixture in `apps/api/test/booking-projection-version-migration.e2e-spec.ts`:
+    - Verified freshness reset (`sourceVersion = 0`) repairs cleanly with stable `agentReference`.
+    - Proved financial tables (`payments`, `refunds`, `ledger_entries`) remain completely unmodified.
+- **Observability Telemetry & Bounded Metrics (`apps/api/src/booking-projection/booking-projection.metrics.ts`) (T039)**:
+  - Implemented structured Prometheus metrics:
+    - Counters: `booking_projection_reconciliation_pass_total` (outcome: `SUCCESS` | `ERROR`), `stale_found_total`, `repaired_total`, `failed_total`, `skipped_total`, `current_total`.
+    - Latency timer: `booking_projection_reconciliation_duration_ms` with percentiles (p50, p90, p95, p99).
+    - Failure tracking: `booking_projection_failure_total` (labels: `error_type` in `HYDRATION_FAILED`, `EXTRACTION_FAILED`, `UNEXPECTED_ERROR`, `INVALID_EVENT`, `DATABASE_ERROR`, `UNKNOWN`).
+  - Strict bounded cardinality and zero raw identifiers (no booking IDs, user IDs, or PII) in Prometheus metric labels.
+  - Injected into `BookingProjectionReconciliationService` and `BookingProjectionListener`.
+- **Operational Runbook & Quickstart Integration (`docs/runbooks/booking-projection-reconciliation.md`) (T040)**:
+  - Authoritative operational guide covering self-healing architecture, keyset traversal mechanics, poison pill triage, multi-replica pod safety, emergency single-booking repair, and rollback/reactivation without financial disruption.
+  - Linked in `specs/024-event-driven-module-deepening/quickstart.md`.
+
 #### Implemented Architecture (Phase 5 Slice 1: US3 Keyset Scan, Background Reconciliation Engine & Backfill Script Unification)
 
 - **Keyset Scan in BookingProjectionRepository (`apps/api/src/booking-projection/booking-projection.repository.ts`) (T035)**:

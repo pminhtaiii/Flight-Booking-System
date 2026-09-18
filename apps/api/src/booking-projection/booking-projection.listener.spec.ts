@@ -271,6 +271,7 @@ describe('BookingProjectionListener', () => {
       );
 
       expect(metrics.getEventsTotal('booking.created', 'ERROR')).toBe(1);
+      expect(metrics.getFailureTotal('HYDRATION_FAILED')).toBe(1);
       expect(metrics.getDurations().length).toBe(1);
     });
   });
@@ -303,6 +304,7 @@ describe('BookingProjectionListener', () => {
       );
 
       expect(metrics.getEventsTotal('booking.created', 'ERROR')).toBe(1);
+      expect(metrics.getFailureTotal('EXTRACTION_FAILED')).toBe(1);
       expect(repository.upsertGuarded).not.toHaveBeenCalled();
       expect(metrics.getDurations().length).toBe(1);
     });
@@ -335,6 +337,7 @@ describe('BookingProjectionListener', () => {
       );
 
       expect(metrics.getEventsTotal('booking.created', 'ERROR')).toBe(1);
+      expect(metrics.getFailureTotal('DATABASE_ERROR')).toBe(1);
       expect(metrics.getDurations().length).toBe(1);
     });
   });
@@ -408,6 +411,7 @@ describe('BookingProjectionListener', () => {
 
       expect(loggerWarnSpy).toHaveBeenCalled();
       expect(metrics.getEventsTotal('booking.unknown', 'ERROR')).toBe(1);
+      expect(metrics.getFailureTotal('INVALID_EVENT')).toBe(1);
       expect(hydrator.hydrate).not.toHaveBeenCalled();
       expect(metrics.getDurations().length).toBe(1);
     });
@@ -426,6 +430,7 @@ describe('BookingProjectionListener', () => {
 
       expect(loggerWarnSpy).toHaveBeenCalled();
       expect(metrics.getEventsTotal('booking.created', 'ERROR')).toBe(1);
+      expect(metrics.getFailureTotal('HYDRATION_FAILED')).toBe(1);
       expect(projectionService.extractProjectionData).not.toHaveBeenCalled();
       expect(repository.upsertGuarded).not.toHaveBeenCalled();
       expect(metrics.getDurations().length).toBe(1);
@@ -446,8 +451,10 @@ describe('BookingProjectionListener', () => {
 
       expect(loggerWarnSpy).toHaveBeenCalled();
       expect(metrics.getEventsTotal('booking.created', 'ERROR')).toBe(1);
+      expect(metrics.getFailureTotal('EXTRACTION_FAILED')).toBe(1);
       expect(repository.upsertGuarded).not.toHaveBeenCalled();
       expect(metrics.getDurations().length).toBe(1);
     });
   });
 });
+

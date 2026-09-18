@@ -1,5 +1,42 @@
 # Progress Tracker
 
+### Feature 024 — Event-Driven Module Deepening: Phase 5 Slice 2 (Tasks T038, T039, T040 - US3 Completed) (2026-09-18)
+
+- **T038 [US3] Comprehensive Reconciliation E2E Suite & Migration Fixture**:
+  - Implemented `apps/api/test/booking-projection-reconciliation.e2e-spec.ts` testing:
+    - Suppressed events & lost messages: repairs missing projections and stale sourceVersions to authoritative state.
+    - Large backlog keyset pagination: multi-pass processing across >100 candidates (105 seeded) with 100 limit, fair keyset cursor progression, and reset on `reachedEnd`.
+    - Malformed source data / poison pill isolation: isolates corrupted rows without crashing, advances cursor, and repairs preceding/subsequent valid bookings.
+    - 5-worker concurrency bound: strictly bounds worker pool concurrency to at most 5 tasks.
+    - Live concurrent mutations: monotonic version fencing prevents older hydrated snapshot from overwriting newer live writes.
+    - Zero provider calls: verified strictly zero external network calls under CI network guard.
+  - Completed legacy-writer compatibility fixture in `apps/api/test/booking-projection-version-migration.e2e-spec.ts`:
+    - Reset projection freshness (`sourceVersion = 0`), triggered reconciliation pass, verified clean repair with stable `agentReference`.
+    - Proved financial tables (`payments`, `refunds`, `ledger_entries`) remain completely unmodified.
+- **T039 [US3] Observability Telemetry & Metrics Implementation**:
+  - Implemented structured metrics in `apps/api/src/booking-projection/booking-projection.metrics.ts`:
+    - `booking_projection_reconciliation_pass_total` (counter, labels: `outcome: SUCCESS | ERROR`).
+    - `booking_projection_reconciliation_stale_found_total` (counter).
+    - `booking_projection_reconciliation_repaired_total` (counter).
+    - `booking_projection_reconciliation_failed_total` (counter).
+    - `booking_projection_reconciliation_skipped_total` (counter).
+    - `booking_projection_reconciliation_current_total` (counter).
+    - `booking_projection_reconciliation_duration_ms` (timer / stats).
+    - `booking_projection_failure_total` (counter, labels: `error_type`).
+  - Enforced bounded cardinality and strictly zero raw IDs or PII in Prometheus labels.
+  - Injected `BookingProjectionMetrics` into `BookingProjectionReconciliationService` and wired pass/failure reporting.
+  - Comprehensive unit tests in `booking-projection.metrics.spec.ts` (17/17 passed).
+- **T040 [US3] Operational Runbook & Quickstart Integration**:
+  - Authored authoritative operational runbook in `docs/runbooks/booking-projection-reconciliation.md` covering architecture, keyset mechanics, poison pill triage, multi-replica safety, diagnostic SQL/PowerShell commands, and safe rollback/reactivation without financial data modification.
+  - Linked runbook in `specs/024-event-driven-module-deepening/quickstart.md`.
+  - Phase 5 (User Story 3: Repair and operate projections) is now fully complete. Phase 6 remains unstarted.
+- **Verification**:
+  - `pnpm exec eslint "apps/api/src/booking-projection/**/*.ts" --max-warnings 0` passed (0 errors, 0 warnings).
+  - `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` passed (0 errors).
+  - `pnpm --filter @api/backend test -- apps/api/src/booking-projection/booking-projection.metrics.spec.ts` passed (17/17 passed).
+  - `pnpm --filter @api/backend test:e2e -- booking-projection-reconciliation.e2e-spec.ts` passed (6/6 passed).
+  - `pnpm --filter @api/backend test:e2e -- booking-projection-version-migration.e2e-spec.ts` passed (5/5 passed).
+
 ### Feature 024 — Event-Driven Module Deepening: Phase 5 Slice 1 (Tasks T035, T036, T037) Completed (2026-09-18)
 
 - **T035 [US3] Keyset Scan for Stale & Missing Projections**:

@@ -55,6 +55,7 @@ export class BookingProjectionListener {
   async handleBookingEvent(event: DomainEventBase): Promise<void> {
     const startTime = Date.now();
     const eventName = this.resolveEventName(event);
+    let failureRecorded = false;
 
     try {
       if (!event || !event.bookingId) {
@@ -63,11 +64,21 @@ export class BookingProjectionListener {
           eventName,
           eventId: (event as unknown as { eventId?: string })?.eventId,
         });
+        this.metrics.incrementFailureTotal('INVALID_EVENT');
+        failureRecorded = true;
         this.metrics.incrementEventsTotal(eventName, 'ERROR');
         return;
       }
 
-      const snapshot = await this.hydrator.hydrate(event.bookingId, event.sourceVersion);
+      let snapshot;
+      try {
+        snapshot = await this.hydrator.hydrate(event.bookingId, event.sourceVersion);
+      } catch (error) {
+        this.metrics.incrementFailureTotal('HYDRATION_FAILED');
+        failureRecorded = true;
+        throw error;
+      }
+
       if (!snapshot) {
         this.logger.warn({
           message: 'Booking snapshot could not be hydrated for event',
@@ -75,11 +86,21 @@ export class BookingProjectionListener {
           bookingId: event.bookingId,
           eventId: (event as unknown as { eventId?: string })?.eventId,
         });
+        this.metrics.incrementFailureTotal('HYDRATION_FAILED');
+        failureRecorded = true;
         this.metrics.incrementEventsTotal(eventName, 'ERROR');
         return;
       }
 
-      const data = this.projectionService.extractProjectionData(snapshot);
+      let data;
+      try {
+        data = this.projectionService.extractProjectionData(snapshot);
+      } catch (error) {
+        this.metrics.incrementFailureTotal('EXTRACTION_FAILED');
+        failureRecorded = true;
+        throw error;
+      }
+
       if (!data) {
         this.logger.warn({
           message: 'Projection data could not be extracted from snapshot',
@@ -87,23 +108,34 @@ export class BookingProjectionListener {
           bookingId: event.bookingId,
           eventId: (event as unknown as { eventId?: string })?.eventId,
         });
+        this.metrics.incrementFailureTotal('EXTRACTION_FAILED');
+        failureRecorded = true;
         this.metrics.incrementEventsTotal(eventName, 'ERROR');
         return;
       }
 
-      const result = await this.repository.upsertGuarded({
-        bookingId: event.bookingId,
-        status: snapshot.status,
-        sourceVersion: snapshot.version,
-        data,
-      });
+      try {
+        const result = await this.repository.upsertGuarded({
+          bookingId: event.bookingId,
+          status: snapshot.status,
+          sourceVersion: snapshot.version,
+          data,
+        });
 
-      if (result.outcome === 'STALE_IGNORED') {
-        this.metrics.incrementEventsTotal(eventName, 'STALE_IGNORED');
-      } else {
-        this.metrics.incrementEventsTotal(eventName, 'SUCCESS');
+        if (result.outcome === 'STALE_IGNORED') {
+          this.metrics.incrementEventsTotal(eventName, 'STALE_IGNORED');
+        } else {
+          this.metrics.incrementEventsTotal(eventName, 'SUCCESS');
+        }
+      } catch (error) {
+        this.metrics.incrementFailureTotal('DATABASE_ERROR');
+        failureRecorded = true;
+        throw error;
       }
     } catch (error) {
+      if (!failureRecorded) {
+        this.metrics.incrementFailureTotal('UNEXPECTED_ERROR');
+      }
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error({
         message: 'Failed to process booking projection event',
