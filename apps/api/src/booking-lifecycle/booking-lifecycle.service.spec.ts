@@ -30,7 +30,6 @@ describe('BookingLifecycleService', () => {
   let service: BookingLifecycleService;
   let mockPrisma: any;
   let mockPublisher: jest.Mocked<BookingEventPublisherService>;
-  let mockProjectionService: any;
 
   beforeEach(() => {
     mockPrisma = {
@@ -57,12 +56,7 @@ describe('BookingLifecycleService', () => {
       resolveEventName: jest.fn().mockReturnValue(null),
     } as unknown as jest.Mocked<BookingEventPublisherService>;
 
-    mockProjectionService = {
-      createOrUpdateProjection: jest.fn().mockResolvedValue(null),
-      updateProjectionStatus: jest.fn().mockResolvedValue(null),
-    };
-
-    service = new BookingLifecycleService(mockPrisma, mockPublisher, mockProjectionService);
+    service = new BookingLifecycleService(mockPrisma, mockPublisher);
   });
 
   describe('createBooking', () => {
@@ -499,10 +493,6 @@ describe('BookingLifecycleService', () => {
           version: { increment: 1 },
         },
       });
-      expect(mockProjectionService.createOrUpdateProjection).toHaveBeenCalledWith(
-        'b-1',
-        mockPrisma,
-      );
       expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
       const emitted = mockPublisher.publish.mock.calls[0][0];
       expect(emitted).toBeDefined();
@@ -588,7 +578,6 @@ describe('BookingLifecycleService', () => {
       );
 
       expect(customTx.booking.updateMany).toHaveBeenCalled();
-      expect(mockProjectionService.createOrUpdateProjection).toHaveBeenCalledWith('b-1', customTx);
       expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
 
@@ -653,11 +642,6 @@ describe('BookingLifecycleService', () => {
           version: { increment: 1 },
         },
       });
-      expect(mockProjectionService.updateProjectionStatus).toHaveBeenCalledWith(
-        'b-1',
-        BookingStatus.FAILED,
-        mockPrisma,
-      );
       expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
       const emitted = mockPublisher.publish.mock.calls[0][0];
       expect(emitted).toBeDefined();
@@ -857,11 +841,6 @@ describe('BookingLifecycleService', () => {
           version: { increment: 1 },
         },
       });
-      expect(mockProjectionService.updateProjectionStatus).toHaveBeenCalledWith(
-        'b-1',
-        BookingStatus.COMPLETED,
-        mockPrisma,
-      );
       expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
       const emitted = mockPublisher.publish.mock.calls[0][0];
       expect(emitted).toBeDefined();

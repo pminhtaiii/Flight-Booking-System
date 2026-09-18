@@ -1,5 +1,76 @@
 # Progress Tracker
 
+### Feature 024 — Event-Driven Module Deepening: Phase 4 (Tasks T031 & T034 - US2 Completed) (2026-09-18)
+
+- **T031 [US2] Obsolete Service Removal & Module Decoupling**:
+  - Removed `BookingAgentProjectionService` from providers and exports in `AgentGatewayModule`.
+  - Deleted legacy `apps/api/src/agent-gateway/booking-agent-projection.service.ts` and associated unit tests; projection logic now lives exclusively in `apps/api/src/booking-projection/`.
+  - Decoupled consumer modules: dropped obsolete `AgentGatewayModule` imports from `BookingLifecycleModule` and `CancellationModule`.
+  - Removed projection-related `forwardRef(() => AgentGatewayModule)` from `DisruptionModule` while preserving safe query cycles.
+- **T034 [US2] Adapt Existing E2E & Privacy Tests for Eventual Consistency**:
+  - `apps/api/test/booking-agent-projection-privacy.e2e-spec.ts`:
+    - Updated suite to deterministically seed a test booking and projection with valid schema attributes, ensuring test runs reliably on empty/fresh databases.
+    - Implemented bounded polling (`waitForCondition` up to 5s) for querying projections while strictly asserting that `projections.length > 0`.
+    - Strictly preserved all privacy allowlist assertions and opaque `agentReference` assertions (`/^bkref_[0-9a-fA-F-]+$/`, non-guessable, not derived from DB id).
+    - Verified clean teardown in `afterAll`.
+  - `apps/api/test/characterization/booking-characterization.e2e-spec.ts`:
+    - Added `waitForCondition` helper and updated post-confirmation projection assertions to use bounded polling (up to 5s) for eventual consistency.
+  - Verified `chat-persistence-migration.e2e-spec.ts` and `safe-booking-read.service.spec.ts` pass cleanly.
+  - Marked Tasks T031, T032, T033, and T034 as complete (`[x]`) in `specs/024-event-driven-module-deepening/tasks.md`. Phase 4 (User Story 2: Event-Driven Safe Booking Projection) is now fully complete.
+- **Verification**:
+  - `pnpm exec eslint "apps/api/**/*.ts" --max-warnings 0` passed (0 errors, 0 warnings).
+  - `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` passed (0 errors).
+  - `pnpm --filter @api/backend test -- apps/api/src/agent-gateway/` passed (7 suites, 85/85 passed).
+  - `pnpm --filter @api/backend test:e2e -- module-deepening.e2e-spec.ts` passed (23/23 passed).
+  - `pnpm --filter @api/backend test:e2e -- booking-events.e2e-spec.ts` passed (16/16 passed).
+  - `pnpm --filter @api/backend test:e2e -- booking-agent-projection-privacy.e2e-spec.ts` passed (2/2 passed).
+  - `pnpm --filter @api/backend test:e2e -- booking-characterization.e2e-spec.ts` passed (14/14 passed).
+
+### Feature 024 — Event-Driven Module Deepening: Phase 4 Slice 6 (Task T033) Completed (2026-09-18)
+
+- **T033 [US2] PostgreSQL Event & Projection E2E Integration Suite**:
+  - `apps/api/test/booking-events.e2e-spec.ts`:
+    - Implemented disposable database assertion checking `test|e2e|flight_booking` in `DATABASE_URL` or `NODE_ENV === 'test'`.
+    - Initialized real Nest application via `Test.createTestingModule({ imports: [AppModule] }).compile()` and `await app.init()`.
+    - Added resilient `waitForCondition` helper to accommodate post-commit asynchronous projection updates.
+    - Added thorough cleanup in `afterAll` to delete all created test bookings, projections, revisions, segments, intents, and users.
+    - Verified all 8 required categories across 16 integration tests:
+      - (a) Creation, Confirmation, Failure, Completion: hydrated processing at version 1 with carrier and flightNumber extracted from intent snapshot, confirmation with version 2 and status CONFIRMED, failure with version 2 and status FAILED, completion with version 3 and status COMPLETED.
+      - (b) Recovery Outcomes: `recordRecoveryOutcome` emits `booking.recovery.resolved` and updates projection accurately.
+      - (c) Cancellation Claims & Finalization: `recordCancellationClaim` emits `booking.cancellation.pending` and updates projection to `CANCELLATION_PENDING`; `finalizeCancellation` emits `booking.cancelled` and updates projection to `CANCELLED_NO_REFUND`.
+      - (d) Supplier Revision Sync & Disruption: `recordSupplierRevision` emits `booking.disruption.synced` and updates projection with updated revision details; `recordDisruptionAcknowledgment` emits `booking.disruption.acknowledged`; `recordDisruptionAcceptance` emits `booking.disruption.accepted`.
+      - (e) Refunds & Emission Isolation: `recordRefundState` emits `booking.refund.updated` and updates projection; direct emission of `refund.settled` on `EventEmitter2` is ignored by listener and causes 0 projection updates.
+      - (f) Rollbacks & No-Ops: rolled-back transaction writes zero projections; idempotent replay yields 0 version increments and 0 events.
+      - (g) Out-of-Order / Replay Fencing: arrival of an event with older `sourceVersion` is ignored via `STALE_IGNORED` and does not overwrite newer projection.
+      - (h) Stable References: initial `agentReference` (`bkref_...`) remains strictly unchanged across subsequent projection updates.
+  - `apps/api/src/booking-projection/booking-projection.listener.ts`:
+    - Implemented `OnApplicationBootstrap` to bind `booking.**` directly on the injected `EventEmitter2` instance, overcoming `EventEmitter2` array-namespace path behavior and ensuring multi-segment domain events (`booking.recovery.resolved`, `booking.disruption.synced`, etc.) trigger projection updates reliably.
+  - `apps/api/src/booking-lifecycle/booking-lifecycle.service.ts`:
+    - Added lifecycle methods for testable domain transitions (`recordRecoveryOutcome`, `recordCancellationClaim`, `finalizeCancellation`, `recordSupplierRevision`, `recordDisruptionAcknowledgment`, `recordDisruptionAcceptance`, `recordRefundState`).
+    - Extended `createBooking` to accept `flightSnapshot` or fall back to `intent.rawOfferSnapshot` so projections can hydrate immediately on creation.
+  - **Verification**:
+    - `pnpm --filter @api/backend test:e2e -- booking-events.e2e-spec.ts` passed (16/16 passed, exit code 0).
+    - `pnpm --filter @api/backend test -- src/booking-lifecycle/booking-lifecycle.service.spec.ts src/booking-projection/` passed (5 suites, 99/99 passed, exit code 0).
+    - `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` passed (0 errors).
+    - `pnpm exec eslint "apps/api/**/*.ts" --max-warnings 0` passed (0 errors, 0 warnings).
+
+### Feature 024 — Event-Driven Module Deepening: Phase 4 Slice 6 (Task T032) Completed (2026-09-18)
+
+- **T032 [US2] Root AppModule Wiring & DI Architecture Verification**:
+  - `apps/api/src/app.module.ts`:
+    - Imported and registered `EventEmitterModule.forRoot({ wildcard: true, delimiter: '.' })`.
+    - Imported and registered `BookingProjectionModule`.
+    - Verified adapter admission settings (`STRIPE_ADMISSION_*`, `DUFFEL_ADMISSION_*`) remain strictly validated in `envSchema`.
+  - `apps/api/test/module-deepening.e2e-spec.ts`:
+    - Updated Section 5 to assert positive registration of `EventEmitterModule` (or `EventEmitterCoreModule`) and `BookingProjectionModule` in `AppModule`.
+    - Asserted that `EventEmitter2`, `BookingProjectionListener`, `BookingProjectionRepository`, `BookingProjectionService`, and `BookingEventHydratorService` are registered tokens/providers in `AppModule`.
+    - Asserted that DI resolves instances for all five tokens cleanly.
+    - Verified full test suite passes (23/23 tests passed, exit code 0).
+  - **Verification**:
+    - `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` passed (0 errors).
+    - `pnpm exec eslint "apps/api/**/*.ts" --max-warnings 0` passed (0 errors, 0 warnings).
+    - `jest --config ./test/jest-e2e.json --runInBand "module-deepening.e2e-spec.ts"` passed (23/23 passed, exit code 0).
+
 ### Feature 024 — Event-Driven Module Deepening: Phase 4 Slice 5 (Tasks T027, T028, T029, T030) Completed (2026-09-18)
 
 - **T027 [US2] Supplier Sync Service Event Routing**:

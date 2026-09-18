@@ -34,6 +34,12 @@ import { DuffelService } from '@/duffel/duffel.service';
 
 import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaService } from '@/prisma/prisma.service';
+import { BookingProjectionModule } from '@/booking-projection/booking-projection.module';
+import { BookingProjectionListener } from '@/booking-projection/booking-projection.listener';
+import { BookingProjectionRepository } from '@/booking-projection/booking-projection.repository';
+import { BookingProjectionService } from '@/booking-projection/booking-projection.service';
+import { BookingEventHydratorService } from '@/domain-events/booking-event-hydrator.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 function assertDisposableDatabase(): void {
   const databaseUrl = process.env.DATABASE_URL;
@@ -337,8 +343,8 @@ describe('Nest Composition Architecture Gate (US1 - T014)', () => {
     });
   });
 
-  describe('5. Strict Phase Invariants (No Premature Phase 4 Slice 3 Leaks)', () => {
-    it('does not register EventEmitterModule or premature Phase 4 Slice 3 modules in AppModule', () => {
+  describe('5. Root AppModule Wiring & DI Architecture (US2 - T032)', () => {
+    it('registers EventEmitterModule (or EventEmitterCoreModule) and BookingProjectionModule in AppModule', () => {
       const container = (moduleFixture as unknown as { container: { getModules: () => Map<string, unknown> } })
         .container;
       const modulesMap = container.getModules();
@@ -351,16 +357,18 @@ describe('Nest Composition Architecture Gate (US1 - T014)', () => {
         }
       }
 
-      expect(registeredModuleNames).not.toContain('EventEmitterModule');
-      expect(registeredModuleNames).not.toContain('EventEmitterCoreModule');
-      expect(registeredModuleNames).not.toContain('BookingProjectionModule');
+      const hasEventEmitter =
+        registeredModuleNames.includes('EventEmitterModule') ||
+        registeredModuleNames.includes('EventEmitterCoreModule');
+      expect(hasEventEmitter).toBe(true);
+      expect(registeredModuleNames).toContain('BookingProjectionModule');
 
       // US2 Slice 2 deliverables are valid active modules
       expect(registeredModuleNames).toContain('BookingStateModule');
       expect(registeredModuleNames).toContain('DomainEventsModule');
     });
 
-    it('does not register EventEmitter2 or premature Phase 4 Slice 3 provider tokens in AppModule', () => {
+    it('registers EventEmitter2, BookingProjectionListener, BookingProjectionRepository, BookingProjectionService, and BookingEventHydratorService in AppModule', () => {
       const container = (moduleFixture as unknown as { container: { getModules: () => Map<string, unknown> } })
         .container;
       const modulesMap = container.getModules();
@@ -371,19 +379,32 @@ describe('Nest Composition Architecture Gate (US1 - T014)', () => {
         if (providers) {
           for (const [key] of providers) {
             if (typeof key === 'string') allProviderKeys.push(key);
-            else if (typeof key === 'function' && key.name) allProviderKeys.push(key.name);
-            else if (typeof key === 'symbol') allProviderKeys.push(key.toString());
+            else if (typeof key === 'function' && key.name) {
+              allProviderKeys.push(key.name);
+              if (key === EventEmitter2) {
+                allProviderKeys.push('EventEmitter2');
+              }
+            } else if (typeof key === 'symbol') allProviderKeys.push(key.toString());
           }
         }
       }
 
-      expect(allProviderKeys).not.toContain('EventEmitter2');
-      expect(allProviderKeys).not.toContain('BookingProjectionListener');
-      expect(allProviderKeys).not.toContain('BookingProjectionRepository');
-      expect(allProviderKeys).not.toContain('BookingEventHydratorService');
+      expect(allProviderKeys).toContain('EventEmitter2');
+      expect(allProviderKeys).toContain('BookingProjectionListener');
+      expect(allProviderKeys).toContain('BookingProjectionRepository');
+      expect(allProviderKeys).toContain('BookingProjectionService');
+      expect(allProviderKeys).toContain('BookingEventHydratorService');
 
       // US2 Slice 2 deliverables are valid active providers
       expect(allProviderKeys).toContain('BookingEventPublisherService');
+    });
+
+    it('resolves EventEmitter2, BookingProjectionListener, BookingProjectionRepository, BookingProjectionService, and BookingEventHydratorService instances via DI', () => {
+      expect(moduleFixture.get(EventEmitter2, { strict: false })).toBeDefined();
+      expect(moduleFixture.get(BookingProjectionListener, { strict: false })).toBeDefined();
+      expect(moduleFixture.get(BookingProjectionRepository, { strict: false })).toBeDefined();
+      expect(moduleFixture.get(BookingProjectionService, { strict: false })).toBeDefined();
+      expect(moduleFixture.get(BookingEventHydratorService, { strict: false })).toBeDefined();
     });
   });
 

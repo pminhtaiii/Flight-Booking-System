@@ -7,11 +7,7 @@ import { BookingProjectionRepository } from './booking-projection.repository';
 import { BookingProjectionMetrics } from './booking-projection.metrics';
 import { BOOKING_EVENTS } from '@/domain-events/booking.events';
 
-export const PROJECTION_BOOKING_EVENTS = [
-  ...Object.values(BOOKING_EVENTS),
-  'booking.*',
-  'booking.**',
-];
+export const PROJECTION_BOOKING_EVENTS = 'booking.**';
 
 @Injectable()
 export class BookingProjectionListener {

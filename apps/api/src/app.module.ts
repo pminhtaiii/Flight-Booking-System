@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { PrismaModule } from './prisma/prisma.module';
 import { HealthModule } from './health/health.module';
 import { CacheModule } from './cache/cache.module';
@@ -20,6 +21,7 @@ import { FlightsModule } from './flights/flights.module';
 import { BookingIntentModule } from './booking-intent/booking-intent.module';
 import { BookingModule } from './booking/booking.module';
 import { BookingLifecycleModule } from './booking-lifecycle/booking-lifecycle.module';
+import { BookingProjectionModule } from './booking-projection/booking-projection.module';
 import { BookingManagementModule } from './booking-management/booking-management.module';
 import { CancellationModule } from './cancellation/cancellation.module';
 import { PaymentModule } from './payment/payment.module';
@@ -116,6 +118,7 @@ export const envSchema = z
       validate: (config) => envSchema.parse(config),
     }),
     ScheduleModule.forRoot(),
+    EventEmitterModule.forRoot({ wildcard: true, delimiter: '.', maxListeners: 20 }),
     PrismaModule,
     StripeModule,
     HealthModule,
@@ -136,6 +139,7 @@ export const envSchema = z
     BookingIntentModule,
     BookingModule,
     BookingLifecycleModule,
+    BookingProjectionModule,
     BookingManagementModule,
     CancellationModule,
     PaymentModule,
