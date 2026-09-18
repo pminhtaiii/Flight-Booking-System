@@ -4,6 +4,24 @@
 
 Planning artifacts: [specification](../specs/024-event-driven-module-deepening/spec.md), [plan](../specs/024-event-driven-module-deepening/plan.md), and [tasks](../specs/024-event-driven-module-deepening/tasks.md).
 
+#### Implemented Architecture (Phase 5 Slice 1: US3 Keyset Scan, Background Reconciliation Engine & Backfill Script Unification)
+
+- **Keyset Scan in BookingProjectionRepository (`apps/api/src/booking-projection/booking-projection.repository.ts`) (T035)**:
+  - Added `findStaleOrMissingBookingIds(limit: number, afterBookingId?: string): Promise<KeysetScanResult>`.
+  - Executes raw SQL keyset scan with LEFT JOIN `"booking_agent_projections"` on `p."bookingId" = b."id"`, selecting candidates where `(p."bookingId" IS NULL OR p."source_version" < b."version")` and `b."id" > cursor`.
+  - Monotonic keyset progression with `reachedEnd` detection and `nextCursor` tracking.
+- **BookingProjectionReconciliationService (`apps/api/src/booking-projection/booking-projection-reconciliation.service.ts`) (T036)**:
+  - Background self-healing repair service scheduled once per minute (`@Cron(CronExpression.EVERY_MINUTE)`).
+  - Enforces local non-overlapping execution lock (`isReconciling: boolean`) ensuring overlapping cron ticks are safely skipped.
+  - Bounded 100-batch / 5-worker concurrency pool processing candidates concurrently without external dependencies.
+  - Safely classifies candidate outcomes into `repaired`, `current`, `skipped`, and `failed`.
+  - Poison-pill progression advances keyset cursor over malformed or unprocessable records to prevent scan deadlocks; resets cursor to `undefined` when `reachedEnd === true` without scanning an extra empty page.
+  - Exported and registered in `BookingProjectionModule` and `booking-projection/index.ts`.
+- **Unified Prisma Backfill Script (`apps/api/prisma/scripts/backfill-booking-agent-projections.ts`) (T037)**:
+  - Refactored backfill script to delegate projection extraction to `BookingProjectionService` and persistence to `BookingProjectionRepository.upsertGuarded`.
+  - Enforces version fencing (`source_version < EXCLUDED.source_version`) and preserves existing `agentReference`.
+  - Bypasses malformed/missing flight records safely without throwing fatal process exits.
+
 #### Implemented Architecture (Phases 3 & 4 Completed: US1 & US2 Safe Payment Orchestration & Event-Driven Safe Booking Projection)
 
 - **IdempotencyModule (`apps/api/src/idempotency/`)**:

@@ -10,6 +10,12 @@ export interface ProjectionUpsertResult {
   outcome: ProjectionUpsertOutcome;
 }
 
+export type KeysetScanResult = {
+  bookingIds: string[];
+  nextCursor: string | null;
+  reachedEnd: boolean;
+};
+
 export interface UpsertGuardedParams {
   bookingId: string;
   status: string;
@@ -137,5 +143,25 @@ export class BookingProjectionRepository {
     }
 
     return projection;
+  }
+
+  async findStaleOrMissingBookingIds(
+    limit: number,
+    afterBookingId?: string,
+  ): Promise<KeysetScanResult> {
+    const cursor = afterBookingId?.trim() ? afterBookingId.trim() : null;
+    const rows = await this.prisma.$queryRaw<{ id: string }[]>`
+      SELECT b."id"
+      FROM "bookings" b
+      LEFT JOIN "booking_agent_projections" p ON p."bookingId" = b."id"
+      WHERE (p."bookingId" IS NULL OR p."source_version" < b."version")
+        AND (${cursor}::text IS NULL OR b."id" > ${cursor}::text)
+      ORDER BY b."id" ASC
+      LIMIT ${limit};
+    `;
+    const bookingIds = rows.map((r) => r.id);
+    const reachedEnd = bookingIds.length < limit;
+    const nextCursor = bookingIds.length > 0 ? bookingIds[bookingIds.length - 1] : null;
+    return { bookingIds, nextCursor, reachedEnd };
   }
 }

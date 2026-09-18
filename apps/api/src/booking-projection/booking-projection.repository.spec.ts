@@ -8,6 +8,7 @@ describe('BookingProjectionRepository', () => {
   let repository: BookingProjectionRepository;
   let prisma: {
     $executeRaw: jest.Mock;
+    $queryRaw: jest.Mock;
     bookingAgentProjection: {
       findUnique: jest.Mock;
     };
@@ -16,6 +17,7 @@ describe('BookingProjectionRepository', () => {
   beforeEach(() => {
     prisma = {
       $executeRaw: jest.fn(),
+      $queryRaw: jest.fn(),
       bookingAgentProjection: {
         findUnique: jest.fn(),
       },
@@ -266,4 +268,97 @@ describe('BookingProjectionRepository', () => {
       expect(result).toBeNull();
     });
   });
+
+  describe('findStaleOrMissingBookingIds', () => {
+    it('returns empty result when no rows returned (empty database)', async () => {
+      prisma.$queryRaw.mockResolvedValueOnce([]);
+
+      const result = await repository.findStaleOrMissingBookingIds(10);
+
+      expect(result).toEqual({
+        bookingIds: [],
+        nextCursor: null,
+        reachedEnd: true,
+      });
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns partial page (< limit) with nextCursor and reachedEnd = true', async () => {
+      prisma.$queryRaw.mockResolvedValueOnce([
+        { id: 'b_001' },
+        { id: 'b_002' },
+      ]);
+
+      const result = await repository.findStaleOrMissingBookingIds(5);
+
+      expect(result).toEqual({
+        bookingIds: ['b_001', 'b_002'],
+        nextCursor: 'b_002',
+        reachedEnd: true,
+      });
+    });
+
+    it('returns full page (=== limit) with nextCursor and reachedEnd = false', async () => {
+      prisma.$queryRaw.mockResolvedValueOnce([
+        { id: 'b_001' },
+        { id: 'b_002' },
+        { id: 'b_003' },
+      ]);
+
+      const result = await repository.findStaleOrMissingBookingIds(3);
+
+      expect(result).toEqual({
+        bookingIds: ['b_001', 'b_002', 'b_003'],
+        nextCursor: 'b_003',
+        reachedEnd: false,
+      });
+    });
+
+    it('passes trimmed afterBookingId cursor into SQL query', async () => {
+      prisma.$queryRaw.mockResolvedValueOnce([{ id: 'b_004' }]);
+
+      const result = await repository.findStaleOrMissingBookingIds(5, '  b_003  ');
+
+      expect(result).toEqual({
+        bookingIds: ['b_004'],
+        nextCursor: 'b_004',
+        reachedEnd: true,
+      });
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+      const [strings, ...values] = prisma.$queryRaw.mock.calls[0];
+      const sql = strings.join('?');
+      expect(sql).toContain('SELECT b."id"');
+      expect(sql).toContain('FROM "bookings" b');
+      expect(sql).toContain('LEFT JOIN "booking_agent_projections" p ON p."bookingId" = b."id"');
+      expect(sql).toContain('WHERE (p."bookingId" IS NULL OR p."source_version" < b."version")');
+      expect(sql).toContain('ORDER BY b."id" ASC');
+      expect(sql).toContain('LIMIT');
+      expect(values).toContain('b_003');
+      expect(values).toContain(5);
+    });
+
+    it('paginates sequentially across multiple pages using cursors until reachedEnd is true', async () => {
+      // Page 1: full page (limit 2)
+      prisma.$queryRaw.mockResolvedValueOnce([{ id: 'b_001' }, { id: 'b_002' }]);
+      // Page 2: full page (limit 2)
+      prisma.$queryRaw.mockResolvedValueOnce([{ id: 'b_003' }, { id: 'b_004' }]);
+      // Page 3: final partial page (limit 2)
+      prisma.$queryRaw.mockResolvedValueOnce([{ id: 'b_005' }]);
+
+      const allIds: string[] = [];
+      let cursor: string | undefined = undefined;
+      let reachedEnd = false;
+
+      while (!reachedEnd) {
+        const page = await repository.findStaleOrMissingBookingIds(2, cursor);
+        allIds.push(...page.bookingIds);
+        cursor = page.nextCursor ?? undefined;
+        reachedEnd = page.reachedEnd;
+      }
+
+      expect(allIds).toEqual(['b_001', 'b_002', 'b_003', 'b_004', 'b_005']);
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(3);
+    });
+  });
 });
+
