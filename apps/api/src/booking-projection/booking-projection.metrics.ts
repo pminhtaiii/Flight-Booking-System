@@ -97,6 +97,8 @@ const REDIS_COUNTER_PREFIX = 'metrics:booking_projection:counter:';
 const REDIS_LATENCY_PREFIX = 'metrics:booking_projection:latency:';
 export const REDIS_LATEST_PASS_STATE_KEY =
   'metrics:booking_projection:latest_pass_state';
+export const REDIS_CONSECUTIVE_ERRORS_KEY =
+  'metrics:booking_projection:consecutive_errors';
 
 // Disallowed patterns in metric labels to avoid PII, booking IDs, user IDs or high cardinality
 const UNSAFE_LABEL_PATTERN =
@@ -342,10 +344,11 @@ export class BookingProjectionMetrics {
     return this.computeDurationStats(this.durationSamples);
   }
 
-  incrementReconciliationPassTotal(
+  async incrementReconciliationPassTotal(
     rawOutcome: ReconciliationPassOutcome | string,
     amount = 1,
-  ): void {
+    passTimestamp = Date.now(),
+  ): Promise<void> {
     const outcome = this.sanitizeReconciliationOutcome(rawOutcome);
     const current = this.reconciliationPassCounters.get(outcome) ?? 0;
     this.reconciliationPassCounters.set(outcome, current + amount);
@@ -359,43 +362,55 @@ export class BookingProjectionMetrics {
     }
 
     if (this.cacheService) {
-      this.cacheService
-        .incrby(
+      try {
+        await this.cacheService.incrby(
           `${REDIS_COUNTER_PREFIX}reconciliation:pass:${outcome.toLowerCase()}`,
           amount,
-        )
-        .catch((err: unknown) => {
-          const errMsg = err instanceof Error ? err.message : String(err);
-          this.logger.warn(
-            `Failed to sync reconciliation pass counter to cache: ${errMsg}`,
-          );
-        });
+        );
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(
+          `Failed to sync reconciliation pass counter to cache: ${errMsg}`,
+        );
+      }
 
-      (async () => {
-        try {
-          let consecutiveErrors = outcome === 'SUCCESS' ? 0 : amount;
-          if (outcome === 'ERROR') {
-            const existing = await this.cacheService!.get(REDIS_LATEST_PASS_STATE_KEY);
-            if (existing) {
-              try {
-                const parsed = JSON.parse(existing) as ClusterPassState;
-                if (parsed.outcome === 'ERROR') {
-                  consecutiveErrors = (parsed.consecutiveErrors ?? 0) + amount;
-                }
-              } catch {}
-            }
-          }
-          const state: ClusterPassState = {
-            outcome,
-            consecutiveErrors,
-            timestamp: Date.now(),
-          };
-          await this.cacheService!.set(REDIS_LATEST_PASS_STATE_KEY, JSON.stringify(state));
-        } catch (err: unknown) {
-          const errMsg = err instanceof Error ? err.message : String(err);
-          this.logger.warn(`Failed to sync latest pass state to cache: ${errMsg}`);
+      try {
+        let consecutiveErrors = 0;
+        if (outcome === 'SUCCESS') {
+          await this.cacheService.del(REDIS_CONSECUTIVE_ERRORS_KEY);
+        } else {
+          consecutiveErrors = await this.cacheService.incrby(
+            REDIS_CONSECUTIVE_ERRORS_KEY,
+            amount,
+          );
         }
-      })();
+
+        const existing = await this.cacheService.get(REDIS_LATEST_PASS_STATE_KEY);
+        if (existing) {
+          try {
+            const parsed = JSON.parse(existing) as ClusterPassState;
+            // Stale write rejection: reject write if Redis already holds a strictly newer pass state
+            if (parsed.timestamp && parsed.timestamp > passTimestamp) {
+              return;
+            }
+          } catch {
+            // unparseable existing state, proceed to overwrite
+          }
+        }
+
+        const state: ClusterPassState = {
+          outcome,
+          consecutiveErrors,
+          timestamp: passTimestamp,
+        };
+        await this.cacheService.set(
+          REDIS_LATEST_PASS_STATE_KEY,
+          JSON.stringify(state),
+        );
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Failed to sync latest pass state to cache: ${errMsg}`);
+      }
     }
   }
 
@@ -656,13 +671,29 @@ export class BookingProjectionMetrics {
     let effectiveConsecutiveErrors = this.consecutivePassErrors;
     if (this.cacheService && redisStatus === 'up') {
       try {
-        const rawState = await this.cacheService.get(REDIS_LATEST_PASS_STATE_KEY);
+        const [rawState, rawConsecutive] = await Promise.all([
+          this.cacheService.get(REDIS_LATEST_PASS_STATE_KEY),
+          this.cacheService.get(REDIS_CONSECUTIVE_ERRORS_KEY),
+        ]);
         if (rawState) {
-          const parsed = JSON.parse(rawState) as ClusterPassState;
-          if (parsed && parsed.outcome) {
-            effectiveOutcome = parsed.outcome;
-            effectiveConsecutiveErrors = parsed.consecutiveErrors ?? 0;
+          try {
+            const parsed = JSON.parse(rawState) as ClusterPassState;
+            if (parsed && parsed.outcome) {
+              effectiveOutcome = parsed.outcome;
+              effectiveConsecutiveErrors = parsed.consecutiveErrors ?? 0;
+            }
+          } catch {
+            // unparseable state
           }
+        }
+        if (rawConsecutive !== null && rawConsecutive !== undefined) {
+          const parsedConsecutive = parseInt(rawConsecutive, 10);
+          if (!isNaN(parsedConsecutive)) {
+            effectiveConsecutiveErrors = parsedConsecutive;
+          }
+        }
+        if (effectiveOutcome === 'SUCCESS') {
+          effectiveConsecutiveErrors = 0;
         }
       } catch (err: unknown) {
         const errMsg = err instanceof Error ? err.message : String(err);
@@ -728,6 +759,7 @@ export class BookingProjectionMetrics {
           ...counterKeys.map((k) => this.cacheService!.del(k)),
           ...latencyKeys.map((k) => this.cacheService!.del(k)),
           this.cacheService.del(REDIS_LATEST_PASS_STATE_KEY),
+          this.cacheService.del(REDIS_CONSECUTIVE_ERRORS_KEY),
         ]);
       } catch (err: unknown) {
         const errMsg = err instanceof Error ? err.message : String(err);

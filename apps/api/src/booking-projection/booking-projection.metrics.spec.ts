@@ -1,6 +1,8 @@
 import {
   BookingProjectionMetrics,
   BOOKING_PROJECTION_METRIC_NAMES,
+  REDIS_LATEST_PASS_STATE_KEY,
+  REDIS_CONSECUTIVE_ERRORS_KEY,
 } from './booking-projection.metrics';
 
 describe('BookingProjectionMetrics', () => {
@@ -136,10 +138,10 @@ describe('BookingProjectionMetrics', () => {
   });
 
   describe('Reset', () => {
-    it('clears all counters and samples', () => {
+    it('clears all counters and samples', async () => {
       metrics.incrementEventsTotal('booking.created', 'SUCCESS');
       metrics.recordDuration(42);
-      metrics.incrementReconciliationPassTotal('SUCCESS');
+      await metrics.incrementReconciliationPassTotal('SUCCESS');
       metrics.incrementReconciliationStaleFoundTotal(5);
       metrics.incrementReconciliationRepairedTotal(3);
       metrics.incrementReconciliationFailedTotal(1);
@@ -148,7 +150,7 @@ describe('BookingProjectionMetrics', () => {
       metrics.recordReconciliationDuration(120);
       metrics.incrementFailureTotal('HYDRATION_FAILED', 2);
 
-      metrics.reset();
+      await metrics.reset();
 
       expect(metrics.getEventsTotal('booking.created', 'SUCCESS')).toBe(0);
       expect(metrics.getDurations()).toHaveLength(0);
@@ -165,20 +167,20 @@ describe('BookingProjectionMetrics', () => {
   });
 
   describe('Reconciliation Metrics', () => {
-    it('tracks reconciliation pass outcomes (SUCCESS / ERROR)', () => {
-      metrics.incrementReconciliationPassTotal('SUCCESS');
-      metrics.incrementReconciliationPassTotal('SUCCESS');
-      metrics.incrementReconciliationPassTotal('ERROR');
+    it('tracks reconciliation pass outcomes (SUCCESS / ERROR)', async () => {
+      await metrics.incrementReconciliationPassTotal('SUCCESS');
+      await metrics.incrementReconciliationPassTotal('SUCCESS');
+      await metrics.incrementReconciliationPassTotal('ERROR');
 
       expect(metrics.getReconciliationPassTotal('SUCCESS')).toBe(2);
       expect(metrics.getReconciliationPassTotal('ERROR')).toBe(1);
       expect(metrics.getReconciliationPassTotal()).toBe(3);
     });
 
-    it('sanitizes invalid or unsafe reconciliation pass outcomes to ERROR', () => {
-      metrics.incrementReconciliationPassTotal('INVALID_OUTCOME');
-      metrics.incrementReconciliationPassTotal('bk_1234567890abcdef');
-      metrics.incrementReconciliationPassTotal('admin@booking.com');
+    it('sanitizes invalid or unsafe reconciliation pass outcomes to ERROR', async () => {
+      await metrics.incrementReconciliationPassTotal('INVALID_OUTCOME');
+      await metrics.incrementReconciliationPassTotal('bk_1234567890abcdef');
+      await metrics.incrementReconciliationPassTotal('admin@booking.com');
 
       expect(metrics.getReconciliationPassTotal('SUCCESS')).toBe(0);
       expect(metrics.getReconciliationPassTotal('ERROR')).toBe(3);
@@ -297,7 +299,7 @@ describe('BookingProjectionMetrics', () => {
 
     it('returns status ok with populated metrics when no failures or pass errors exist', async () => {
       metrics.incrementEventsTotal('booking.created', 'SUCCESS');
-      metrics.incrementReconciliationPassTotal('SUCCESS');
+      await metrics.incrementReconciliationPassTotal('SUCCESS');
       metrics.incrementReconciliationStaleFoundTotal(2);
       metrics.incrementReconciliationRepairedTotal(2);
       metrics.recordReconciliationDuration(150);
@@ -322,7 +324,7 @@ describe('BookingProjectionMetrics', () => {
     });
 
     it('returns status degraded when reconciliation pass has errors', async () => {
-      metrics.incrementReconciliationPassTotal('ERROR', 1);
+      await metrics.incrementReconciliationPassTotal('ERROR', 1);
 
       const snapshot = await metrics.getHealthSnapshot();
       expect(snapshot.status).toBe('degraded');
@@ -335,7 +337,7 @@ describe('BookingProjectionMetrics', () => {
       expect(snapshot.status).toBe('ok');
 
       // 2. Reconciliation error occurs -> status degraded
-      metrics.incrementReconciliationPassTotal('ERROR', 1);
+      await metrics.incrementReconciliationPassTotal('ERROR', 1);
       metrics.incrementFailureTotal('HYDRATION_FAILED', 1);
       snapshot = await metrics.getHealthSnapshot();
       expect(snapshot.status).toBe('degraded');
@@ -343,7 +345,7 @@ describe('BookingProjectionMetrics', () => {
       expect(snapshot.metrics.reconciliation.passes.error).toBe(1);
 
       // 3. Successful reconciliation pass occurs -> status recovers to ok even though failure counters remain
-      metrics.incrementReconciliationPassTotal('SUCCESS', 1);
+      await metrics.incrementReconciliationPassTotal('SUCCESS', 1);
       snapshot = await metrics.getHealthSnapshot();
       expect(snapshot.status).toBe('ok');
       expect(snapshot.metrics.failures['HYDRATION_FAILED']).toBe(1);
@@ -351,23 +353,23 @@ describe('BookingProjectionMetrics', () => {
       expect(snapshot.metrics.reconciliation.passes.error).toBe(1);
 
       // 4. Reconciliation error occurs -> status degraded again
-      metrics.incrementReconciliationPassTotal('ERROR', 1);
+      await metrics.incrementReconciliationPassTotal('ERROR', 1);
       snapshot = await metrics.getHealthSnapshot();
       expect(snapshot.status).toBe('degraded');
 
       // 5. Subsequent successful pass recovers back to ok
-      metrics.incrementReconciliationPassTotal('SUCCESS', 1);
+      await metrics.incrementReconciliationPassTotal('SUCCESS', 1);
       snapshot = await metrics.getHealthSnapshot();
       expect(snapshot.status).toBe('ok');
       expect(snapshot.metrics.reconciliation.passes.error).toBe(2);
     });
 
     it('degrades status when consecutive pass errors reach threshold of 3', async () => {
-      metrics.incrementReconciliationPassTotal('ERROR', 1);
-      metrics.incrementReconciliationPassTotal('ERROR', 1);
+      await metrics.incrementReconciliationPassTotal('ERROR', 1);
+      await metrics.incrementReconciliationPassTotal('ERROR', 1);
       expect(metrics.getConsecutivePassErrors()).toBe(2);
 
-      metrics.incrementReconciliationPassTotal('ERROR', 1);
+      await metrics.incrementReconciliationPassTotal('ERROR', 1);
       expect(metrics.getConsecutivePassErrors()).toBe(3);
 
       const snapshot = await metrics.getHealthSnapshot();
@@ -419,20 +421,20 @@ describe('BookingProjectionMetrics', () => {
       );
     });
 
-    it('persists counter increments to Redis asynchronously', () => {
+    it('persists counter increments to Redis asynchronously', async () => {
       distributedMetrics.incrementEventsTotal('booking.created', 'SUCCESS', 2);
       expect(mockCacheService.incrby).toHaveBeenCalledWith(
         'metrics:booking_projection:counter:events:booking.created:SUCCESS',
         2,
       );
 
-      distributedMetrics.incrementReconciliationPassTotal('SUCCESS', 1);
+      await distributedMetrics.incrementReconciliationPassTotal('SUCCESS', 1);
       expect(mockCacheService.incrby).toHaveBeenCalledWith(
         'metrics:booking_projection:counter:reconciliation:pass:success',
         1,
       );
 
-      distributedMetrics.incrementReconciliationPassTotal('ERROR', 1);
+      await distributedMetrics.incrementReconciliationPassTotal('ERROR', 1);
       expect(mockCacheService.incrby).toHaveBeenCalledWith(
         'metrics:booking_projection:counter:reconciliation:pass:error',
         1,
@@ -542,11 +544,10 @@ describe('BookingProjectionMetrics', () => {
     });
 
     it('persists cluster pass state to Redis on reconciliation pass increment', async () => {
-      distributedMetrics.incrementReconciliationPassTotal('ERROR', 1);
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await distributedMetrics.incrementReconciliationPassTotal('ERROR', 1);
 
       expect(mockCacheService.set).toHaveBeenCalledWith(
-        'metrics:booking_projection:latest_pass_state',
+        REDIS_LATEST_PASS_STATE_KEY,
         expect.stringContaining('"outcome":"ERROR"'),
       );
     });
@@ -555,7 +556,7 @@ describe('BookingProjectionMetrics', () => {
       // Local state has no error (outcome undefined)
       // Redis cluster pass state has ERROR
       mockCacheService.get.mockImplementation(async (key: string) => {
-        if (key === 'metrics:booking_projection:latest_pass_state') {
+        if (key === REDIS_LATEST_PASS_STATE_KEY) {
           return JSON.stringify({
             outcome: 'ERROR',
             consecutiveErrors: 1,
@@ -571,11 +572,11 @@ describe('BookingProjectionMetrics', () => {
 
     it('clears degraded status across replicas when a successful pass is recorded in Redis', async () => {
       // Local state has an error
-      distributedMetrics.incrementReconciliationPassTotal('ERROR', 1);
+      await distributedMetrics.incrementReconciliationPassTotal('ERROR', 1);
 
       // But another replica succeeded and updated Redis cluster pass state
       mockCacheService.get.mockImplementation(async (key: string) => {
-        if (key === 'metrics:booking_projection:latest_pass_state') {
+        if (key === REDIS_LATEST_PASS_STATE_KEY) {
           return JSON.stringify({
             outcome: 'SUCCESS',
             consecutiveErrors: 0,
@@ -592,8 +593,113 @@ describe('BookingProjectionMetrics', () => {
     it('clears latest cluster pass state from Redis on reset', async () => {
       await distributedMetrics.reset();
       expect(mockCacheService.del).toHaveBeenCalledWith(
-        'metrics:booking_projection:latest_pass_state',
+        REDIS_LATEST_PASS_STATE_KEY,
       );
+      expect(mockCacheService.del).toHaveBeenCalledWith(
+        REDIS_CONSECUTIVE_ERRORS_KEY,
+      );
+    });
+
+    it('does not overwrite Redis pass state when pass has older timestamp than existing state (monotonic ordering)', async () => {
+      const t1Older = 1000;
+      const t2Newer = 2000;
+
+      // Redis already holds newer pass state at t2Newer
+      mockCacheService.get.mockImplementation(async (key: string) => {
+        if (key === REDIS_LATEST_PASS_STATE_KEY) {
+          return JSON.stringify({
+            outcome: 'SUCCESS',
+            consecutiveErrors: 0,
+            timestamp: t2Newer,
+          });
+        }
+        return null;
+      });
+
+      // Pass with older timestamp t1Older completes later
+      await distributedMetrics.incrementReconciliationPassTotal('ERROR', 1, t1Older);
+
+      // Verify that Redis latest_pass_state was NOT overwritten
+      expect(mockCacheService.set).not.toHaveBeenCalled();
+    });
+
+    it('overwrites Redis pass state when incoming pass has newer timestamp', async () => {
+      const t1Older = 1000;
+      const t2Newer = 2000;
+
+      mockCacheService.get.mockImplementation(async (key: string) => {
+        if (key === REDIS_LATEST_PASS_STATE_KEY) {
+          return JSON.stringify({
+            outcome: 'ERROR',
+            consecutiveErrors: 1,
+            timestamp: t1Older,
+          });
+        }
+        return null;
+      });
+
+      await distributedMetrics.incrementReconciliationPassTotal('SUCCESS', 1, t2Newer);
+
+      expect(mockCacheService.set).toHaveBeenCalledWith(
+        REDIS_LATEST_PASS_STATE_KEY,
+        JSON.stringify({
+          outcome: 'SUCCESS',
+          consecutiveErrors: 0,
+          timestamp: t2Newer,
+        }),
+      );
+    });
+
+    it('atomically tracks consecutive errors in Redis across multiple error passes', async () => {
+      let redisErrors = 0;
+      mockCacheService.incrby.mockImplementation(async (key: string, amount: number) => {
+        if (key === REDIS_CONSECUTIVE_ERRORS_KEY) {
+          redisErrors += amount;
+          return redisErrors;
+        }
+        return 1;
+      });
+      mockCacheService.del.mockImplementation(async (key: string) => {
+        if (key === REDIS_CONSECUTIVE_ERRORS_KEY) {
+          redisErrors = 0;
+        }
+      });
+
+      // Pass 1 fails
+      await distributedMetrics.incrementReconciliationPassTotal('ERROR', 1, 100);
+      expect(mockCacheService.incrby).toHaveBeenCalledWith(REDIS_CONSECUTIVE_ERRORS_KEY, 1);
+      expect(redisErrors).toBe(1);
+
+      // Pass 2 fails
+      await distributedMetrics.incrementReconciliationPassTotal('ERROR', 1, 200);
+      expect(redisErrors).toBe(2);
+
+      // Pass 3 fails
+      await distributedMetrics.incrementReconciliationPassTotal('ERROR', 1, 300);
+      expect(redisErrors).toBe(3);
+
+      // Health snapshot reflects consecutive errors
+      mockCacheService.get.mockImplementation(async (key: string) => {
+        if (key === REDIS_CONSECUTIVE_ERRORS_KEY) {
+          return String(redisErrors);
+        }
+        if (key === REDIS_LATEST_PASS_STATE_KEY) {
+          return JSON.stringify({
+            outcome: 'ERROR',
+            consecutiveErrors: redisErrors,
+            timestamp: 300,
+          });
+        }
+        return null;
+      });
+
+      const snapshot = await distributedMetrics.getHealthSnapshot();
+      expect(snapshot.status).toBe('degraded');
+
+      // Pass 4 succeeds -> resets consecutive errors key in Redis
+      await distributedMetrics.incrementReconciliationPassTotal('SUCCESS', 1, 400);
+      expect(mockCacheService.del).toHaveBeenCalledWith(REDIS_CONSECUTIVE_ERRORS_KEY);
+      expect(redisErrors).toBe(0);
     });
   });
 });

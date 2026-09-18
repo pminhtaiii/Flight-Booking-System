@@ -104,7 +104,8 @@ export class BookingProjectionReconciliationService {
         reachedEnd: scanResult.reachedEnd,
       };
 
-      this.metrics?.incrementReconciliationPassTotal('SUCCESS');
+      const passEndTime = Date.now();
+      await this.metrics?.incrementReconciliationPassTotal('SUCCESS', 1, passEndTime);
       this.metrics?.incrementReconciliationStaleFoundTotal(candidateIds.length);
       this.metrics?.incrementReconciliationRepairedTotal(tallies.repaired);
       this.metrics?.incrementReconciliationFailedTotal(tallies.failed);
@@ -118,7 +119,8 @@ export class BookingProjectionReconciliationService {
 
       return summary;
     } catch (error) {
-      this.metrics?.incrementReconciliationPassTotal('ERROR');
+      const passEndTime = Date.now();
+      await this.metrics?.incrementReconciliationPassTotal('ERROR', 1, passEndTime);
       throw error;
     } finally {
       this.metrics?.recordReconciliationDuration(Date.now() - startTime);
