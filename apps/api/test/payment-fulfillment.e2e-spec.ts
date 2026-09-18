@@ -13,7 +13,8 @@ import { StripeService } from '@/common/stripe.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { DuffelOrder } from '@/duffel/duffel.types';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
-import { PaymentIdempotencyService } from '@/payment/payment-idempotency.service';
+import { PaymentIdempotencyService } from '@/idempotency/payment-idempotency.service';
+import { BookingLifecycleService } from '@/booking-lifecycle/booking-lifecycle.service';
 import {
   Prisma,
   PaymentStatus,
@@ -84,6 +85,7 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
   let stripeService: StripeService;
   let duffelService: DuffelService;
   let idempotencyService: PaymentIdempotencyService;
+  let bookingLifecycleService: BookingLifecycleService;
 
   let testUser: { id: string; email: string };
   let testToken: string;
@@ -112,6 +114,7 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
     stripeService = moduleFixture.get<StripeService>(StripeService);
     duffelService = moduleFixture.get<DuffelService>(DuffelService);
     idempotencyService = moduleFixture.get<PaymentIdempotencyService>(PaymentIdempotencyService);
+    bookingLifecycleService = moduleFixture.get<BookingLifecycleService>(BookingLifecycleService);
   });
 
   afterAll(async () => {
@@ -795,13 +798,1068 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
 
       expect(res.body.success).toBe(false);
       expect(cancelSpy).toHaveBeenCalledTimes(1);
-      expect(cancelSpy).toHaveBeenCalledWith(payment.stripePaymentIntentId);
+      expect(cancelSpy).toHaveBeenCalledWith(
+        payment.stripePaymentIntentId,
+        `${payment.stripePaymentIntentId}-stripe-void`,
+      );
 
       const dbPayment = await prisma.payment.findUnique({ where: { id: payment.id } });
       expect(dbPayment?.status).toBe(PaymentStatus.CANCELLED);
 
       const dbBooking = await prisma.booking.findUnique({ where: { id: bookingId } });
       expect(dbBooking?.status).toBe(BookingStatus.FAILED);
+    });
+  });
+
+  describe('Scenario 6: Fenced Checkpoint Resumption', () => {
+    it('resumes from CHECKPOINT_AUTHORIZED (stripe_authorized): skips hold authorization and proceeds to Duffel order, Stripe capture, and confirmation', async () => {
+      const offer = await createFlightOffer();
+      const intent = await createBookingIntent(testUser.id, offer.id);
+      const idempotencyKey = `idem-resume-auth-${crypto.randomUUID()}`;
+      const bookingId = crypto.randomUUID();
+      const payload = { paymentId: '', bookingId };
+
+      const idemKey = await prisma.idempotencyKey.create({
+        data: {
+          key: idempotencyKey,
+          requestHash: 'pending-hash',
+          customerId: testUser.id,
+          requestPath: '/api/bookings/payment/confirm',
+          recoveryPoint: 'stripe_authorized',
+          lockedAt: null,
+          expiresAt: new Date(Date.now() + 86400000),
+        },
+      });
+
+      const payment = await prisma.payment.create({
+        data: {
+          bookingIntentId: intent.id,
+          attemptNumber: 1,
+          idempotencyKeyId: idemKey.id,
+          stripePaymentIntentId: `pi_test_${crypto.randomUUID()}`,
+          amount: 12550,
+          currency: 'usd',
+          status: PaymentStatus.AUTHORIZED,
+          version: 0,
+        },
+      });
+
+      payload.paymentId = payment.id;
+      await prisma.idempotencyKey.update({
+        where: { id: idemKey.id },
+        data: { requestHash: idempotencyService.computeHash(payload) },
+      });
+
+      const mockOrder = getMockDuffelOrder('ord_resume_auth', 'REFAUTH');
+
+      const retrieveSpy = jest.spyOn(stripeService, 'retrievePaymentIntent');
+      const createOrderSpy = jest
+        .spyOn(duffelService, 'createOrder')
+        .mockResolvedValue(mockOrder as unknown as Record<string, unknown>);
+      jest
+        .spyOn(duffelService, 'retrieveCompleteOrder')
+        .mockResolvedValue(mockOrder as unknown as DuffelOrder);
+      const captureSpy = jest.spyOn(stripeService, 'capturePaymentIntent').mockResolvedValue({
+        id: payment.stripePaymentIntentId,
+        status: 'succeeded',
+      } as unknown as Stripe.PaymentIntent);
+
+      const res = await request(app.getHttpServer())
+        .post('/api/bookings/payment/confirm')
+        .set('Authorization', `Bearer ${testToken}`)
+        .set('Idempotency-Key', idempotencyKey)
+        .send(payload)
+        .expect(200);
+
+      expect(res.body).toEqual({
+        success: true,
+        status: 'SUCCEEDED',
+        paymentId: payment.id,
+        bookingReference: 'REFAUTH',
+        duffelOrderId: 'ord_resume_auth',
+      });
+
+      // Assert hold authorization is skipped on resumption
+      expect(retrieveSpy).toHaveBeenCalledTimes(0);
+      expect(createOrderSpy).toHaveBeenCalledTimes(1);
+      expect(captureSpy).toHaveBeenCalledTimes(1);
+
+      const dbPayment = await prisma.payment.findUnique({ where: { id: payment.id } });
+      expect(dbPayment?.status).toBe(PaymentStatus.SUCCEEDED);
+
+      const dbBooking = await prisma.booking.findUnique({ where: { id: bookingId } });
+      expect(dbBooking?.status).toBe(BookingStatus.CONFIRMED);
+
+      const updatedKey = await prisma.idempotencyKey.findUnique({ where: { id: idemKey.id } });
+      expect(updatedKey?.recoveryPoint).toBe('completed');
+    });
+
+    it('resumes from CHECKPOINT_ORDER_CREATED (duffel_order_created): skips hold auth and Duffel order, proceeds to capture and confirmation', async () => {
+      const offer = await createFlightOffer();
+      const intent = await createBookingIntent(testUser.id, offer.id);
+      const idempotencyKey = `idem-resume-order-${crypto.randomUUID()}`;
+      const bookingId = crypto.randomUUID();
+      const payload = { paymentId: '', bookingId };
+
+      const idemKey = await prisma.idempotencyKey.create({
+        data: {
+          key: idempotencyKey,
+          requestHash: 'pending-hash',
+          customerId: testUser.id,
+          requestPath: '/api/bookings/payment/confirm',
+          recoveryPoint: 'duffel_order_created',
+          lockedAt: null,
+          expiresAt: new Date(Date.now() + 86400000),
+        },
+      });
+
+      const payment = await prisma.payment.create({
+        data: {
+          bookingIntentId: intent.id,
+          attemptNumber: 1,
+          idempotencyKeyId: idemKey.id,
+          stripePaymentIntentId: `pi_test_${crypto.randomUUID()}`,
+          amount: 12550,
+          currency: 'usd',
+          status: PaymentStatus.AUTHORIZED,
+          version: 0,
+        },
+      });
+
+      payload.paymentId = payment.id;
+      await prisma.idempotencyKey.update({
+        where: { id: idemKey.id },
+        data: { requestHash: idempotencyService.computeHash(payload) },
+      });
+
+      const mockOrder = getMockDuffelOrder('ord_resume_created', 'REFORDER');
+
+      await prisma.paymentEvent.create({
+        data: {
+          paymentId: payment.id,
+          eventType: 'duffel_order_created',
+          previousStatus: 'AUTHORIZED',
+          newStatus: 'AUTHORIZED',
+          amount: payment.amount,
+          source: 'API',
+          metadata: mockOrder as unknown as Prisma.InputJsonValue,
+          createdBy: testUser.id,
+        },
+      });
+
+      const retrieveSpy = jest.spyOn(stripeService, 'retrievePaymentIntent');
+      const createOrderSpy = jest.spyOn(duffelService, 'createOrder');
+      jest
+        .spyOn(duffelService, 'retrieveCompleteOrder')
+        .mockResolvedValue(mockOrder as unknown as DuffelOrder);
+      const captureSpy = jest.spyOn(stripeService, 'capturePaymentIntent').mockResolvedValue({
+        id: payment.stripePaymentIntentId,
+        status: 'succeeded',
+      } as unknown as Stripe.PaymentIntent);
+
+      const res = await request(app.getHttpServer())
+        .post('/api/bookings/payment/confirm')
+        .set('Authorization', `Bearer ${testToken}`)
+        .set('Idempotency-Key', idempotencyKey)
+        .send(payload)
+        .expect(200);
+
+      expect(res.body).toEqual({
+        success: true,
+        status: 'SUCCEEDED',
+        paymentId: payment.id,
+        bookingReference: 'REFORDER',
+        duffelOrderId: 'ord_resume_created',
+      });
+
+      // Assert both hold auth and order creation are skipped
+      expect(retrieveSpy).toHaveBeenCalledTimes(0);
+      expect(createOrderSpy).toHaveBeenCalledTimes(0);
+      expect(captureSpy).toHaveBeenCalledTimes(1);
+
+      const dbPayment = await prisma.payment.findUnique({ where: { id: payment.id } });
+      expect(dbPayment?.status).toBe(PaymentStatus.SUCCEEDED);
+
+      const dbBooking = await prisma.booking.findUnique({ where: { id: bookingId } });
+      expect(dbBooking?.status).toBe(BookingStatus.CONFIRMED);
+
+      const updatedKey = await prisma.idempotencyKey.findUnique({ where: { id: idemKey.id } });
+      expect(updatedKey?.recoveryPoint).toBe('completed');
+    });
+
+    it('resumes from CHECKPOINT_CAPTURED (captured): completes canonical confirmation without re-invoking capture or Duffel order', async () => {
+      const offer = await createFlightOffer();
+      const intent = await createBookingIntent(testUser.id, offer.id);
+      const idempotencyKey = `idem-resume-captured-${crypto.randomUUID()}`;
+      const bookingId = crypto.randomUUID();
+      const payload = { paymentId: '', bookingId };
+
+      const idemKey = await prisma.idempotencyKey.create({
+        data: {
+          key: idempotencyKey,
+          requestHash: 'pending-hash',
+          customerId: testUser.id,
+          requestPath: '/api/bookings/payment/confirm',
+          recoveryPoint: 'captured',
+          lockedAt: null,
+          expiresAt: new Date(Date.now() + 86400000),
+        },
+      });
+
+      const payment = await prisma.payment.create({
+        data: {
+          bookingIntentId: intent.id,
+          attemptNumber: 1,
+          idempotencyKeyId: idemKey.id,
+          stripePaymentIntentId: `pi_test_${crypto.randomUUID()}`,
+          amount: 12550,
+          currency: 'usd',
+          status: PaymentStatus.AUTHORIZED,
+          version: 0,
+        },
+      });
+
+      payload.paymentId = payment.id;
+      await prisma.idempotencyKey.update({
+        where: { id: idemKey.id },
+        data: { requestHash: idempotencyService.computeHash(payload) },
+      });
+
+      const mockOrder = getMockDuffelOrder('ord_resume_cap', 'REFCAP');
+
+      await prisma.paymentEvent.create({
+        data: {
+          paymentId: payment.id,
+          eventType: 'duffel_order_created',
+          previousStatus: 'AUTHORIZED',
+          newStatus: 'AUTHORIZED',
+          amount: payment.amount,
+          source: 'API',
+          metadata: mockOrder as unknown as Prisma.InputJsonValue,
+          createdBy: testUser.id,
+        },
+      });
+
+      const retrieveSpy = jest.spyOn(stripeService, 'retrievePaymentIntent');
+      const createOrderSpy = jest.spyOn(duffelService, 'createOrder');
+      const captureSpy = jest.spyOn(stripeService, 'capturePaymentIntent');
+
+      jest
+        .spyOn(duffelService, 'retrieveCompleteOrder')
+        .mockResolvedValue(mockOrder as unknown as DuffelOrder);
+
+      const res = await request(app.getHttpServer())
+        .post('/api/bookings/payment/confirm')
+        .set('Authorization', `Bearer ${testToken}`)
+        .set('Idempotency-Key', idempotencyKey)
+        .send(payload)
+        .expect(200);
+
+      expect(res.body).toEqual({
+        success: true,
+        status: 'SUCCEEDED',
+        paymentId: payment.id,
+        bookingReference: 'REFCAP',
+        duffelOrderId: 'ord_resume_cap',
+      });
+
+      // Assert zero duplicate remote effects
+      expect(retrieveSpy).toHaveBeenCalledTimes(0);
+      expect(createOrderSpy).toHaveBeenCalledTimes(0);
+      expect(captureSpy).toHaveBeenCalledTimes(0);
+
+      const dbPayment = await prisma.payment.findUnique({ where: { id: payment.id } });
+      expect(dbPayment?.status).toBe(PaymentStatus.SUCCEEDED);
+
+      const dbBooking = await prisma.booking.findUnique({ where: { id: bookingId } });
+      expect(dbBooking?.status).toBe(BookingStatus.CONFIRMED);
+
+      const ledgerEntries = await prisma.ledgerEntry.findMany({ where: { paymentId: payment.id } });
+      expect(ledgerEntries.length).toBe(2);
+
+      const updatedKey = await prisma.idempotencyKey.findUnique({ where: { id: idemKey.id } });
+      expect(updatedKey?.recoveryPoint).toBe('completed');
+    });
+  });
+
+  describe('Scenario 7: Duplicate Remote Effects & Replay Invariants', () => {
+    it('returns 409 Conflict when payment confirmation is already in-flight under active lease without duplicate provider calls', async () => {
+      const offer = await createFlightOffer();
+      const intent = await createBookingIntent(testUser.id, offer.id);
+      const payment = await createPaymentFixture(testUser.id, intent.id);
+      const bookingId = crypto.randomUUID();
+      const idempotencyKey = `idem-inflight-${crypto.randomUUID()}`;
+      const payload = { paymentId: payment.id, bookingId };
+
+      await prisma.idempotencyKey.create({
+        data: {
+          key: idempotencyKey,
+          requestHash: idempotencyService.computeHash(payload),
+          customerId: testUser.id,
+          requestPath: '/api/bookings/payment/confirm',
+          recoveryPoint: 'started',
+          lockedAt: new Date(Date.now() - 30 * 1000), // active lease (30s old < 5m)
+          responseBody: Prisma.DbNull,
+          expiresAt: new Date(Date.now() + 86400000),
+        },
+      });
+
+      const retrieveSpy = jest.spyOn(stripeService, 'retrievePaymentIntent');
+      const createOrderSpy = jest.spyOn(duffelService, 'createOrder');
+      const captureSpy = jest.spyOn(stripeService, 'capturePaymentIntent');
+
+      const res = await request(app.getHttpServer())
+        .post('/api/bookings/payment/confirm')
+        .set('Authorization', `Bearer ${testToken}`)
+        .set('Idempotency-Key', idempotencyKey)
+        .send(payload)
+        .expect(409);
+
+      expect(res.body.message).toContain('Request is already in progress');
+      expect(retrieveSpy).toHaveBeenCalledTimes(0);
+      expect(createOrderSpy).toHaveBeenCalledTimes(0);
+      expect(captureSpy).toHaveBeenCalledTimes(0);
+    });
+  });
+
+  describe('Scenario 8: Atomic Completion & Transaction Rollback', () => {
+    it('verifies that Booking CONFIRMED, Payment SUCCEEDED, and balanced ledger entries commit atomically in one transaction', async () => {
+      const offer = await createFlightOffer();
+      const intent = await createBookingIntent(testUser.id, offer.id);
+      const payment = await createPaymentFixture(testUser.id, intent.id);
+      const bookingId = crypto.randomUUID();
+      const mockOrder = getMockDuffelOrder('ord_atomic_succ', 'REFATOMIC');
+
+      jest.spyOn(stripeService, 'retrievePaymentIntent').mockResolvedValue({
+        id: payment.stripePaymentIntentId,
+        status: 'requires_capture',
+      } as unknown as Stripe.PaymentIntent);
+
+      jest
+        .spyOn(duffelService, 'createOrder')
+        .mockResolvedValue(mockOrder as unknown as Record<string, unknown>);
+      jest
+        .spyOn(duffelService, 'retrieveCompleteOrder')
+        .mockResolvedValue(mockOrder as unknown as DuffelOrder);
+      jest.spyOn(stripeService, 'capturePaymentIntent').mockResolvedValue({
+        id: payment.stripePaymentIntentId,
+        status: 'succeeded',
+      } as unknown as Stripe.PaymentIntent);
+
+      await request(app.getHttpServer())
+        .post('/api/bookings/payment/confirm')
+        .set('Authorization', `Bearer ${testToken}`)
+        .set('Idempotency-Key', `idem-atomic-${crypto.randomUUID()}`)
+        .send({ paymentId: payment.id, bookingId })
+        .expect(200);
+
+      const dbPayment = await prisma.payment.findUnique({ where: { id: payment.id } });
+      expect(dbPayment?.status).toBe(PaymentStatus.SUCCEEDED);
+
+      const dbBooking = await prisma.booking.findUnique({ where: { id: bookingId } });
+      expect(dbBooking?.status).toBe(BookingStatus.CONFIRMED);
+      expect(dbBooking?.pnrReference).toBe('REFATOMIC');
+      expect(dbBooking?.duffelOrderId).toBe('ord_atomic_succ');
+
+      const dbIntent = await prisma.bookingIntent.findUnique({ where: { id: intent.id } });
+      expect(dbIntent?.status).toBe('CONFIRMED');
+
+      const capturedEvent = await prisma.paymentEvent.findFirst({
+        where: { paymentId: payment.id, eventType: 'payment_captured' },
+      });
+      expect(capturedEvent).not.toBeNull();
+      expect(capturedEvent?.newStatus).toBe('SUCCEEDED');
+
+      const ledgers = await prisma.ledgerEntry.findMany({ where: { paymentId: payment.id } });
+      expect(ledgers.length).toBe(2);
+      const debit = ledgers.find((l) => l.entryType === 'DEBIT');
+      const credit = ledgers.find((l) => l.entryType === 'CREDIT');
+      expect(debit).toBeDefined();
+      expect(credit).toBeDefined();
+      expect(debit?.accountId).toBe('CUSTOMER_RECEIVABLE');
+      expect(credit?.accountId).toBe('PLATFORM_REVENUE');
+      expect(debit?.amount.toString()).toBe(payment.amount.toString());
+      expect(credit?.amount.toString()).toBe(payment.amount.toString());
+      expect(debit?.transactionId).toBe(credit?.transactionId);
+    });
+
+    it('rolls back completely on DB failure during post-capture confirmation without canceling payment or order', async () => {
+      const offer = await createFlightOffer();
+      const intent = await createBookingIntent(testUser.id, offer.id);
+      const payment = await createPaymentFixture(testUser.id, intent.id);
+      const bookingId = crypto.randomUUID();
+      const mockOrder = getMockDuffelOrder('ord_atomic_fail', 'REFFAIL');
+      const idempotencyKey = `idem-rollback-${crypto.randomUUID()}`;
+
+      jest.spyOn(stripeService, 'retrievePaymentIntent').mockResolvedValue({
+        id: payment.stripePaymentIntentId,
+        status: 'requires_capture',
+      } as unknown as Stripe.PaymentIntent);
+
+      jest
+        .spyOn(duffelService, 'createOrder')
+        .mockResolvedValue(mockOrder as unknown as Record<string, unknown>);
+      jest
+        .spyOn(duffelService, 'retrieveCompleteOrder')
+        .mockResolvedValue(mockOrder as unknown as DuffelOrder);
+      jest.spyOn(stripeService, 'capturePaymentIntent').mockResolvedValue({
+        id: payment.stripePaymentIntentId,
+        status: 'succeeded',
+      } as unknown as Stripe.PaymentIntent);
+
+      const origTransaction = prisma.$transaction.bind(prisma);
+      jest.spyOn(prisma, '$transaction').mockImplementation(async (cb: any, ...args: any[]) => {
+        if (typeof cb === 'function') {
+          return origTransaction(async (tx: any) => {
+            let isConfirmationTx = false;
+            const origCreateMany = tx.ledgerEntry?.createMany?.bind(tx.ledgerEntry);
+            if (origCreateMany) {
+              tx.ledgerEntry.createMany = async (...ledgerArgs: any[]) => {
+                isConfirmationTx = true;
+                return origCreateMany(...ledgerArgs);
+              };
+            }
+            await cb(tx);
+            if (isConfirmationTx) {
+              // At this point in tx:
+              // 1. tx.payment.updateMany (status: SUCCEEDED)
+              // 2. tx.paymentEvent.create (payment_captured)
+              // 3. tx.bookingIntent.update (status: CONFIRMED)
+              // 4. bookingLifecycleService.updateToConfirmed (real booking update to CONFIRMED with PNR)
+              // 5. tx.ledgerEntry.createMany (real creation of debit/credit ledger rows)
+              // Now throw to force full PostgreSQL transaction rollback:
+              throw new Error('Simulated DB constraint/deadlock during confirmation commit');
+            }
+          }, ...args);
+        }
+        return origTransaction(cb, ...args);
+      });
+
+      const cancelHoldSpy = jest.spyOn(stripeService, 'cancelPaymentIntent');
+      const cancelOrderSpy = jest.spyOn(duffelService, 'cancelOrder');
+
+      await request(app.getHttpServer())
+        .post('/api/bookings/payment/confirm')
+        .set('Authorization', `Bearer ${testToken}`)
+        .set('Idempotency-Key', idempotencyKey)
+        .send({ paymentId: payment.id, bookingId })
+        .expect(500);
+
+      // Verify transaction rollback:
+      const dbPayment = await prisma.payment.findUnique({ where: { id: payment.id } });
+      expect(dbPayment?.status).not.toBe(PaymentStatus.SUCCEEDED);
+
+      const dbBooking = await prisma.booking.findUnique({ where: { id: bookingId } });
+      expect(dbBooking?.status).not.toBe(BookingStatus.CONFIRMED);
+
+      const dbBookingIntent = await prisma.bookingIntent.findUnique({ where: { id: intent.id } });
+      expect(dbBookingIntent?.status).not.toBe('CONFIRMED');
+
+      const paymentEvents = await prisma.paymentEvent.findMany({
+        where: { paymentId: payment.id, eventType: 'payment_captured' },
+      });
+      expect(paymentEvents.length).toBe(0);
+
+      const ledgers = await prisma.ledgerEntry.findMany({ where: { paymentId: payment.id } });
+      expect(ledgers.length).toBe(0);
+
+      // STRICT INVARIANT: Known capture NEVER cancels order or payment hold!
+      expect(cancelHoldSpy).toHaveBeenCalledTimes(0);
+      expect(cancelOrderSpy).toHaveBeenCalledTimes(0);
+
+      // Checkpoint was advanced to captured so state remains recoverable
+      const storedKey = await prisma.idempotencyKey.findUnique({ where: { key: idempotencyKey } });
+      expect(storedKey?.recoveryPoint).toBe('captured');
+    });
+  });
+
+  describe('Scenario 9: Stale Owner Takeover & CAS Eviction', () => {
+    it('aborts and prevents provider call when ownership is lost before hold authorization', async () => {
+      const offer = await createFlightOffer();
+      const intent = await createBookingIntent(testUser.id, offer.id);
+      const payment = await createPaymentFixture(testUser.id, intent.id);
+      const bookingId = crypto.randomUUID();
+      const idempotencyKey = `idem-cas-auth-${crypto.randomUUID()}`;
+
+      // Hook getResumePoint to simulate concurrent lease takeover in PostgreSQL before authorizeHold
+      jest.spyOn(idempotencyService, 'getResumePoint').mockImplementation(async (key: string) => {
+        await prisma.idempotencyKey.update({
+          where: { key },
+          data: { lockedAt: new Date(Date.now() + 60000) },
+        });
+        return 'started';
+      });
+
+      const retrieveSpy = jest.spyOn(stripeService, 'retrievePaymentIntent');
+
+      const res = await request(app.getHttpServer())
+        .post('/api/bookings/payment/confirm')
+        .set('Authorization', `Bearer ${testToken}`)
+        .set('Idempotency-Key', idempotencyKey)
+        .send({ paymentId: payment.id, bookingId })
+        .expect(409);
+
+      expect(res.body.message).toContain('Idempotency key ownership lost');
+      expect(retrieveSpy).toHaveBeenCalledTimes(0);
+    });
+
+    it('aborts and prevents Duffel order creation when ownership is lost before createOrder', async () => {
+      const offer = await createFlightOffer();
+      const intent = await createBookingIntent(testUser.id, offer.id);
+      const idempotencyKey = `idem-cas-order-${crypto.randomUUID()}`;
+      const bookingId = crypto.randomUUID();
+      const payload = { paymentId: '', bookingId };
+
+      const idemKey = await prisma.idempotencyKey.create({
+        data: {
+          key: idempotencyKey,
+          requestHash: 'pending-hash',
+          customerId: testUser.id,
+          requestPath: '/api/bookings/payment/confirm',
+          recoveryPoint: 'stripe_authorized',
+          lockedAt: null,
+          expiresAt: new Date(Date.now() + 86400000),
+        },
+      });
+
+      const payment = await prisma.payment.create({
+        data: {
+          bookingIntentId: intent.id,
+          attemptNumber: 1,
+          idempotencyKeyId: idemKey.id,
+          stripePaymentIntentId: `pi_test_${crypto.randomUUID()}`,
+          amount: 12550,
+          currency: 'usd',
+          status: PaymentStatus.AUTHORIZED,
+          version: 0,
+        },
+      });
+
+      payload.paymentId = payment.id;
+      await prisma.idempotencyKey.update({
+        where: { id: idemKey.id },
+        data: { requestHash: idempotencyService.computeHash(payload) },
+      });
+
+      const origFindUnique = prisma.bookingIntent.findUnique.bind(prisma.bookingIntent);
+      jest.spyOn(prisma.bookingIntent as any, 'findUnique').mockImplementation(async (args: any) => {
+        const result = await origFindUnique(args);
+        if (args?.where?.id === intent.id) {
+          await prisma.idempotencyKey.update({
+            where: { key: idempotencyKey },
+            data: { lockedAt: new Date(Date.now() + 60000) },
+          });
+        }
+        return result;
+      });
+
+      const createOrderSpy = jest.spyOn(duffelService, 'createOrder');
+      const cancelHoldSpy = jest.spyOn(stripeService, 'cancelPaymentIntent');
+
+      const res = await request(app.getHttpServer())
+        .post('/api/bookings/payment/confirm')
+        .set('Authorization', `Bearer ${testToken}`)
+        .set('Idempotency-Key', idempotencyKey)
+        .send(payload)
+        .expect(409);
+
+      expect(res.body.message).toContain('Idempotency key ownership lost');
+      expect(createOrderSpy).toHaveBeenCalledTimes(0);
+      expect(cancelHoldSpy).toHaveBeenCalledTimes(0);
+
+      const dbPayment = await prisma.payment.findUnique({ where: { id: payment.id } });
+      expect(dbPayment?.status).toBe(PaymentStatus.AUTHORIZED);
+    });
+
+    it('aborts and prevents Stripe capture when ownership is lost before capturePayment', async () => {
+      const offer = await createFlightOffer();
+      const intent = await createBookingIntent(testUser.id, offer.id);
+      const idempotencyKey = `idem-cas-cap-${crypto.randomUUID()}`;
+      const bookingId = crypto.randomUUID();
+      const payload = { paymentId: '', bookingId };
+
+      const idemKey = await prisma.idempotencyKey.create({
+        data: {
+          key: idempotencyKey,
+          requestHash: 'pending-hash',
+          customerId: testUser.id,
+          requestPath: '/api/bookings/payment/confirm',
+          recoveryPoint: 'duffel_order_created',
+          lockedAt: null,
+          expiresAt: new Date(Date.now() + 86400000),
+        },
+      });
+
+      const payment = await prisma.payment.create({
+        data: {
+          bookingIntentId: intent.id,
+          attemptNumber: 1,
+          idempotencyKeyId: idemKey.id,
+          stripePaymentIntentId: `pi_test_${crypto.randomUUID()}`,
+          amount: 12550,
+          currency: 'usd',
+          status: PaymentStatus.AUTHORIZED,
+          version: 0,
+        },
+      });
+
+      payload.paymentId = payment.id;
+      await prisma.idempotencyKey.update({
+        where: { id: idemKey.id },
+        data: { requestHash: idempotencyService.computeHash(payload) },
+      });
+
+      const mockOrder = getMockDuffelOrder('ord_cas_cap', 'REFCASCAP');
+      await prisma.paymentEvent.create({
+        data: {
+          paymentId: payment.id,
+          eventType: 'duffel_order_created',
+          previousStatus: 'AUTHORIZED',
+          newStatus: 'AUTHORIZED',
+          amount: payment.amount,
+          source: 'API',
+          metadata: mockOrder as unknown as Prisma.InputJsonValue,
+          createdBy: testUser.id,
+        },
+      });
+
+      jest.spyOn(idempotencyService, 'getResumePoint').mockImplementation(async (key: string) => {
+        await prisma.idempotencyKey.update({
+          where: { key },
+          data: { lockedAt: new Date(Date.now() + 60000) },
+        });
+        return 'duffel_order_created';
+      });
+
+      const captureSpy = jest.spyOn(stripeService, 'capturePaymentIntent');
+
+      const res = await request(app.getHttpServer())
+        .post('/api/bookings/payment/confirm')
+        .set('Authorization', `Bearer ${testToken}`)
+        .set('Idempotency-Key', idempotencyKey)
+        .send(payload)
+        .expect(409);
+
+      expect(res.body.message).toContain('Idempotency key ownership lost');
+      expect(captureSpy).toHaveBeenCalledTimes(0);
+    });
+
+    it('aborts compensation and prevents voidHold when ownership is lost during compensation', async () => {
+      const offer = await createFlightOffer();
+      const intent = await createBookingIntent(testUser.id, offer.id);
+      const payment = await createPaymentFixture(testUser.id, intent.id);
+      const bookingId = crypto.randomUUID();
+      const idempotencyKey = `idem-cas-comp-${crypto.randomUUID()}`;
+
+      jest.spyOn(stripeService, 'retrievePaymentIntent').mockResolvedValue({
+        id: payment.stripePaymentIntentId,
+        status: 'requires_capture',
+      } as unknown as Stripe.PaymentIntent);
+
+      jest.spyOn(duffelService, 'createOrder').mockImplementation(async () => {
+        await prisma.idempotencyKey.update({
+          where: { key: idempotencyKey },
+          data: { lockedAt: new Date(Date.now() + 60000) },
+        });
+        throw new Error('Duffel failure triggering compensation');
+      });
+
+      const cancelHoldSpy = jest.spyOn(stripeService, 'cancelPaymentIntent');
+
+      const res = await request(app.getHttpServer())
+        .post('/api/bookings/payment/confirm')
+        .set('Authorization', `Bearer ${testToken}`)
+        .set('Idempotency-Key', idempotencyKey)
+        .send({ paymentId: payment.id, bookingId })
+        .expect(409);
+
+      expect(res.body.message).toContain('Idempotency key ownership lost');
+      expect(cancelHoldSpy).toHaveBeenCalledTimes(0);
+
+      const dbPayment = await prisma.payment.findUnique({ where: { id: payment.id } });
+      expect(dbPayment?.status).toBe(PaymentStatus.AUTHORIZED);
+    });
+
+    it('aborts gracefully in background execution after 25s handoff when ownership is taken over', async () => {
+      const offer = await createFlightOffer();
+      const intent = await createBookingIntent(testUser.id, offer.id);
+      const payment = await createPaymentFixture(testUser.id, intent.id);
+      const bookingId = crypto.randomUUID();
+      const idempotencyKey = `idem-cas-bg-${crypto.randomUUID()}`;
+      const mockOrder = getMockDuffelOrder('ord_cas_bg', 'REFBG');
+
+      jest.spyOn(stripeService, 'retrievePaymentIntent').mockResolvedValue({
+        id: payment.stripePaymentIntentId,
+        status: 'requires_capture',
+      } as unknown as Stripe.PaymentIntent);
+
+      const origSetTimeout = global.setTimeout;
+      const timeoutSpy = jest
+        .spyOn(global, 'setTimeout')
+        .mockImplementation((fn: Parameters<typeof setTimeout>[0], ms?: number) => {
+          if (ms === 25000) {
+            return origSetTimeout(fn, 10);
+          }
+          return origSetTimeout(fn, ms);
+        });
+
+      let orderStolenPromise: Promise<void>;
+      let resolveOrderStolen: () => void;
+      orderStolenPromise = new Promise((resolve) => {
+        resolveOrderStolen = resolve;
+      });
+
+      jest.spyOn(duffelService, 'createOrder').mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            origSetTimeout(async () => {
+              try {
+                await prisma.idempotencyKey.updateMany({
+                  where: { key: idempotencyKey },
+                  data: { lockedAt: new Date(Date.now() + 60000) },
+                });
+              } catch {
+                // Ignore teardown races
+              } finally {
+                resolveOrderStolen();
+                resolve(mockOrder as unknown as Record<string, unknown>);
+              }
+            }, 50);
+          }),
+      );
+
+      const captureSpy = jest.spyOn(stripeService, 'capturePaymentIntent');
+
+      try {
+        const res = await request(app.getHttpServer())
+          .post('/api/bookings/payment/confirm')
+          .set('Authorization', `Bearer ${testToken}`)
+          .set('Idempotency-Key', idempotencyKey)
+          .send({ paymentId: payment.id, bookingId })
+          .expect(202);
+
+        expect(res.body.status).toBe('PENDING');
+
+        await orderStolenPromise;
+        await new Promise((resolve) => origSetTimeout(resolve, 200));
+
+        expect(captureSpy).toHaveBeenCalledTimes(0);
+
+        const dbPayment = await prisma.payment.findUnique({ where: { id: payment.id } });
+        expect(dbPayment?.status).not.toBe(PaymentStatus.SUCCEEDED);
+      } finally {
+        timeoutSpy.mockRestore();
+      }
+    });
+  });
+
+  describe('Scenario 10: Capture Throw Matrix', () => {
+    it('proceeds to complete canonical booking when capture throws but subsequent status check reveals captured (succeeded)', async () => {
+      const offer = await createFlightOffer();
+      const intent = await createBookingIntent(testUser.id, offer.id);
+      const payment = await createPaymentFixture(testUser.id, intent.id);
+      const bookingId = crypto.randomUUID();
+      const mockOrder = getMockDuffelOrder('ord_throw_succeeded', 'REFTHROWSUCC');
+
+      jest
+        .spyOn(stripeService, 'retrievePaymentIntent')
+        .mockResolvedValueOnce({
+          id: payment.stripePaymentIntentId,
+          status: 'requires_capture',
+        } as unknown as Stripe.PaymentIntent)
+        .mockResolvedValueOnce({
+          id: payment.stripePaymentIntentId,
+          status: 'succeeded',
+        } as unknown as Stripe.PaymentIntent);
+
+      jest
+        .spyOn(duffelService, 'createOrder')
+        .mockResolvedValue(mockOrder as unknown as Record<string, unknown>);
+      jest
+        .spyOn(duffelService, 'retrieveCompleteOrder')
+        .mockResolvedValue(mockOrder as unknown as DuffelOrder);
+
+      jest
+        .spyOn(stripeService, 'capturePaymentIntent')
+        .mockRejectedValue(new Error('Network socket hangup during capture'));
+
+      const cancelHoldSpy = jest.spyOn(stripeService, 'cancelPaymentIntent');
+      const cancelOrderSpy = jest.spyOn(duffelService, 'cancelOrder');
+
+      const res = await request(app.getHttpServer())
+        .post('/api/bookings/payment/confirm')
+        .set('Authorization', `Bearer ${testToken}`)
+        .set('Idempotency-Key', `idem-throw-succ-${crypto.randomUUID()}`)
+        .send({ paymentId: payment.id, bookingId })
+        .expect(200);
+
+      expect(res.body).toEqual({
+        success: true,
+        status: 'SUCCEEDED',
+        paymentId: payment.id,
+        bookingReference: 'REFTHROWSUCC',
+        duffelOrderId: 'ord_throw_succeeded',
+      });
+
+      // Strict Invariant: Known capture NEVER cancels!
+      expect(cancelHoldSpy).toHaveBeenCalledTimes(0);
+      expect(cancelOrderSpy).toHaveBeenCalledTimes(0);
+
+      const dbPayment = await prisma.payment.findUnique({ where: { id: payment.id } });
+      expect(dbPayment?.status).toBe(PaymentStatus.SUCCEEDED);
+
+      const dbBooking = await prisma.booking.findUnique({ where: { id: bookingId } });
+      expect(dbBooking?.status).toBe(BookingStatus.CONFIRMED);
+    });
+
+    it('cancels Duffel order, voids hold, and marks booking FAILED when capture throws and subsequent status check reveals authorized (requires_capture)', async () => {
+      const offer = await createFlightOffer();
+      const intent = await createBookingIntent(testUser.id, offer.id);
+      const payment = await createPaymentFixture(testUser.id, intent.id);
+      const bookingId = crypto.randomUUID();
+      const mockOrder = getMockDuffelOrder('ord_throw_auth', 'REFTHROWAUTH');
+
+      jest
+        .spyOn(stripeService, 'retrievePaymentIntent')
+        .mockResolvedValueOnce({
+          id: payment.stripePaymentIntentId,
+          status: 'requires_capture',
+        } as unknown as Stripe.PaymentIntent)
+        .mockResolvedValueOnce({
+          id: payment.stripePaymentIntentId,
+          status: 'requires_capture',
+        } as unknown as Stripe.PaymentIntent);
+
+      jest
+        .spyOn(duffelService, 'createOrder')
+        .mockResolvedValue(mockOrder as unknown as Record<string, unknown>);
+      jest
+        .spyOn(duffelService, 'retrieveCompleteOrder')
+        .mockResolvedValue(mockOrder as unknown as DuffelOrder);
+
+      jest
+        .spyOn(stripeService, 'capturePaymentIntent')
+        .mockRejectedValue(new Error('Card declined on capture'));
+
+      const cancelOrderSpy = jest.spyOn(duffelService, 'cancelOrder').mockResolvedValue({});
+      const cancelHoldSpy = jest.spyOn(stripeService, 'cancelPaymentIntent').mockResolvedValue({
+        id: payment.stripePaymentIntentId,
+        status: 'canceled',
+      } as unknown as Stripe.PaymentIntent);
+
+      const res = await request(app.getHttpServer())
+        .post('/api/bookings/payment/confirm')
+        .set('Authorization', `Bearer ${testToken}`)
+        .set('Idempotency-Key', `idem-throw-auth-${crypto.randomUUID()}`)
+        .send({ paymentId: payment.id, bookingId })
+        .expect(502);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error).toContain('Duffel order cancelled and hold released');
+
+      expect(cancelOrderSpy).toHaveBeenCalledTimes(1);
+      expect(cancelHoldSpy).toHaveBeenCalledTimes(1);
+
+      const dbPayment = await prisma.payment.findUnique({ where: { id: payment.id } });
+      expect(dbPayment?.status).toBe(PaymentStatus.CANCELLED);
+
+      const dbBooking = await prisma.booking.findUnique({ where: { id: bookingId } });
+      expect(dbBooking?.status).toBe(BookingStatus.FAILED);
+    });
+
+    it('cancels Duffel order, voids hold, and marks booking FAILED when capture throws and subsequent status check reveals voided (canceled)', async () => {
+      const offer = await createFlightOffer();
+      const intent = await createBookingIntent(testUser.id, offer.id);
+      const payment = await createPaymentFixture(testUser.id, intent.id);
+      const bookingId = crypto.randomUUID();
+      const mockOrder = getMockDuffelOrder('ord_throw_void', 'REFTHROWVOID');
+
+      jest
+        .spyOn(stripeService, 'retrievePaymentIntent')
+        .mockResolvedValueOnce({
+          id: payment.stripePaymentIntentId,
+          status: 'requires_capture',
+        } as unknown as Stripe.PaymentIntent)
+        .mockResolvedValueOnce({
+          id: payment.stripePaymentIntentId,
+          status: 'canceled',
+        } as unknown as Stripe.PaymentIntent);
+
+      jest
+        .spyOn(duffelService, 'createOrder')
+        .mockResolvedValue(mockOrder as unknown as Record<string, unknown>);
+      jest
+        .spyOn(duffelService, 'retrieveCompleteOrder')
+        .mockResolvedValue(mockOrder as unknown as DuffelOrder);
+
+      jest
+        .spyOn(stripeService, 'capturePaymentIntent')
+        .mockRejectedValue(new Error('Card declined on capture'));
+
+      const cancelOrderSpy = jest.spyOn(duffelService, 'cancelOrder').mockResolvedValue({});
+      const cancelHoldSpy = jest.spyOn(stripeService, 'cancelPaymentIntent').mockResolvedValue({
+        id: payment.stripePaymentIntentId,
+        status: 'canceled',
+      } as unknown as Stripe.PaymentIntent);
+
+      const res = await request(app.getHttpServer())
+        .post('/api/bookings/payment/confirm')
+        .set('Authorization', `Bearer ${testToken}`)
+        .set('Idempotency-Key', `idem-throw-void-${crypto.randomUUID()}`)
+        .send({ paymentId: payment.id, bookingId })
+        .expect(502);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error).toContain('Duffel order cancelled and hold released');
+
+      expect(cancelOrderSpy).toHaveBeenCalledTimes(1);
+      expect(cancelHoldSpy).toHaveBeenCalledTimes(1);
+
+      const dbPayment = await prisma.payment.findUnique({ where: { id: payment.id } });
+      expect(dbPayment?.status).toBe(PaymentStatus.CANCELLED);
+
+      const dbBooking = await prisma.booking.findUnique({ where: { id: bookingId } });
+      expect(dbBooking?.status).toBe(BookingStatus.FAILED);
+    });
+
+    it('leaves state recoverable without canceling order or payment when capture throws and status check is unavailable', async () => {
+      const offer = await createFlightOffer();
+      const intent = await createBookingIntent(testUser.id, offer.id);
+      const payment = await createPaymentFixture(testUser.id, intent.id);
+      const bookingId = crypto.randomUUID();
+      const mockOrder = getMockDuffelOrder('ord_throw_unavail', 'REFTHROWN');
+
+      jest
+        .spyOn(stripeService, 'retrievePaymentIntent')
+        .mockResolvedValueOnce({
+          id: payment.stripePaymentIntentId,
+          status: 'requires_capture',
+        } as unknown as Stripe.PaymentIntent)
+        .mockRejectedValueOnce(new Error('Stripe API unavailable during status check'));
+
+      jest
+        .spyOn(duffelService, 'createOrder')
+        .mockResolvedValue(mockOrder as unknown as Record<string, unknown>);
+      jest
+        .spyOn(duffelService, 'retrieveCompleteOrder')
+        .mockResolvedValue(mockOrder as unknown as DuffelOrder);
+
+      jest
+        .spyOn(stripeService, 'capturePaymentIntent')
+        .mockRejectedValue(new Error('Capture socket dropped'));
+
+      const cancelOrderSpy = jest.spyOn(duffelService, 'cancelOrder');
+      const cancelHoldSpy = jest.spyOn(stripeService, 'cancelPaymentIntent');
+
+      const res = await request(app.getHttpServer())
+        .post('/api/bookings/payment/confirm')
+        .set('Authorization', `Bearer ${testToken}`)
+        .set('Idempotency-Key', `idem-throw-unavail-${crypto.randomUUID()}`)
+        .send({ paymentId: payment.id, bookingId })
+        .expect(502);
+
+      expect(res.body).toEqual(
+        expect.objectContaining({
+          success: false,
+          error: 'Stripe capture outcome is unknown. Retry payment confirmation.',
+          bookingStatus: 'PROCESSING',
+        }),
+      );
+
+      // Strict Invariant: Unknown capture outcome MUST NOT cancel order or hold!
+      expect(cancelOrderSpy).toHaveBeenCalledTimes(0);
+      expect(cancelHoldSpy).toHaveBeenCalledTimes(0);
+
+      const dbPayment = await prisma.payment.findUnique({ where: { id: payment.id } });
+      expect(dbPayment?.status).toBe(PaymentStatus.AUTHORIZED);
+
+      const dbBooking = await prisma.booking.findUnique({ where: { id: bookingId } });
+      expect(dbBooking?.status).not.toBe(BookingStatus.FAILED);
+    });
+  });
+
+  describe('Scenario 11: Failed Compensation & DB Failure Handling', () => {
+    it('safely handles failed hold voiding during Duffel failure compensation without leaking internal stack traces', async () => {
+      const offer = await createFlightOffer();
+      const intent = await createBookingIntent(testUser.id, offer.id);
+      const payment = await createPaymentFixture(testUser.id, intent.id);
+      const bookingId = crypto.randomUUID();
+
+      jest.spyOn(stripeService, 'retrievePaymentIntent').mockResolvedValue({
+        id: payment.stripePaymentIntentId,
+        status: 'requires_capture',
+      } as unknown as Stripe.PaymentIntent);
+
+      jest
+        .spyOn(duffelService, 'createOrder')
+        .mockRejectedValue(new Error('Duffel route unavailable'));
+
+      jest
+        .spyOn(stripeService, 'cancelPaymentIntent')
+        .mockRejectedValue(new Error('Stripe cancel error 500'));
+
+      const res = await request(app.getHttpServer())
+        .post('/api/bookings/payment/confirm')
+        .set('Authorization', `Bearer ${testToken}`)
+        .set('Idempotency-Key', `idem-fail-comp-${crypto.randomUUID()}`)
+        .send({ paymentId: payment.id, bookingId })
+        .expect(502);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error).toContain('Duffel booking failed');
+      expect(res.body.error).not.toContain('Stripe cancel error 500');
+
+      const dbPayment = await prisma.payment.findUnique({ where: { id: payment.id } });
+      expect(dbPayment?.status).toBe(PaymentStatus.CANCELLED);
+
+      const dbBooking = await prisma.booking.findUnique({ where: { id: bookingId } });
+      expect(dbBooking?.status).toBe(BookingStatus.FAILED);
+    });
+
+    it('preserves capture and does not cancel payment when post-capture DB confirmation fails', async () => {
+      const offer = await createFlightOffer();
+      const intent = await createBookingIntent(testUser.id, offer.id);
+      const payment = await createPaymentFixture(testUser.id, intent.id);
+      const bookingId = crypto.randomUUID();
+      const mockOrder = getMockDuffelOrder('ord_db_fail', 'REFDBFAIL');
+      const idempotencyKey = `idem-db-fail-${crypto.randomUUID()}`;
+
+      jest.spyOn(stripeService, 'retrievePaymentIntent').mockResolvedValue({
+        id: payment.stripePaymentIntentId,
+        status: 'requires_capture',
+      } as unknown as Stripe.PaymentIntent);
+
+      jest
+        .spyOn(duffelService, 'createOrder')
+        .mockResolvedValue(mockOrder as unknown as Record<string, unknown>);
+      jest
+        .spyOn(duffelService, 'retrieveCompleteOrder')
+        .mockResolvedValue(mockOrder as unknown as DuffelOrder);
+      jest.spyOn(stripeService, 'capturePaymentIntent').mockResolvedValue({
+        id: payment.stripePaymentIntentId,
+        status: 'succeeded',
+      } as unknown as Stripe.PaymentIntent);
+
+      jest
+        .spyOn(bookingLifecycleService, 'updateToConfirmed')
+        .mockRejectedValue(new Error('Disk I/O failure during updateToConfirmed'));
+
+      const cancelHoldSpy = jest.spyOn(stripeService, 'cancelPaymentIntent');
+      const cancelOrderSpy = jest.spyOn(duffelService, 'cancelOrder');
+
+      await request(app.getHttpServer())
+        .post('/api/bookings/payment/confirm')
+        .set('Authorization', `Bearer ${testToken}`)
+        .set('Idempotency-Key', idempotencyKey)
+        .send({ paymentId: payment.id, bookingId })
+        .expect(500);
+
+      // Known capture NEVER cancels:
+      expect(cancelHoldSpy).toHaveBeenCalledTimes(0);
+      expect(cancelOrderSpy).toHaveBeenCalledTimes(0);
+
+      const keyRecord = await prisma.idempotencyKey.findUnique({ where: { key: idempotencyKey } });
+      expect(keyRecord?.recoveryPoint).toBe('captured');
     });
   });
 });

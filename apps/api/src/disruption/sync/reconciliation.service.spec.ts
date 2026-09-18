@@ -5,6 +5,7 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { SupplierSyncService } from './supplier-sync.service';
 import { CacheService } from '@/cache/cache.service';
 import { DisruptionStatus, DisruptionActorType } from '@prisma/client';
+import { BookingEventPublisherService } from '@/domain-events';
 
 describe('ReconciliationService & Booking Completion', () => {
   describe('ReconciliationService', () => {
@@ -286,7 +287,15 @@ describe('ReconciliationService & Booking Completion', () => {
         $transaction: jest.fn((callback) => callback(mockPrisma)),
       };
 
-      bookingLifecycleService = new BookingLifecycleService(mockPrisma as unknown as PrismaService);
+      const mockPublisher = {
+        publish: jest.fn().mockResolvedValue(undefined),
+        createContext: jest.fn((tx) => ({ tx, events: [] })),
+      } as unknown as BookingEventPublisherService;
+
+      bookingLifecycleService = new BookingLifecycleService(
+        mockPrisma as unknown as PrismaService,
+        mockPublisher,
+      );
     });
 
     it('should complete booking and resolve detected disruption if departure/arrival has passed', async () => {
@@ -320,6 +329,7 @@ describe('ReconciliationService & Booking Completion', () => {
         },
         data: {
           status: 'COMPLETED',
+          version: { increment: 1 },
           disruptionStatus: DisruptionStatus.RESOLVED,
           disruptionResolvedReason: 'DEPARTURE_PASSED',
           disruptionResolvedAt: expect.any(Date),
@@ -408,6 +418,7 @@ describe('ReconciliationService & Booking Completion', () => {
         },
         data: {
           status: 'COMPLETED',
+          version: { increment: 1 },
         },
       });
       expect(mockPrisma.disruptionAuditEvent.create).not.toHaveBeenCalled();

@@ -69,6 +69,10 @@ pnpm run test:smoke:all
 
 Use the existing harness's local orchestration and mock-provider environment. Adapt its booking readiness waits to eventual projection completion if required, retaining deterministic bounded assertions. Preserve previous payment/booking behavior and final runner exit code 0. If changed files extend to web/agent/shared contracts, run their change-aware gates in AGENTS.md too.
 
+## Operational documentation
+
+For background reconciler troubleshooting, keyset mechanics, poison pill isolation, multi-replica considerations, diagnostic queries, and the rollback/reactivation procedure, see [docs/runbooks/booking-projection-reconciliation.md](../../docs/runbooks/booking-projection-reconciliation.md).
+
 ## Operational rehearsal
 
 1. Stop legacy API writers; apply additive migration and deploy the complete projection slice (US2+US3). US1 may already be deployed.

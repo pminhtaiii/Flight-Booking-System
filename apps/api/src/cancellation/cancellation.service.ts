@@ -5,13 +5,20 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-  Optional,
 } from '@nestjs/common';
-import { Booking, BookingFailureReason, BookingStatus, Prisma, RefundStatus } from '@prisma/client';
+import {
+  Booking,
+  BookingFailureReason,
+  BookingStatus,
+  DisruptionActorType,
+  DisruptionStatus,
+  RefundStatus,
+} from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { PaymentRefundService } from '@/payment/payment-refund.service';
-import { BookingAgentProjectionService } from '@/agent-gateway/booking-agent-projection.service';
+import { BookingLifecycleService } from '@/booking-lifecycle/booking-lifecycle.service';
+import { BookingEventPublisherService, PublishableEvent } from '@/domain-events';
 import {
   CancellationQuoteResponseDto,
   CancellationResponseDto,
@@ -28,7 +35,8 @@ export class CancellationService {
     private readonly prisma: PrismaService,
     private readonly duffelService: DuffelService,
     private readonly paymentRefundService: PaymentRefundService,
-    @Optional() private readonly bookingAgentProjectionService?: BookingAgentProjectionService,
+    private readonly bookingLifecycleService: BookingLifecycleService,
+    private readonly publisher: BookingEventPublisherService,
   ) {}
 
   async getCancellationStatus(
@@ -341,17 +349,33 @@ export class CancellationService {
     }
 
     const staleClaimThreshold = new Date(Date.now() - 2 * 60 * 1000);
-    const claim = await this.prisma.booking.updateMany({
-      where: {
-        id: bookingId,
+    let claimEvents: PublishableEvent[] = [];
+    const claim = await this.prisma.$transaction(async (tx) => {
+      const claimContext = this.publisher.createContext(tx);
+      const claimResult = await this.bookingLifecycleService.claimCancellation(
+        bookingId,
         userId,
-        OR: [
-          { status: { in: [BookingStatus.CONFIRMED, BookingStatus.COMPLETED] } },
-          { status: BookingStatus.CANCELLATION_PENDING, updatedAt: { lte: staleClaimThreshold } },
-        ],
-      },
-      data: { status: BookingStatus.CANCELLATION_PENDING },
+        staleClaimThreshold,
+        tx,
+        claimContext,
+      );
+      claimEvents = claimContext.events;
+      return claimResult;
     });
+
+    if (claimEvents.length > 0) {
+      try {
+        await this.publisher.publish(claimEvents);
+      } catch (error) {
+        this.logger.error(
+          `[cancelBooking] Failed to dispatch cancellation pending events for booking ${bookingId}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+          error instanceof Error ? error.stack : undefined,
+        );
+      }
+    }
+
     if (claim.count === 0) {
       const canonical = await this.prisma.booking.findUnique({ where: { id: bookingId } });
       if (!canonical) {
@@ -377,46 +401,27 @@ export class CancellationService {
       refundable && amountInMinorUnits > 0
         ? BookingStatus.CANCELLED_PENDING_REFUND
         : BookingStatus.CANCELLED_NO_REFUND;
+
+    let finalEvents: PublishableEvent[] = [];
     const persistedCount = await this.prisma.$transaction(async (tx) => {
-      const dbBooking = await tx.booking.findUnique({
-        where: { id: bookingId },
-        select: { status: true, disruptionStatus: true, activeDisruptionRevisionId: true },
-      });
-      if (dbBooking?.status !== BookingStatus.CANCELLATION_PENDING) {
+      const cancelContext = this.publisher.createContext(tx);
+      const cancelResult = await this.bookingLifecycleService.cancelBooking(
+        bookingId,
+        cancellationStatus,
+        refundAmount,
+        {
+          resolvedByType: DisruptionActorType.TRAVELLER,
+          resolvedById: userId,
+        },
+        tx,
+        cancelContext,
+      );
+
+      if (cancelResult.count === 0) {
         return 0;
       }
 
-      const updateData: Prisma.BookingUpdateInput = {
-        status: cancellationStatus,
-        airlineRefundAmount: refundAmount,
-        customerRefundAmount: refundAmount,
-      };
-
-      const hasActiveDisruption =
-        dbBooking.disruptionStatus === 'DETECTED' || dbBooking.disruptionStatus === 'ACKNOWLEDGED';
-
-      if (hasActiveDisruption) {
-        updateData.disruptionStatus = 'RESOLVED';
-        updateData.disruptionResolvedReason = 'BOOKING_CANCELLED';
-        updateData.disruptionResolvedAt = new Date();
-        updateData.disruptionResolvedByType = 'TRAVELLER';
-        updateData.disruptionResolvedById = userId;
-      }
-
-      const result = await tx.booking.updateMany({
-        where: { id: bookingId, status: BookingStatus.CANCELLATION_PENDING },
-        data: updateData,
-      });
-
-      if (result.count > 0) {
-        await this.bookingAgentProjectionService?.updateProjectionStatus(
-          bookingId,
-          cancellationStatus,
-          tx,
-        );
-      }
-
-      if (result.count > 0 && booking.payment) {
+      if (booking.payment) {
         const existingObligation = await tx.cancellationRefundObligation.findUnique({
           where: { bookingId },
           select: { id: true },
@@ -456,15 +461,15 @@ export class CancellationService {
         });
       }
 
-      if (result.count > 0 && hasActiveDisruption) {
+      if (cancelResult.hasActiveDisruption) {
         await tx.disruptionAuditEvent.create({
           data: {
             bookingId,
-            revisionId: dbBooking.activeDisruptionRevisionId,
+            revisionId: cancelResult.activeDisruptionRevisionId,
             action: 'BOOKING_CANCELLED',
-            fromStatus: dbBooking.disruptionStatus,
-            toStatus: 'RESOLVED',
-            actorType: 'TRAVELLER',
+            fromStatus: cancelResult.previousDisruptionStatus,
+            toStatus: DisruptionStatus.RESOLVED,
+            actorType: DisruptionActorType.TRAVELLER,
             actorId: userId,
             correlationId: `cancel-${bookingId}-${Date.now()}`,
             traceId: `cancel-${bookingId}-${Date.now()}`,
@@ -472,8 +477,23 @@ export class CancellationService {
           },
         });
       }
-      return result.count;
+
+      finalEvents = cancelContext.events;
+      return cancelResult.count;
     });
+
+    if (finalEvents.length > 0) {
+      try {
+        await this.publisher.publish(finalEvents);
+      } catch (error) {
+        this.logger.error(
+          `[cancelBooking] Failed to dispatch cancellation finalized events for booking ${bookingId}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+          error instanceof Error ? error.stack : undefined,
+        );
+      }
+    }
 
     if (persistedCount === 0) {
       const canonical = await this.prisma.booking.findUnique({ where: { id: bookingId } });

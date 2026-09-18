@@ -618,7 +618,7 @@ describe('Booking Passenger Final Validation (E2E) - Task T068', () => {
       expect(duffelCreateOrderSpy).toHaveBeenCalledTimes(0);
 
       // Assert Stripe authorization hold cancelled
-      expect(stripeCancelSpy).toHaveBeenCalledWith(stripePiId);
+      expect(stripeCancelSpy).toHaveBeenCalledWith(stripePiId, `${stripePiId}-stripe-void`);
 
       // Assert Payment status is CANCELLED in DB
       const dbPayment = await prisma.payment.findUnique({
@@ -716,7 +716,7 @@ describe('Booking Passenger Final Validation (E2E) - Task T068', () => {
 
       expect([422, 502]).toContain(confirmRes.status);
       expect(duffelCreateOrderSpy).toHaveBeenCalledTimes(0);
-      expect(stripeCancelSpy).toHaveBeenCalledWith(stripePiId);
+      expect(stripeCancelSpy).toHaveBeenCalledWith(stripePiId, `${stripePiId}-stripe-void`);
 
       const dbPayment = await prisma.payment.findUnique({
         where: { id: paymentId },
@@ -827,7 +827,7 @@ describe('Booking Passenger Final Validation (E2E) - Task T068', () => {
 
       expect([422, 502]).toContain(confirmRes.status);
       expect(duffelCreateOrderSpy).toHaveBeenCalledTimes(0);
-      expect(stripeCancelSpy).toHaveBeenCalledWith(stripePiId);
+      expect(stripeCancelSpy).toHaveBeenCalledWith(stripePiId, `${stripePiId}-stripe-void`);
 
       const dbPayment = await prisma.payment.findUnique({
         where: { id: paymentId },
@@ -905,7 +905,7 @@ describe('Booking Passenger Final Validation (E2E) - Task T068', () => {
 
       expect([422, 502]).toContain(confirmRes.status);
       expect(duffelCreateOrderSpy).toHaveBeenCalledTimes(0);
-      expect(stripeCancelSpy).toHaveBeenCalledWith(stripePiId);
+      expect(stripeCancelSpy).toHaveBeenCalledWith(stripePiId, `${stripePiId}-stripe-void`);
 
       const dbPayment = await prisma.payment.findUnique({
         where: { id: paymentId },

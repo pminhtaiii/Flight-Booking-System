@@ -1,5 +1,525 @@
 # Progress Tracker
 
+### Feature 024 — Event-Driven Module Deepening: Phase 5 Slice 2 (Tasks T038, T039, T040 - US3 Completed) (2026-09-18)
+
+- **T038 [US3] Comprehensive Reconciliation E2E Suite & Migration Fixture**:
+  - Implemented `apps/api/test/booking-projection-reconciliation.e2e-spec.ts` testing:
+    - Suppressed events & lost messages: repairs missing projections and stale sourceVersions to authoritative state.
+    - Large backlog keyset pagination: multi-pass processing across >100 candidates (105 seeded) with 100 limit, fair keyset cursor progression, and reset on `reachedEnd`.
+    - Malformed source data / poison pill isolation: isolates corrupted rows without crashing, advances cursor, and repairs preceding/subsequent valid bookings.
+    - 5-worker concurrency bound: strictly bounds worker pool concurrency to at most 5 tasks.
+    - Live concurrent mutations: monotonic version fencing prevents older hydrated snapshot from overwriting newer live writes.
+    - Zero provider calls: verified strictly zero external network calls under CI network guard.
+  - Completed legacy-writer compatibility fixture in `apps/api/test/booking-projection-version-migration.e2e-spec.ts`:
+    - Reset projection freshness (`sourceVersion = 0`), triggered reconciliation pass, verified clean repair with stable `agentReference`.
+    - Proved financial tables (`payments`, `refunds`, `ledger_entries`) remain completely unmodified.
+- **T039 [US3] Observability Telemetry & Metrics Implementation**:
+  - Implemented structured metrics in `apps/api/src/booking-projection/booking-projection.metrics.ts`:
+    - `booking_projection_reconciliation_pass_total` (counter, labels: `outcome: SUCCESS | ERROR`).
+    - `booking_projection_reconciliation_stale_found_total` (counter).
+    - `booking_projection_reconciliation_repaired_total` (counter).
+    - `booking_projection_reconciliation_failed_total` (counter).
+    - `booking_projection_reconciliation_skipped_total` (counter).
+    - `booking_projection_reconciliation_current_total` (counter).
+    - `booking_projection_reconciliation_duration_ms` (timer / stats).
+    - `booking_projection_failure_total` (counter, labels: `error_type`).
+  - Enforced bounded cardinality and strictly zero raw IDs or PII in Prometheus labels.
+  - Injected `BookingProjectionMetrics` into `BookingProjectionReconciliationService` and wired pass/failure reporting.
+  - Comprehensive unit tests in `booking-projection.metrics.spec.ts` (17/17 passed).
+- **T040 [US3] Operational Runbook & Quickstart Integration**:
+  - Authored authoritative operational runbook in `docs/runbooks/booking-projection-reconciliation.md` covering architecture, keyset mechanics, poison pill triage, multi-replica safety, diagnostic SQL/PowerShell commands, and safe rollback/reactivation without financial data modification.
+  - Linked runbook in `specs/024-event-driven-module-deepening/quickstart.md`.
+  - Phase 5 (User Story 3: Repair and operate projections) is now fully complete. Phase 6 remains unstarted.
+- **Verification**:
+  - `pnpm exec eslint "apps/api/src/booking-projection/**/*.ts" --max-warnings 0` passed (0 errors, 0 warnings).
+  - `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` passed (0 errors).
+  - `pnpm --filter @api/backend test -- apps/api/src/booking-projection/booking-projection.metrics.spec.ts` passed (17/17 passed).
+  - `pnpm --filter @api/backend test:e2e -- booking-projection-reconciliation.e2e-spec.ts` passed (6/6 passed).
+  - `pnpm --filter @api/backend test:e2e -- booking-projection-version-migration.e2e-spec.ts` passed (5/5 passed).
+
+### Feature 024 — Event-Driven Module Deepening: Phase 5 Slice 1 (Tasks T035, T036, T037) Completed (2026-09-18)
+
+- **T035 [US3] Keyset Scan for Stale & Missing Projections**:
+  - Implemented `findStaleOrMissingBookingIds(limit: number, afterBookingId?: string): Promise<KeysetScanResult>` in `apps/api/src/booking-projection/booking-projection.repository.ts`.
+  - Executes raw SQL keyset scan with LEFT JOIN `"booking_agent_projections"` on `p."bookingId" = b."id"`, selecting candidates where `(p."bookingId" IS NULL OR p."source_version" < b."version")` with cursor pagination ordered by `b."id" ASC LIMIT ${limit}`.
+  - Returns `bookingIds`, `nextCursor` (last ID in batch or null), and `reachedEnd` (`bookingIds.length < limit`).
+  - Added unit tests in `booking-projection.repository.spec.ts` covering empty results, partial page, full page, and cursor pagination.
+- **T036 [US3] 100/5 Scheduled Reconciliation Service**:
+  - Implemented `BookingProjectionReconciliationService` in `apps/api/src/booking-projection/booking-projection-reconciliation.service.ts`.
+  - Runs once per minute (`@Cron(CronExpression.EVERY_MINUTE)`) with local in-memory execution lock (`isReconciling`) preventing overlapping cycles.
+  - Bounded 100-item batching with 5-worker concurrency pool processing candidates concurrently without external dependencies.
+  - Safely classifies candidate outcomes: `repaired` (successful upsert), `current` (stale ignored), `skipped` (no source snapshot/flight data), `failed` (malformed revision or thrown exception).
+  - Poison-pill progression: logs and advances cursor on unprocessable rows to prevent deadlocks; resets cursor to `undefined` when `reachedEnd === true` without scanning an extra empty page.
+  - Exported and registered in `BookingProjectionModule` and `booking-projection/index.ts`. Added comprehensive unit tests in `booking-projection-reconciliation.service.spec.ts`.
+- **T037 [US3] Prisma Backfill Script Unification**:
+  - Refactored `apps/api/prisma/scripts/backfill-booking-agent-projections.ts` to reuse shared `BookingProjectionService` and `BookingProjectionRepository.upsertGuarded`.
+  - Preserves existing `agentReference` values and enforces monotonic version fencing (`source_version < EXCLUDED.source_version`).
+  - Bypasses malformed/missing flight records safely without throwing fatal process exits.
+  - Extended `apps/api/test/booking-projection-backfill.e2e-spec.ts` with tests for rerun idempotency, stable references, version fencing, and malformed flight data handling.
+- **Verification**:
+  - `pnpm exec eslint "apps/api/src/booking-projection/**/*.ts" "apps/api/prisma/scripts/**/*.ts" --max-warnings 0` passed (0 errors, 0 warnings).
+  - `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` passed (0 errors).
+  - `pnpm --filter @api/backend test -- apps/api/src/booking-projection/` passed (5 suites, 61/61 passed).
+  - `pnpm --filter @api/backend test:e2e -- booking-projection-backfill.e2e-spec.ts` passed (4/4 passed).
+
+### Feature 024 — Event-Driven Module Deepening: Phase 4 (Tasks T031 & T034 - US2 Completed) (2026-09-18)
+
+- **T031 [US2] Obsolete Service Removal & Module Decoupling**:
+  - Removed `BookingAgentProjectionService` from providers and exports in `AgentGatewayModule`.
+  - Deleted legacy `apps/api/src/agent-gateway/booking-agent-projection.service.ts` and associated unit tests; projection logic now lives exclusively in `apps/api/src/booking-projection/`.
+  - Decoupled consumer modules: dropped obsolete `AgentGatewayModule` imports from `BookingLifecycleModule` and `CancellationModule`.
+  - Removed projection-related `forwardRef(() => AgentGatewayModule)` from `DisruptionModule` while preserving safe query cycles.
+- **T034 [US2] Adapt Existing E2E & Privacy Tests for Eventual Consistency**:
+  - `apps/api/test/booking-agent-projection-privacy.e2e-spec.ts`:
+    - Updated suite to deterministically seed a test booking and projection with valid schema attributes, ensuring test runs reliably on empty/fresh databases.
+    - Implemented bounded polling (`waitForCondition` up to 5s) for querying projections while strictly asserting that `projections.length > 0`.
+    - Strictly preserved all privacy allowlist assertions and opaque `agentReference` assertions (`/^bkref_[0-9a-fA-F-]+$/`, non-guessable, not derived from DB id).
+    - Verified clean teardown in `afterAll`.
+  - `apps/api/test/characterization/booking-characterization.e2e-spec.ts`:
+    - Added `waitForCondition` helper and updated post-confirmation projection assertions to use bounded polling (up to 5s) for eventual consistency.
+  - Verified `chat-persistence-migration.e2e-spec.ts` and `safe-booking-read.service.spec.ts` pass cleanly.
+  - Marked Tasks T031, T032, T033, and T034 as complete (`[x]`) in `specs/024-event-driven-module-deepening/tasks.md`. Phase 4 (User Story 2: Event-Driven Safe Booking Projection) is now fully complete.
+- **Verification**:
+  - `pnpm exec eslint "apps/api/**/*.ts" --max-warnings 0` passed (0 errors, 0 warnings).
+  - `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` passed (0 errors).
+  - `pnpm --filter @api/backend test -- apps/api/src/agent-gateway/` passed (7 suites, 85/85 passed).
+  - `pnpm --filter @api/backend test:e2e -- module-deepening.e2e-spec.ts` passed (23/23 passed).
+  - `pnpm --filter @api/backend test:e2e -- booking-events.e2e-spec.ts` passed (16/16 passed).
+  - `pnpm --filter @api/backend test:e2e -- booking-agent-projection-privacy.e2e-spec.ts` passed (2/2 passed).
+  - `pnpm --filter @api/backend test:e2e -- booking-characterization.e2e-spec.ts` passed (14/14 passed).
+
+### Feature 024 — Event-Driven Module Deepening: Phase 4 Slice 6 (Task T033) Completed (2026-09-18)
+
+- **T033 [US2] PostgreSQL Event & Projection E2E Integration Suite**:
+  - `apps/api/test/booking-events.e2e-spec.ts`:
+    - Implemented disposable database assertion checking `test|e2e|flight_booking` in `DATABASE_URL` or `NODE_ENV === 'test'`.
+    - Initialized real Nest application via `Test.createTestingModule({ imports: [AppModule] }).compile()` and `await app.init()`.
+    - Added resilient `waitForCondition` helper to accommodate post-commit asynchronous projection updates.
+    - Added thorough cleanup in `afterAll` to delete all created test bookings, projections, revisions, segments, intents, and users.
+    - Verified all 8 required categories across 16 integration tests:
+      - (a) Creation, Confirmation, Failure, Completion: hydrated processing at version 1 with carrier and flightNumber extracted from intent snapshot, confirmation with version 2 and status CONFIRMED, failure with version 2 and status FAILED, completion with version 3 and status COMPLETED.
+      - (b) Recovery Outcomes: `recordRecoveryOutcome` emits `booking.recovery.resolved` and updates projection accurately.
+      - (c) Cancellation Claims & Finalization: `recordCancellationClaim` emits `booking.cancellation.pending` and updates projection to `CANCELLATION_PENDING`; `finalizeCancellation` emits `booking.cancelled` and updates projection to `CANCELLED_NO_REFUND`.
+      - (d) Supplier Revision Sync & Disruption: `recordSupplierRevision` emits `booking.disruption.synced` and updates projection with updated revision details; `recordDisruptionAcknowledgment` emits `booking.disruption.acknowledged`; `recordDisruptionAcceptance` emits `booking.disruption.accepted`.
+      - (e) Refunds & Emission Isolation: `recordRefundState` emits `booking.refund.updated` and updates projection; direct emission of `refund.settled` on `EventEmitter2` is ignored by listener and causes 0 projection updates.
+      - (f) Rollbacks & No-Ops: rolled-back transaction writes zero projections; idempotent replay yields 0 version increments and 0 events.
+      - (g) Out-of-Order / Replay Fencing: arrival of an event with older `sourceVersion` is ignored via `STALE_IGNORED` and does not overwrite newer projection.
+      - (h) Stable References: initial `agentReference` (`bkref_...`) remains strictly unchanged across subsequent projection updates.
+  - `apps/api/src/booking-projection/booking-projection.listener.ts`:
+    - Implemented `OnApplicationBootstrap` to bind `booking.**` directly on the injected `EventEmitter2` instance, overcoming `EventEmitter2` array-namespace path behavior and ensuring multi-segment domain events (`booking.recovery.resolved`, `booking.disruption.synced`, etc.) trigger projection updates reliably.
+  - `apps/api/src/booking-lifecycle/booking-lifecycle.service.ts`:
+    - Added lifecycle methods for testable domain transitions (`recordRecoveryOutcome`, `recordCancellationClaim`, `finalizeCancellation`, `recordSupplierRevision`, `recordDisruptionAcknowledgment`, `recordDisruptionAcceptance`, `recordRefundState`).
+    - Extended `createBooking` to accept `flightSnapshot` or fall back to `intent.rawOfferSnapshot` so projections can hydrate immediately on creation.
+  - **Verification**:
+    - `pnpm --filter @api/backend test:e2e -- booking-events.e2e-spec.ts` passed (16/16 passed, exit code 0).
+    - `pnpm --filter @api/backend test -- src/booking-lifecycle/booking-lifecycle.service.spec.ts src/booking-projection/` passed (5 suites, 99/99 passed, exit code 0).
+    - `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` passed (0 errors).
+    - `pnpm exec eslint "apps/api/**/*.ts" --max-warnings 0` passed (0 errors, 0 warnings).
+
+### Feature 024 — Event-Driven Module Deepening: Phase 4 Slice 6 (Task T032) Completed (2026-09-18)
+
+- **T032 [US2] Root AppModule Wiring & DI Architecture Verification**:
+  - `apps/api/src/app.module.ts`:
+    - Imported and registered `EventEmitterModule.forRoot({ wildcard: true, delimiter: '.' })`.
+    - Imported and registered `BookingProjectionModule`.
+    - Verified adapter admission settings (`STRIPE_ADMISSION_*`, `DUFFEL_ADMISSION_*`) remain strictly validated in `envSchema`.
+  - `apps/api/test/module-deepening.e2e-spec.ts`:
+    - Updated Section 5 to assert positive registration of `EventEmitterModule` (or `EventEmitterCoreModule`) and `BookingProjectionModule` in `AppModule`.
+    - Asserted that `EventEmitter2`, `BookingProjectionListener`, `BookingProjectionRepository`, `BookingProjectionService`, and `BookingEventHydratorService` are registered tokens/providers in `AppModule`.
+    - Asserted that DI resolves instances for all five tokens cleanly.
+    - Verified full test suite passes (23/23 tests passed, exit code 0).
+  - **Verification**:
+    - `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` passed (0 errors).
+    - `pnpm exec eslint "apps/api/**/*.ts" --max-warnings 0` passed (0 errors, 0 warnings).
+    - `jest --config ./test/jest-e2e.json --runInBand "module-deepening.e2e-spec.ts"` passed (23/23 passed, exit code 0).
+
+### Feature 024 — Event-Driven Module Deepening: Phase 4 Slice 5 (Tasks T027, T028, T029, T030) Completed (2026-09-18)
+
+- **T027 [US2] Supplier Sync Service Event Routing**:
+  - `apps/api/src/disruption/sync/supplier-sync.service.ts`:
+    - Injected `BookingEventPublisherService`.
+    - Completely removed direct calls to `BookingAgentProjectionService`.
+    - Allocated fresh `TransactionEventContext` per retry loop attempt (`publisher.createContext(tx)`), guaranteeing collector isolation and zero phantom events leaked on P2002 version collisions.
+    - Atomically advanced `Booking.version` by 1 on committed revision creation and collected `BookingDisruptionSyncedEvent` (`booking.disruption.synced`).
+    - Enforced bookkeeping exclusions: lease touches, fingerprint unchanged checks, backoff sync touches, and row-lock touches emit 0 events and do NOT increment version.
+    - Strictly dispatched collected events post-commit via `this.publisher.publish(events)`.
+  - `apps/api/src/disruption/sync/supplier-sync.service.spec.ts`:
+    - Verified revision commits increment version and dispatch `booking.disruption.synced` post-commit.
+    - Verified retry loop collector isolation and rollback event suppression.
+    - Verified zero calls to `BookingAgentProjectionService`.
+
+- **T028 [US2] Disruption Acknowledge & Accept Aggregate Changes**:
+  - `apps/api/src/disruption/api/disruption.service.ts`:
+    - Injected `BookingEventPublisherService`.
+    - Routed traveler acknowledgement through lifecycle context: advances `Booking.version` by 1 and collects `BookingDisruptionAcknowledgedEvent`.
+    - Routed traveler acceptance through lifecycle context: advances `Booking.version` by 1 and collects `BookingDisruptionAcceptedEvent`.
+    - Enforced idempotency safety: replayed acknowledgement (already `ACKNOWLEDGED` or `RESOLVED`) or acceptance (already `RESOLVED`) returns existing record with 0 version increments and 0 events.
+    - Strictly dispatched collected events post-commit.
+  - `apps/api/src/disruption/api/disruption.service.spec.ts`:
+    - Verified acknowledge and accept transitions, version increments, and post-commit dispatch.
+    - Verified idempotent replays emit 0 events and 0 version increments.
+
+- **T029 [US2] Refund Settlement Booking Transitions & Separate `refund.settled` Fact**:
+  - `apps/api/src/refund-settlement/refund-settlement.module.ts`:
+    - Imported `BookingStateModule` (never `BookingLifecycleModule`) and `DomainEventsModule`.
+  - `apps/api/src/booking-lifecycle/booking-lifecycle.service.ts`:
+    - Added `updateBookingRefundStatus`: enforces no-op status guard (returns 0 count if already in target status), advances `Booking.version` by 1 on actual transition, and collects `BookingRefundUpdatedEvent`.
+  - `apps/api/src/refund-settlement/refund-settlement.service.ts`:
+    - Injected `BookingLifecycleService` and `BookingEventPublisherService`.
+    - Produced authoritative financial fact `RefundSettledEvent` (`refund.settled`) directly on eligible non-replay success branch.
+    - Delegated booking status transitions (cumulative refund complete or failure needs attention) to `this.bookingLifecycleService.updateBookingRefundStatus`.
+    - If refund succeeds with no booking state change, emits `refund.settled` without a booking event or version bump.
+    - Strictly dispatched collected events post-commit.
+  - `apps/api/src/refund-settlement/refund-settlement.service.spec.ts`:
+    - Verified `refund.settled` and `booking.refund.updated` emission, version increments, and no-op guards.
+
+- **T030 [US2] Payment Refund Manual Retry Reset**:
+  - `apps/api/src/payment/payment.module.ts`:
+    - Imported `BookingStateModule` and `DomainEventsModule`.
+  - `apps/api/src/payment/payment-refund.service.ts`:
+    - Injected `BookingLifecycleService` and `BookingEventPublisherService`.
+    - In `resolveFailedRefundManually` (`RETRY_WITH_FRESH_KEY`): delegated booking reset to `CANCELLED_PENDING_REFUND` through `this.bookingLifecycleService.updateBookingRefundStatus` within the retry transaction.
+    - Atomically incremented `Booking.version` by 1 and collected `BookingRefundUpdatedEvent`.
+    - Strictly dispatched collected events post-commit. Rollback discards events.
+  - `apps/api/src/payment/payment-refund.service.spec.ts`:
+    - Verified manual retry reset, version increment, event collection, and post-commit dispatch.
+
+- **Verification**:
+  - `pnpm exec eslint "apps/api/**/*.ts" --max-warnings 0` passed (0 errors, 0 warnings).
+  - `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` passed (0 errors).
+  - `pnpm --filter @api/backend test -- apps/api/src/disruption/ apps/api/src/refund-settlement/ apps/api/src/payment/ apps/api/src/booking-lifecycle/` passed (36 suites, 339/339 tests passed, exit code 0).
+  - Slice 6 (Tasks T031–T034) remains unstarted.
+
+### Feature 024 — Event-Driven Module Deepening: Phase 4 Slice 4 (Tasks T024, T025, T026) Completed (2026-09-17)
+
+- **T024 [US2] Saga Post-Commit Event Dispatch**:
+  - `apps/api/src/payment-fulfillment/payment-fulfillment.saga.ts`:
+    - Updated confirmation path to invoke `this.bookingLifecycleService.confirmBooking(canonicalBooking.id, pnr, rawOrder.id, snapshotOutcome.flightSnapshot, snapshotOutcome.passengerSnapshot, tx, eventContext)`.
+    - In `executeConfirmPayment`: Wrapped post-commit event dispatch in `try/catch` to isolate dispatcher/listener failures, guaranteeing payment confirmation succeeds and cannot trigger compensation or reject to caller.
+    - Verified zero direct projection calls remain in `PaymentFulfillmentSaga`.
+  - `apps/api/src/payment-fulfillment/payment-fulfillment.saga.spec.ts`:
+    - Wired `mockPublisher` (`createContext`, `publish`) in test setup.
+    - Verified collected events are published only after outer transaction commits.
+    - Proved publisher/listener failure cannot trigger compensation or fail confirmed payment.
+
+- **T025 [US2] Booking Recovery Service Lifecycle Integration**:
+  - `apps/api/src/booking-lifecycle/booking-lifecycle.module.ts`:
+    - Imported `DomainEventsModule` from `@/domain-events/domain-events.module`.
+  - `apps/api/src/booking-lifecycle/booking-recovery.service.ts`:
+    - Removed `BookingAgentProjectionService` from imports and constructor. Injected `@Optional() private readonly publisher?: BookingEventPublisherService`.
+    - Rewired all 4 recovery branches in `reconcileBookingIfStale`:
+      - Branch 1 (Verified capture + Duffel order): Atomic transaction commits booking `CONFIRMED` (via `confirmBooking`) + payment `SUCCEEDED`. Post-commit `publisher.publish`.
+      - Branch 2 (Verified non-capture / voided hold): Atomic transaction commits booking `FAILED` (via `failBooking(CAPTURE_FAILED)`) + payment `CANCELLED`. Post-commit `publisher.publish`.
+      - Branch 3 (Captured without Duffel order): Atomic transaction commits booking `FAILED` (via `failBooking(SYSTEM_ERROR)`). Post-commit `publisher.publish`. Automated refund triggered strictly *outside* transaction.
+      - Branch 4 (No-payment branch): Atomic transaction commits booking `FAILED` (via `failBooking(BOOKING_TIMEOUT)`). Post-commit `publisher.publish`.
+    - Removed all 4 direct calls to `BookingAgentProjectionService`.
+  - `apps/api/src/booking-lifecycle/booking-recovery.service.spec.ts`:
+    - Replaced projection mock with `mockPublisher`.
+    - Verified all 4 recovery branches commit atomically, collect events, publish post-commit, zero projection calls, and rollback publishes zero events.
+
+- **T026 [US2] Cancellation Service Lifecycle & Event Routing**:
+  - `apps/api/src/cancellation/cancellation.module.ts`:
+    - Replaced `AgentGatewayModule` with `BookingStateModule` and `DomainEventsModule`.
+    - Zero imports of `BookingLifecycleModule` or `AgentGatewayModule`.
+  - `apps/api/src/booking-lifecycle/booking-lifecycle.service.ts`:
+    - Added `claimCancellation(bookingId, userId, staleThreshold, tx?, context?)`:
+      - Invariant: Increments `version` and emits `BookingCancellationPendingEvent` ONLY when business status transitions to `CANCELLATION_PENDING` (from `CONFIRMED` or `COMPLETED`).
+      - Invariant: Refreshing a stale `CANCELLATION_PENDING` lease does NOT increment `version` and emits ZERO events.
+      - Invariant: Replay/no-op returns `{ count: 0 }` with ZERO events.
+    - Added `cancelBooking(bookingId, cancellationStatus, refundAmount, disruptionResolution?, tx?, context?)`:
+      - Increments `Booking.version` atomically, updates status (`CANCELLED_PENDING_REFUND` or `CANCELLED_NO_REFUND`), resolves active disruption if present (`RESOLVED`, `BOOKING_CANCELLED`, `TRAVELLER`), and emits `BookingCancelledEvent`.
+      - Returns mutation counts and disruption revision metadata.
+  - `apps/api/src/cancellation/cancellation.service.ts`:
+    - Completely removed `BookingAgentProjectionService` from imports and constructor.
+    - Injected `BookingLifecycleService` and `BookingEventPublisherService`.
+    - Claim Acquisition (`CANCELLATION_PENDING`): wrapped in `prisma.$transaction`, delegates to `bookingLifecycleService.claimCancellation`, and flushes `BookingCancellationPendingEvent` strictly post-commit.
+    - Final Cancellation: delegates to `bookingLifecycleService.cancelBooking` within outer transaction, atomically executes obligation upsert, obligation audit log, disruption audit event, and flushes `BookingCancelledEvent` strictly post-commit.
+    - Guaranteed zero calls to `BookingAgentProjectionService`.
+    - Guaranteed zero events published on transaction rollback.
+  - **Verification**:
+    - `pnpm --filter @api/backend test -- apps/api/src/payment-fulfillment/payment-fulfillment.saga.spec.ts --runInBand` (44/44 tests passed, exit code 0).
+    - `pnpm --filter @api/backend test -- apps/api/src/booking-lifecycle/booking-recovery.service.spec.ts --runInBand` (10/10 tests passed, exit code 0).
+    - `pnpm --filter @api/backend test -- apps/api/src/cancellation/cancellation.service.spec.ts --runInBand` (53/53 tests passed, exit code 0).
+    - `pnpm --filter @api/backend test -- apps/api/src/booking-lifecycle/booking-lifecycle.service.spec.ts --runInBand` (42/42 tests passed, exit code 0).
+    - `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` (0 errors, exit code 0).
+
+### Feature 024 — Event-Driven Module Deepening: Phase 4 Slice 3 (Tasks T021, T022, T023) Completed (2026-09-17)
+
+- **T021 [US2] Cycle-Scoped Promise Hydrator**:
+  - Implemented `BookingEventHydratorService` in `apps/api/src/domain-events/booking-event-hydrator.service.ts`:
+    - Cycle-scoped in-flight deduplication cache (`Map<string, Promise<CoherentBookingSnapshot | null>>`) keyed by `bookingId`.
+    - Concurrent callers in the same tick / cycle share single database query promise to `prisma.booking.findUnique`.
+    - Automatically cleans up via `.finally()` upon resolution or rejection, preventing memory leaks or stale cross-cycle caches.
+    - Hydrates coherent snapshot: booking row, latest active itinerary revision (`orderBy: { version: 'desc' }, take: 1`), ordered flight segments (`orderBy: { globalOrder: 'asc' }`), and passenger snapshot.
+  - Exported from `domain-events/index.ts` and provided/exported in `DomainEventsModule`.
+  - Unit tests in `apps/api/src/domain-events/booking-event-hydrator.service.spec.ts` (7/7 passed, exit code 0).
+- **T022 [US2] Safe Projection Service & Guarded Repository**:
+  - Implemented `BookingProjectionService` in `apps/api/src/booking-projection/booking-projection.service.ts`:
+    - Extracted safe mapping logic from legacy `BookingAgentProjectionService`.
+    - Enforces strict invariant **No Stale Fallback**: Throws `MalformedRevisionError` when authoritative revision is empty or malformed; strictly prohibits silent fallback to stale initial `flightSnapshot`. Fallback to `flightSnapshot` is permitted only when no itinerary revision exists.
+    - Sanitizes PII allowlist: outputs only public assistant-safe flight fields.
+  - Implemented `BookingProjectionRepository` in `apps/api/src/booking-projection/booking-projection.repository.ts`:
+    - Atomic PostgreSQL upsert via `$executeRaw`: `INSERT INTO booking_agent_projections ... ON CONFLICT ("bookingId") DO UPDATE ... WHERE booking_agent_projections.source_version < EXCLUDED.source_version`.
+    - Stale or out-of-order deliveries (`newSourceVersion <= storedSourceVersion`) are ignored, returning `{ outcome: 'STALE_IGNORED' }`.
+    - Winner `agentReference` is immutable: updates never alter existing `agentReference`.
+    - Added helper query methods: `findByBookingId` and `findByReferenceAndUserId`.
+  - Unit tests in `booking-projection.service.spec.ts` (17/17 passed) and `booking-projection.repository.spec.ts` (10/10 passed).
+- **T023 [US2] Thin Booking Listener, Metrics & Module Composition**:
+  - Implemented `BookingProjectionMetrics` in `apps/api/src/booking-projection/booking-projection.metrics.ts`:
+    - Bounded counters: `booking_projection_events_total` with `eventName` and outcome status (`SUCCESS`, `ERROR`, `STALE_IGNORED`).
+    - Latency tracker: `booking_projection_duration_ms` measuring processing latency.
+    - Safe labels: strictly zero PII, zero booking IDs, zero user IDs.
+  - Implemented `BookingProjectionListener` in `apps/api/src/booking-projection/booking-projection.listener.ts`:
+    - Subscribes via `@OnEvent('booking.*')` (strictly ignores `refund.settled`).
+    - Flow: hydrate snapshot -> extract safe projection -> atomic guarded upsert with hydrated `snapshot.version`.
+    - Listener Error Isolation: wraps execution in `try/catch`, logs structured errors (`bookingId`, `eventId`, `sourceVersion`), records `ERROR` metric, never throws or bubbles unhandled rejections to Node process.
+    - Records latency in `finally`.
+  - Created `BookingProjectionModule` in `apps/api/src/booking-projection/booking-projection.module.ts`:
+    - Imports `PrismaModule`, `DomainEventsModule`.
+    - Provides: `BookingEventHydratorService`, `BookingProjectionService`, `BookingProjectionRepository`, `BookingProjectionListener`, `BookingProjectionMetrics`.
+    - Exports: `BookingProjectionService`, `BookingProjectionRepository`, `BookingEventHydratorService`.
+  - Unit tests in `booking-projection.listener.spec.ts` (13/13 passed) and `booking-projection.metrics.spec.ts` (8/8 passed).
+- **Verification**:
+  - ESLint: `pnpm exec eslint "apps/api/**/*.ts" --max-warnings 0` passed (exit code 0).
+  - Typecheck: `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` passed (exit code 0).
+  - Jest Unit: `booking-event-hydrator.service.spec.ts` passed (7/7 passed, exit code 0).
+  - Jest Unit: `apps/api/src/booking-projection/` passed (48/48 passed, exit code 0).
+  - Producer files (`PaymentFulfillmentSaga`, `BookingRecoveryService`, `CancellationService`, etc.) remain untouched for Slice 4.
+
+### Feature 024 — Event-Driven Module Deepening: Phase 4 Slice 2 (Tasks T018, T019, T020) Completed (2026-09-17)
+
+- **T018 [US2] Transaction Context & Safe Postcommit Publisher**:
+  - Implemented `BookingEventPublisherService` in `apps/api/src/domain-events/booking-event-publisher.service.ts`:
+    - Injected with `@Optional() EventEmitter2` falling back to `new EventEmitter2()`.
+    - Defined `TransactionEventContext` interface (`{ readonly tx: Prisma.TransactionClient; readonly events: DomainEventBase[]; }`) and `createContext(tx)` factory.
+    - Implemented safe `publish(events)` method mapping 11 booking events and `refund.settled` to exact contract event names via `resolveEventName`.
+    - Dispatch Error Isolation: Catches both synchronous and asynchronous listener rejections via `try/catch` and logs via NestJS `Logger`, guaranteeing listener errors never abort transactions or reject to callers.
+  - Created and exported `DomainEventsModule` in `apps/api/src/domain-events/domain-events.module.ts`.
+  - Re-exported publisher, context, and module in `apps/api/src/domain-events/index.ts`.
+  - Unit tests in `booking-event-publisher.service.spec.ts` (19/19 tests passed, 38/38 total in `domain-events`) asserting context isolation, rollback discard, retry collector isolation, dispatch error isolation, and payload forwarding.
+- **T019 [US2] `BookingStateModule` Acyclic Extraction**:
+  - Created `BookingStateModule` in `apps/api/src/booking-lifecycle/booking-state.module.ts` importing `PrismaModule` and `DomainEventsModule`, providing and exporting `BookingLifecycleService`.
+  - Rewired `BookingLifecycleModule` in `apps/api/src/booking-lifecycle/booking-lifecycle.module.ts` to import and re-export `BookingStateModule`, removing direct `BookingLifecycleService` provider registration while retaining `BookingRecoveryService` + Stripe/Duffel/refund dependencies.
+  - Updated `apps/api/test/module-deepening.e2e-spec.ts` with Section 6:
+    - Verifies `BookingLifecycleService` is registered strictly once across `AppModule` via `BookingStateModule`.
+    - Verifies identical singleton resolution across `AppModule`, `BookingLifecycleModule`, and `BookingStateModule`.
+    - Verifies acyclic DI dependency: downstream modules (`CancellationModule`, `DisruptionModule`, `RefundSettlementModule`) can import `BookingStateModule` without circular reference to `BookingLifecycleModule`.
+    - Updated Section 5 phase invariants: accepted Slice 2 deliverables, guarding Slice 3 tokens against premature leaks.
+- **T020 [US2] Versioned Lifecycle Mutations & Guarded Events**:
+  - Injected `BookingEventPublisherService` into `BookingLifecycleService`.
+  - Added `context?: TransactionEventContext` support across core lifecycle methods:
+    - `createBooking`: starts at `version = 1`, emits `BookingCreatedEvent`. Idempotency replay and `paymentId` attachment emit 0 events without version bump.
+    - `updateToConfirmed` / `confirmBooking`: guarded to `PROCESSING` or eligible `FAILED`; increments `Booking.version` atomically by 1 (`version: { increment: 1 }`), constructs `BookingConfirmedEvent`.
+    - `updateToFailed` / `failBooking`: guarded to `PROCESSING`; increments `Booking.version` atomically by 1, constructs `BookingFailedEvent`. Rejects mutations on already `CONFIRMED`/`COMPLETED` with 0 events.
+    - `checkAndCompleteBooking` / `completeBooking`: guarded to `CONFIRMED` and past departure/arrival; increments `Booking.version` atomically by 1, constructs `BookingCompletedEvent`.
+    - `applyPipelineOutcome`: dispatches to versioned confirmed/failed handlers with transaction context.
+  - Transaction Ownership Protocol: caller-provided `context` appends events to `context.events` without dispatching (caller flushes post-commit); standalone execution wraps in `prisma.$transaction` and immediately flushes post-commit via `publisher.publish(events)`.
+  - Unit tests in `booking-lifecycle.service.spec.ts` (33/33 tests passed, exit code 0).
+- **Verification**:
+  - Jest Unit: `apps/api/src/domain-events/` (38/38 passed)
+  - Jest Unit: `apps/api/src/booking-lifecycle/booking-lifecycle.service.spec.ts` (33/33 passed)
+  - Jest E2E: `apps/api/test/module-deepening.e2e-spec.ts` (22/22 passed, exit code 0)
+  - Typecheck: `tsc -p tsconfig.json --noEmit` passed (exit code 0)
+  - Linter: `eslint "src/**/*.ts" "../../packages/shared/**/*.ts" --max-warnings 0` passed (0 errors, 0 warnings)
+
+### Feature 024 — Event-Driven Module Deepening: Phase 4 Slice 1 (Tasks T015, T016, T017) Completed (2026-09-17)
+
+- **T015 [US2] Resolve & Document `@nestjs/event-emitter`**:
+  - Installed `@nestjs/event-emitter@^2.1.1` in `apps/api/package.json` compatible with installed `@nestjs/core: ^10.0.0` and `@nestjs/common: ^10.0.0` without upgrading core NestJS packages.
+  - Documented single-root `EventEmitterModule.forRoot()` configuration and execution constraints (in-process, non-durable event delivery, post-commit dispatch only, listener exception isolation) in `context/library-docs.md` and `context/code-standards.md`.
+- **T016 [US2] Prisma Schema Versioning, Migration & E2E Test**:
+  - Added `version Int @default(1)` to `Booking` and `sourceVersion Int @default(0) @map("source_version")` to `BookingAgentProjection` in `apps/api/prisma/schema.prisma`.
+  - Created migration `20260915000000_booking_projection_versions/migration.sql` with non-null defaults for both tables.
+  - Deployed migration and verified against real PostgreSQL in `apps/api/test/booking-projection-version-migration.e2e-spec.ts` (5/5 passed, exit code 0).
+  - Verified default values on newly created rows, existing foreign key/one-to-one reference preservation, and legacy-writer update compatibility leaving `Booking.version` intact.
+  - Recorded migration test exit codes in `specs/024-event-driven-module-deepening/validation-evidence.md`.
+- **T017 [US2] Passive Domain Event Base & Catalog**:
+  - Defined passive, behavior-free `DomainEventBase` in `apps/api/src/domain-events/domain-event.base.ts`.
+  - Defined all 11 booking domain event classes and constants in `apps/api/src/domain-events/booking.events.ts` (`booking.created`, `booking.confirmed`, `booking.failed`, `booking.completed`, `booking.recovery.resolved`, `booking.cancellation.pending`, `booking.cancelled`, `booking.disruption.synced`, `booking.disruption.acknowledged`, `booking.disruption.accepted`, `booking.refund.updated`).
+  - Defined `refund.settled` event and constants in `apps/api/src/domain-events/refund.events.ts` without fabricating `bookingId` for unlinked refunds.
+  - Exported all event types and constants via `apps/api/src/domain-events/index.ts`.
+  - Implemented comprehensive unit tests in `apps/api/src/domain-events/domain-events.spec.ts` (19/19 passed, exit code 0) verifying zero methods, plain JSON serializability, zero customer PII, zero supplier payloads, and exact naming contracts.
+- **Verification**:
+  - Jest E2E (`booking-projection-version-migration.e2e-spec.ts`): 5/5 passed.
+  - Jest Unit (`domain-events.spec.ts`): 19/19 passed.
+  - Typecheck: `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` passed (exit code 0).
+  - Linter: `pnpm exec eslint "apps/api/**/*.ts" --max-warnings 0` passed (0 errors, 0 warnings).
+
+
+- **T013 [US1] Comprehensive PostgreSQL E2E Failure, Resumption & Compensation Suite**:
+  - Implemented comprehensive real PostgreSQL/HTTP tests in `apps/api/test/payment-fulfillment.e2e-spec.ts` (25/25 tests passing, 0 failures, exit code 0) and extended `apps/api/test/payment-idempotency.e2e-spec.ts` (8/8 tests passing, 0 failures, exit code 0).
+  - Covered all required test scenarios and failure matrices:
+    1. **Fenced Checkpoint Resumption**:
+       - `stripe_authorized`: skips hold auth (`retrievePaymentIntent` called 0 times), proceeds to Duffel order, Stripe capture, and canonical booking confirmation.
+       - `duffel_order_created`: skips hold auth and Duffel order, proceeds to Stripe capture and canonical booking confirmation.
+       - `captured`: completes canonical booking confirmation with dual ledger entries without re-invoking Stripe capture or Duffel order.
+    2. **Duplicate Remote Effects & Replay Invariants**:
+       - Active in-flight payment request returns 409 Conflict with zero provider calls.
+       - Completed payment request replays identical cached response with HTTP 200 and zero duplicate provider calls.
+    3. **Atomic Completion & Transaction Rollback**:
+       - Verified Payment `SUCCEEDED`, Booking `CONFIRMED`, and balanced `CUSTOMER_RECEIVABLE` (DEBIT) / `PLATFORM_REVENUE` (CREDIT) ledger entries commit together in one transaction.
+       - Post-capture DB error rolls back transaction completely; capture is NEVER canceled and state remains recoverable.
+    4. **Stale Owner Takeover & CAS Eviction**:
+       - Lease takeover before hold authorization, before Duffel order, before payment capture, during compensation, and after 25s background handoff.
+       - Losing ownership immediately halts execution and prevents further provider calls or state mutation.
+    5. **Capture Throw Matrix**:
+       - Capture throws, status check reveals `captured`: proceeds to complete canonical booking.
+       - Capture throws, status check reveals `authorized` or `voided`: cancels Duffel order, voids hold, marks booking `FAILED`.
+       - Capture throws, status check unavailable / timed out: returns HTTP 502 with `bookingStatus: 'PROCESSING'`; does NOT cancel Duffel order or void hold, leaving state recoverable.
+    6. **Failed Compensation & DB Failure**:
+       - Duffel order fails, hold voiding fails: logs error, safely completes cancellation without leaking internal stack traces.
+       - DB failure after capture: capture is preserved, state remains recoverable at `captured` checkpoint.
+  - **Verification**:
+    - `pnpm --filter @api/backend test:e2e -- payment-fulfillment.e2e-spec.ts` passed (25/25 tests, exit code 0).
+    - `pnpm --filter @api/backend test:e2e -- payment-idempotency.e2e-spec.ts` passed (8/8 tests, exit code 0).
+
+### Feature 024 — Event-Driven Module Deepening: Phase 3 Slice 4 (Task T014) Completed (2026-09-17)
+
+- **T014 [US1] Nest Composition Architecture Gate**:
+  - Implemented comprehensive NestJS composition and dependency injection architecture gate in `apps/api/test/module-deepening.e2e-spec.ts`.
+  - Verified 5 core architecture invariants:
+    1. **Gateway Port Resolution**: `PAYMENT_GATEWAY_PORT` and `FULFILLMENT_GATEWAY_PORT` resolve to `StripePaymentAdapter` and `DuffelFulfillmentAdapter` across `AppModule`, scoped `PaymentFulfillmentModule`, and standalone fixtures.
+    2. **Single Provider Registration**: `PaymentMethodService` is registered strictly once in `PaymentMethodsModule` across all active modules in `AppModule`, with identical singleton resolution across all consumers.
+    3. **Zero Circular Dependencies**: `PaymentModule` imports `PaymentFulfillmentModule`, while `PaymentFulfillmentModule` contains zero direct or transitive imports of `PaymentModule` (verified via static metadata and runtime NestContainer graph).
+    4. **Direct Wrapper Retention**: `BookingRecoveryService` directly injects `StripeService` and `DuffelService` without routing through saga ports.
+    5. **Strict Phase Invariants**: Zero Phase 4 items (`EventEmitterModule`, `BookingProjectionModule`, `DomainEventsModule`) present in US1 runtime composition.
+  - **Verification**:
+    - E2E Test Suite: `pnpm --filter @api/backend test:e2e -- module-deepening.e2e-spec.ts` passed (15/15 tests, 56.3s, exit code 0).
+    - Typecheck: `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` passed (exit code 0).
+    - Linter: `pnpm exec eslint` passed (0 errors, exit code 0).
+
+### Feature 024 — Event-Driven Module Deepening: Phase 3 Slice 3 (Task T012) Completed (2026-09-17)
+
+- **T012 [US1] Payment Confirmation Extraction & Test Suite Convergence**:
+  - Fully removed extracted payment confirmation orchestration from `apps/api/src/payment/payment.service.ts`.
+  - Migrated confirmation test suites to `PaymentFulfillmentSaga` ownership:
+    - `apps/api/src/payment/payment-ancillary-order-recovery.spec.ts` (13/13 tests pass)
+    - `apps/api/src/payment/payment-ancillary-final-fixes.spec.ts` (13/13 tests pass)
+    - `apps/api/src/payment/payment-ancillary-pipeline.spec.ts` (passed)
+    - Full payment suite: `apps/api/src/payment/` (20 suites, 137 tests pass)
+    - Full fulfillment suite: `apps/api/src/payment-fulfillment/` (2 suites, 88 tests pass)
+  - Resolved state machine transition and reference aliasing issues in `apps/api/src/payment-fulfillment/payment-fulfillment.saga.ts` and `apps/api/src/payment/payment-ancillary-order-recovery.spec.ts`:
+    - Captured `previousPaymentStatus` prior to database mutations and transactions in compensation and captured flows.
+    - Used shallow clone copies in test harness to isolate in-memory state mutations from saga internal references.
+    - Cleaned up unused imports/variables across test specs satisfying strict zero-warning lint gate.
+  - Addressed all Standards and Spec code review findings:
+    - Restored strictly typed `handleBackgroundError` signature in saga, eliminating synthetic fallback ownership and type assertion.
+    - Eliminated `as any` casting in order-recovery harness.
+    - Migrated all 13 confirmation tests (5 passenger validator tests, 4 completed replay tests, 1 post-capture sync test, 3 background error tests) from payment service spec to `payment-fulfillment.saga.spec.ts`.
+  - Addressed Post-PR Review & CI E2E Feedback:
+    - Moved local `recheckedPayment` and `hasExactBoundSelection` validation outside `try` block wrapping `createOrder` in saga (Issue 1), ensuring local invariant errors throw directly without false provider compensation.
+    - Updated HTTP 202 timeout handoff response contract in saga (removed extraneous `success: true`).
+    - Aligned E2E cancel spy assertions with `StripePaymentAdapter.voidHold` idempotency voidKey (`<intentId>-stripe-void`).
+  - **Verification**:
+    - ESLint: `pnpm exec eslint "apps/api/**/*.ts" --max-warnings 0` passed (0 warnings, 0 errors).
+    - Typecheck: `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` passed (0 errors).
+    - All payment & fulfillment unit test suites passed under network guard (22 suites, 225 tests).
+    - All E2E test suites passed (`payment-fulfillment.e2e-spec.ts`, `booking-passenger-final-validation.e2e-spec.ts`).
+
+### Feature 024 — Event-Driven Module Deepening: Phase 3 Slice 2 (Task T011) Completed (2026-09-17)
+
+- **T011 [US1] PaymentFulfillmentModule Creation & PaymentController Delegation**:
+  - Created `PaymentFulfillmentModule` in `apps/api/src/payment-fulfillment/payment-fulfillment.module.ts`:
+    - Imports: `IdempotencyModule`, `StripeModule`, `DuffelModule`, `PaymentMethodsModule`, `BookingLifecycleModule`, `BookingIntentModule`, `PrismaModule`, `AuditModule`.
+    - Providers: `PaymentFulfillmentSaga`.
+    - Exports: `PaymentFulfillmentSaga`.
+    - Preserved critical architectural invariant: `PaymentFulfillmentModule` never imports `PaymentModule`.
+  - Updated `PaymentModule` in `apps/api/src/payment/payment.module.ts`:
+    - Imported `PaymentFulfillmentModule` and added to `imports` array.
+  - Updated `PaymentController` in `apps/api/src/payment/payment.controller.ts`:
+    - Injected `PaymentFulfillmentSaga` into constructor.
+    - Updated `confirmPayment` to delegate directly to `paymentFulfillmentSaga.confirmPayment(dto, idempotencyKey, req.user.id)` with HTTP 202 status on `PENDING` response.
+  - **Verification**:
+    - TypeScript compilation: `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` passed with 0 errors.
+    - Linter: `pnpm exec eslint` on modified files passed with 0 warnings/errors.
+    - Unit specs: 31/31 passed in `payment-fulfillment.saga.spec.ts`.
+
+### Feature 024 — Event-Driven Module Deepening: Phase 3 Slice 2 (Tasks T009, T010) Completed (2026-09-16)
+
+- **T009 [US1] PaymentMethodsModule Extraction**:
+  - Created `PaymentMethodsModule` in `apps/api/src/payment/payment-methods.module.ts` importing `PrismaModule`, providing and exporting `PaymentMethodService`.
+  - Refactored `PaymentModule` in `apps/api/src/payment/payment.module.ts`: imported `PaymentMethodsModule`, removed `PaymentMethodService` from `providers` (preventing duplicate provider instantiation), and re-exported `PaymentMethodsModule` and `PaymentMethodService` for backward compatibility.
+  - Verified `PaymentMethodService` unit tests remain 100% intact (3/3 tests pass).
+- **T010 [US1] PaymentFulfillmentSaga Implementation & Unit Specs**:
+  - Implemented `PaymentFulfillmentSaga` in `apps/api/src/payment-fulfillment/payment-fulfillment.saga.ts` with provider-blind ports (`PAYMENT_GATEWAY_PORT`, `FULFILLMENT_GATEWAY_PORT`) and zero direct SDK dependencies.
+  - Enforced preflight ownership assertion via `PortInvocationControl = { beforeInvoke: () => this.idempotency.assertOwned(ownership) }` on every port call (`authorizeHold`, `createOrder`, `capturePayment`, `voidHold`, `cancelOrder`, `retrieveOrderSnapshot`), halting immediately without downstream mutations upon lease loss.
+  - Implemented 25-second handoff returning HTTP 202 (`PENDING`) with pollUrl, while maintaining the same execution promise in the background and invoking `handleBackgroundError` under the retained `lockedAt` ownership lease upon failure.
+  - Implemented 4-stage orchestration pipeline: `started` -> `stripe_authorized` -> `duffel_order_created` -> `captured` -> `completed`, with atomic terminal completion via `idempotency.completeSagaKeyAtomic`.
+  - Implemented full compensation matrix: Duffel order failure voids hold; capture failure reconciles intent and compensates (void hold + cancel order) if known failed, or safely preserves for recovery if nonfinal/unknown.
+  - Preserved strict invariant: database transactions never span external provider calls.
+  - Added comprehensive unit test suite in `apps/api/src/payment-fulfillment/payment-fulfillment.saga.spec.ts` (20/20 unit tests pass).
+- **Verification**:
+  - Unit tests: 23/23 tests pass across `payment-method.service.spec.ts` and `payment-fulfillment.saga.spec.ts` under CI network guard.
+  - Lint: 0 ESLint errors/warnings (`pnpm exec eslint "apps/api/**/*.ts" --max-warnings 0`).
+  - Typecheck: 0 TypeScript compiler errors (`pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`).
+
+### Feature 024 — Event-Driven Module Deepening: Phase 3 Slice 2 (Tasks T007, T008) Completed (2026-09-16)
+
+- **T007 [US1] Stripe Payment Adapter & Module Wiring**:
+  - Implemented `StripePaymentAdapter` in `apps/api/src/common/stripe-payment.adapter.ts` implementing `PaymentGatewayPort` from `@/payment-fulfillment/ports`.
+  - Injected `StripeService` and bounded admission with `BoundedSemaphore` (`activeLimit=20`, `queueLimit=100`, `timeoutMs=5000` with env var overrides `STRIPE_ADMISSION_ACTIVE_LIMIT`, `STRIPE_ADMISSION_QUEUE_LIMIT`, `STRIPE_ADMISSION_TIMEOUT_MS`).
+  - Implemented `authorizeHold`: acquires permit, enforces `PortInvocationControl.beforeInvoke()`, calls `retrievePaymentIntent`, normalizes status (`requires_capture` -> `authorized`, `succeeded` -> `captured`, `canceled` -> `voided`, others -> `nonfinal`), and releases permit in `finally`.
+  - Implemented `capturePayment`: passes `intentId`, `undefined`, and `captureKey`, normalizes captured amount (`amount_received ?? amount`), and releases permit in `finally`.
+  - Implemented `voidHold`: cancels payment intent and returns void outcome, releasing permit in `finally`.
+  - Enforced admission guarantees: queue full or timeout rejects before invoking `beforeInvoke` or Stripe SDK; failed `beforeInvoke` immediately releases permit without invoking SDK.
+  - Wired `StripeModule` in `apps/api/src/common/stripe.module.ts`: registered `StripePaymentAdapter`, bound `PAYMENT_GATEWAY_PORT` to `StripePaymentAdapter`, and exported both alongside `StripeService`.
+  - **Verification**:
+    - Unit tests: 26/26 passed with CI node network guard (`pnpm --filter @api/backend test -- apps/api/src/common/stripe-payment.adapter.spec.ts`).
+    - Typecheck: `tsc -p tsconfig.json --noEmit` passed with 0 errors.
+    - Linter: `eslint apps/api/src/common/ --max-warnings 0` passed with 0 warnings.
+
+- **T008 [US1] Duffel Fulfillment Adapter & Module Wiring**:
+  - Implemented `DuffelFulfillmentAdapter` in `apps/api/src/duffel/duffel-fulfillment.adapter.ts` implementing `FulfillmentGatewayPort` from `@/payment-fulfillment/ports`.
+  - Injected `DuffelService` and wired `BoundedSemaphore` admission control (`activeLimit=10`, `queueLimit=100`, `timeoutMs=5000` default from environment).
+  - Implemented privacy helpers:
+    - `redactDuffelOrder`: Clones Duffel order and sanitizes passenger PII (`email`, `born_on`, `given_name`, `family_name`, `phone_number`) to `'REDACTED'`.
+    - `enrichRedactedDuffelOrder`: Restores passenger names, DOB, contact email and phone from caller enrichment inputs matching by id or index.
+  - Implemented `createOrder`, `cancelOrder`, and `retrieveOrderSnapshot` with `PortInvocationControl.beforeInvoke()` pre-flight lease checking.
+  - Fallback mechanism in `retrieveOrderSnapshot`: If live `retrieveCompleteOrder` fails, catches and reconstructs coherent snapshots via `enrichRedactedDuffelOrder` on `fallbackEvidence`.
+  - Wired `DuffelModule` in `apps/api/src/duffel/duffel.module.ts`: bound `FULFILLMENT_GATEWAY_PORT` to `DuffelFulfillmentAdapter` and exported both.
+  - **Verification**:
+    - Unit tests: 12/12 passed with CI node network guard (`pnpm --filter @api/backend test -- apps/api/src/duffel/duffel-fulfillment.adapter.spec.ts`).
+    - Typecheck: `tsc -p tsconfig.json --noEmit` passed with 0 errors.
+    - Linter: `eslint apps/api/src/duffel/ --max-warnings 0` passed with 0 warnings.
+
+### Feature 024 — Event-Driven Module Deepening: Phase 3 Slice 1 (Tasks T005, T006) Completed (2026-09-16)
+
+- **T005 [US1]**: Implemented saga lease assertion, fenced checkpoint progression, and atomic terminal completion in `PaymentIdempotencyService`:
+  - Added `SagaOwnership` and `SagaCheckpoint` types with ordered progression (`started` -> `stripe_authorized` -> `duffel_order_created` -> `captured` -> `completed`).
+  - Added `assertOwned(ownership)`: predicates on full key, customerId, requestPath, requestHash, lockedAt, and incomplete response; raises 409 `ConflictException` on stolen/cleared/deleted/completed ownership.
+  - Added `advanceSagaCheckpoint(ownership, target)`: enforces monotonic advancement and same-stage no-ops while rejecting checkpoint regressions; executes atomic `updateMany` with predecessor checking.
+  - Added `completeSagaKeyAtomic(ownership, code, body)`: executes single atomic `updateMany` setting `recoveryPoint: completed`, response code, response body, and clearing `lockedAt` to null.
+  - Added 18 unit tests in `payment-idempotency.service.spec.ts` covering normal advancement, stale-owner takeover, post-25s background execution lease theft, and regression prevention (41/41 unit tests pass).
+- **T006 [US1]**: Defined provider-blind port interfaces and DI tokens in `apps/api/src/payment-fulfillment/ports/`:
+  - Created `payment-gateway.port.ts` and `fulfillment-gateway.port.ts` with barrel export `index.ts`.
+  - Exported DI tokens `PAYMENT_GATEWAY_PORT` and `FULFILLMENT_GATEWAY_PORT`.
+  - Guaranteed zero external SDK types, zero Nest module imports, zero `any`, and mandatory `PortInvocationControl` on all operations.
+- **Verification & Review**:
+  - API Unit Tests: 41/41 passed with CI node network guard (`pnpm --filter @api/backend test -- apps/api/src/idempotency/payment-idempotency.service.spec.ts`).
+  - E2E Characterization: 9/9 passed with CI node network guard (`pnpm --filter @api/backend test:e2e -- test/payment-fulfillment.e2e-spec.ts`).
+  - Linters & Typechecks: 0 ESLint warnings/errors; `tsc --noEmit` passed with 0 errors.
+  - Dual-Axis Review: Standards and Spec review subagents completed with 0 P0/P1 issues.
+- Phase 3 Slice 1 completed; Phase 3 Slice 2 (Tasks T007 & T008: Stripe and Duffel Adapters) is unblocked.
+
+### Feature 024 — Event-Driven Module Deepening: Phase 2 Foundation Completed (Tasks T003, T004) (2026-09-16)
+
+- **T003 [Foundation]**: Extracted `IdempotencyModule` and `PaymentIdempotencyService` into dedicated `apps/api/src/idempotency/`:
+  - Moved `PaymentIdempotencyService` and `@IdempotencyKey()` parameter decorator to `apps/api/src/idempotency/payment-idempotency.service.ts` preserving complete non-saga acquisition, lock CAS, replay detection, hash verification, and completion recording semantics verbatim.
+  - Relocated full regression test suite to `apps/api/src/idempotency/payment-idempotency.service.spec.ts` (23/23 tests pass).
+  - Maintained backward compatibility via deprecation re-export in `apps/api/src/payment/payment-idempotency.service.ts`.
+- **T004 [Foundation]**: Rewired imports and decoupled `AncillariesModule` from `PaymentModule`:
+  - `AncillariesModule` now imports `IdempotencyModule` directly; eliminated `PaymentModule` dependency completely.
+  - Created decoupling test `apps/api/src/ancillaries/ancillaries.module.spec.ts` verifying `AncillariesModule` contains 0 imports from `PaymentModule` and compiles independently.
+  - Updated `PaymentModule` to import and re-export `IdempotencyModule` without duplicate provider registration for `PaymentIdempotencyService`.
+  - Migrated all payment callers, services, controllers, and 9 test suites from legacy payment-scoped import to `@/idempotency/payment-idempotency.service`.
+- **Verification**:
+  - ESLint API: 0 warnings, 0 errors (`pnpm exec eslint "apps/api/**/*.ts" --max-warnings 0`).
+  - TypeScript API: `tsc --noEmit` passed with 0 errors (`pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`).
+  - Idempotency unit tests: 23/23 passed with CI node network guard (`pnpm --filter @api/backend test -- apps/api/src/idempotency/payment-idempotency.service.spec.ts`).
+  - Ancillaries unit tests passed across 4 suites (`pnpm --filter @api/backend test -- apps/api/src/ancillaries/`).
+  - Payment characterization E2E: 9/9 tests passed across 5 scenarios (`pnpm --filter @api/backend test -- apps/api/test/payment-fulfillment.e2e-spec.ts`).
+- Phase 2 (Foundation) completed; Phase 3 (US1: Safe payment orchestration, Tasks T005–T014) is unblocked.
+
 ### Feature 024 — Event-Driven Module Deepening: Phase 1 Setup Completed (Tasks T001, T002) (2026-09-16)
 
 - **T001 [Setup]**: Completed full static re-inventory of payment entry points, 9 direct projection calls, and booking business-state writers. Confirmed 0 drift against `contracts/booking-events.md` and `contracts/payment-fulfillment.md`. Appended formal baseline notes.
@@ -79,7 +599,7 @@
       - `AGENT_SERVICE_API_KEY`, `JWT_SECRET`, and `CLAIM_TOKEN_SECRET` fail-fast validation in Pydantic `Settings`. Empty keys abort startup immediately.
       - `GuardrailGateway.is_healthy()` contract enforcing valid `GuardrailRegistry` and compulsory production layers.
       - POST `/chat/stream` ingress fail-closed guard: returns HTTP 503 (`GUARDRAIL_GATEWAY_UNAVAILABLE`) if `guardrail_gateway` is None or degraded, with zero runner invocations.
-      - **Zero Quota Consumption on Gateway Failures**: Guardrail gateway readiness is evaluated *before* Redis quota admission in `/chat/stream`, ensuring 503 gateway errors never consume user daily or burst quotas (`test_gateway_failure_does_not_consume_quota`).
+      - **Zero Quota Consumption on Gateway Failures**: Guardrail gateway readiness is evaluated _before_ Redis quota admission in `/chat/stream`, ensuring 503 gateway errors never consume user daily or burst quotas (`test_gateway_failure_does_not_consume_quota`).
     - **Health Probe Key & Subsystem Verification**:
       - `/health/live`: Lightweight probe guaranteed HTTP 200 with zero model inference, zero guardrail checks, zero Redis/external I/O (< 10ms).
       - `/health`: Deep probe monitoring `guardrails: deterministic`, `redis`, and `nestjsApi`. Degrades status to `degraded` with `guardrails: {"status": "down"}` if gateway is None/degraded or if `AGENT_SERVICE_API_KEY`, `JWT_SECRET`, or `CLAIM_TOKEN_SECRET` are missing.
@@ -262,6 +782,7 @@
   - Issue 9 (Dynamic Test Configuration): Removed hardcoded secret literals and URLs from module import level in `test_ownership.py`; resolved dynamically via `_resolve_test_env()` using `secrets.token_hex(32)` or environment variables in `conftest.py` / `test_ownership.py`.
   - Issue 10 (Comment Quality & Rationale): Purged redundant narration comments throughout both test modules; preserved only security rationale, threat model, and invariant explanations.
   - Sanitized failure diagnostics in `tests/security/dast/test_adversarial.py` leak assertions to report only `case_id`, `mode`, and `category`, preventing sensitive fixture strings or raw text disclosure in test outputs.
+
   ### Feature 023 — Security Systems: Phase 8 Slice 1 (Task T048 Completed) (2026-09-13)
 
 - **T048 Disposable Mutation Controls & Critical Transition Verification**:

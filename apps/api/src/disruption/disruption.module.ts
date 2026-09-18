@@ -1,8 +1,8 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { PrismaModule } from '@/prisma/prisma.module';
 import { DuffelModule } from '@/duffel/duffel.module';
-import { BookingLifecycleModule } from '@/booking-lifecycle/booking-lifecycle.module';
-import { AgentGatewayModule } from '@/agent-gateway/agent-gateway.module';
+import { BookingStateModule } from '@/booking-lifecycle/booking-state.module';
+import { DomainEventsModule } from '@/domain-events/domain-events.module';
 import { SyncClaimService } from './sync/sync-claim.service';
 import { SupplierSyncService } from './sync/supplier-sync.service';
 import { ReconciliationService } from './sync/reconciliation.service';
@@ -18,8 +18,8 @@ import { DuffelEventProcessor } from './webhook/duffel-event.processor';
   imports: [
     PrismaModule,
     DuffelModule,
-    BookingLifecycleModule,
-    forwardRef(() => AgentGatewayModule),
+    BookingStateModule,
+    DomainEventsModule,
   ],
 
   controllers: [DisruptionController, TravellerDisruptionController, DuffelWebhookController],

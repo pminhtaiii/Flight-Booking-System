@@ -43,6 +43,11 @@ The AI agent on this project operates as a senior engineer. This means:
 - Use Pipes for input validation — `ValidationPipe` globally registered
 - Every controller method has a try/catch — errors are caught by a global exception filter
 - Injectable services use constructor injection — never use `new` for service instantiation
+- Domain event conventions:
+  - Behavior-free passive DTO envelopes containing typed primitive/readonly attributes.
+  - Post-commit dispatch only: emit events strictly after database transactions commit; never emit within uncommitted transaction blocks.
+  - Single-root `EventEmitterModule` registration: registered once in `AppModule` (`EventEmitterModule.forRoot({ wildcard: true, delimiter: '.', maxListeners: 20 })`), never imported into feature submodules.
+  - Async listener isolation: event listeners must catch their own asynchronous exceptions without failing committed commands or triggering compensations.
 
 ### Capability-Local Module Conventions & Anti-Cyclic Architecture
 

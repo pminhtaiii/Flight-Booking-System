@@ -1,11 +1,17 @@
 import { ConflictException, UnprocessableEntityException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { PaymentIdempotencyService } from './payment-idempotency.service';
+import {
+  PaymentIdempotencyService,
+  SagaOwnership,
+  SagaCheckpoint,
+  SAGA_CHECKPOINTS,
+} from './payment-idempotency.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 describe('PaymentIdempotencyService', () => {
   type MockIdempotencyKey = {
     findUnique: jest.Mock;
+    findFirst: jest.Mock;
     create: jest.Mock;
     update: jest.Mock;
     updateMany: jest.Mock;
@@ -21,6 +27,7 @@ describe('PaymentIdempotencyService', () => {
     mockPrisma = {
       idempotencyKey: {
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
         updateMany: jest.fn(),
@@ -353,4 +360,288 @@ describe('PaymentIdempotencyService', () => {
       expect(await service.isLocked('key-1')).toBe(false);
     });
   });
+
+  describe('SAGA_CHECKPOINTS', () => {
+    it('defines ordered saga checkpoints', () => {
+      const checkpoints: readonly SagaCheckpoint[] = SAGA_CHECKPOINTS;
+      expect(checkpoints).toEqual([
+        'started',
+        'stripe_authorized',
+        'duffel_order_created',
+        'captured',
+        'completed',
+      ]);
+    });
+  });
+
+  describe('assertOwned', () => {
+    const ownership: SagaOwnership = {
+      key: 'saga-key-1',
+      userId: 'user-1',
+      requestPath: '/api/bookings/payment/confirm',
+      requestHash: 'hash-abc',
+      lockedAt: new Date('2026-09-16T10:00:00.000Z'),
+    };
+
+    it('succeeds when key matches full ownership predicate with null responseBody', async () => {
+      mockPrisma.idempotencyKey.findFirst.mockResolvedValueOnce({ id: 'key-record-1' });
+
+      await expect(service.assertOwned(ownership)).resolves.toBeUndefined();
+
+      expect(mockPrisma.idempotencyKey.findFirst).toHaveBeenCalledWith({
+        where: {
+          key: ownership.key,
+          customerId: ownership.userId,
+          requestPath: ownership.requestPath,
+          requestHash: ownership.requestHash,
+          lockedAt: ownership.lockedAt,
+          responseBody: { equals: Prisma.DbNull },
+        },
+        select: { id: true },
+      });
+    });
+
+    it('throws ConflictException if key was deleted or cron-cleared', async () => {
+      mockPrisma.idempotencyKey.findFirst.mockResolvedValueOnce(null);
+
+      await expect(service.assertOwned(ownership)).rejects.toThrow(
+        new ConflictException('Idempotency key ownership lost'),
+      );
+    });
+
+    it('throws ConflictException if lease was stolen (lockedAt modified)', async () => {
+      // findFirst returns null because lockedAt predicate does not match stolen lease
+      mockPrisma.idempotencyKey.findFirst.mockResolvedValueOnce(null);
+
+      await expect(service.assertOwned(ownership)).rejects.toThrow(
+        new ConflictException('Idempotency key ownership lost'),
+      );
+    });
+
+    it('throws ConflictException if responseBody is already set (completed key)', async () => {
+      // findFirst returns null because responseBody is not DbNull
+      mockPrisma.idempotencyKey.findFirst.mockResolvedValueOnce(null);
+
+      await expect(service.assertOwned(ownership)).rejects.toThrow(
+        new ConflictException('Idempotency key ownership lost'),
+      );
+    });
+
+    it('throws ConflictException for post-25s background execution when ownership lost', async () => {
+      const backgroundOwnership: SagaOwnership = {
+        key: 'background-key-1',
+        userId: 'user-bg',
+        requestPath: '/api/bookings/payment/confirm',
+        requestHash: 'hash-bg',
+        lockedAt: new Date(Date.now() - 30_000), // acquired 30s ago in foreground
+      };
+      mockPrisma.idempotencyKey.findFirst.mockResolvedValueOnce(null);
+
+      await expect(service.assertOwned(backgroundOwnership)).rejects.toThrow(
+        new ConflictException('Idempotency key ownership lost'),
+      );
+    });
+  });
+
+  describe('advanceSagaCheckpoint', () => {
+    const ownership: SagaOwnership = {
+      key: 'saga-key-1',
+      userId: 'user-1',
+      requestPath: '/api/bookings/payment/confirm',
+      requestHash: 'hash-abc',
+      lockedAt: new Date('2026-09-16T10:00:00.000Z'),
+    };
+
+    it('advances checkpoint forward from started to stripe_authorized', async () => {
+      mockPrisma.idempotencyKey.findFirst.mockResolvedValueOnce({ recoveryPoint: 'started' });
+      mockPrisma.idempotencyKey.updateMany.mockResolvedValueOnce({ count: 1 });
+
+      await expect(
+        service.advanceSagaCheckpoint(ownership, 'stripe_authorized'),
+      ).resolves.toBeUndefined();
+
+      expect(mockPrisma.idempotencyKey.updateMany).toHaveBeenCalledWith({
+        where: {
+          key: ownership.key,
+          customerId: ownership.userId,
+          requestPath: ownership.requestPath,
+          requestHash: ownership.requestHash,
+          lockedAt: ownership.lockedAt,
+          responseBody: { equals: Prisma.DbNull },
+          recoveryPoint: { in: ['started'] },
+        },
+        data: {
+          recoveryPoint: 'stripe_authorized',
+        },
+      });
+    });
+
+    it('advances checkpoint forward across multiple stages with allowed predecessors', async () => {
+      mockPrisma.idempotencyKey.findFirst.mockResolvedValueOnce({ recoveryPoint: 'started' });
+      mockPrisma.idempotencyKey.updateMany.mockResolvedValueOnce({ count: 1 });
+
+      await expect(service.advanceSagaCheckpoint(ownership, 'captured')).resolves.toBeUndefined();
+
+      expect(mockPrisma.idempotencyKey.updateMany).toHaveBeenCalledWith({
+        where: {
+          key: ownership.key,
+          customerId: ownership.userId,
+          requestPath: ownership.requestPath,
+          requestHash: ownership.requestHash,
+          lockedAt: ownership.lockedAt,
+          responseBody: { equals: Prisma.DbNull },
+          recoveryPoint: { in: ['started', 'stripe_authorized', 'duffel_order_created'] },
+        },
+        data: {
+          recoveryPoint: 'captured',
+        },
+      });
+    });
+
+    it('allows same-stage no-op without modification or throwing', async () => {
+      mockPrisma.idempotencyKey.findFirst.mockResolvedValueOnce({
+        recoveryPoint: 'stripe_authorized',
+      });
+
+      await expect(
+        service.advanceSagaCheckpoint(ownership, 'stripe_authorized'),
+      ).resolves.toBeUndefined();
+      expect(mockPrisma.idempotencyKey.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('prevents checkpoint regression and throws ConflictException (e.g. captured -> stripe_authorized)', async () => {
+      mockPrisma.idempotencyKey.findFirst.mockResolvedValueOnce({
+        recoveryPoint: 'captured',
+      });
+
+      await expect(
+        service.advanceSagaCheckpoint(ownership, 'stripe_authorized'),
+      ).rejects.toThrow(ConflictException);
+      expect(mockPrisma.idempotencyKey.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('prevents regression from completed backwards and throws ConflictException', async () => {
+      mockPrisma.idempotencyKey.findFirst.mockResolvedValueOnce({
+        recoveryPoint: 'completed',
+      });
+
+      await expect(
+        service.advanceSagaCheckpoint(ownership, 'duffel_order_created'),
+      ).rejects.toThrow(ConflictException);
+      expect(mockPrisma.idempotencyKey.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('throws ConflictException if key ownership was lost prior to checkpoint advancement', async () => {
+      mockPrisma.idempotencyKey.findFirst.mockResolvedValueOnce(null);
+
+      await expect(
+        service.advanceSagaCheckpoint(ownership, 'stripe_authorized'),
+      ).rejects.toThrow(new ConflictException('Idempotency key ownership lost'));
+      expect(mockPrisma.idempotencyKey.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('throws ConflictException if updateMany returns count 0 (concurrent lease takeover during wait)', async () => {
+      mockPrisma.idempotencyKey.findFirst.mockResolvedValueOnce({ recoveryPoint: 'started' });
+      mockPrisma.idempotencyKey.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      await expect(
+        service.advanceSagaCheckpoint(ownership, 'stripe_authorized'),
+      ).rejects.toThrow(new ConflictException('Idempotency key ownership lost'));
+    });
+
+    it('handles post-25s background stale-owner losing race on checkpoint update', async () => {
+      const backgroundOwnership: SagaOwnership = {
+        key: 'background-key-1',
+        userId: 'user-bg',
+        requestPath: '/api/bookings/payment/confirm',
+        requestHash: 'hash-bg',
+        lockedAt: new Date(Date.now() - 35_000),
+      };
+      mockPrisma.idempotencyKey.findFirst.mockResolvedValueOnce({ recoveryPoint: 'stripe_authorized' });
+      mockPrisma.idempotencyKey.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      await expect(
+        service.advanceSagaCheckpoint(backgroundOwnership, 'duffel_order_created'),
+      ).rejects.toThrow(new ConflictException('Idempotency key ownership lost'));
+    });
+  });
+
+  describe('completeSagaKeyAtomic', () => {
+    const ownership: SagaOwnership = {
+      key: 'saga-key-1',
+      userId: 'user-1',
+      requestPath: '/api/bookings/payment/confirm',
+      requestHash: 'hash-abc',
+      lockedAt: new Date('2026-09-16T10:00:00.000Z'),
+    };
+
+    it('atomically updates key to completed, sets response, and clears lock when owned', async () => {
+      mockPrisma.idempotencyKey.updateMany.mockResolvedValueOnce({ count: 1 });
+
+      const responseBody = { success: true, paymentId: 'pay-123' };
+      await expect(
+        service.completeSagaKeyAtomic(ownership, 200, responseBody),
+      ).resolves.toBeUndefined();
+
+      expect(mockPrisma.idempotencyKey.updateMany).toHaveBeenCalledWith({
+        where: {
+          key: ownership.key,
+          customerId: ownership.userId,
+          requestPath: ownership.requestPath,
+          requestHash: ownership.requestHash,
+          lockedAt: ownership.lockedAt,
+          responseBody: { equals: Prisma.DbNull },
+        },
+        data: {
+          recoveryPoint: 'completed',
+          responseCode: 200,
+          responseBody,
+          lockedAt: null,
+        },
+      });
+    });
+
+    it('handles null or undefined responseBody gracefully', async () => {
+      mockPrisma.idempotencyKey.updateMany.mockResolvedValueOnce({ count: 1 });
+
+      await expect(
+        service.completeSagaKeyAtomic(ownership, 204, undefined),
+      ).resolves.toBeUndefined();
+
+      expect(mockPrisma.idempotencyKey.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            recoveryPoint: 'completed',
+            responseCode: 204,
+            responseBody: null,
+            lockedAt: null,
+          }),
+        }),
+      );
+    });
+
+    it('throws ConflictException if updateMany returns count 0 (lease stolen or cron-cleared)', async () => {
+      mockPrisma.idempotencyKey.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      await expect(
+        service.completeSagaKeyAtomic(ownership, 200, { success: true }),
+      ).rejects.toThrow(new ConflictException('Idempotency key ownership lost'));
+    });
+
+    it('throws ConflictException for post-25s background execution when lease stolen by another worker', async () => {
+      const backgroundOwnership: SagaOwnership = {
+        key: 'background-key-1',
+        userId: 'user-bg',
+        requestPath: '/api/bookings/payment/confirm',
+        requestHash: 'hash-bg',
+        lockedAt: new Date(Date.now() - 40_000),
+      };
+      mockPrisma.idempotencyKey.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      await expect(
+        service.completeSagaKeyAtomic(backgroundOwnership, 200, { success: true }),
+      ).rejects.toThrow(new ConflictException('Idempotency key ownership lost'));
+    });
+  });
 });
+

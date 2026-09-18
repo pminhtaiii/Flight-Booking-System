@@ -1,0 +1,17 @@
+import { Module } from '@nestjs/common';
+import { PrismaModule } from '@/prisma/prisma.module';
+import { BookingEventPublisherService } from './booking-event-publisher.service';
+
+/**
+ * DomainEventsModule
+ *
+ * Provides and exports BookingEventPublisherService.
+ * Works cleanly with optional EventEmitter2 injection before
+ * root EventEmitterModule is registered.
+ */
+@Module({
+  imports: [PrismaModule],
+  providers: [BookingEventPublisherService],
+  exports: [BookingEventPublisherService],
+})
+export class DomainEventsModule {}

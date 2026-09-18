@@ -5,6 +5,7 @@ import { CacheService } from '@/cache/cache.service';
 import { DuffelProcessorHealthService } from '@/disruption/webhook/duffel-processor-health.service';
 import { AgentHealthService } from '@/health/agent-health.service';
 import { BookingReadinessMetricsService } from '@/common/observability/booking-readiness.metrics';
+import { BookingProjectionMetrics } from '@/booking-projection/booking-projection.metrics';
 
 @Controller(['health', 'api/health'])
 export class HealthController {
@@ -16,6 +17,7 @@ export class HealthController {
     private readonly cacheService: CacheService,
     private readonly agentHealthService: AgentHealthService,
     @Optional() private readonly readinessMetrics?: BookingReadinessMetricsService,
+    @Optional() private readonly projectionMetrics?: BookingProjectionMetrics,
   ) {}
 
   @Get()
@@ -155,6 +157,24 @@ export class HealthController {
       });
     }
     const snapshot = await this.readinessMetrics.getHealthSnapshot();
+    const httpStatus =
+      snapshot.status === 'degraded' ? HttpStatus.SERVICE_UNAVAILABLE : HttpStatus.OK;
+    return res.status(httpStatus).json(snapshot);
+  }
+
+  @Get('booking-projection')
+  async getBookingProjectionHealth(@Res() res: Response): Promise<Response> {
+    if (!this.projectionMetrics) {
+      return res.status(HttpStatus.OK).json({
+        status: 'ok',
+        dependencies: {
+          database: 'up',
+          redis: 'up',
+        },
+        metrics: null,
+      });
+    }
+    const snapshot = await this.projectionMetrics.getHealthSnapshot();
     const httpStatus =
       snapshot.status === 'degraded' ? HttpStatus.SERVICE_UNAVAILABLE : HttpStatus.OK;
     return res.status(httpStatus).json(snapshot);

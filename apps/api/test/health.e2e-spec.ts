@@ -209,4 +209,45 @@ describe('Health Check (E2E)', () => {
     const netDuration = duration - baseDuration;
     expect(netDuration).toBeLessThan(750);
   });
+
+  describe('GET /health/booking-projection', () => {
+    it('returns HTTP 200 and status ok with dependencies when healthy', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/health/booking-projection')
+        .expect('Content-Type', /json/)
+        .expect(200);
+
+      expect(response.body.status).toBe('ok');
+      expect(response.body.dependencies).toEqual({
+        database: 'up',
+        redis: 'up',
+      });
+      expect(response.body.metrics).toBeDefined();
+    });
+
+    it('returns HTTP 503 and status degraded when database is down', async () => {
+      dbMockSpy.mockRejectedValueOnce(new Error('Database unavailable'));
+
+      const response = await request(app.getHttpServer())
+        .get('/health/booking-projection')
+        .expect('Content-Type', /json/)
+        .expect(503);
+
+      expect(response.body.status).toBe('degraded');
+      expect(response.body.dependencies.database).toBe('down');
+    });
+
+    it('returns HTTP 503 and status degraded when redis is down', async () => {
+      redisMockSpy.mockResolvedValueOnce('down');
+
+      const response = await request(app.getHttpServer())
+        .get('/health/booking-projection')
+        .expect('Content-Type', /json/)
+        .expect(503);
+
+      expect(response.body.status).toBe('degraded');
+      expect(response.body.dependencies.redis).toBe('down');
+    });
+  });
 });
+

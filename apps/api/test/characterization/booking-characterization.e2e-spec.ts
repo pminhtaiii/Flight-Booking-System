@@ -22,11 +22,26 @@ import { DuffelService } from '@/duffel/duffel.service';
 import { BookingLifecycleService } from '@/booking-lifecycle/booking-lifecycle.service';
 import { BookingRecoveryService } from '@/booking-lifecycle/booking-recovery.service';
 import { BookingManagementService } from '@/booking-management/booking-management.service';
-import { BookingAgentProjectionService } from '@/agent-gateway/booking-agent-projection.service';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { BookingStatus, BookingFailureReason, PaymentStatus, Prisma } from '@prisma/client';
 import { FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
 import * as crypto from 'crypto';
+
+async function waitForCondition<T>(
+  predicate: () => Promise<T | null | undefined | false>,
+  timeoutMs = 5000,
+  intervalMs = 100,
+): Promise<T> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const result = await predicate();
+    if (result) return result;
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  const last = await predicate();
+  if (last) return last;
+  throw new Error(`Condition not met within ${timeoutMs}ms`);
+}
 
 describe('Booking Characterization (E2E)', () => {
   jest.setTimeout(60000);
@@ -38,7 +53,6 @@ describe('Booking Characterization (E2E)', () => {
   let bookingLifecycleService: BookingLifecycleService;
   let bookingRecoveryService: BookingRecoveryService;
   let bookingManagementService: BookingManagementService;
-  let projectionService: BookingAgentProjectionService;
 
   let userA: { id: string; email: string };
   let tokenA: string;
@@ -70,9 +84,6 @@ describe('Booking Characterization (E2E)', () => {
     bookingRecoveryService = moduleFixture.get<BookingRecoveryService>(BookingRecoveryService);
     bookingManagementService =
       moduleFixture.get<BookingManagementService>(BookingManagementService);
-    projectionService = moduleFixture.get<BookingAgentProjectionService>(
-      BookingAgentProjectionService,
-    );
   });
 
   afterAll(async () => {
@@ -300,10 +311,12 @@ describe('Booking Characterization (E2E)', () => {
       expect(confirmedBooking.flightSnapshot).toBeDefined();
       expect(confirmedBooking.passengerSnapshot).toBeDefined();
 
-      // Verify Agent Projection created
-      const projection = await prisma.bookingAgentProjection.findUnique({
-        where: { bookingId },
-      });
+      // Verify Agent Projection created (using bounded polling for eventual consistency)
+      const projection = await waitForCondition(async () => {
+        return prisma.bookingAgentProjection.findUnique({
+          where: { bookingId },
+        });
+      }, 5000);
       expect(projection).toBeDefined();
       expect(projection!.status).toBe(BookingStatus.CONFIRMED);
       expect(projection!.agentReference).toMatch(/^bkref_/);

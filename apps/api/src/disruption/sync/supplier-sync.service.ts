@@ -1,8 +1,10 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { SyncClaimService } from './sync-claim.service';
-import { BookingAgentProjectionService } from '@/agent-gateway/booking-agent-projection.service';
+import { BookingEventPublisherService } from '@/domain-events/booking-event-publisher.service';
+import { BookingDisruptionSyncedEvent } from '@/domain-events/booking.events';
+import { PublishableEvent } from '@/domain-events';
 import {
   normalizeDuffelOrder,
   normalizeFlightSegments,
@@ -12,10 +14,11 @@ import {
 import { generateItineraryFingerprint } from '../domain/itinerary-fingerprint';
 import { computeItineraryDiff } from '../domain/itinerary-diff';
 import { classifyMateriality } from '../domain/materiality-classifier';
-import { ItineraryRevisionSource, DisruptionStatus, Prisma } from '@prisma/client';
+import { ItineraryRevisionSource, DisruptionStatus, BookingStatus, Prisma } from '@prisma/client';
 import { FlightSegmentSnapshot } from '@shared/booking-types';
 import { MaterialDisruptionReason, MaterialBaseline } from '@shared/disruption-types';
 import * as crypto from 'crypto';
+import { randomUUID } from 'crypto';
 
 export type SyncResult =
   | { status: 'NO_CHANGE' }
@@ -120,7 +123,7 @@ export class SupplierSyncService {
     private readonly prisma: PrismaService,
     private readonly duffelService: DuffelService,
     private readonly syncClaimService: SyncClaimService,
-    @Optional() private readonly bookingAgentProjectionService?: BookingAgentProjectionService,
+    private readonly publisher: BookingEventPublisherService,
   ) {}
 
   /**
@@ -229,9 +232,11 @@ export class SupplierSyncService {
       // 6. Execute db writes in a short transaction
       let attempts = 0;
       while (attempts < 3) {
+        let eventsToPublish: PublishableEvent[] = [];
         try {
-          return await this.prisma.$transaction(
-            async (tx) => {
+          const result = await this.prisma.$transaction(
+            async (tx): Promise<SyncResult> => {
+              const context = this.publisher.createContext(tx);
               const now = new Date();
 
               // Lock the booking row immediately to serialize concurrent syncs and cancellations
@@ -481,7 +486,10 @@ export class SupplierSyncService {
               // Commit Booking updates conditionally (status is confirmed)
               const updateResult = await tx.booking.updateMany({
                 where: { id: bookingId, status: 'CONFIRMED', syncLockToken: token },
-                data: bookingData,
+                data: {
+                  ...bookingData,
+                  version: { increment: 1 },
+                },
               });
 
               if (updateResult.count === 0) {
@@ -499,7 +507,19 @@ export class SupplierSyncService {
                 });
               }
 
-              await this.bookingAgentProjectionService?.createOrUpdateProjection(bookingId, tx);
+              context.events.push(
+                new BookingDisruptionSyncedEvent({
+                  bookingId,
+                  eventId: randomUUID(),
+                  sourceVersion: (dbBooking.version ?? 1) + 1,
+                  revisionId: newRevision.id,
+                  // Safe cast: bookingData optionally overrides status, falling back to current dbBooking.status
+                  status: (bookingData.status as BookingStatus | undefined) ?? dbBooking.status,
+                  timestamp: now,
+                }),
+              );
+
+              eventsToPublish = context.events;
 
               this.logger.log(
                 `Successfully completed sync for booking ${bookingId}. Created revision ${newRevision.id}. Correlation: ${correlationId}`,
@@ -508,6 +528,12 @@ export class SupplierSyncService {
             },
             { timeout: 15000, maxWait: 10000 },
           );
+
+          if (eventsToPublish.length > 0) {
+            await this.publisher.publish(eventsToPublish);
+          }
+
+          return result;
         } catch (txError: unknown) {
           const errWithCode = txError as { code?: string; meta?: { target?: string[] } };
           if (errWithCode.code === 'P2002') {

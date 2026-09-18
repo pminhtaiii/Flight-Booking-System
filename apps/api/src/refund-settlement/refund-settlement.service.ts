@@ -10,6 +10,13 @@ import {
   RefundStatus,
 } from '@prisma/client';
 import * as crypto from 'crypto';
+import { randomUUID } from 'crypto';
+import {
+  BookingEventPublisherService,
+  PublishableEvent,
+  RefundSettledEvent,
+} from '@/domain-events';
+import { BookingLifecycleService } from '@/booking-lifecycle/booking-lifecycle.service';
 import {
   RefundProvenanceSource,
   RefundSettlementInput,
@@ -26,6 +33,8 @@ export class RefundSettlementService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly publisher: BookingEventPublisherService,
+    private readonly bookingLifecycleService: BookingLifecycleService,
   ) {}
 
   private mapProvenanceToEventSource(source: RefundProvenanceSource): PaymentEventSource {
@@ -85,7 +94,11 @@ export class RefundSettlementService {
   }
 
   async settleVerifiedOutcome(input: RefundSettlementInput): Promise<RefundSettlementResult> {
-    return this.prisma.$transaction(async (tx) => {
+    let eventsToPublish: PublishableEvent[] = [];
+
+    const result = await this.prisma.$transaction<RefundSettlementResult>(async (tx) => {
+      const context = this.publisher.createContext(tx);
+      const now = new Date();
       const lockedRefunds = await tx.$queryRaw<
         Array<{
           id: string;
@@ -167,7 +180,8 @@ export class RefundSettlementService {
         this.logSettlementTelemetry('NO_OP', input.provenance.source, refund.status);
         return {
           applied: false,
-          transactionStatus: refund.status,
+          transactionStatus:
+            refund.status === RefundStatus.FAILED ? 'FAILED' : 'REFUND_FAILED_NEEDS_ATTENTION',
           paymentStatus: refund.payment.status,
           bookingStatus: booking?.status,
         };
@@ -264,12 +278,25 @@ export class RefundSettlementService {
             source: this.mapProvenanceToEventSource(input.provenance.source),
             stripeEventId: input.provenance.externalEventId ?? null,
             createdBy: input.provenance.actorId ?? 'system',
+            // Safe cast: metadata record is serializable JSON value for Prisma input
             metadata: (input.provenance.metadata as Prisma.InputJsonValue) ?? undefined,
           },
         });
 
-        let finalBookingStatus: BookingStatus | undefined = undefined;
         const obligation = refund.cancellationRefundObligation;
+
+        context.events.push(
+          new RefundSettledEvent({
+            eventId: randomUUID(),
+            refundId: refund.id,
+            amount: refund.amount,
+            currency: refund.currency,
+            timestamp: now,
+            bookingId: obligation?.bookingId,
+          }),
+        );
+
+        let finalBookingStatus: BookingStatus | undefined = undefined;
 
         if (obligation) {
           const obligationSucceeded = await tx.refund.findMany({
@@ -290,11 +317,16 @@ export class RefundSettlementService {
             finalBookingStatus = BookingStatus.CANCELLED_PENDING_REFUND;
           }
 
-          if (obligation.booking && obligation.booking.status !== finalBookingStatus) {
-            await tx.booking.update({
-              where: { id: obligation.bookingId },
-              data: { status: finalBookingStatus },
-            });
+          if (finalBookingStatus) {
+            const bookingUpdate = await this.bookingLifecycleService.updateBookingRefundStatus(
+              obligation.bookingId,
+              finalBookingStatus,
+              RefundStatus.SUCCEEDED,
+              undefined,
+              tx,
+              context,
+            );
+            finalBookingStatus = bookingUpdate.updatedBooking?.status ?? finalBookingStatus;
           }
         }
 
@@ -316,6 +348,8 @@ export class RefundSettlementService {
         });
 
         this.logSettlementTelemetry('APPLIED', input.provenance.source, RefundStatus.SUCCEEDED);
+
+        eventsToPublish = [...context.events];
 
         return {
           applied: true,
@@ -345,11 +379,17 @@ export class RefundSettlementService {
       let finalBookingStatus: BookingStatus | undefined = booking?.status;
       if (targetStatus === RefundStatus.REFUND_FAILED_NEEDS_ATTENTION) {
         finalBookingStatus = BookingStatus.REFUND_FAILED_NEEDS_ATTENTION;
-        if (refund.cancellationRefundObligation?.bookingId) {
-          await tx.booking.updateMany({
-            where: { id: refund.cancellationRefundObligation.bookingId },
-            data: { status: BookingStatus.REFUND_FAILED_NEEDS_ATTENTION },
-          });
+        const bookingId = refund.cancellationRefundObligation?.bookingId;
+        if (bookingId) {
+          const bookingUpdate = await this.bookingLifecycleService.updateBookingRefundStatus(
+            bookingId,
+            BookingStatus.REFUND_FAILED_NEEDS_ATTENTION,
+            RefundStatus.REFUND_FAILED_NEEDS_ATTENTION,
+            input.outcome.errorCode,
+            tx,
+            context,
+          );
+          finalBookingStatus = bookingUpdate.updatedBooking?.status ?? finalBookingStatus;
         }
       }
 
@@ -408,6 +448,7 @@ export class RefundSettlementService {
           source: this.mapProvenanceToEventSource(input.provenance.source),
           stripeEventId: input.provenance.externalEventId ?? null,
           createdBy: input.provenance.actorId ?? 'system',
+          // Safe cast: metadata record is serializable JSON value for Prisma input
           metadata: {
             errorCode: input.outcome.errorCode,
             ...(input.provenance.metadata ?? {}),
@@ -434,6 +475,8 @@ export class RefundSettlementService {
 
       this.logSettlementTelemetry('APPLIED', input.provenance.source, targetStatus);
 
+      eventsToPublish = [...context.events];
+
       return {
         applied: true,
         transactionStatus: targetStatus,
@@ -441,5 +484,11 @@ export class RefundSettlementService {
         bookingStatus: finalBookingStatus,
       };
     });
+
+    if (eventsToPublish.length > 0) {
+      await this.publisher.publish(eventsToPublish);
+    }
+
+    return result;
   }
 }

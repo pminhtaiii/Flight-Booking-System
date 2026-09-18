@@ -1,10 +1,7 @@
 import { AuditService } from '@/audit/audit.service';
-import { BookingLifecycleService } from '@/booking-lifecycle/booking-lifecycle.service';
 import { StripeService } from '@/common/stripe.service';
-import { DuffelService } from '@/duffel/duffel.service';
 import { AncillaryPaymentValidationService } from '@/payment/ancillary-payment-validation.service';
-import { PaymentIdempotencyService } from '@/payment/payment-idempotency.service';
-import { PaymentMethodService } from '@/payment/payment-method.service';
+import { PaymentIdempotencyService } from '@/idempotency/payment-idempotency.service';
 import { PaymentService } from '@/payment/payment.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { Prisma } from '@prisma/client';
@@ -141,10 +138,7 @@ describe('PaymentService ancillary snapshot binding', () => {
       prisma as unknown as PrismaService,
       stripe as unknown as StripeService,
       idempotency as unknown as PaymentIdempotencyService,
-      {} as DuffelService,
       audit as unknown as AuditService,
-      {} as PaymentMethodService,
-      {} as BookingLifecycleService,
       validation as unknown as AncillaryPaymentValidationService,
     );
 
@@ -255,10 +249,7 @@ describe('PaymentService ancillary snapshot binding', () => {
       prisma as unknown as PrismaService,
       stripe as unknown as StripeService,
       idempotency as unknown as PaymentIdempotencyService,
-      {} as DuffelService,
       {} as AuditService,
-      {} as PaymentMethodService,
-      {} as BookingLifecycleService,
       validation as unknown as AncillaryPaymentValidationService,
     );
 
@@ -327,10 +318,7 @@ describe('PaymentService ancillary snapshot binding', () => {
       prisma as unknown as PrismaService,
       stripe as unknown as StripeService,
       idempotency as unknown as PaymentIdempotencyService,
-      {} as DuffelService,
       {} as AuditService,
-      {} as PaymentMethodService,
-      {} as BookingLifecycleService,
       validation as unknown as AncillaryPaymentValidationService,
     );
 
@@ -421,10 +409,7 @@ describe('PaymentService ancillary snapshot binding', () => {
       prisma as unknown as PrismaService,
       stripe as unknown as StripeService,
       idempotency as unknown as PaymentIdempotencyService,
-      {} as DuffelService,
       {} as AuditService,
-      {} as PaymentMethodService,
-      {} as BookingLifecycleService,
       validation as unknown as AncillaryPaymentValidationService,
     );
 
@@ -550,10 +535,7 @@ describe('PaymentService ancillary snapshot binding', () => {
       prisma as unknown as PrismaService,
       stripe as unknown as StripeService,
       idempotency as unknown as PaymentIdempotencyService,
-      {} as DuffelService,
       audit as unknown as AuditService,
-      {} as PaymentMethodService,
-      {} as BookingLifecycleService,
       validation as unknown as AncillaryPaymentValidationService,
     );
 

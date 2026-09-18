@@ -122,6 +122,34 @@ describe('AppModule Config Validation', () => {
       expect(parsed.CHAT_HANDOFF_SECRET_V2).toBe('secret-v2');
       expect(parsed.CHAT_HANDOFF_SECRET_V3).toBe('secret-v3');
     });
+
+    it('validates admission limits in envSchema', () => {
+      const valid = envSchema.parse({
+        ...baseConfig,
+        STRIPE_ADMISSION_ACTIVE_LIMIT: '10',
+        STRIPE_ADMISSION_QUEUE_LIMIT: '50',
+        STRIPE_ADMISSION_TIMEOUT_MS: '3000',
+        DUFFEL_ADMISSION_ACTIVE_LIMIT: '15',
+        DUFFEL_ADMISSION_QUEUE_LIMIT: '75',
+        DUFFEL_ADMISSION_TIMEOUT_MS: '4000',
+      });
+      expect(valid.STRIPE_ADMISSION_ACTIVE_LIMIT).toBe('10');
+      expect(valid.DUFFEL_ADMISSION_TIMEOUT_MS).toBe('4000');
+
+      expect(() =>
+        envSchema.parse({
+          ...baseConfig,
+          STRIPE_ADMISSION_ACTIVE_LIMIT: '5workers',
+        }),
+      ).toThrow();
+
+      expect(() =>
+        envSchema.parse({
+          ...baseConfig,
+          DUFFEL_ADMISSION_ACTIVE_LIMIT: '0',
+        }),
+      ).toThrow();
+    });
   });
 });
 
