@@ -1009,66 +1009,155 @@ export class BookingLifecycleService {
       if (Array.isArray(slice.segments)) {
         stops += Math.max(0, slice.segments.length - 1);
         for (let segmentOrder = 0; segmentOrder < slice.segments.length; segmentOrder++) {
-          const seg = slice.segments[segmentOrder] as Record<string, any> | null;
-          if (!seg) continue;
+          const seg = slice.segments[segmentOrder] as Record<string, unknown> | null;
+          if (!seg || typeof seg !== 'object') continue;
 
-          if (Array.isArray(seg.passengers) && seg.passengers[0]?.cabin_class) {
-            cabinClass = seg.passengers[0].cabin_class;
-          } else if (seg.cabin_class) {
+          const passengers = Array.isArray(seg.passengers) ? seg.passengers : null;
+          const firstPassenger =
+            passengers && passengers.length > 0 && typeof passengers[0] === 'object' && passengers[0] !== null
+              ? (passengers[0] as Record<string, unknown>)
+              : null;
+
+          if (typeof firstPassenger?.cabin_class === 'string' && firstPassenger.cabin_class) {
+            cabinClass = firstPassenger.cabin_class;
+          } else if (typeof firstPassenger?.cabinClass === 'string' && firstPassenger.cabinClass) {
+            cabinClass = firstPassenger.cabinClass;
+          } else if (typeof seg.cabin_class === 'string' && seg.cabin_class) {
             cabinClass = seg.cabin_class;
+          } else if (typeof seg.cabinClass === 'string' && seg.cabinClass) {
+            cabinClass = seg.cabinClass;
           }
 
-          const operatingCarrier = seg.operating_carrier || seg.operatingCarrier;
-          const marketingCarrier = seg.marketing_carrier || seg.marketingCarrier;
-          const airlineObj = seg.airline;
+          const operatingCarrier =
+            typeof seg.operating_carrier === 'object' && seg.operating_carrier !== null
+              ? (seg.operating_carrier as Record<string, unknown>)
+              : typeof seg.operatingCarrier === 'object' && seg.operatingCarrier !== null
+              ? (seg.operatingCarrier as Record<string, unknown>)
+              : null;
+
+          const marketingCarrier =
+            typeof seg.marketing_carrier === 'object' && seg.marketing_carrier !== null
+              ? (seg.marketing_carrier as Record<string, unknown>)
+              : typeof seg.marketingCarrier === 'object' && seg.marketingCarrier !== null
+              ? (seg.marketingCarrier as Record<string, unknown>)
+              : null;
+
+          const airlineObj =
+            typeof seg.airline === 'object' && seg.airline !== null
+              ? (seg.airline as Record<string, unknown>)
+              : null;
+
           const airlineName =
-            operatingCarrier?.name ||
-            marketingCarrier?.name ||
-            (typeof airlineObj === 'object' && airlineObj?.name) ||
+            (typeof operatingCarrier?.name === 'string' && operatingCarrier.name) ||
+            (typeof marketingCarrier?.name === 'string' && marketingCarrier.name) ||
+            (typeof airlineObj?.name === 'string' && airlineObj.name) ||
             'Unknown';
+
           const airlineIata =
-            operatingCarrier?.iata_code ||
-            operatingCarrier?.iataCode ||
-            marketingCarrier?.iata_code ||
-            marketingCarrier?.iataCode ||
-            (typeof airlineObj === 'object' && (airlineObj?.iata_code || airlineObj?.iataCode)) ||
+            (typeof operatingCarrier?.iata_code === 'string' && operatingCarrier.iata_code) ||
+            (typeof operatingCarrier?.iataCode === 'string' && operatingCarrier.iataCode) ||
+            (typeof marketingCarrier?.iata_code === 'string' && marketingCarrier.iata_code) ||
+            (typeof marketingCarrier?.iataCode === 'string' && marketingCarrier.iataCode) ||
+            (typeof airlineObj?.iata_code === 'string' && airlineObj.iata_code) ||
+            (typeof airlineObj?.iataCode === 'string' && airlineObj.iataCode) ||
             'XX';
 
           const flightNumber =
-            seg.marketing_carrier_flight_number ||
-            seg.marketingCarrierFlightNumber ||
-            seg.flight_number ||
-            seg.flightNumber ||
+            (typeof seg.marketing_carrier_flight_number === 'string' && seg.marketing_carrier_flight_number) ||
+            (typeof seg.marketingCarrierFlightNumber === 'string' && seg.marketingCarrierFlightNumber) ||
+            (typeof seg.flight_number === 'string' && seg.flight_number) ||
+            (typeof seg.flightNumber === 'string' && seg.flightNumber) ||
             '0000';
 
-          const origin = seg.origin || {};
-          const destination = seg.destination || {};
+          const origin =
+            typeof seg.origin === 'object' && seg.origin !== null
+              ? (seg.origin as Record<string, unknown>)
+              : null;
+          const destination =
+            typeof seg.destination === 'object' && seg.destination !== null
+              ? (seg.destination as Record<string, unknown>)
+              : null;
 
-          const depIata = origin.iata_code || origin.iataCode || '';
-          const depName = origin.name || '';
+          const depIata =
+            (typeof origin?.iata_code === 'string' && origin.iata_code) ||
+            (typeof origin?.iataCode === 'string' && origin.iataCode) ||
+            '';
+          const depName =
+            (typeof origin?.name === 'string' && origin.name) ||
+            '';
+          const originCityObj =
+            typeof origin?.city === 'object' && origin.city !== null
+              ? (origin.city as Record<string, unknown>)
+              : null;
           const depCity =
-            origin.city_name ||
-            origin.cityName ||
-            origin.city?.name ||
-            (typeof origin.city === 'string' ? origin.city : '') ||
-            origin.name ||
+            (typeof origin?.city_name === 'string' && origin.city_name) ||
+            (typeof origin?.cityName === 'string' && origin.cityName) ||
+            (typeof originCityObj?.name === 'string' && originCityObj.name) ||
+            (typeof origin?.city === 'string' && origin.city) ||
+            depName ||
             '';
-          const depTerminal = seg.origin_terminal ?? seg.originTerminal ?? undefined;
+          const depTerminal =
+            typeof seg.origin_terminal === 'string'
+              ? seg.origin_terminal
+              : typeof seg.originTerminal === 'string'
+              ? seg.originTerminal
+              : undefined;
 
-          const arrIata = destination.iata_code || destination.iataCode || '';
-          const arrName = destination.name || '';
+          const arrIata =
+            (typeof destination?.iata_code === 'string' && destination.iata_code) ||
+            (typeof destination?.iataCode === 'string' && destination.iataCode) ||
+            '';
+          const arrName =
+            (typeof destination?.name === 'string' && destination.name) ||
+            '';
+          const destinationCityObj =
+            typeof destination?.city === 'object' && destination.city !== null
+              ? (destination.city as Record<string, unknown>)
+              : null;
           const arrCity =
-            destination.city_name ||
-            destination.cityName ||
-            destination.city?.name ||
-            (typeof destination.city === 'string' ? destination.city : '') ||
-            destination.name ||
+            (typeof destination?.city_name === 'string' && destination.city_name) ||
+            (typeof destination?.cityName === 'string' && destination.cityName) ||
+            (typeof destinationCityObj?.name === 'string' && destinationCityObj.name) ||
+            (typeof destination?.city === 'string' && destination.city) ||
+            arrName ||
             '';
-          const arrTerminal = seg.destination_terminal ?? seg.destinationTerminal ?? undefined;
+          const arrTerminal =
+            typeof seg.destination_terminal === 'string'
+              ? seg.destination_terminal
+              : typeof seg.destinationTerminal === 'string'
+              ? seg.destinationTerminal
+              : undefined;
 
-          const departureAt = seg.departing_at || seg.departureAt || '';
-          const arrivalAt = seg.arriving_at || seg.arrivalAt || '';
-          const duration = seg.duration || '';
+          const departureAt =
+            typeof seg.departing_at === 'string'
+              ? seg.departing_at
+              : typeof seg.departureAt === 'string'
+              ? seg.departureAt
+              : '';
+          const arrivalAt =
+            typeof seg.arriving_at === 'string'
+              ? seg.arriving_at
+              : typeof seg.arrivalAt === 'string'
+              ? seg.arrivalAt
+              : '';
+          const duration =
+            typeof seg.duration === 'string'
+              ? seg.duration
+              : '';
+
+          const aircraftObj =
+            typeof seg.aircraft === 'object' && seg.aircraft !== null
+              ? (seg.aircraft as Record<string, unknown>)
+              : null;
+          const aircraftType =
+            (typeof aircraftObj?.name === 'string' && aircraftObj.name) ||
+            (typeof seg.aircraftType === 'string' && seg.aircraftType) ||
+            undefined;
+
+          const duffelSegmentId =
+            (typeof seg.id === 'string' && seg.id) ||
+            (typeof seg.duffelSegmentId === 'string' && seg.duffelSegmentId) ||
+            undefined;
 
           segments.push({
             airline: {
@@ -1080,19 +1169,19 @@ export class BookingLifecycleService {
               iataCode: depIata,
               name: depName,
               city: depCity,
-              terminal: depTerminal !== null ? depTerminal : undefined,
+              terminal: depTerminal,
             },
             arrivalAirport: {
               iataCode: arrIata,
               name: arrName,
               city: arrCity,
-              terminal: arrTerminal !== null ? arrTerminal : undefined,
+              terminal: arrTerminal,
             },
             departureAt,
             arrivalAt,
             duration,
-            aircraftType: seg.aircraft?.name || seg.aircraftType || undefined,
-            duffelSegmentId: seg.id || seg.duffelSegmentId || undefined,
+            aircraftType,
+            duffelSegmentId,
             sliceOrder,
             segmentOrder,
             globalOrder: globalOrder++,
