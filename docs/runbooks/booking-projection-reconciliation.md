@@ -327,10 +327,18 @@ In case of severe database load or scheduled database migrations, reconciliation
 1. **Kubernetes / Pod Configuration**:
    Scale down dedicated background worker pods or stop the API deployment if maintenance is in progress.
 2. **Alternative Configuration Guard**:
-   If dynamic cron suspension is required, remove or conditionalize `BookingProjectionReconciliationService` in `BookingProjectionModule`, or pause the job via NestJS `SchedulerRegistry`:
+   If dynamic cron suspension is required, remove or conditionalize `BookingProjectionReconciliationService` in `BookingProjectionModule`, or pause the job via NestJS `SchedulerRegistry`. The job is explicitly registered under `BookingProjectionReconciliationService` (via `RECONCILIATION_CRON_JOB_NAME` exported from `booking-projection-reconciliation.service.ts`). Always check existence before stopping:
    ```typescript
-   // To pause the cron job at runtime via NestJS SchedulerRegistry:
-   schedulerRegistry.getCronJob('BookingProjectionReconciliationService').stop();
+   // Verify and pause the cron job at runtime via NestJS SchedulerRegistry:
+   if (schedulerRegistry.doesExist('cron', 'BookingProjectionReconciliationService')) {
+     schedulerRegistry.getCronJob('BookingProjectionReconciliationService').stop();
+   }
+   ```
+   To resume the reconciliation cron job later:
+   ```typescript
+   if (schedulerRegistry.doesExist('cron', 'BookingProjectionReconciliationService')) {
+     schedulerRegistry.getCronJob('BookingProjectionReconciliationService').start();
+   }
    ```
 
 ---

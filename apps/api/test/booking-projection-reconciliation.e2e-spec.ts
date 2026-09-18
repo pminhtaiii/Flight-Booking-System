@@ -1,5 +1,7 @@
 import 'reflect-metadata';
 import { Test, TestingModule } from '@nestjs/testing';
+import { INestApplication } from '@nestjs/common';
+import { ScheduleModule, SchedulerRegistry } from '@nestjs/schedule';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from '@/prisma/prisma.module';
 import { DomainEventsModule } from '@/domain-events/domain-events.module';
@@ -17,6 +19,7 @@ describe('Booking Projection Reconciliation (E2E - T038)', () => {
   jest.setTimeout(90000);
 
   let testingModule: TestingModule;
+  let app: INestApplication;
   let prisma: PrismaService;
   let reconciliationService: BookingProjectionReconciliationService;
   let repository: BookingProjectionRepository;
@@ -99,11 +102,18 @@ describe('Booking Projection Reconciliation (E2E - T038)', () => {
     testingModule = await Test.createTestingModule({
       imports: [
         ConfigModule.forRoot({ isGlobal: true }),
+        ScheduleModule.forRoot(),
         PrismaModule,
         DomainEventsModule,
         BookingProjectionModule,
       ],
     }).compile();
+
+    app = testingModule.createNestApplication();
+    await app.init();
+
+    const schedulerRegistry = app.get(SchedulerRegistry);
+    schedulerRegistry.getCronJobs().forEach((job) => job.stop());
 
     prisma = testingModule.get<PrismaService>(PrismaService);
     reconciliationService = testingModule.get<BookingProjectionReconciliationService>(
@@ -121,7 +131,11 @@ describe('Booking Projection Reconciliation (E2E - T038)', () => {
     try {
       await cleanTrackedData();
     } finally {
-      await testingModule.close();
+      if (app) {
+        await app.close();
+      } else {
+        await testingModule.close();
+      }
     }
   });
 
@@ -831,6 +845,15 @@ describe('Booking Projection Reconciliation (E2E - T038)', () => {
       } finally {
         globalThis.fetch = originalFetch;
       }
+    });
+  });
+
+  describe('g) SchedulerRegistry Cron Registration', () => {
+    it('registers the named cron job in SchedulerRegistry allowing runtime pause', () => {
+      const schedulerRegistry = app.get(SchedulerRegistry);
+      expect(schedulerRegistry.doesExist('cron', 'BookingProjectionReconciliationService')).toBe(true);
+      const cronJob = schedulerRegistry.getCronJob('BookingProjectionReconciliationService');
+      expect(cronJob).toBeDefined();
     });
   });
 });

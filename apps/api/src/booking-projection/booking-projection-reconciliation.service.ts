@@ -17,6 +17,9 @@ export type ReconciliationPassSummary = {
   reachedEnd: boolean;
 };
 
+export const RECONCILIATION_CRON_JOB_NAME =
+  'BookingProjectionReconciliationService';
+
 @Injectable()
 export class BookingProjectionReconciliationService {
   private readonly logger = new Logger(BookingProjectionReconciliationService.name);
@@ -35,7 +38,7 @@ export class BookingProjectionReconciliationService {
     return this.cursor;
   }
 
-  @Cron(CronExpression.EVERY_MINUTE, { name: 'BookingProjectionReconciliationService' })
+  @Cron(CronExpression.EVERY_MINUTE, { name: RECONCILIATION_CRON_JOB_NAME })
   async reconcileBatch(batchSize = 100): Promise<ReconciliationPassSummary | null> {
     if (this.isReconciling) {
       this.logger.warn({

@@ -29,6 +29,12 @@ export type ProjectionErrorType =
   | 'DATABASE_ERROR'
   | 'UNKNOWN';
 
+export interface ClusterPassState {
+  outcome: ReconciliationPassOutcome;
+  consecutiveErrors: number;
+  timestamp: number;
+}
+
 export interface ProjectionDurationStats {
   count: number;
   min: number;
@@ -89,6 +95,8 @@ const MAX_COUNTER_ENTRIES = 100;
 const MAX_DURATION_SAMPLES = 1000;
 const REDIS_COUNTER_PREFIX = 'metrics:booking_projection:counter:';
 const REDIS_LATENCY_PREFIX = 'metrics:booking_projection:latency:';
+export const REDIS_LATEST_PASS_STATE_KEY =
+  'metrics:booking_projection:latest_pass_state';
 
 // Disallowed patterns in metric labels to avoid PII, booking IDs, user IDs or high cardinality
 const UNSAFE_LABEL_PATTERN =
@@ -335,14 +343,14 @@ export class BookingProjectionMetrics {
   }
 
   incrementReconciliationPassTotal(
-    outcome: ReconciliationPassOutcome | string,
+    rawOutcome: ReconciliationPassOutcome | string,
     amount = 1,
   ): void {
-    const sanitized = this.sanitizeReconciliationOutcome(outcome);
-    const current = this.reconciliationPassCounters.get(sanitized) ?? 0;
-    this.reconciliationPassCounters.set(sanitized, current + amount);
+    const outcome = this.sanitizeReconciliationOutcome(rawOutcome);
+    const current = this.reconciliationPassCounters.get(outcome) ?? 0;
+    this.reconciliationPassCounters.set(outcome, current + amount);
 
-    if (sanitized === 'SUCCESS') {
+    if (outcome === 'SUCCESS') {
       this.lastPassOutcome = 'SUCCESS';
       this.consecutivePassErrors = 0;
     } else {
@@ -353,7 +361,7 @@ export class BookingProjectionMetrics {
     if (this.cacheService) {
       this.cacheService
         .incrby(
-          `${REDIS_COUNTER_PREFIX}reconciliation:pass:${sanitized.toLowerCase()}`,
+          `${REDIS_COUNTER_PREFIX}reconciliation:pass:${outcome.toLowerCase()}`,
           amount,
         )
         .catch((err: unknown) => {
@@ -362,6 +370,32 @@ export class BookingProjectionMetrics {
             `Failed to sync reconciliation pass counter to cache: ${errMsg}`,
           );
         });
+
+      (async () => {
+        try {
+          let consecutiveErrors = outcome === 'SUCCESS' ? 0 : amount;
+          if (outcome === 'ERROR') {
+            const existing = await this.cacheService!.get(REDIS_LATEST_PASS_STATE_KEY);
+            if (existing) {
+              try {
+                const parsed = JSON.parse(existing) as ClusterPassState;
+                if (parsed.outcome === 'ERROR') {
+                  consecutiveErrors = (parsed.consecutiveErrors ?? 0) + amount;
+                }
+              } catch {}
+            }
+          }
+          const state: ClusterPassState = {
+            outcome,
+            consecutiveErrors,
+            timestamp: Date.now(),
+          };
+          await this.cacheService!.set(REDIS_LATEST_PASS_STATE_KEY, JSON.stringify(state));
+        } catch (err: unknown) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          this.logger.warn(`Failed to sync latest pass state to cache: ${errMsg}`);
+        }
+      })();
     }
   }
 
@@ -618,11 +652,29 @@ export class BookingProjectionMetrics {
       }
     }
 
+    let effectiveOutcome = this.lastPassOutcome;
+    let effectiveConsecutiveErrors = this.consecutivePassErrors;
+    if (this.cacheService && redisStatus === 'up') {
+      try {
+        const rawState = await this.cacheService.get(REDIS_LATEST_PASS_STATE_KEY);
+        if (rawState) {
+          const parsed = JSON.parse(rawState) as ClusterPassState;
+          if (parsed && parsed.outcome) {
+            effectiveOutcome = parsed.outcome;
+            effectiveConsecutiveErrors = parsed.consecutiveErrors ?? 0;
+          }
+        }
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Failed to read cluster pass state from cache: ${errMsg}`);
+      }
+    }
+
     const isDegraded =
       dbStatus === 'down' ||
       redisStatus === 'down' ||
-      this.consecutivePassErrors >= 3 ||
-      this.lastPassOutcome === 'ERROR';
+      effectiveConsecutiveErrors >= 3 ||
+      effectiveOutcome === 'ERROR';
 
     return {
       status: isDegraded ? 'degraded' : 'ok',
@@ -675,11 +727,16 @@ export class BookingProjectionMetrics {
         await Promise.all([
           ...counterKeys.map((k) => this.cacheService!.del(k)),
           ...latencyKeys.map((k) => this.cacheService!.del(k)),
+          this.cacheService.del(REDIS_LATEST_PASS_STATE_KEY),
         ]);
       } catch (err: unknown) {
         const errMsg = err instanceof Error ? err.message : String(err);
         this.logger.warn(`Failed to reset cache metrics: ${errMsg}`);
       }
     }
+  }
+
+  async resetMetrics(): Promise<void> {
+    return this.reset();
   }
 }

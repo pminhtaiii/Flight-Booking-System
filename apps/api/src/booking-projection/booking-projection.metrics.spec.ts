@@ -383,6 +383,7 @@ describe('BookingProjectionMetrics', () => {
       lrange: jest.Mock;
       keys: jest.Mock;
       get: jest.Mock;
+      set: jest.Mock;
       checkHealth: jest.Mock;
       del: jest.Mock;
     };
@@ -399,6 +400,7 @@ describe('BookingProjectionMetrics', () => {
         lrange: jest.fn().mockResolvedValue([]),
         keys: jest.fn().mockResolvedValue([]),
         get: jest.fn().mockResolvedValue(null),
+        set: jest.fn().mockResolvedValue(undefined),
         checkHealth: jest.fn().mockResolvedValue('up'),
         del: jest.fn().mockResolvedValue(undefined),
       };
@@ -537,6 +539,61 @@ describe('BookingProjectionMetrics', () => {
       const snapshot = await distributedMetrics.getHealthSnapshot();
       expect(snapshot.dependencies.redis).toBe('down');
       expect(snapshot.status).toBe('degraded');
+    });
+
+    it('persists cluster pass state to Redis on reconciliation pass increment', async () => {
+      distributedMetrics.incrementReconciliationPassTotal('ERROR', 1);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(mockCacheService.set).toHaveBeenCalledWith(
+        'metrics:booking_projection:latest_pass_state',
+        expect.stringContaining('"outcome":"ERROR"'),
+      );
+    });
+
+    it('overrides local pass state with cluster pass state stored in Redis when available', async () => {
+      // Local state has no error (outcome undefined)
+      // Redis cluster pass state has ERROR
+      mockCacheService.get.mockImplementation(async (key: string) => {
+        if (key === 'metrics:booking_projection:latest_pass_state') {
+          return JSON.stringify({
+            outcome: 'ERROR',
+            consecutiveErrors: 1,
+            timestamp: Date.now(),
+          });
+        }
+        return null;
+      });
+
+      const snapshot = await distributedMetrics.getHealthSnapshot();
+      expect(snapshot.status).toBe('degraded');
+    });
+
+    it('clears degraded status across replicas when a successful pass is recorded in Redis', async () => {
+      // Local state has an error
+      distributedMetrics.incrementReconciliationPassTotal('ERROR', 1);
+
+      // But another replica succeeded and updated Redis cluster pass state
+      mockCacheService.get.mockImplementation(async (key: string) => {
+        if (key === 'metrics:booking_projection:latest_pass_state') {
+          return JSON.stringify({
+            outcome: 'SUCCESS',
+            consecutiveErrors: 0,
+            timestamp: Date.now(),
+          });
+        }
+        return null;
+      });
+
+      const snapshot = await distributedMetrics.getHealthSnapshot();
+      expect(snapshot.status).toBe('ok');
+    });
+
+    it('clears latest cluster pass state from Redis on reset', async () => {
+      await distributedMetrics.reset();
+      expect(mockCacheService.del).toHaveBeenCalledWith(
+        'metrics:booking_projection:latest_pass_state',
+      );
     });
   });
 });
