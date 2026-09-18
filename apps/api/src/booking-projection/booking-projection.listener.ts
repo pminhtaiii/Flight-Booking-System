@@ -5,7 +5,6 @@ import { BookingEventHydratorService } from '@/domain-events/booking-event-hydra
 import { BookingProjectionService } from './booking-projection.service';
 import { BookingProjectionRepository } from './booking-projection.repository';
 import { BookingProjectionMetrics } from './booking-projection.metrics';
-import { BOOKING_EVENTS } from '@/domain-events/booking.events';
 
 export const PROJECTION_BOOKING_EVENTS = 'booking.**';
 

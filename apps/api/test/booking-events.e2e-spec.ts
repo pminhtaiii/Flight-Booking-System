@@ -11,6 +11,9 @@ import { BookingLifecycleService } from '@/booking-lifecycle/booking-lifecycle.s
 import { BookingProjectionRepository } from '@/booking-projection/booking-projection.repository';
 import { BookingEventPublisherService } from '@/domain-events/booking-event-publisher.service';
 import { BookingEventHydratorService } from '@/domain-events/booking-event-hydrator.service';
+import { DisruptionService } from '@/disruption/api/disruption.service';
+import { SupplierSyncService } from '@/disruption/sync/supplier-sync.service';
+import { DuffelService } from '@/duffel/duffel.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   BookingStatus,
@@ -61,6 +64,9 @@ describe('Booking Events & Projection Updates E2E (US2 - T033)', () => {
   let publisher: BookingEventPublisherService;
   let eventEmitter: EventEmitter2;
   let hydrator: BookingEventHydratorService;
+  let disruptionService: DisruptionService;
+  let supplierSyncService: SupplierSyncService;
+  let duffelService: DuffelService;
 
   const createdUserIds: string[] = [];
   const createdIntentIds: string[] = [];
@@ -110,6 +116,9 @@ describe('Booking Events & Projection Updates E2E (US2 - T033)', () => {
     publisher = moduleFixture.get<BookingEventPublisherService>(BookingEventPublisherService);
     eventEmitter = moduleFixture.get<EventEmitter2>(EventEmitter2);
     hydrator = moduleFixture.get<BookingEventHydratorService>(BookingEventHydratorService);
+    disruptionService = moduleFixture.get<DisruptionService>(DisruptionService);
+    supplierSyncService = moduleFixture.get<SupplierSyncService>(SupplierSyncService);
+    duffelService = moduleFixture.get<DuffelService>(DuffelService);
   });
 
   afterAll(async () => {
@@ -434,7 +443,7 @@ describe('Booking Events & Projection Updates E2E (US2 - T033)', () => {
   });
 
   describe('c. Cancellation Claims & Finalization', () => {
-    it('recordCancellationClaim: emits booking.cancellation.pending and updates projection status to CANCELLATION_PENDING', async () => {
+    it('claimCancellation: emits booking.cancellation.pending and updates projection status to CANCELLATION_PENDING', async () => {
       const user = await createTestUser();
       const intent = await createTestBookingIntent(user.id);
       const bookingId = `bk_canc_${randomUUID()}`;
@@ -458,7 +467,7 @@ describe('Booking Events & Projection Updates E2E (US2 - T033)', () => {
         return p && p.sourceVersion === 2 ? p : null;
       });
 
-      const claimResult = await lifecycleService.recordCancellationClaim(bookingId, user.id);
+      const claimResult = await lifecycleService.claimCancellation(bookingId, user.id);
       expect(claimResult.count).toBe(1);
 
       const projection = await waitForCondition(async () => {
@@ -471,7 +480,7 @@ describe('Booking Events & Projection Updates E2E (US2 - T033)', () => {
       expect(projection!.sourceVersion).toBe(3);
     });
 
-    it('finalizeCancellation: emits booking.cancelled and updates projection status to CANCELLED_NO_REFUND', async () => {
+    it('cancelBooking: emits booking.cancelled and updates projection status to CANCELLED_NO_REFUND', async () => {
       const user = await createTestUser();
       const intent = await createTestBookingIntent(user.id);
       const bookingId = `bk_canc_fin_${randomUUID()}`;
@@ -495,13 +504,13 @@ describe('Booking Events & Projection Updates E2E (US2 - T033)', () => {
         return p && p.sourceVersion === 2 ? p : null;
       });
 
-      await lifecycleService.recordCancellationClaim(bookingId, user.id);
+      await lifecycleService.claimCancellation(bookingId, user.id);
       await waitForCondition(async () => {
         const p = await prisma.bookingAgentProjection.findUnique({ where: { bookingId } });
         return p && p.sourceVersion === 3 ? p : null;
       });
 
-      const cancelResult = await lifecycleService.finalizeCancellation(
+      const cancelResult = await lifecycleService.cancelBooking(
         bookingId,
         BookingStatus.CANCELLED_NO_REFUND,
         '0.00',
@@ -520,7 +529,7 @@ describe('Booking Events & Projection Updates E2E (US2 - T033)', () => {
   });
 
   describe('d. Supplier Revision Sync & Disruption', () => {
-    it('recordSupplierRevision: emits booking.disruption.synced and updates projection with updated revision details', async () => {
+    it('SupplierSyncService: emits booking.disruption.synced and updates projection with updated revision details', async () => {
       const user = await createTestUser();
       const intent = await createTestBookingIntent(user.id);
       const bookingId = `bk_disr_${randomUUID()}`;
@@ -544,27 +553,36 @@ describe('Booking Events & Projection Updates E2E (US2 - T033)', () => {
         return p && p.sourceVersion === 2 ? p : null;
       });
 
-      // Initial revision v1
-      await createTestItineraryRevision(bookingId, 1);
-
-      // New revision v2 with changed departure time & destination
       const newDeparture = new Date(Date.now() + 172800000);
       const newArrival = new Date(Date.now() + 172800000 + 8 * 3600000);
-      const newRev = await createTestItineraryRevision(
-        bookingId,
-        2,
-        newDeparture,
-        newArrival,
-        'JFK',
-        'CDG',
-      );
+      const duffelSpy = jest.spyOn(duffelService, 'retrieveCompleteOrder').mockResolvedValueOnce({
+        id: 'ORD_DISR',
+        slices: [
+          {
+            id: 'sli_disr',
+            duration: 'PT8H',
+            segments: [
+              {
+                id: 'seg_disr',
+                departing_at: newDeparture.toISOString(),
+                arriving_at: newArrival.toISOString(),
+                origin: { iata_code: 'JFK', name: 'John F Kennedy Intl', city_name: 'New York' },
+                destination: { iata_code: 'CDG', name: 'Charles de Gaulle', city_name: 'Paris' },
+                operating_carrier: { iata_code: 'DL', name: 'Delta Air Lines' },
+                marketing_carrier: { iata_code: 'DL', name: 'Delta Air Lines' },
+                marketing_carrier_flight_number: '100',
+                duration: 'PT8H',
+                passengers: [{ cabin_class: 'economy' }],
+              },
+            ],
+          },
+        ],
+        passengers: [],
+      } as any);
 
-      await lifecycleService.recordSupplierRevision(bookingId, newRev.id, {
-        departureAt: newDeparture,
-        currentDepartureAt: newDeparture,
-        currentFinalArrivalAt: newArrival,
-        isMaterial: true,
-      });
+      const syncResult = await supplierSyncService.syncBooking(bookingId, 'WEBHOOK');
+      expect(syncResult.status).toBe('REVISION_CREATED');
+      duffelSpy.mockRestore();
 
       const projection = await waitForCondition(async () => {
         const p = await prisma.bookingAgentProjection.findUnique({ where: { bookingId } });
@@ -577,7 +595,7 @@ describe('Booking Events & Projection Updates E2E (US2 - T033)', () => {
       expect(new Date(projection!.departureAt).getTime()).toBe(newDeparture.getTime());
     });
 
-    it('recordDisruptionAcknowledgment: emits booking.disruption.acknowledged and updates projection', async () => {
+    it('DisruptionService: emits booking.disruption.acknowledged and updates projection', async () => {
       const user = await createTestUser();
       const intent = await createTestBookingIntent(user.id);
       const bookingId = `bk_disr_ack_${randomUUID()}`;
@@ -607,7 +625,7 @@ describe('Booking Events & Projection Updates E2E (US2 - T033)', () => {
         },
       });
 
-      await lifecycleService.recordDisruptionAcknowledgment(bookingId, rev.id, user.id);
+      await disruptionService.acknowledgeDisruption(bookingId, rev.id, user.id);
 
       const dbBooking = await prisma.booking.findUnique({ where: { id: bookingId } });
       expect(dbBooking!.disruptionStatus).toBe(DisruptionStatus.ACKNOWLEDGED);
@@ -620,7 +638,7 @@ describe('Booking Events & Projection Updates E2E (US2 - T033)', () => {
       expect(projection).toBeDefined();
     });
 
-    it('recordDisruptionAcceptance: emits booking.disruption.accepted and updates projection', async () => {
+    it('DisruptionService: emits booking.disruption.accepted and updates projection', async () => {
       const user = await createTestUser();
       const intent = await createTestBookingIntent(user.id);
       const bookingId = `bk_disr_acc_${randomUUID()}`;
@@ -649,7 +667,7 @@ describe('Booking Events & Projection Updates E2E (US2 - T033)', () => {
         },
       });
 
-      await lifecycleService.recordDisruptionAcceptance(bookingId, rev.id, user.id);
+      await disruptionService.acceptDisruption(bookingId, rev.id, user.id);
 
       const dbBooking = await prisma.booking.findUnique({ where: { id: bookingId } });
       expect(dbBooking!.disruptionStatus).toBe(DisruptionStatus.RESOLVED);
@@ -664,7 +682,7 @@ describe('Booking Events & Projection Updates E2E (US2 - T033)', () => {
   });
 
   describe('e. Refunds & Emission Isolation', () => {
-    it('recordRefundState: emits booking.refund.updated and updates projection', async () => {
+    it('updateBookingRefundStatus: emits booking.refund.updated and updates projection', async () => {
       const user = await createTestUser();
       const intent = await createTestBookingIntent(user.id);
       const bookingId = `bk_ref_state_${randomUUID()}`;
@@ -684,7 +702,7 @@ describe('Booking Events & Projection Updates E2E (US2 - T033)', () => {
         },
       });
 
-      const refundResult = await lifecycleService.recordRefundState(
+      const refundResult = await lifecycleService.updateBookingRefundStatus(
         bookingId,
         BookingStatus.CANCELLED_AND_REFUNDED,
         'SUCCEEDED',
@@ -896,7 +914,7 @@ describe('Booking Events & Projection Updates E2E (US2 - T033)', () => {
       expect(confirmedProj!.agentReference).toBe(stableReference);
 
       // 3. Cancellation claim
-      await lifecycleService.recordCancellationClaim(bookingId, user.id);
+      await lifecycleService.claimCancellation(bookingId, user.id);
       const cancelClaimProj = await waitForCondition(async () => {
         const p = await prisma.bookingAgentProjection.findUnique({ where: { bookingId } });
         return p && p.sourceVersion === 3 ? p : null;
@@ -904,7 +922,7 @@ describe('Booking Events & Projection Updates E2E (US2 - T033)', () => {
       expect(cancelClaimProj!.agentReference).toBe(stableReference);
 
       // 4. Final cancellation
-      await lifecycleService.finalizeCancellation(
+      await lifecycleService.cancelBooking(
         bookingId,
         BookingStatus.CANCELLED_NO_REFUND,
         '0.00',

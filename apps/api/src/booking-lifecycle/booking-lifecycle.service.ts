@@ -16,7 +16,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
-import { FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
+import { FlightSnapshot, FlightSegmentSnapshot, PassengerSnapshot } from '@shared/booking-types';
 import {
   BookingCreatedEvent,
   BookingConfirmedEvent,
@@ -25,9 +25,6 @@ import {
   BookingRecoveryResolvedEvent,
   BookingCancellationPendingEvent,
   BookingCancelledEvent,
-  BookingDisruptionSyncedEvent,
-  BookingDisruptionAcknowledgedEvent,
-  BookingDisruptionAcceptedEvent,
   BookingRefundUpdatedEvent,
   BookingEventPublisherService,
   PublishableEvent,
@@ -199,6 +196,8 @@ export class BookingLifecycleService {
       const raw = intent.rawOfferSnapshot as Record<string, unknown>;
       if (Array.isArray(raw.segments) && raw.segments.length > 0) {
         snapshotToStore = intent.rawOfferSnapshot as unknown as FlightSnapshot;
+      } else if (Array.isArray(raw.slices) && raw.slices.length > 0) {
+        snapshotToStore = this.parseDuffelRawOfferSnapshot(raw) ?? undefined;
       }
     }
 
@@ -652,7 +651,7 @@ export class BookingLifecycleService {
   async claimCancellation(
     bookingId: string,
     userId: string,
-    staleThreshold: Date,
+    staleThreshold: Date = new Date(Date.now() - 2 * 60 * 1000),
     tx?: Prisma.TransactionClient,
     context?: TransactionEventContext,
   ): Promise<{ count: number }> {
@@ -712,8 +711,8 @@ export class BookingLifecycleService {
 
   async cancelBooking(
     bookingId: string,
-    cancellationStatus: BookingStatus,
-    refundAmount: string,
+    cancellationStatus: BookingStatus = BookingStatus.CANCELLED_NO_REFUND,
+    refundAmount: string = '0.00',
     disruptionResolution?: {
       resolvedByType?: DisruptionActorType;
       resolvedById?: string;
@@ -811,7 +810,7 @@ export class BookingLifecycleService {
   async updateBookingRefundStatus(
     bookingId: string,
     targetStatus: BookingStatus,
-    refundStatus: string,
+    refundStatus: string = 'SUCCEEDED',
     reason?: string,
     tx?: Prisma.TransactionClient,
     context?: TransactionEventContext,
@@ -979,263 +978,159 @@ export class BookingLifecycleService {
     });
   }
 
-  async recordCancellationClaim(
-    bookingId: string,
-    userId: string,
-    staleThreshold: Date = new Date(Date.now() - 2 * 60 * 1000),
-    tx?: Prisma.TransactionClient,
-    context?: TransactionEventContext,
-  ): Promise<{ count: number }> {
-    return this.claimCancellation(bookingId, userId, staleThreshold, tx, context);
-  }
+  private parseDuffelRawOfferSnapshot(raw: Record<string, unknown>): FlightSnapshot | null {
+    if (!Array.isArray(raw.slices) || raw.slices.length === 0) {
+      return null;
+    }
 
-  async finalizeCancellation(
-    bookingId: string,
-    cancellationStatus: BookingStatus = BookingStatus.CANCELLED_NO_REFUND,
-    refundAmount: string = '0.00',
-    disruptionResolution?: {
-      resolvedByType?: DisruptionActorType;
-      resolvedById?: string;
-    },
-    tx?: Prisma.TransactionClient,
-    context?: TransactionEventContext,
-  ): Promise<{
-    count: number;
-    hasActiveDisruption: boolean;
-    activeDisruptionRevisionId: string | null;
-    previousDisruptionStatus: DisruptionStatus | null;
-  }> {
-    return this.cancelBooking(
-      bookingId,
-      cancellationStatus,
-      refundAmount,
-      disruptionResolution,
-      tx,
-      context,
-    );
-  }
+    let totalDuration =
+      typeof raw.total_duration === 'string'
+        ? raw.total_duration
+        : typeof raw.totalDuration === 'string'
+        ? raw.totalDuration
+        : 'PT0H';
+    let totalMinutes = 0;
+    let stops = 0;
+    let cabinClass =
+      typeof raw.cabinClass === 'string'
+        ? raw.cabinClass
+        : typeof raw.cabin_class === 'string'
+        ? raw.cabin_class
+        : 'economy';
+    const segments: FlightSegmentSnapshot[] = [];
+    let globalOrder = 0;
 
-  async recordSupplierRevision(
-    bookingId: string,
-    revisionId: string,
-    bookingData?: {
-      departureAt?: Date;
-      currentDepartureAt?: Date;
-      currentFinalArrivalAt?: Date;
-      status?: BookingStatus;
-      isMaterial?: boolean;
-    },
-    tx?: Prisma.TransactionClient,
-    context?: TransactionEventContext,
-  ): Promise<Booking> {
-    const { tx: resolvedTx, context: resolvedContext } = resolveTxAndContext(tx, context);
-
-    return this.executeMutation(resolvedContext, resolvedTx, async (client, events) => {
-      const updateData: Prisma.BookingUpdateInput = {
-        version: { increment: 1 },
-      };
-      if (bookingData?.departureAt !== undefined) updateData.departureAt = bookingData.departureAt;
-      if (bookingData?.currentDepartureAt !== undefined) {
-        updateData.currentDepartureAt = bookingData.currentDepartureAt;
+    for (let sliceOrder = 0; sliceOrder < raw.slices.length; sliceOrder++) {
+      const slice = raw.slices[sliceOrder] as Record<string, unknown> | null;
+      if (!slice) continue;
+      if (typeof slice.duration === 'string') {
+        totalMinutes += this.parseIsoDurationToMinutes(slice.duration);
       }
-      if (bookingData?.currentFinalArrivalAt !== undefined) {
-        updateData.currentFinalArrivalAt = bookingData.currentFinalArrivalAt;
-      }
-      if (bookingData?.status !== undefined) updateData.status = bookingData.status;
+      if (Array.isArray(slice.segments)) {
+        stops += Math.max(0, slice.segments.length - 1);
+        for (let segmentOrder = 0; segmentOrder < slice.segments.length; segmentOrder++) {
+          const seg = slice.segments[segmentOrder] as Record<string, any> | null;
+          if (!seg) continue;
 
-      const updateResult = await client.booking.updateMany({
-        where: { id: bookingId },
-        data: updateData,
-      });
+          if (Array.isArray(seg.passengers) && seg.passengers[0]?.cabin_class) {
+            cabinClass = seg.passengers[0].cabin_class;
+          } else if (seg.cabin_class) {
+            cabinClass = seg.cabin_class;
+          }
 
-      if (updateResult.count === 0) {
-        throw new NotFoundException(`Booking ${bookingId} not found`);
-      }
+          const operatingCarrier = seg.operating_carrier || seg.operatingCarrier;
+          const marketingCarrier = seg.marketing_carrier || seg.marketingCarrier;
+          const airlineObj = seg.airline;
+          const airlineName =
+            operatingCarrier?.name ||
+            marketingCarrier?.name ||
+            (typeof airlineObj === 'object' && airlineObj?.name) ||
+            'Unknown';
+          const airlineIata =
+            operatingCarrier?.iata_code ||
+            operatingCarrier?.iataCode ||
+            marketingCarrier?.iata_code ||
+            marketingCarrier?.iataCode ||
+            (typeof airlineObj === 'object' && (airlineObj?.iata_code || airlineObj?.iataCode)) ||
+            'XX';
 
-      if (bookingData?.isMaterial) {
-        await client.booking.update({
-          where: { id: bookingId },
-          data: {
-            activeDisruptionRevision: {
-              connect: { id: revisionId },
+          const flightNumber =
+            seg.marketing_carrier_flight_number ||
+            seg.marketingCarrierFlightNumber ||
+            seg.flight_number ||
+            seg.flightNumber ||
+            '0000';
+
+          const origin = seg.origin || {};
+          const destination = seg.destination || {};
+
+          const depIata = origin.iata_code || origin.iataCode || '';
+          const depName = origin.name || '';
+          const depCity =
+            origin.city_name ||
+            origin.cityName ||
+            origin.city?.name ||
+            (typeof origin.city === 'string' ? origin.city : '') ||
+            origin.name ||
+            '';
+          const depTerminal = seg.origin_terminal ?? seg.originTerminal ?? undefined;
+
+          const arrIata = destination.iata_code || destination.iataCode || '';
+          const arrName = destination.name || '';
+          const arrCity =
+            destination.city_name ||
+            destination.cityName ||
+            destination.city?.name ||
+            (typeof destination.city === 'string' ? destination.city : '') ||
+            destination.name ||
+            '';
+          const arrTerminal = seg.destination_terminal ?? seg.destinationTerminal ?? undefined;
+
+          const departureAt = seg.departing_at || seg.departureAt || '';
+          const arrivalAt = seg.arriving_at || seg.arrivalAt || '';
+          const duration = seg.duration || '';
+
+          segments.push({
+            airline: {
+              name: airlineName,
+              iataCode: airlineIata,
             },
-          },
-        });
-      }
-
-      const updated = await client.booking.findUnique({ where: { id: bookingId } });
-      if (!updated) {
-        throw new NotFoundException(`Booking ${bookingId} not found`);
-      }
-
-      events.push(
-        new BookingDisruptionSyncedEvent({
-          bookingId,
-          eventId: randomUUID(),
-          sourceVersion: updated.version,
-          revisionId,
-          status: updated.status,
-          timestamp: new Date(),
-        }),
-      );
-
-      return updated;
-    });
-  }
-
-  async recordDisruptionAcknowledgment(
-    bookingId: string,
-    revisionId: string,
-    userId: string,
-    tx?: Prisma.TransactionClient,
-    context?: TransactionEventContext,
-  ): Promise<Booking> {
-    const { tx: resolvedTx, context: resolvedContext } = resolveTxAndContext(tx, context);
-
-    return this.executeMutation(resolvedContext, resolvedTx, async (client, events) => {
-      const current = await client.booking.findUnique({ where: { id: bookingId } });
-      if (!current) {
-        throw new NotFoundException('Booking not found');
-      }
-      if (current.userId !== userId) {
-        throw new ForbiddenException('Insufficient permissions');
-      }
-
-      const updateResult = await client.booking.updateMany({
-        where: {
-          id: bookingId,
-          activeDisruptionRevisionId: revisionId,
-          disruptionStatus: { in: [DisruptionStatus.DETECTED, DisruptionStatus.ACKNOWLEDGED] },
-        },
-        data: {
-          disruptionStatus: DisruptionStatus.ACKNOWLEDGED,
-          version: { increment: 1 },
-        },
-      });
-
-      if (updateResult.count === 0) {
-        const reloaded = await client.booking.findUnique({ where: { id: bookingId } });
-        if (
-          reloaded &&
-          reloaded.activeDisruptionRevisionId === revisionId &&
-          reloaded.disruptionStatus === DisruptionStatus.ACKNOWLEDGED
-        ) {
-          return reloaded;
+            flightNumber,
+            departureAirport: {
+              iataCode: depIata,
+              name: depName,
+              city: depCity,
+              terminal: depTerminal !== null ? depTerminal : undefined,
+            },
+            arrivalAirport: {
+              iataCode: arrIata,
+              name: arrName,
+              city: arrCity,
+              terminal: arrTerminal !== null ? arrTerminal : undefined,
+            },
+            departureAt,
+            arrivalAt,
+            duration,
+            aircraftType: seg.aircraft?.name || seg.aircraftType || undefined,
+            duffelSegmentId: seg.id || seg.duffelSegmentId || undefined,
+            sliceOrder,
+            segmentOrder,
+            globalOrder: globalOrder++,
+          });
         }
-        throw new ConflictException({
-          code: 'STALE_DISRUPTION_REVISION',
-          activeRevisionId: reloaded?.activeDisruptionRevisionId ?? null,
-          disruptionStatus: reloaded?.disruptionStatus ?? null,
-        });
       }
+    }
 
-      const updated = await client.booking.findUnique({ where: { id: bookingId } });
-      if (!updated) {
-        throw new NotFoundException('Booking not found');
-      }
+    if (totalMinutes > 0 && totalDuration === 'PT0H') {
+      totalDuration = this.formatMinutesToIsoDuration(totalMinutes);
+    }
 
-      events.push(
-        new BookingDisruptionAcknowledgedEvent({
-          bookingId,
-          eventId: randomUUID(),
-          sourceVersion: updated.version,
-          disruptionId: revisionId,
-          status: DisruptionStatus.ACKNOWLEDGED,
-          timestamp: new Date(),
-        }),
-      );
-
-      return updated;
-    });
+    return {
+      segments,
+      totalDuration,
+      stops,
+      cabinClass,
+    };
   }
 
-  async recordDisruptionAcceptance(
-    bookingId: string,
-    revisionId: string,
-    userId: string,
-    tx?: Prisma.TransactionClient,
-    context?: TransactionEventContext,
-  ): Promise<Booking> {
-    const { tx: resolvedTx, context: resolvedContext } = resolveTxAndContext(tx, context);
-
-    return this.executeMutation(resolvedContext, resolvedTx, async (client, events) => {
-      const current = await client.booking.findUnique({ where: { id: bookingId } });
-      if (!current) {
-        throw new NotFoundException('Booking not found');
-      }
-      if (current.userId !== userId) {
-        throw new ForbiddenException('Insufficient permissions');
-      }
-
-      const now = new Date();
-      const updateResult = await client.booking.updateMany({
-        where: {
-          id: bookingId,
-          activeDisruptionRevisionId: revisionId,
-          disruptionStatus: { in: [DisruptionStatus.DETECTED, DisruptionStatus.ACKNOWLEDGED] },
-        },
-        data: {
-          disruptionStatus: DisruptionStatus.RESOLVED,
-          disruptionResolvedReason: 'TRAVELLER_ACCEPTED',
-          disruptionResolvedAt: now,
-          disruptionResolvedByType: DisruptionActorType.TRAVELLER,
-          disruptionResolvedById: userId,
-          version: { increment: 1 },
-        },
-      });
-
-      if (updateResult.count === 0) {
-        const reloaded = await client.booking.findUnique({ where: { id: bookingId } });
-        if (
-          reloaded &&
-          reloaded.activeDisruptionRevisionId === revisionId &&
-          reloaded.disruptionStatus === DisruptionStatus.RESOLVED
-        ) {
-          return reloaded;
-        }
-        throw new ConflictException({
-          code: 'STALE_DISRUPTION_REVISION',
-          activeRevisionId: reloaded?.activeDisruptionRevisionId ?? null,
-          disruptionStatus: reloaded?.disruptionStatus ?? null,
-        });
-      }
-
-      const updated = await client.booking.findUnique({ where: { id: bookingId } });
-      if (!updated) {
-        throw new NotFoundException('Booking not found');
-      }
-
-      events.push(
-        new BookingDisruptionAcceptedEvent({
-          bookingId,
-          eventId: randomUUID(),
-          sourceVersion: updated.version,
-          disruptionId: revisionId,
-          status: 'RESOLVED',
-          timestamp: now,
-        }),
-      );
-
-      return updated;
-    });
+  private parseIsoDurationToMinutes(durationStr: string): number {
+    if (!durationStr || typeof durationStr !== 'string') return 0;
+    const matches = durationStr.match(/P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?/);
+    if (!matches) return 0;
+    const days = parseInt(matches[1] || '0', 10);
+    const hours = parseInt(matches[2] || '0', 10);
+    const minutes = parseInt(matches[3] || '0', 10);
+    return days * 24 * 60 + hours * 60 + minutes;
   }
 
-  async recordRefundState(
-    bookingId: string,
-    targetStatus: BookingStatus,
-    refundStatus: string = 'SUCCEEDED',
-    reason?: string,
-    tx?: Prisma.TransactionClient,
-    context?: TransactionEventContext,
-  ): Promise<{ count: number; updatedBooking?: Booking }> {
-    return this.updateBookingRefundStatus(
-      bookingId,
-      targetStatus,
-      refundStatus,
-      reason,
-      tx,
-      context,
-    );
+  private formatMinutesToIsoDuration(totalMinutes: number): string {
+    if (totalMinutes <= 0) return 'PT0H';
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    let result = 'PT';
+    if (hours > 0) result += `${hours}H`;
+    if (minutes > 0) result += `${minutes}M`;
+    return result;
   }
 }
 
