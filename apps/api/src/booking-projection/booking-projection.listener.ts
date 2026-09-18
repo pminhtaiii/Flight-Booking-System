@@ -5,7 +5,6 @@ import { BookingEventHydratorService } from '@/domain-events/booking-event-hydra
 import { BookingProjectionService } from './booking-projection.service';
 import { BookingProjectionRepository } from './booking-projection.repository';
 import { BookingProjectionMetrics } from './booking-projection.metrics';
-
 export const PROJECTION_BOOKING_EVENTS = 'booking.**';
 
 @Injectable()
@@ -108,10 +107,12 @@ export class BookingProjectionListener {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error({
         message: 'Failed to process booking projection event',
+        eventName,
         bookingId: (event as unknown as { bookingId?: string })?.bookingId,
         eventId: (event as unknown as { eventId?: string })?.eventId,
         sourceVersion: (event as unknown as { sourceVersion?: number })?.sourceVersion,
         error: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined,
       });
       this.metrics.incrementEventsTotal(eventName, 'ERROR');
     } finally {

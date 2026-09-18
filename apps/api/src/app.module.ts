@@ -139,6 +139,18 @@ export const envSchema = z
     BookingIntentModule,
     BookingModule,
     BookingLifecycleModule,
+    /**
+     * Architectural Note: Feature 024 Event-Driven Projection Cutover
+     *
+     * US2 (event-driven safe booking projection) and US3 (reconciliation repair loop)
+     * share a single atomic deployment boundary (tasks.md lines 36, 81; plan.md line 28).
+     *
+     * In accordance with T032, BookingProjectionModule is registered here alongside root
+     * EventEmitterModule.forRoot to support event-driven projection updates in this feature branch.
+     * Full production cutover requires Phase 5 (US3 reconciliation loop, tasks T035-T040)
+     * to be completed on branch 024-event-driven-module-deepening before merging to development,
+     * ensuring transient in-memory dispatch losses or restarts are repaired autonomously by DB scan.
+     */
     BookingProjectionModule,
     BookingManagementModule,
     CancellationModule,

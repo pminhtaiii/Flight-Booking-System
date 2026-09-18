@@ -164,7 +164,7 @@ describe('BookingProjectionListener', () => {
   });
 
   describe('b) Confirms only booking.* events are subscribed; refund.settled is NOT subscribed', () => {
-    it('verifies OnEvent decorator metadata targets booking.* and strictly excludes refund.settled', () => {
+    it('verifies OnEvent decorator metadata targets booking.** and strictly excludes refund.settled', () => {
       const metadata = Reflect.getMetadata('EVENT_LISTENER_METADATA', BookingProjectionListener.prototype.handleBookingEvent);
       expect(metadata).toBeDefined();
       expect(Array.isArray(metadata)).toBe(true);
