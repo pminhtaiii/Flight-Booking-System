@@ -10,6 +10,13 @@ import {
   RefundStatus,
 } from '@prisma/client';
 import * as crypto from 'crypto';
+import { randomUUID } from 'crypto';
+import {
+  BookingEventPublisherService,
+  BookingRefundUpdatedEvent,
+  PublishableEvent,
+  RefundSettledEvent,
+} from '@/domain-events';
 import {
   RefundProvenanceSource,
   RefundSettlementInput,
@@ -26,6 +33,7 @@ export class RefundSettlementService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly publisher: BookingEventPublisherService,
   ) {}
 
   private mapProvenanceToEventSource(source: RefundProvenanceSource): PaymentEventSource {
@@ -85,7 +93,11 @@ export class RefundSettlementService {
   }
 
   async settleVerifiedOutcome(input: RefundSettlementInput): Promise<RefundSettlementResult> {
-    return this.prisma.$transaction(async (tx) => {
+    let eventsToPublish: PublishableEvent[] = [];
+
+    const result = await this.prisma.$transaction<RefundSettlementResult>(async (tx) => {
+      const context = this.publisher.createContext(tx);
+      const now = new Date();
       const lockedRefunds = await tx.$queryRaw<
         Array<{
           id: string;
@@ -167,7 +179,7 @@ export class RefundSettlementService {
         this.logSettlementTelemetry('NO_OP', input.provenance.source, refund.status);
         return {
           applied: false,
-          transactionStatus: refund.status,
+          transactionStatus: refund.status as 'FAILED' | 'REFUND_FAILED_NEEDS_ATTENTION',
           paymentStatus: refund.payment.status,
           bookingStatus: booking?.status,
         };
@@ -268,8 +280,20 @@ export class RefundSettlementService {
           },
         });
 
-        let finalBookingStatus: BookingStatus | undefined = undefined;
         const obligation = refund.cancellationRefundObligation;
+
+        (context.events as PublishableEvent[]).push(
+          new RefundSettledEvent({
+            eventId: randomUUID(),
+            refundId: refund.id,
+            amount: refund.amount,
+            currency: refund.currency,
+            timestamp: now,
+            bookingId: obligation?.bookingId,
+          }),
+        );
+
+        let finalBookingStatus: BookingStatus | undefined = undefined;
 
         if (obligation) {
           const obligationSucceeded = await tx.refund.findMany({
@@ -291,10 +315,24 @@ export class RefundSettlementService {
           }
 
           if (obligation.booking && obligation.booking.status !== finalBookingStatus) {
-            await tx.booking.update({
+            const updatedBooking = await tx.booking.update({
               where: { id: obligation.bookingId },
-              data: { status: finalBookingStatus },
+              data: {
+                status: finalBookingStatus,
+                version: { increment: 1 },
+              },
             });
+
+            (context.events as PublishableEvent[]).push(
+              new BookingRefundUpdatedEvent({
+                bookingId: obligation.bookingId,
+                eventId: randomUUID(),
+                sourceVersion: updatedBooking?.version ?? (obligation.booking.version ?? 1) + 1,
+                status: finalBookingStatus,
+                refundStatus: RefundStatus.SUCCEEDED,
+                timestamp: now,
+              }),
+            );
           }
         }
 
@@ -316,6 +354,8 @@ export class RefundSettlementService {
         });
 
         this.logSettlementTelemetry('APPLIED', input.provenance.source, RefundStatus.SUCCEEDED);
+
+        eventsToPublish = [...context.events] as PublishableEvent[];
 
         return {
           applied: true,
@@ -345,11 +385,27 @@ export class RefundSettlementService {
       let finalBookingStatus: BookingStatus | undefined = booking?.status;
       if (targetStatus === RefundStatus.REFUND_FAILED_NEEDS_ATTENTION) {
         finalBookingStatus = BookingStatus.REFUND_FAILED_NEEDS_ATTENTION;
-        if (refund.cancellationRefundObligation?.bookingId) {
-          await tx.booking.updateMany({
-            where: { id: refund.cancellationRefundObligation.bookingId },
-            data: { status: BookingStatus.REFUND_FAILED_NEEDS_ATTENTION },
+        const bookingId = refund.cancellationRefundObligation?.bookingId;
+        if (bookingId) {
+          const updatedBooking = await tx.booking.update({
+            where: { id: bookingId },
+            data: {
+              status: BookingStatus.REFUND_FAILED_NEEDS_ATTENTION,
+              version: { increment: 1 },
+            },
           });
+
+          (context.events as PublishableEvent[]).push(
+            new BookingRefundUpdatedEvent({
+              bookingId,
+              eventId: randomUUID(),
+              sourceVersion: updatedBooking?.version ?? (booking?.version ?? 1) + 1,
+              status: BookingStatus.REFUND_FAILED_NEEDS_ATTENTION,
+              refundStatus: RefundStatus.REFUND_FAILED_NEEDS_ATTENTION,
+              reason: input.outcome.errorCode,
+              timestamp: now,
+            }),
+          );
         }
       }
 
@@ -434,6 +490,8 @@ export class RefundSettlementService {
 
       this.logSettlementTelemetry('APPLIED', input.provenance.source, targetStatus);
 
+      eventsToPublish = [...context.events] as PublishableEvent[];
+
       return {
         applied: true,
         transactionStatus: targetStatus,
@@ -441,5 +499,11 @@ export class RefundSettlementService {
         bookingStatus: finalBookingStatus,
       };
     });
+
+    if (eventsToPublish.length > 0) {
+      await this.publisher.publish(eventsToPublish);
+    }
+
+    return result;
   }
 }

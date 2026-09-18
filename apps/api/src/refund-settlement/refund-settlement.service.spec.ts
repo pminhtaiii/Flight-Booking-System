@@ -8,6 +8,11 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
+import {
+  BookingEventPublisherService,
+  BookingRefundUpdatedEvent,
+  RefundSettledEvent,
+} from '@/domain-events';
 import { RefundSettlementService } from './refund-settlement.service';
 import { RefundSettlementInput } from './refund-settlement.types';
 
@@ -40,6 +45,10 @@ describe('RefundSettlementService', () => {
   let mockAuditService: {
     createLog: jest.Mock;
   };
+  let mockPublisher: {
+    createContext: jest.Mock;
+    publish: jest.Mock;
+  };
   let logSpy: jest.SpyInstance;
   let warnSpy: jest.SpyInstance;
   let errorSpy: jest.SpyInstance;
@@ -65,7 +74,7 @@ describe('RefundSettlementService', () => {
         update: jest.fn(),
       },
       booking: {
-        update: jest.fn(),
+        update: jest.fn().mockResolvedValue({ id: 'book_123', version: 2 }),
         updateMany: jest.fn(),
       },
       ledgerEntry: {
@@ -84,9 +93,15 @@ describe('RefundSettlementService', () => {
       createLog: jest.fn().mockResolvedValue(undefined),
     };
 
+    mockPublisher = {
+      createContext: jest.fn((tx) => ({ tx, events: [] })),
+      publish: jest.fn().mockResolvedValue(undefined),
+    };
+
     service = new RefundSettlementService(
       mockPrisma as unknown as PrismaService,
       mockAuditService as unknown as AuditService,
+      mockPublisher as unknown as BookingEventPublisherService,
     );
   });
 
@@ -217,7 +232,10 @@ describe('RefundSettlementService', () => {
 
       expect(mockTx.booking.update).toHaveBeenCalledWith({
         where: { id: 'book_123' },
-        data: { status: BookingStatus.CANCELLED_AND_REFUNDED },
+        data: {
+          status: BookingStatus.CANCELLED_AND_REFUNDED,
+          version: { increment: 1 },
+        },
       });
 
       expect(mockTx.paymentEvent.create).toHaveBeenCalledWith({
@@ -407,7 +425,10 @@ describe('RefundSettlementService', () => {
       });
       expect(mockTx.booking.update).toHaveBeenCalledWith({
         where: { id: 'book_300' },
-        data: { status: BookingStatus.CANCELLED_AND_REFUNDED },
+        data: {
+          status: BookingStatus.CANCELLED_AND_REFUNDED,
+          version: { increment: 1 },
+        },
       });
     });
 
@@ -545,7 +566,10 @@ describe('RefundSettlementService', () => {
       expect(result.bookingStatus).toBe(BookingStatus.CANCELLED_NO_REFUND);
       expect(mockTx.booking.update).toHaveBeenCalledWith({
         where: { id: 'book_123' },
-        data: { status: BookingStatus.CANCELLED_NO_REFUND },
+        data: {
+          status: BookingStatus.CANCELLED_NO_REFUND,
+          version: { increment: 1 },
+        },
       });
     });
 
@@ -696,6 +720,184 @@ describe('RefundSettlementService', () => {
           }),
         }),
       );
+    });
+
+    it('should emit RefundSettledEvent post-commit on non-replay success', async () => {
+      mockTx.refund.findUnique.mockResolvedValue(baseRefundRow);
+      mockTx.refund.findMany.mockResolvedValue([{ amount: 20000 }]);
+
+      await service.settleVerifiedOutcome(baseInput);
+
+      expect(mockPublisher.createContext).toHaveBeenCalledWith(mockTx);
+      expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
+      const publishedBatch = mockPublisher.publish.mock.calls[0][0];
+      const refundSettled = publishedBatch.find((e: any) => e instanceof RefundSettledEvent);
+      expect(refundSettled).toBeDefined();
+      expect(refundSettled).toMatchObject({
+        refundId: 'ref_123',
+        amount: 20000,
+        currency: 'USD',
+        bookingId: 'book_123',
+      });
+      expect(refundSettled.eventId).toBeDefined();
+      expect(refundSettled.timestamp).toBeInstanceOf(Date);
+    });
+
+    it('should increment booking version and emit BookingRefundUpdatedEvent post-commit on booking status transition', async () => {
+      mockTx.refund.findUnique.mockResolvedValue(baseRefundRow);
+      mockTx.refund.findMany.mockResolvedValue([{ amount: 20000 }]);
+      mockTx.booking.update.mockResolvedValue({ id: 'book_123', version: 2 });
+
+      await service.settleVerifiedOutcome(baseInput);
+
+      expect(mockTx.booking.update).toHaveBeenCalledWith({
+        where: { id: 'book_123' },
+        data: {
+          status: BookingStatus.CANCELLED_AND_REFUNDED,
+          version: { increment: 1 },
+        },
+      });
+
+      expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
+      const publishedBatch = mockPublisher.publish.mock.calls[0][0];
+      const bookingRefundUpdated = publishedBatch.find(
+        (e: any) => e instanceof BookingRefundUpdatedEvent,
+      );
+      expect(bookingRefundUpdated).toBeDefined();
+      expect(bookingRefundUpdated).toMatchObject({
+        bookingId: 'book_123',
+        status: BookingStatus.CANCELLED_AND_REFUNDED,
+        refundStatus: RefundStatus.SUCCEEDED,
+        sourceVersion: 2,
+      });
+      expect(bookingRefundUpdated.eventId).toBeDefined();
+      expect(bookingRefundUpdated.timestamp).toBeInstanceOf(Date);
+    });
+
+    it('should emit refund.settled without a booking event or version bump when refund succeeds with NO booking state change', async () => {
+      const partialRefundRow = {
+        ...baseRefundRow,
+        amount: 10000,
+        cancellationRefundObligation: {
+          ...baseRefundRow.cancellationRefundObligation,
+          totalAmount: 30000,
+          booking: {
+            id: 'book_123',
+            status: BookingStatus.CANCELLED_PENDING_REFUND,
+            version: 3,
+          },
+        },
+      };
+
+      mockTx.refund.findUnique.mockResolvedValue(partialRefundRow);
+      mockTx.refund.findMany.mockImplementation((args) => {
+        if (args.where.cancellationRefundObligationId) {
+          return [{ amount: 10000 }];
+        }
+        if (args.where.paymentId) {
+          return [{ amount: 10000 }];
+        }
+        return [];
+      });
+
+      const partialInput: RefundSettlementInput = {
+        ...baseInput,
+        money: { amount: 10000, currency: 'USD' },
+      };
+
+      await service.settleVerifiedOutcome(partialInput);
+
+      expect(mockTx.booking.update).not.toHaveBeenCalled();
+
+      expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
+      const publishedBatch = mockPublisher.publish.mock.calls[0][0];
+      expect(publishedBatch).toHaveLength(1);
+      expect(publishedBatch[0]).toBeInstanceOf(RefundSettledEvent);
+      expect(publishedBatch[0]).toMatchObject({
+        refundId: 'ref_123',
+        amount: 10000,
+        currency: 'USD',
+        bookingId: 'book_123',
+      });
+      const hasBookingEvent = publishedBatch.some(
+        (e: any) => e instanceof BookingRefundUpdatedEvent,
+      );
+      expect(hasBookingEvent).toBe(false);
+    });
+
+    it('should increment booking version and emit BookingRefundUpdatedEvent on REFUND_FAILED_NEEDS_ATTENTION', async () => {
+      mockTx.refund.findUnique.mockResolvedValue({
+        ...baseRefundRow,
+        cancellationRefundObligation: {
+          ...baseRefundRow.cancellationRefundObligation,
+          booking: {
+            id: 'book_123',
+            status: BookingStatus.CANCELLED_PENDING_REFUND,
+            version: 1,
+          },
+        },
+      });
+      mockTx.refund.findMany.mockResolvedValue([]);
+      mockTx.booking.update.mockResolvedValue({ id: 'book_123', version: 2 });
+
+      const attentionInput: RefundSettlementInput = {
+        transactionId: 'ref_123',
+        money: { amount: 20000, currency: 'USD' },
+        outcome: {
+          status: 'FAILED',
+          errorCode: 'STRIPE_REQUIRES_ATTENTION',
+          occurredAt: '2026-08-22T10:00:00.000Z',
+        },
+        provenance: {
+          source: 'CRON',
+        },
+      };
+
+      await service.settleVerifiedOutcome(attentionInput);
+
+      expect(mockTx.booking.update).toHaveBeenCalledWith({
+        where: { id: 'book_123' },
+        data: {
+          status: BookingStatus.REFUND_FAILED_NEEDS_ATTENTION,
+          version: { increment: 1 },
+        },
+      });
+
+      expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
+      const publishedBatch = mockPublisher.publish.mock.calls[0][0];
+      expect(publishedBatch).toHaveLength(1);
+      const bookingRefundUpdated = publishedBatch[0];
+      expect(bookingRefundUpdated).toBeInstanceOf(BookingRefundUpdatedEvent);
+      expect(bookingRefundUpdated).toMatchObject({
+        bookingId: 'book_123',
+        status: BookingStatus.REFUND_FAILED_NEEDS_ATTENTION,
+        refundStatus: RefundStatus.REFUND_FAILED_NEEDS_ATTENTION,
+        reason: 'STRIPE_REQUIRES_ATTENTION',
+        sourceVersion: 2,
+      });
+      const hasSettledFact = publishedBatch.some((e: any) => e instanceof RefundSettledEvent);
+      expect(hasSettledFact).toBe(false);
+    });
+
+    it('should discard all events on transaction rollback', async () => {
+      mockTx.refund.findUnique.mockResolvedValue(baseRefundRow);
+      mockTx.ledgerEntry.create.mockRejectedValueOnce(new Error('Transaction aborted'));
+
+      await expect(service.settleVerifiedOutcome(baseInput)).rejects.toThrow('Transaction aborted');
+
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
+    });
+
+    it('should publish zero events on replay of SUCCEEDED', async () => {
+      mockTx.refund.findUnique.mockResolvedValue({
+        ...baseRefundRow,
+        status: RefundStatus.SUCCEEDED,
+      });
+
+      const result = await service.settleVerifiedOutcome(baseInput);
+
+      expect(result.applied).toBe(false);
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
   });
 });
