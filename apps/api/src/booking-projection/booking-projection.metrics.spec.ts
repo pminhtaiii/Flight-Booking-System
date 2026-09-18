@@ -272,9 +272,13 @@ describe('BookingProjectionMetrics', () => {
   });
 
   describe('Health snapshot: getHealthSnapshot()', () => {
-    it('returns status ok with empty/zero metrics on initial state', () => {
-      const snapshot = metrics.getHealthSnapshot();
+    it('returns status ok with empty/zero metrics on initial state', async () => {
+      const snapshot = await metrics.getHealthSnapshot();
       expect(snapshot.status).toBe('ok');
+      expect(snapshot.dependencies).toEqual({
+        database: 'up',
+        redis: 'up',
+      });
       expect(snapshot.metrics.reconciliation.passes).toEqual({
         success: 0,
         error: 0,
@@ -291,14 +295,14 @@ describe('BookingProjectionMetrics', () => {
       expect(snapshot.metrics.reconciliation.duration.count).toBe(0);
     });
 
-    it('returns status ok with populated metrics when no failures or pass errors exist', () => {
+    it('returns status ok with populated metrics when no failures or pass errors exist', async () => {
       metrics.incrementEventsTotal('booking.created', 'SUCCESS');
       metrics.incrementReconciliationPassTotal('SUCCESS');
       metrics.incrementReconciliationStaleFoundTotal(2);
       metrics.incrementReconciliationRepairedTotal(2);
       metrics.recordReconciliationDuration(150);
 
-      const snapshot = metrics.getHealthSnapshot();
+      const snapshot = await metrics.getHealthSnapshot();
       expect(snapshot.status).toBe('ok');
       expect(snapshot.metrics.reconciliation.passes.success).toBe(1);
       expect(snapshot.metrics.reconciliation.passes.error).toBe(0);
@@ -309,20 +313,230 @@ describe('BookingProjectionMetrics', () => {
       expect(snapshot.metrics.failures).toEqual({});
     });
 
-    it('returns status degraded when failure counters are non-zero', () => {
+    it('preserves failure counters without marking status degraded when no pass errors exist', async () => {
       metrics.incrementFailureTotal('HYDRATION_FAILED', 1);
 
-      const snapshot = metrics.getHealthSnapshot();
-      expect(snapshot.status).toBe('degraded');
+      const snapshot = await metrics.getHealthSnapshot();
+      expect(snapshot.status).toBe('ok');
       expect(snapshot.metrics.failures['HYDRATION_FAILED']).toBe(1);
     });
 
-    it('returns status degraded when reconciliation pass has errors', () => {
+    it('returns status degraded when reconciliation pass has errors', async () => {
       metrics.incrementReconciliationPassTotal('ERROR', 1);
 
-      const snapshot = metrics.getHealthSnapshot();
+      const snapshot = await metrics.getHealthSnapshot();
       expect(snapshot.status).toBe('degraded');
       expect(snapshot.metrics.reconciliation.passes.error).toBe(1);
+    });
+
+    it('recovers status from degraded back to ok when transient failure is followed by successful reconciliation pass', async () => {
+      // 1. Initial state is ok
+      let snapshot = await metrics.getHealthSnapshot();
+      expect(snapshot.status).toBe('ok');
+
+      // 2. Reconciliation error occurs -> status degraded
+      metrics.incrementReconciliationPassTotal('ERROR', 1);
+      metrics.incrementFailureTotal('HYDRATION_FAILED', 1);
+      snapshot = await metrics.getHealthSnapshot();
+      expect(snapshot.status).toBe('degraded');
+      expect(snapshot.metrics.failures['HYDRATION_FAILED']).toBe(1);
+      expect(snapshot.metrics.reconciliation.passes.error).toBe(1);
+
+      // 3. Successful reconciliation pass occurs -> status recovers to ok even though failure counters remain
+      metrics.incrementReconciliationPassTotal('SUCCESS', 1);
+      snapshot = await metrics.getHealthSnapshot();
+      expect(snapshot.status).toBe('ok');
+      expect(snapshot.metrics.failures['HYDRATION_FAILED']).toBe(1);
+      expect(snapshot.metrics.reconciliation.passes.success).toBe(1);
+      expect(snapshot.metrics.reconciliation.passes.error).toBe(1);
+
+      // 4. Reconciliation error occurs -> status degraded again
+      metrics.incrementReconciliationPassTotal('ERROR', 1);
+      snapshot = await metrics.getHealthSnapshot();
+      expect(snapshot.status).toBe('degraded');
+
+      // 5. Subsequent successful pass recovers back to ok
+      metrics.incrementReconciliationPassTotal('SUCCESS', 1);
+      snapshot = await metrics.getHealthSnapshot();
+      expect(snapshot.status).toBe('ok');
+      expect(snapshot.metrics.reconciliation.passes.error).toBe(2);
+    });
+
+    it('degrades status when consecutive pass errors reach threshold of 3', async () => {
+      metrics.incrementReconciliationPassTotal('ERROR', 1);
+      metrics.incrementReconciliationPassTotal('ERROR', 1);
+      expect(metrics.getConsecutivePassErrors()).toBe(2);
+
+      metrics.incrementReconciliationPassTotal('ERROR', 1);
+      expect(metrics.getConsecutivePassErrors()).toBe(3);
+
+      const snapshot = await metrics.getHealthSnapshot();
+      expect(snapshot.status).toBe('degraded');
+    });
+  });
+
+  describe('Redis persistence and dependencies', () => {
+    let mockCacheService: {
+      incrby: jest.Mock;
+      lpush: jest.Mock;
+      ltrim: jest.Mock;
+      lrange: jest.Mock;
+      keys: jest.Mock;
+      get: jest.Mock;
+      checkHealth: jest.Mock;
+      del: jest.Mock;
+    };
+    let mockPrisma: {
+      $transaction: jest.Mock;
+    };
+    let distributedMetrics: BookingProjectionMetrics;
+
+    beforeEach(() => {
+      mockCacheService = {
+        incrby: jest.fn().mockResolvedValue(1),
+        lpush: jest.fn().mockResolvedValue(1),
+        ltrim: jest.fn().mockResolvedValue(undefined),
+        lrange: jest.fn().mockResolvedValue([]),
+        keys: jest.fn().mockResolvedValue([]),
+        get: jest.fn().mockResolvedValue(null),
+        checkHealth: jest.fn().mockResolvedValue('up'),
+        del: jest.fn().mockResolvedValue(undefined),
+      };
+      mockPrisma = {
+        $transaction: jest.fn().mockImplementation(async (cb) => {
+          const tx = {
+            $executeRawUnsafe: jest.fn().mockResolvedValue(1),
+            $queryRaw: jest.fn().mockResolvedValue([1]),
+          };
+          return cb(tx);
+        }),
+      };
+      distributedMetrics = new BookingProjectionMetrics(
+        mockCacheService as any,
+        mockPrisma as any,
+      );
+    });
+
+    it('persists counter increments to Redis asynchronously', () => {
+      distributedMetrics.incrementEventsTotal('booking.created', 'SUCCESS', 2);
+      expect(mockCacheService.incrby).toHaveBeenCalledWith(
+        'metrics:booking_projection:counter:events:booking.created:SUCCESS',
+        2,
+      );
+
+      distributedMetrics.incrementReconciliationPassTotal('SUCCESS', 1);
+      expect(mockCacheService.incrby).toHaveBeenCalledWith(
+        'metrics:booking_projection:counter:reconciliation:pass:success',
+        1,
+      );
+
+      distributedMetrics.incrementReconciliationPassTotal('ERROR', 1);
+      expect(mockCacheService.incrby).toHaveBeenCalledWith(
+        'metrics:booking_projection:counter:reconciliation:pass:error',
+        1,
+      );
+
+      distributedMetrics.incrementReconciliationStaleFoundTotal(5);
+      expect(mockCacheService.incrby).toHaveBeenCalledWith(
+        'metrics:booking_projection:counter:reconciliation:stale_found',
+        5,
+      );
+
+      distributedMetrics.incrementReconciliationRepairedTotal(3);
+      expect(mockCacheService.incrby).toHaveBeenCalledWith(
+        'metrics:booking_projection:counter:reconciliation:repaired',
+        3,
+      );
+
+      distributedMetrics.incrementReconciliationFailedTotal(2);
+      expect(mockCacheService.incrby).toHaveBeenCalledWith(
+        'metrics:booking_projection:counter:reconciliation:failed',
+        2,
+      );
+
+      distributedMetrics.incrementReconciliationSkippedTotal(1);
+      expect(mockCacheService.incrby).toHaveBeenCalledWith(
+        'metrics:booking_projection:counter:reconciliation:skipped',
+        1,
+      );
+
+      distributedMetrics.incrementReconciliationCurrentTotal(4);
+      expect(mockCacheService.incrby).toHaveBeenCalledWith(
+        'metrics:booking_projection:counter:reconciliation:current',
+        4,
+      );
+
+      distributedMetrics.incrementFailureTotal('HYDRATION_FAILED', 2);
+      expect(mockCacheService.incrby).toHaveBeenCalledWith(
+        'metrics:booking_projection:counter:failure:HYDRATION_FAILED',
+        2,
+      );
+    });
+
+    it('persists duration samples to Redis list', () => {
+      distributedMetrics.recordDuration(45);
+      expect(mockCacheService.lpush).toHaveBeenCalledWith(
+        'metrics:booking_projection:latency:duration_ms',
+        '45',
+      );
+      expect(mockCacheService.ltrim).toHaveBeenCalledWith(
+        'metrics:booking_projection:latency:duration_ms',
+        0,
+        999,
+      );
+
+      distributedMetrics.recordReconciliationDuration(120);
+      expect(mockCacheService.lpush).toHaveBeenCalledWith(
+        'metrics:booking_projection:latency:reconciliation_duration_ms',
+        '120',
+      );
+      expect(mockCacheService.ltrim).toHaveBeenCalledWith(
+        'metrics:booking_projection:latency:reconciliation_duration_ms',
+        0,
+        999,
+      );
+    });
+
+    it('merges distributed counters from Redis in getHealthSnapshot', async () => {
+      mockCacheService.keys.mockResolvedValueOnce([
+        'metrics:booking_projection:counter:reconciliation:pass:success',
+        'metrics:booking_projection:counter:reconciliation:stale_found',
+        'metrics:booking_projection:counter:reconciliation:repaired',
+        'metrics:booking_projection:counter:events:booking.created:SUCCESS',
+        'metrics:booking_projection:counter:failure:DATABASE_ERROR',
+      ]);
+      mockCacheService.get.mockImplementation(async (key: string) => {
+        if (key.endsWith('pass:success')) return '10';
+        if (key.endsWith('stale_found')) return '5';
+        if (key.endsWith('repaired')) return '4';
+        if (key.endsWith('booking.created:SUCCESS')) return '25';
+        if (key.endsWith('DATABASE_ERROR')) return '2';
+        return null;
+      });
+
+      const snapshot = await distributedMetrics.getHealthSnapshot();
+      expect(snapshot.dependencies).toEqual({ database: 'up', redis: 'up' });
+      expect(snapshot.metrics.reconciliation.passes.success).toBe(10);
+      expect(snapshot.metrics.reconciliation.candidates.staleFound).toBe(5);
+      expect(snapshot.metrics.reconciliation.candidates.repaired).toBe(4);
+      expect(snapshot.metrics.events['booking.created:SUCCESS']).toBe(25);
+      expect(snapshot.metrics.failures['DATABASE_ERROR']).toBe(2);
+    });
+
+    it('reports database down and degraded status when prisma check throws', async () => {
+      mockPrisma.$transaction.mockRejectedValueOnce(new Error('Connection lost'));
+
+      const snapshot = await distributedMetrics.getHealthSnapshot();
+      expect(snapshot.dependencies.database).toBe('down');
+      expect(snapshot.status).toBe('degraded');
+    });
+
+    it('reports redis down and degraded status when cacheService checkHealth fails', async () => {
+      mockCacheService.checkHealth.mockResolvedValueOnce('down');
+
+      const snapshot = await distributedMetrics.getHealthSnapshot();
+      expect(snapshot.dependencies.redis).toBe('down');
+      expect(snapshot.status).toBe('degraded');
     });
   });
 });

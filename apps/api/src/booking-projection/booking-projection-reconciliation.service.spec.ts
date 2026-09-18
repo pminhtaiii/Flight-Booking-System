@@ -589,5 +589,16 @@ describe('BookingProjectionReconciliationService', () => {
       expect(metrics.getReconciliationFailedTotal()).toBe(1);
     });
   });
+
+  describe('Named Cron Metadata', () => {
+    it('declares named cron job BookingProjectionReconciliationService for runtime management', () => {
+      const metadata = Reflect.getMetadata(
+        'SCHEDULE_CRON_OPTIONS',
+        BookingProjectionReconciliationService.prototype.reconcileBatch,
+      );
+      expect(metadata?.name).toBe('BookingProjectionReconciliationService');
+    });
+  });
 });
+
 

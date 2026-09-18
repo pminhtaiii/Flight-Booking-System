@@ -167,10 +167,14 @@ export class HealthController {
     if (!this.projectionMetrics) {
       return res.status(HttpStatus.OK).json({
         status: 'ok',
+        dependencies: {
+          database: 'up',
+          redis: 'up',
+        },
         metrics: null,
       });
     }
-    const snapshot = this.projectionMetrics.getHealthSnapshot();
+    const snapshot = await this.projectionMetrics.getHealthSnapshot();
     const httpStatus =
       snapshot.status === 'degraded' ? HttpStatus.SERVICE_UNAVAILABLE : HttpStatus.OK;
     return res.status(httpStatus).json(snapshot);

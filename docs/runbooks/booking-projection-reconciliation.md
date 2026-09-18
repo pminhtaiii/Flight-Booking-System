@@ -329,7 +329,7 @@ In case of severe database load or scheduled database migrations, reconciliation
 2. **Alternative Configuration Guard**:
    If dynamic cron suspension is required, remove or conditionalize `BookingProjectionReconciliationService` in `BookingProjectionModule`, or pause the job via NestJS `SchedulerRegistry`:
    ```typescript
-   // To stop the cron job at runtime:
+   // To pause the cron job at runtime via NestJS SchedulerRegistry:
    schedulerRegistry.getCronJob('BookingProjectionReconciliationService').stop();
    ```
 

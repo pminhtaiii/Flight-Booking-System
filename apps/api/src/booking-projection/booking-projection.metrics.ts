@@ -1,4 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { CacheService } from '@/cache/cache.service';
+import { PrismaService } from '@/prisma/prisma.service';
 
 export const BOOKING_PROJECTION_METRIC_NAMES = {
   EVENTS_TOTAL: 'booking_projection_events_total',
@@ -40,6 +42,10 @@ export interface ProjectionDurationStats {
 
 export interface BookingProjectionHealthSnapshot {
   status: 'ok' | 'degraded';
+  dependencies: {
+    database: 'up' | 'down';
+    redis: 'up' | 'down';
+  };
   metrics: {
     reconciliation: {
       passes: {
@@ -81,6 +87,8 @@ const VALID_ERROR_TYPES: Set<ProjectionErrorType> =
 
 const MAX_COUNTER_ENTRIES = 100;
 const MAX_DURATION_SAMPLES = 1000;
+const REDIS_COUNTER_PREFIX = 'metrics:booking_projection:counter:';
+const REDIS_LATENCY_PREFIX = 'metrics:booking_projection:latency:';
 
 // Disallowed patterns in metric labels to avoid PII, booking IDs, user IDs or high cardinality
 const UNSAFE_LABEL_PATTERN =
@@ -103,6 +111,22 @@ export class BookingProjectionMetrics {
   private reconciliationFailedTotal = 0;
   private reconciliationSkippedTotal = 0;
   private reconciliationCurrentTotal = 0;
+
+  private lastPassOutcome?: ReconciliationPassOutcome;
+  private consecutivePassErrors = 0;
+
+  constructor(
+    @Optional() private readonly cacheService?: CacheService,
+    @Optional() private readonly prisma?: PrismaService,
+  ) {}
+
+  getLastPassOutcome(): ReconciliationPassOutcome | undefined {
+    return this.lastPassOutcome;
+  }
+
+  getConsecutivePassErrors(): number {
+    return this.consecutivePassErrors;
+  }
 
   private sanitizeEventName(eventName: string): string {
     if (!eventName || typeof eventName !== 'string') {
@@ -157,7 +181,6 @@ export class BookingProjectionMetrics {
     return 'UNKNOWN';
   }
 
-
   private makeCounterKey(eventName: string, status: ProjectionMetricStatus): string {
     return `${eventName}:${status}`;
   }
@@ -183,10 +206,28 @@ export class BookingProjectionMetrics {
       }
       const fallbackCurrent = this.counters.get(fallbackKey) ?? 0;
       this.counters.set(fallbackKey, fallbackCurrent + amount);
+
+      if (this.cacheService) {
+        this.cacheService
+          .incrby(`${REDIS_COUNTER_PREFIX}events:${fallbackKey}`, amount)
+          .catch((err: unknown) => {
+            const errMsg = err instanceof Error ? err.message : String(err);
+            this.logger.warn(`Failed to sync counter events:${fallbackKey} to cache: ${errMsg}`);
+          });
+      }
       return;
     }
 
     this.counters.set(key, current + amount);
+
+    if (this.cacheService) {
+      this.cacheService
+        .incrby(`${REDIS_COUNTER_PREFIX}events:${key}`, amount)
+        .catch((err: unknown) => {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          this.logger.warn(`Failed to sync counter events:${key} to cache: ${errMsg}`);
+        });
+    }
   }
 
   recordDuration(durationMs: number): void {
@@ -195,6 +236,17 @@ export class BookingProjectionMetrics {
       this.durationSamples.shift();
     }
     this.durationSamples.push(rounded);
+
+    if (this.cacheService) {
+      const key = `${REDIS_LATENCY_PREFIX}duration_ms`;
+      Promise.all([
+        this.cacheService.lpush(key, String(rounded)),
+        this.cacheService.ltrim(key, 0, MAX_DURATION_SAMPLES - 1),
+      ]).catch((err: unknown) => {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Failed to sync duration to cache: ${errMsg}`);
+      });
+    }
   }
 
   getEventsTotal(eventName?: string, status?: ProjectionMetricStatus): number {
@@ -249,8 +301,8 @@ export class BookingProjectionMetrics {
     return sorted[Math.max(0, Math.min(sorted.length - 1, index))];
   }
 
-  getDurationStats(): ProjectionDurationStats {
-    if (this.durationSamples.length === 0) {
+  private computeDurationStats(samples: number[]): ProjectionDurationStats {
+    if (samples.length === 0) {
       return {
         count: 0,
         p50: 0,
@@ -263,7 +315,7 @@ export class BookingProjectionMetrics {
       };
     }
 
-    const sorted = [...this.durationSamples].sort((a, b) => a - b);
+    const sorted = [...samples].sort((a, b) => a - b);
     const sum = sorted.reduce((acc, val) => acc + val, 0);
 
     return {
@@ -278,6 +330,10 @@ export class BookingProjectionMetrics {
     };
   }
 
+  getDurationStats(): ProjectionDurationStats {
+    return this.computeDurationStats(this.durationSamples);
+  }
+
   incrementReconciliationPassTotal(
     outcome: ReconciliationPassOutcome | string,
     amount = 1,
@@ -285,6 +341,28 @@ export class BookingProjectionMetrics {
     const sanitized = this.sanitizeReconciliationOutcome(outcome);
     const current = this.reconciliationPassCounters.get(sanitized) ?? 0;
     this.reconciliationPassCounters.set(sanitized, current + amount);
+
+    if (sanitized === 'SUCCESS') {
+      this.lastPassOutcome = 'SUCCESS';
+      this.consecutivePassErrors = 0;
+    } else {
+      this.lastPassOutcome = 'ERROR';
+      this.consecutivePassErrors += amount;
+    }
+
+    if (this.cacheService) {
+      this.cacheService
+        .incrby(
+          `${REDIS_COUNTER_PREFIX}reconciliation:pass:${sanitized.toLowerCase()}`,
+          amount,
+        )
+        .catch((err: unknown) => {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          this.logger.warn(
+            `Failed to sync reconciliation pass counter to cache: ${errMsg}`,
+          );
+        });
+    }
   }
 
   getReconciliationPassTotal(outcome?: ReconciliationPassOutcome): number {
@@ -301,6 +379,14 @@ export class BookingProjectionMetrics {
 
   incrementReconciliationStaleFoundTotal(amount = 1): void {
     this.reconciliationStaleFoundTotal += amount;
+    if (this.cacheService) {
+      this.cacheService
+        .incrby(`${REDIS_COUNTER_PREFIX}reconciliation:stale_found`, amount)
+        .catch((err: unknown) => {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          this.logger.warn(`Failed to sync stale_found counter to cache: ${errMsg}`);
+        });
+    }
   }
 
   getReconciliationStaleFoundTotal(): number {
@@ -309,6 +395,14 @@ export class BookingProjectionMetrics {
 
   incrementReconciliationRepairedTotal(amount = 1): void {
     this.reconciliationRepairedTotal += amount;
+    if (this.cacheService) {
+      this.cacheService
+        .incrby(`${REDIS_COUNTER_PREFIX}reconciliation:repaired`, amount)
+        .catch((err: unknown) => {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          this.logger.warn(`Failed to sync repaired counter to cache: ${errMsg}`);
+        });
+    }
   }
 
   getReconciliationRepairedTotal(): number {
@@ -317,6 +411,14 @@ export class BookingProjectionMetrics {
 
   incrementReconciliationFailedTotal(amount = 1): void {
     this.reconciliationFailedTotal += amount;
+    if (this.cacheService) {
+      this.cacheService
+        .incrby(`${REDIS_COUNTER_PREFIX}reconciliation:failed`, amount)
+        .catch((err: unknown) => {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          this.logger.warn(`Failed to sync failed counter to cache: ${errMsg}`);
+        });
+    }
   }
 
   getReconciliationFailedTotal(): number {
@@ -325,6 +427,14 @@ export class BookingProjectionMetrics {
 
   incrementReconciliationSkippedTotal(amount = 1): void {
     this.reconciliationSkippedTotal += amount;
+    if (this.cacheService) {
+      this.cacheService
+        .incrby(`${REDIS_COUNTER_PREFIX}reconciliation:skipped`, amount)
+        .catch((err: unknown) => {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          this.logger.warn(`Failed to sync skipped counter to cache: ${errMsg}`);
+        });
+    }
   }
 
   getReconciliationSkippedTotal(): number {
@@ -333,6 +443,14 @@ export class BookingProjectionMetrics {
 
   incrementReconciliationCurrentTotal(amount = 1): void {
     this.reconciliationCurrentTotal += amount;
+    if (this.cacheService) {
+      this.cacheService
+        .incrby(`${REDIS_COUNTER_PREFIX}reconciliation:current`, amount)
+        .catch((err: unknown) => {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          this.logger.warn(`Failed to sync current counter to cache: ${errMsg}`);
+        });
+    }
   }
 
   getReconciliationCurrentTotal(): number {
@@ -345,6 +463,17 @@ export class BookingProjectionMetrics {
       this.reconciliationDurationSamples.shift();
     }
     this.reconciliationDurationSamples.push(rounded);
+
+    if (this.cacheService) {
+      const key = `${REDIS_LATENCY_PREFIX}reconciliation_duration_ms`;
+      Promise.all([
+        this.cacheService.lpush(key, String(rounded)),
+        this.cacheService.ltrim(key, 0, MAX_DURATION_SAMPLES - 1),
+      ]).catch((err: unknown) => {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Failed to sync reconciliation duration sample to cache: ${errMsg}`);
+      });
+    }
   }
 
   getReconciliationDurations(): number[] {
@@ -352,32 +481,7 @@ export class BookingProjectionMetrics {
   }
 
   getReconciliationDurationStats(): ProjectionDurationStats {
-    if (this.reconciliationDurationSamples.length === 0) {
-      return {
-        count: 0,
-        p50: 0,
-        p90: 0,
-        p95: 0,
-        p99: 0,
-        min: 0,
-        max: 0,
-        avg: 0,
-      };
-    }
-
-    const sorted = [...this.reconciliationDurationSamples].sort((a, b) => a - b);
-    const sum = sorted.reduce((acc, val) => acc + val, 0);
-
-    return {
-      count: sorted.length,
-      p50: this.calculatePercentile(sorted, 50),
-      p90: this.calculatePercentile(sorted, 90),
-      p95: this.calculatePercentile(sorted, 95),
-      p99: this.calculatePercentile(sorted, 99),
-      min: sorted[0],
-      max: sorted[sorted.length - 1],
-      avg: Math.round((sum / sorted.length) * 100) / 100,
-    };
+    return this.computeDurationStats(this.reconciliationDurationSamples);
   }
 
   incrementFailureTotal(
@@ -387,6 +491,15 @@ export class BookingProjectionMetrics {
     const sanitized = this.sanitizeErrorType(errorType);
     const current = this.failureCounters.get(sanitized) ?? 0;
     this.failureCounters.set(sanitized, current + amount);
+
+    if (this.cacheService) {
+      this.cacheService
+        .incrby(`${REDIS_COUNTER_PREFIX}failure:${sanitized}`, amount)
+        .catch((err: unknown) => {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          this.logger.warn(`Failed to sync failure counter to cache: ${errMsg}`);
+        });
+    }
   }
 
   getFailureTotal(errorType?: ProjectionErrorType | string): number {
@@ -401,39 +514,144 @@ export class BookingProjectionMetrics {
     return total;
   }
 
-  getHealthSnapshot(): BookingProjectionHealthSnapshot {
-    const isDegraded =
-      this.getFailureTotal() > 0 || this.getReconciliationPassTotal('ERROR') > 0;
+  async getHealthSnapshot(): Promise<BookingProjectionHealthSnapshot> {
+    let dbStatus: 'up' | 'down' = 'up';
+    if (this.prisma) {
+      try {
+        await this.prisma.$transaction(
+          async (tx) => {
+            await tx.$executeRawUnsafe('SET LOCAL statement_timeout = 500');
+            await tx.$queryRaw`SELECT 1`;
+          },
+          {
+            maxWait: 500,
+            timeout: 500,
+          },
+        );
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.error(`Database health check failed in projection metrics: ${errMsg}`);
+        dbStatus = 'down';
+      }
+    }
+
+    let redisStatus: 'up' | 'down' = 'up';
+    if (this.cacheService) {
+      try {
+        redisStatus = await this.cacheService.checkHealth();
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Redis health check failed in projection metrics: ${errMsg}`);
+        redisStatus = 'down';
+      }
+    }
+
+    let passSuccess = this.getReconciliationPassTotal('SUCCESS');
+    let passError = this.getReconciliationPassTotal('ERROR');
+    let staleFound = this.reconciliationStaleFoundTotal;
+    let repaired = this.reconciliationRepairedTotal;
+    let failed = this.reconciliationFailedTotal;
+    let skipped = this.reconciliationSkippedTotal;
+    let current = this.reconciliationCurrentTotal;
 
     const failures: Record<string, number> = {};
     for (const [key, value] of this.failureCounters.entries()) {
       failures[key] = value;
     }
 
+    const events: Record<string, number> = this.getAllEventTotals();
+
+    if (this.cacheService && redisStatus === 'up') {
+      try {
+        const counterKeys = await this.cacheService.keys(`${REDIS_COUNTER_PREFIX}*`);
+        for (const key of counterKeys) {
+          const val = await this.cacheService.get(key);
+          if (val === null) continue;
+          const num = parseInt(val, 10) || 0;
+          const subKey = key.slice(REDIS_COUNTER_PREFIX.length);
+
+          if (subKey === 'reconciliation:pass:success') {
+            passSuccess = Math.max(passSuccess, num);
+          } else if (subKey === 'reconciliation:pass:error') {
+            passError = Math.max(passError, num);
+          } else if (subKey === 'reconciliation:stale_found') {
+            staleFound = Math.max(staleFound, num);
+          } else if (subKey === 'reconciliation:repaired') {
+            repaired = Math.max(repaired, num);
+          } else if (subKey === 'reconciliation:failed') {
+            failed = Math.max(failed, num);
+          } else if (subKey === 'reconciliation:skipped') {
+            skipped = Math.max(skipped, num);
+          } else if (subKey === 'reconciliation:current') {
+            current = Math.max(current, num);
+          } else if (subKey.startsWith('failure:')) {
+            const errorType = subKey.slice('failure:'.length);
+            failures[errorType] = Math.max(failures[errorType] ?? 0, num);
+          } else if (subKey.startsWith('events:')) {
+            const eventKey = subKey.slice('events:'.length);
+            events[eventKey] = Math.max(events[eventKey] ?? 0, num);
+          }
+        }
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Failed to merge distributed counters from cache: ${errMsg}`);
+      }
+    }
+
+    let durationStats = this.getReconciliationDurationStats();
+    if (this.cacheService && redisStatus === 'up') {
+      try {
+        const rawSamples = await this.cacheService.lrange(
+          `${REDIS_LATENCY_PREFIX}reconciliation_duration_ms`,
+          0,
+          -1,
+        );
+        if (rawSamples && rawSamples.length > 0) {
+          const samples = rawSamples.map((s) => parseInt(s, 10)).filter((n) => !isNaN(n));
+          if (samples.length > 0) {
+            durationStats = this.computeDurationStats(samples);
+          }
+        }
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Failed to read reconciliation duration from cache: ${errMsg}`);
+      }
+    }
+
+    const isDegraded =
+      dbStatus === 'down' ||
+      redisStatus === 'down' ||
+      this.consecutivePassErrors >= 3 ||
+      this.lastPassOutcome === 'ERROR';
+
     return {
       status: isDegraded ? 'degraded' : 'ok',
+      dependencies: {
+        database: dbStatus,
+        redis: redisStatus,
+      },
       metrics: {
         reconciliation: {
           passes: {
-            success: this.getReconciliationPassTotal('SUCCESS'),
-            error: this.getReconciliationPassTotal('ERROR'),
+            success: passSuccess,
+            error: passError,
           },
           candidates: {
-            staleFound: this.reconciliationStaleFoundTotal,
-            repaired: this.reconciliationRepairedTotal,
-            failed: this.reconciliationFailedTotal,
-            skipped: this.reconciliationSkippedTotal,
-            current: this.reconciliationCurrentTotal,
+            staleFound,
+            repaired,
+            failed,
+            skipped,
+            current,
           },
-          duration: this.getReconciliationDurationStats(),
+          duration: durationStats,
         },
         failures,
-        events: this.getAllEventTotals(),
+        events,
       },
     };
   }
 
-  reset(): void {
+  resetLocal(): void {
     this.counters.clear();
     this.durationSamples.length = 0;
     this.reconciliationPassCounters.clear();
@@ -444,5 +662,24 @@ export class BookingProjectionMetrics {
     this.reconciliationSkippedTotal = 0;
     this.reconciliationCurrentTotal = 0;
     this.failureCounters.clear();
+    this.lastPassOutcome = undefined;
+    this.consecutivePassErrors = 0;
+  }
+
+  async reset(): Promise<void> {
+    this.resetLocal();
+    if (this.cacheService) {
+      try {
+        const counterKeys = await this.cacheService.keys(`${REDIS_COUNTER_PREFIX}*`);
+        const latencyKeys = await this.cacheService.keys(`${REDIS_LATENCY_PREFIX}*`);
+        await Promise.all([
+          ...counterKeys.map((k) => this.cacheService!.del(k)),
+          ...latencyKeys.map((k) => this.cacheService!.del(k)),
+        ]);
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Failed to reset cache metrics: ${errMsg}`);
+      }
+    }
   }
 }
