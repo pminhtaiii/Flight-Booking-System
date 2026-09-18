@@ -30,7 +30,6 @@ describe('BookingLifecycleService', () => {
   let service: BookingLifecycleService;
   let mockPrisma: any;
   let mockPublisher: jest.Mocked<BookingEventPublisherService>;
-  let mockProjectionService: any;
 
   beforeEach(() => {
     mockPrisma = {
@@ -57,12 +56,7 @@ describe('BookingLifecycleService', () => {
       resolveEventName: jest.fn().mockReturnValue(null),
     } as unknown as jest.Mocked<BookingEventPublisherService>;
 
-    mockProjectionService = {
-      createOrUpdateProjection: jest.fn().mockResolvedValue(null),
-      updateProjectionStatus: jest.fn().mockResolvedValue(null),
-    };
-
-    service = new BookingLifecycleService(mockPrisma, mockPublisher, mockProjectionService);
+    service = new BookingLifecycleService(mockPrisma, mockPublisher);
   });
 
   describe('createBooking', () => {
@@ -162,6 +156,73 @@ describe('BookingLifecycleService', () => {
         }),
       );
       expect(mockPublisher.publish).not.toHaveBeenCalled();
+    });
+
+    it('parses Duffel rawOfferSnapshot with slices and segments into flightSnapshot when flightSnapshot not provided', async () => {
+      mockPrisma.bookingIntent.findUnique.mockResolvedValue({
+        id: 'intent-duffel',
+        userId: 'user-1',
+        confirmedPrice: '450.00',
+        currency: 'GBP',
+        rawOfferSnapshot: {
+          total_duration: 'PT8H',
+          slices: [
+            {
+              duration: 'PT8H',
+              segments: [
+                {
+                  id: 'seg_1',
+                  departing_at: '2026-09-18T10:00:00Z',
+                  arriving_at: '2026-09-18T18:00:00Z',
+                  duration: 'PT8H',
+                  marketing_carrier_flight_number: 'DL100',
+                  operating_carrier: { name: 'Delta Air Lines', iata_code: 'DL' },
+                  origin: { iata_code: 'JFK', name: 'John F Kennedy Intl', city_name: 'New York' },
+                  destination: { iata_code: 'LHR', name: 'London Heathrow', city_name: 'London' },
+                  passengers: [{ cabin_class: 'economy' }],
+                },
+              ],
+            },
+          ],
+        },
+      });
+      mockPrisma.booking.create.mockResolvedValue({
+        id: 'booking-duffel',
+        userId: 'user-1',
+        bookingIntentId: 'intent-duffel',
+        totalAmount: '450.00',
+        currency: 'GBP',
+        status: BookingStatus.PROCESSING,
+        version: 1,
+      });
+
+      await service.createBooking('user-1', 'booking-duffel', 'intent-duffel');
+
+      expect(mockPrisma.booking.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            flightSnapshot: expect.objectContaining({
+              totalDuration: 'PT8H',
+              stops: 0,
+              cabinClass: 'economy',
+              segments: [
+                expect.objectContaining({
+                  airline: { name: 'Delta Air Lines', iataCode: 'DL' },
+                  flightNumber: 'DL100',
+                  departureAirport: expect.objectContaining({ iataCode: 'JFK', name: 'John F Kennedy Intl', city: 'New York' }),
+                  arrivalAirport: expect.objectContaining({ iataCode: 'LHR', name: 'London Heathrow', city: 'London' }),
+                  departureAt: '2026-09-18T10:00:00Z',
+                  arrivalAt: '2026-09-18T18:00:00Z',
+                  duration: 'PT8H',
+                  sliceOrder: 0,
+                  segmentOrder: 0,
+                  globalOrder: 0,
+                }),
+              ],
+            }),
+          }),
+        }),
+      );
     });
 
     it('throws NotFoundException if booking intent does not exist', async () => {
@@ -499,10 +560,6 @@ describe('BookingLifecycleService', () => {
           version: { increment: 1 },
         },
       });
-      expect(mockProjectionService.createOrUpdateProjection).toHaveBeenCalledWith(
-        'b-1',
-        mockPrisma,
-      );
       expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
       const emitted = mockPublisher.publish.mock.calls[0][0];
       expect(emitted).toBeDefined();
@@ -588,7 +645,6 @@ describe('BookingLifecycleService', () => {
       );
 
       expect(customTx.booking.updateMany).toHaveBeenCalled();
-      expect(mockProjectionService.createOrUpdateProjection).toHaveBeenCalledWith('b-1', customTx);
       expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
 
@@ -653,11 +709,6 @@ describe('BookingLifecycleService', () => {
           version: { increment: 1 },
         },
       });
-      expect(mockProjectionService.updateProjectionStatus).toHaveBeenCalledWith(
-        'b-1',
-        BookingStatus.FAILED,
-        mockPrisma,
-      );
       expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
       const emitted = mockPublisher.publish.mock.calls[0][0];
       expect(emitted).toBeDefined();
@@ -857,11 +908,6 @@ describe('BookingLifecycleService', () => {
           version: { increment: 1 },
         },
       });
-      expect(mockProjectionService.updateProjectionStatus).toHaveBeenCalledWith(
-        'b-1',
-        BookingStatus.COMPLETED,
-        mockPrisma,
-      );
       expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
       const emitted = mockPublisher.publish.mock.calls[0][0];
       expect(emitted).toBeDefined();

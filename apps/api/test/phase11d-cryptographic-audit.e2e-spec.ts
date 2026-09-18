@@ -32,7 +32,7 @@ import { ChatService } from '@/chat/chat.service';
 import { ChatMessageCryptoService } from '@/chat/chat-message-crypto.service';
 import { SelectionAttestationService } from '@/agent-gateway/selection-attestation.service';
 import { ChatHandoffService } from '@/chat-handoff/chat-handoff.service';
-import { BookingAgentProjectionService } from '@/agent-gateway/booking-agent-projection.service';
+import { BookingProjectionRepository } from '@/booking-projection/booking-projection.repository';
 import { CacheService } from '@/cache/cache.service';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 
@@ -69,7 +69,7 @@ describe('Phase 11D: Comprehensive Cryptographic and Data Privacy Final Audit (e
   let cryptoService: ChatMessageCryptoService;
   let attestationService: SelectionAttestationService;
   let handoffService: ChatHandoffService;
-  let projectionService: BookingAgentProjectionService;
+  let projectionRepository: BookingProjectionRepository;
   let cacheService: CacheService;
 
   const runMarker = `phase11d-audit-${crypto.randomUUID()}`;
@@ -116,7 +116,7 @@ describe('Phase 11D: Comprehensive Cryptographic and Data Privacy Final Audit (e
     cryptoService = moduleFixture.get(ChatMessageCryptoService);
     attestationService = moduleFixture.get(SelectionAttestationService);
     handoffService = moduleFixture.get(ChatHandoffService);
-    projectionService = moduleFixture.get(BookingAgentProjectionService);
+    projectionRepository = moduleFixture.get<BookingProjectionRepository>(BookingProjectionRepository);
     cacheService = moduleFixture.get(CacheService);
 
     // Create test user
@@ -441,7 +441,23 @@ describe('Phase 11D: Comprehensive Cryptographic and Data Privacy Final Audit (e
       });
       testBookingId = booking.id;
 
-      const projection = await projectionService.createOrUpdateProjection(booking.id);
+      const agentReference = projectionRepository.generateAgentReference();
+      await projectionRepository.upsertGuarded({
+        bookingId: booking.id,
+        status: booking.status,
+        sourceVersion: 1,
+        agentReference,
+        airline: 'Vietnam Airlines',
+        origin: 'SGN',
+        destination: 'DAD',
+        departureAt: new Date(Date.now() + 86_400_000),
+        arrivalAt: new Date(Date.now() + 90_000_000),
+        durationMinutes: 60,
+        stopCount: 0,
+        flightNumber: 'VN VN123',
+        baggageSummary: '1x23kg',
+      });
+      const projection = await projectionRepository.findByBookingId(booking.id);
       expect(projection).not.toBeNull();
       expect(projection!.agentReference).toMatch(/^bkref_[0-9a-fA-F-]+$/);
 

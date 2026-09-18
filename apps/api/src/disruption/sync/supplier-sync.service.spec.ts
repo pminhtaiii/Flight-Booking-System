@@ -11,7 +11,6 @@ import { DuffelService } from '@/duffel/duffel.service';
 import { SyncClaimService } from './sync-claim.service';
 import { SupplierSyncService } from './supplier-sync.service';
 import { BookingEventPublisherService } from '@/domain-events';
-import { BookingAgentProjectionService } from '@/agent-gateway/booking-agent-projection.service';
 import { BookingDisruptionSyncedEvent } from '@/domain-events/booking.events';
 import { DisruptionStatus, Prisma } from '@prisma/client';
 import * as crypto from 'crypto';
@@ -25,9 +24,6 @@ describe('SupplierSyncService unit/integration tests', () => {
     createContext: jest.Mock;
     publish: jest.Mock;
     resolveEventName: jest.Mock;
-  };
-  let mockProjectionService: {
-    createOrUpdateProjection: jest.Mock;
   };
 
   let userId: string;
@@ -44,9 +40,6 @@ describe('SupplierSyncService unit/integration tests', () => {
       publish: jest.fn().mockResolvedValue(undefined),
       resolveEventName: jest.fn(),
     };
-    mockProjectionService = {
-      createOrUpdateProjection: jest.fn().mockResolvedValue(undefined),
-    };
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -55,8 +48,6 @@ describe('SupplierSyncService unit/integration tests', () => {
       .useValue(mockDuffelService)
       .overrideProvider(BookingEventPublisherService)
       .useValue(mockPublisher)
-      .overrideProvider(BookingAgentProjectionService)
-      .useValue(mockProjectionService)
       .compile();
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
@@ -69,7 +60,6 @@ describe('SupplierSyncService unit/integration tests', () => {
     jest.clearAllMocks();
     mockPublisher.createContext.mockImplementation((tx) => ({ tx, events: [] }));
     mockPublisher.publish.mockResolvedValue(undefined);
-    mockProjectionService.createOrUpdateProjection.mockResolvedValue(undefined);
 
     const user = await prisma.user.create({
       data: {
@@ -885,7 +875,7 @@ describe('SupplierSyncService unit/integration tests', () => {
   });
 
   describe('SupplierSyncService Event Routing & Post-Commit Dispatch (T027)', () => {
-    it('should emit BookingDisruptionSyncedEvent post-commit with version increment on revision creation and not call projection service', async () => {
+    it('should emit BookingDisruptionSyncedEvent post-commit with version increment on revision creation', async () => {
       const initialBooking = await prisma.booking.findUnique({ where: { id: bookingId } });
       expect(initialBooking?.version).toBe(1);
 
@@ -913,9 +903,6 @@ describe('SupplierSyncService unit/integration tests', () => {
       const result = await supplierSyncService.syncBooking(bookingId, 'WEBHOOK');
       expect(result.status).toBe('REVISION_CREATED');
       const revisionId = (result as { status: 'REVISION_CREATED'; revisionId: string }).revisionId;
-
-      // Invariant: Zero direct projection calls
-      expect(mockProjectionService.createOrUpdateProjection).not.toHaveBeenCalled();
 
       // Invariant: Booking.version incremented on revision creation
       const updatedBooking = await prisma.booking.findUnique({ where: { id: bookingId } });

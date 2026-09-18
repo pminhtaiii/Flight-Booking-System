@@ -507,6 +507,65 @@ This section records verification evidence for the asynchronous projection consu
 | **Bounded Telemetry** | Metrics use safe labels without PII, booking IDs, or user IDs. | **PASSED** |
 | **Untouched Slice 4 Callers** | Producers (Saga, Recovery, Cancellation, Disruption, Settlement) remain untouched. | **PASSED** |
 
+---
+
+## Phase 4 Slice 6 Verification: Task T032 (Root AppModule Wiring & DI Architecture)
+
+**Execution Date**: 2026-09-18  
+**Scope**: Root `AppModule` wiring in `apps/api/src/app.module.ts` and DI architecture verification in `apps/api/test/module-deepening.e2e-spec.ts`.
+
+### 1. Composition Gate E2E Test Results (CI Network Guard)
+
+- **Command**:
+  ```powershell
+  $env:NODE_OPTIONS = "--require=C:/BOOKIN~1/tests/ci/node-network-guard.cjs"
+  pnpm --filter @api/backend test:e2e -- module-deepening.e2e-spec.ts
+  ```
+- **Exit Code**: `0`
+- **Summary**:
+  - Test Suites: **1 passed, 1 total**
+  - Tests: **23 passed, 23 total**
+  - Snapshots: **0 total**
+
+```text
+PASS test/module-deepening.e2e-spec.ts
+  Nest Composition Architecture Gate (US1 - T014)
+    1. Gateway Port Resolution to Concrete Adapters
+      √ resolves PAYMENT_GATEWAY_PORT to StripePaymentAdapter in AppModule
+      √ resolves FULFILLMENT_GATEWAY_PORT to DuffelFulfillmentAdapter in AppModule
+      √ resolves both ports within PaymentFulfillmentModule scope
+      √ injects concrete adapters into PaymentFulfillmentSaga
+      √ compiles standalone PaymentFulfillmentModule with ConfigModule and resolves ports
+    2. Single Registration of PaymentMethodService
+      √ registers PaymentMethodService in exactly one module across all active modules in AppModule
+      √ declares PaymentMethodService in PaymentMethodsModule metadata, and NOT in PaymentModule or PaymentFulfillmentModule
+      √ resolves the identical singleton instance of PaymentMethodService across all consuming modules
+    3. Zero Circular Dependencies Between PaymentModule and PaymentFulfillmentModule
+      √ verifies static module metadata: PaymentModule imports PaymentFulfillmentModule, PaymentFulfillmentModule does NOT import PaymentModule
+      √ verifies zero direct or transitive import of PaymentModule from PaymentFulfillmentModule
+      √ verifies runtime NestContainer dependency graph has no reverse link or cycle
+    4. BookingRecoveryService Retains Direct SDK Wrappers
+      √ injects direct StripeService and DuffelService into BookingRecoveryService constructor metadata
+      √ holds direct SDK instances at runtime and does NOT expose saga ports or adapter instances
+    5. Root AppModule Wiring & DI Architecture (US2 - T032)
+      √ registers EventEmitterModule (or EventEmitterCoreModule) and BookingProjectionModule in AppModule
+      √ registers EventEmitter2, BookingProjectionListener, BookingProjectionRepository, BookingProjectionService, and BookingEventHydratorService in AppModule
+      √ resolves EventEmitter2, BookingProjectionListener, BookingProjectionRepository, BookingProjectionService, and BookingEventHydratorService instances via DI
+    6. BookingStateModule Single Registration and Acyclic Extraction (US2 - T019)
+      √ registers BookingLifecycleService in exactly one module across all active modules in AppModule
+      √ declares BookingLifecycleService in BookingStateModule providers metadata, and NOT in BookingLifecycleModule providers metadata
+      √ declares BookingLifecycleModule metadata imports and re-exports BookingStateModule, and does NOT register BookingLifecycleService in providers
+      √ resolves the identical singleton instance of BookingLifecycleService across AppModule, BookingLifecycleModule, and BookingStateModule
+      √ proves BookingStateModule has zero direct or transitive imports of BookingLifecycleModule, CancellationModule, DisruptionModule, or RefundSettlementModule
+      √ allows downstream modules (cancellation, disruption, refund-settlement) to import BookingStateModule without circular reference to BookingLifecycleModule
+      √ verifies runtime NestContainer dependency graph has no link from BookingStateModule back to BookingLifecycleModule
+```
+
+### 2. Static Type & Linter Verification
+
+- `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`: **Exit code 0** (0 errors)
+- `pnpm exec eslint "apps/api/**/*.ts" --max-warnings 0`: **Exit code 0** (0 errors, 0 warnings)
+
 
 
 

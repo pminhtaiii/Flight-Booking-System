@@ -4,7 +4,7 @@
 
 Planning artifacts: [specification](../specs/024-event-driven-module-deepening/spec.md), [plan](../specs/024-event-driven-module-deepening/plan.md), and [tasks](../specs/024-event-driven-module-deepening/tasks.md).
 
-#### Implemented Architecture (Phase 3 Completed: US1 Safe Payment Orchestration)
+#### Implemented Architecture (Phases 3 & 4 Completed: US1 & US2 Safe Payment Orchestration & Event-Driven Safe Booking Projection)
 
 - **IdempotencyModule (`apps/api/src/idempotency/`)**:
   - Independent domain module extracted from `PaymentModule`, providing and exporting `PaymentIdempotencyService` and `@IdempotencyKey()` parameter decorator.
@@ -67,7 +67,7 @@ Planning artifacts: [specification](../specs/024-event-driven-module-deepening/s
   - Verifies provider uniqueness: `PaymentMethodService` is registered strictly once in `PaymentMethodsModule` across all modules in `AppModule`, resolving identical singleton references across all consumer modules.
   - Enforces acyclic architecture: `PaymentModule` imports `PaymentFulfillmentModule`, while `PaymentFulfillmentModule` contains zero direct or transitive imports of `PaymentModule` in both static metadata and runtime NestContainer dependency graph.
   - Verifies direct SDK wrapper retention: `BookingRecoveryService` directly injects `StripeService` and `DuffelService` without routing through saga ports.
-  - Enforces strict phase separation: Phase 4 Slice 3 items (`BookingProjectionModule`, `BookingProjectionListener`, `BookingProjectionRepository`, `BookingEventHydratorService`) do not leak prematurely.
+  - Root AppModule Wiring & DI Architecture (T032): `AppModule` imports `EventEmitterModule.forRoot({ wildcard: true, delimiter: '.' })` and `BookingProjectionModule`; verifies DI registration and resolution of `EventEmitter2`, `BookingProjectionListener`, `BookingProjectionRepository`, `BookingProjectionService`, and `BookingEventHydratorService`.
 
 #### Implemented Architecture (Phase 4 Slice 2: US2 Event Publisher & Acyclic State Module)
 
@@ -90,7 +90,17 @@ Planning artifacts: [specification](../specs/024-event-driven-module-deepening/s
   - **BookingEventHydratorService (T021)**: Reads cohesive booking snapshot from Prisma (booking row, latest active revision ordered by version desc with segments ordered by `globalOrder: asc`, and passenger snapshot). Deduplicates concurrent calls via a cycle-scoped in-flight promise cache (`Map<string, Promise<CoherentBookingSnapshot | null>>`), sharing a single database fetch and releasing via `.finally()`.
   - **BookingProjectionService (T022)**: Extracts safe flight fields for agent consumption with PII sanitization. Enforces the strict invariant **No Stale Fallback**: if an authoritative revision exists but has empty/malformed segments, throws `MalformedRevisionError` rather than falling back to stale initial `flightSnapshot`. Fallback is permitted only when no revision exists.
   - **BookingProjectionRepository (T023)**: Implements atomic guarded upsert via PostgreSQL `INSERT ... ON CONFLICT ("bookingId") DO UPDATE ... WHERE booking_agent_projections.source_version < EXCLUDED.source_version`. Monotonically persists `Booking.version` as `source_version`, silently ignoring out-of-order/stale deliveries (`outcome: 'STALE_IGNORED'`), and guaranteeing immutable `agentReference` on conflict.
-  - **BookingProjectionListener & Metrics (T023)**: Thin asynchronous event listener subscribing strictly to `@OnEvent('booking.*')` (strictly no `refund.settled`). Enforces complete error isolation: all hydrator and projection failures are logged with structured event context (`bookingId`, `eventId`, `sourceVersion`) and measured without throwing unhandled rejections to Node.js. Exposes bounded telemetry counters (`booking_projection_events_total` with `SUCCESS | ERROR | STALE_IGNORED`) and latency tracking (`booking_projection_duration_ms`).
+   - **BookingProjectionListener & Metrics (T023, T033)**: Thin asynchronous event listener subscribing strictly to booking domain events (strictly no `refund.settled`). Implements `OnApplicationBootstrap` to bind `booking.**` directly on the event bus, ensuring multi-segment domain events (`booking.recovery.resolved`, `booking.disruption.synced`, etc.) are caught reliably under EventEmitter2 delimiter semantics. Enforces complete error isolation: all hydrator and projection failures are logged with structured event context (`bookingId`, `eventId`, `sourceVersion`) and measured without throwing unhandled rejections to Node.js. Exposes bounded telemetry counters (`booking_projection_events_total` with `SUCCESS | ERROR | STALE_IGNORED`) and latency tracking (`booking_projection_duration_ms`).
+- **PostgreSQL Event & Projection E2E Integration Suite (`apps/api/test/booking-events.e2e-spec.ts`) (T033)**:
+  - Comprehensive real-database integration test suite across all 8 domain event categories against PostgreSQL:
+    - (a) Creation, Confirmation, Failure, Completion: Verifies hydrated processing projection at version 1, confirmation to version 2, failure transitions, and completion transitions.
+    - (b) Recovery Outcomes: Confirms `booking.recovery.resolved` projection synchronization on recovered bookings.
+    - (c) Cancellation Claims & Finalization: Validates `booking.cancellation.pending` and final `booking.cancelled` transitions to `CANCELLED_NO_REFUND`.
+    - (d) Supplier Revision Sync & Disruption: Confirms `booking.disruption.synced` with material/non-material revisions, and traveler `booking.disruption.acknowledged`/`booking.disruption.accepted` transitions.
+    - (e) Refunds & Emission Isolation: Validates `booking.refund.updated` projection updates and asserts strict isolation where direct `refund.settled` emission produces zero projection mutations.
+    - (f) Rollbacks & No-Ops: Asserts zero projection writes on rolled-back transactions and zero version increments/events on idempotent replays.
+    - (g) Out-of-Order / Replay Fencing: Verifies projection is guarded against overwrite when older or duplicate sourceVersions arrive.
+    - (h) Stable References: Confirms `agentReference` generated on initial projection creation remains strictly immutable across subsequent updates.
 - **Core Event Producers Rewiring (Saga, Recovery, Cancellation) (T024–T026)**:
   - **PaymentFulfillmentSaga Post-Commit Event Dispatch (T024)**: Replaced projection calls with lifecycle transaction context. In `executeConfirmPayment`, delegates confirmation to `BookingLifecycleService.confirmBooking(..., tx, eventContext)` and dispatches collected events strictly post-commit via `BookingEventPublisherService.publish` with isolated error handling protecting financial execution.
   - **BookingRecoveryService Lifecycle Integration (T025)**: Eliminated direct `BookingAgentProjectionService` calls across all 4 recovery branches. Rewired to delegate outcomes through `BookingLifecycleService` inside atomic transactions with paired payment status writes and version increments: Branch 1 (`confirmBooking` + payment `SUCCEEDED`), Branch 2 (`failBooking(CAPTURE_FAILED)` + payment `CANCELLED`), Branch 3 (`failBooking(SYSTEM_ERROR)` + automated refund outside transaction), Branch 4 (`failBooking(BOOKING_TIMEOUT)`). Dispatches events strictly post-commit.
@@ -100,13 +110,24 @@ Planning artifacts: [specification](../specs/024-event-driven-module-deepening/s
   - **DisruptionService Acknowledge & Accept Aggregate Changes (T028)**: Routed traveler disruption acknowledgement and acceptance through transaction context, advancing `Booking.version` by 1 and emitting `BookingDisruptionAcknowledgedEvent` and `BookingDisruptionAcceptedEvent` post-commit. Enforced idempotency safety: replayed acknowledgement or acceptance returns existing state without incrementing version or emitting duplicate events.
   - **RefundSettlementService Booking Transitions & Separate `refund.settled` Fact (T029)**: `RefundSettlementModule` imports `BookingStateModule` (never `BookingLifecycleModule`) and `DomainEventsModule`. In `applySettlementOutcome`, produces authoritative financial fact `RefundSettledEvent` (`refund.settled`) directly on eligible non-replay success branch (not subscribed by projection listener). Delegates booking status updates (cumulative refund complete or failure needs attention) to `BookingLifecycleService.updateBookingRefundStatus`, which enforces a no-op guard (0 version bump and 0 events if already in target status). Strictly dispatches collected events post-commit.
   - **PaymentRefundService Manual Retry Reset (T030)**: `PaymentModule` imports `BookingStateModule` and `DomainEventsModule`. In `resolveFailedRefundManually` (`RETRY_WITH_FRESH_KEY`), delegates booking reset to `CANCELLED_PENDING_REFUND` via `BookingLifecycleService.updateBookingRefundStatus` within the retry transaction, advancing `Booking.version` by 1 and emitting `BookingRefundUpdatedEvent` post-commit. Preserves refund idempotency and lock order.
+- **Obsolete Service Removal & Module Decoupling (`apps/api/src/agent-gateway/`) (T031)**:
+  - Removed `BookingAgentProjectionService` from providers and exports in `AgentGatewayModule`.
+  - Deleted legacy `apps/api/src/agent-gateway/booking-agent-projection.service.ts` and its unit tests; projection logic now lives exclusively in `BookingProjectionModule`.
+  - Decoupled consumer modules: dropped obsolete `AgentGatewayModule` imports from `BookingLifecycleModule` and `CancellationModule`.
+  - Removed projection-related `forwardRef(() => AgentGatewayModule)` from `DisruptionModule` while preserving safe query cycles.
+- **Root AppModule Wiring & DI Architecture (`apps/api/src/app.module.ts`, `apps/api/test/module-deepening.e2e-spec.ts`) (T032)**:
+  - Registered `EventEmitterModule.forRoot({ wildcard: true, delimiter: '.' })` once at the application root.
+  - Registered `BookingProjectionModule` in `AppModule` imports.
+  - Verified `EventEmitter2`, `BookingProjectionListener`, `BookingProjectionRepository`, `BookingProjectionService`, and `BookingEventHydratorService` tokens resolve cleanly via DI with zero circular dependencies.
+- **Eventual Consistency Test Adaptation (`apps/api/test/`) (T034)**:
+  - `booking-agent-projection-privacy.e2e-spec.ts`: Seeded test booking and projection deterministically to ensure consistent execution on fresh databases, and adapted projection query to bounded polling (`waitForCondition` up to 5s) while strictly preserving information schema privacy allowlist checks and opaque `agentReference` validation.
+  - `characterization/booking-characterization.e2e-spec.ts`: Added `waitForCondition` helper and bounded polling for projection assertions following `updateToConfirmed`.
+  - Verified `chat-persistence-migration.e2e-spec.ts` and `safe-booking-read.service.spec.ts` pass cleanly.
 
-### Remaining Architecture (Phases 4–6)
+### Remaining Architecture (Phases 5–6)
 
-- Extract payment confirmation into PaymentFulfillmentSaga, SDK-local adapters and IdempotencyModule; retain public HTTP behavior and financial transaction/recovery semantics.
-- Extract BookingProjectionModule with passive postcommit events, coherent versioned hydration, guarded persistence and bounded reconciliation (100 candidates, five repairs concurrently).
-- Share provider-blind lifecycle registration through BookingStateModule and existing saved-method support through PaymentMethodsModule to avoid new cycles.
-- US1 can ship independently; event producers, projection listener and reconciliation activate together without dual writes. See the plan for additive schema and rollback/reactivation safeguards.
+- Phase 5 (US3): Repair and operate projections with background reconciliation scanner (`BookingProjectionReconciliationService`), minute-scheduled repair loop (100 candidates, 5 concurrent workers), and backfill script integration (`T035`–`T040`).
+- Phase 6: Final gates, runbooks, documentation synchronization, and plan convergence (`T041`–`T044`).
 
 ## Stack
 

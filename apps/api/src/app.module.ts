@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { PrismaModule } from './prisma/prisma.module';
 import { HealthModule } from './health/health.module';
 import { CacheModule } from './cache/cache.module';
@@ -20,6 +21,7 @@ import { FlightsModule } from './flights/flights.module';
 import { BookingIntentModule } from './booking-intent/booking-intent.module';
 import { BookingModule } from './booking/booking.module';
 import { BookingLifecycleModule } from './booking-lifecycle/booking-lifecycle.module';
+import { BookingProjectionModule } from './booking-projection/booking-projection.module';
 import { BookingManagementModule } from './booking-management/booking-management.module';
 import { CancellationModule } from './cancellation/cancellation.module';
 import { PaymentModule } from './payment/payment.module';
@@ -116,6 +118,7 @@ export const envSchema = z
       validate: (config) => envSchema.parse(config),
     }),
     ScheduleModule.forRoot(),
+    EventEmitterModule.forRoot({ wildcard: true, delimiter: '.', maxListeners: 20 }),
     PrismaModule,
     StripeModule,
     HealthModule,
@@ -136,6 +139,19 @@ export const envSchema = z
     BookingIntentModule,
     BookingModule,
     BookingLifecycleModule,
+    /**
+     * Architectural Note: Feature 024 Event-Driven Projection Cutover
+     *
+     * US2 (event-driven safe booking projection) and US3 (reconciliation repair loop)
+     * share a single atomic deployment boundary (tasks.md lines 36, 81; plan.md line 28).
+     *
+     * In accordance with T032, BookingProjectionModule is registered here alongside root
+     * EventEmitterModule.forRoot to support event-driven projection updates in this feature branch.
+     * Full production cutover requires Phase 5 (US3 reconciliation loop, tasks T035-T040)
+     * to be completed on branch 024-event-driven-module-deepening before merging to development,
+     * ensuring transient in-memory dispatch losses or restarts are repaired autonomously by DB scan.
+     */
+    BookingProjectionModule,
     BookingManagementModule,
     CancellationModule,
     PaymentModule,

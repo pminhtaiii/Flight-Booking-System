@@ -164,7 +164,7 @@ describe('BookingProjectionListener', () => {
   });
 
   describe('b) Confirms only booking.* events are subscribed; refund.settled is NOT subscribed', () => {
-    it('verifies OnEvent decorator metadata targets booking.* and strictly excludes refund.settled', () => {
+    it('verifies OnEvent decorator metadata targets booking.** and strictly excludes refund.settled', () => {
       const metadata = Reflect.getMetadata('EVENT_LISTENER_METADATA', BookingProjectionListener.prototype.handleBookingEvent);
       expect(metadata).toBeDefined();
       expect(Array.isArray(metadata)).toBe(true);
@@ -173,21 +173,19 @@ describe('BookingProjectionListener', () => {
       const subscribedPatterns = metadata.flatMap((m: any) =>
         Array.isArray(m.event) ? m.event : [m.event],
       );
-      expect(subscribedPatterns).toContain('booking.*');
       expect(subscribedPatterns).toContain('booking.**');
-      expect(subscribedPatterns).toContain('booking.created');
-      expect(subscribedPatterns).toContain('booking.recovery.resolved');
-      expect(subscribedPatterns).toContain('booking.disruption.synced');
 
       // Assert no subscription to refund.settled or refund.*
       for (const pattern of subscribedPatterns) {
         expect(pattern).not.toBe('refund.settled');
         expect(pattern).not.toBe('refund.*');
       }
+      expect(subscribedPatterns).not.toContain('refund.settled');
+      expect(subscribedPatterns).not.toContain('refund.*');
     });
 
     it('dispatches only booking events including multi-segment through EventEmitter2 and ignores refund.settled', async () => {
-      const emitter = new EventEmitter2({ wildcard: false });
+      const emitter = new EventEmitter2({ wildcard: true, delimiter: '.' });
       const spy = jest.spyOn(listener, 'handleBookingEvent').mockResolvedValue(undefined);
 
       // Register listener methods with emitter based on decorator metadata

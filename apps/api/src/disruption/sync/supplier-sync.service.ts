@@ -1,8 +1,7 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { SyncClaimService } from './sync-claim.service';
-import { BookingAgentProjectionService } from '@/agent-gateway/booking-agent-projection.service';
 import { BookingEventPublisherService } from '@/domain-events/booking-event-publisher.service';
 import { BookingDisruptionSyncedEvent } from '@/domain-events/booking.events';
 import { PublishableEvent } from '@/domain-events';
@@ -125,7 +124,6 @@ export class SupplierSyncService {
     private readonly duffelService: DuffelService,
     private readonly syncClaimService: SyncClaimService,
     private readonly publisher: BookingEventPublisherService,
-    @Optional() private readonly bookingAgentProjectionService?: BookingAgentProjectionService,
   ) {}
 
   /**

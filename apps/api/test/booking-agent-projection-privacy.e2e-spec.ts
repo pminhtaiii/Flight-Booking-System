@@ -1,14 +1,113 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma, BookingIntentStatus } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
+
+async function waitForCondition<T>(
+  predicate: () => Promise<T | null | undefined | false>,
+  timeoutMs = 5000,
+  intervalMs = 100,
+): Promise<T> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const result = await predicate();
+    if (result) return result;
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  const last = await predicate();
+  if (last) return last;
+  throw new Error(`Condition not met within ${timeoutMs}ms`);
+}
 
 describe('BookingAgentProjection Privacy Invariants (E2E)', () => {
   let prisma: PrismaClient;
+  let testUserId: string;
+  let testIntentId: string;
+  let testBookingId: string;
 
   beforeAll(async () => {
     prisma = new PrismaClient();
+
+    // Deterministically seed a test booking and projection to guarantee rows exist
+    const user = await prisma.user.create({
+      data: {
+        id: randomUUID(),
+        email: `privacy-test-${randomUUID()}@example.com`,
+        password: 'Password123!',
+        status: 'ACTIVE',
+      },
+    });
+    testUserId = user.id;
+
+    const intent = await prisma.bookingIntent.create({
+      data: {
+        userId: testUserId,
+        duffelOfferId: `off_privacy_${randomUUID()}`,
+        status: BookingIntentStatus.COMPLETED,
+        originalPrice: new Prisma.Decimal('199.99'),
+        confirmedPrice: new Prisma.Decimal('199.99'),
+        pricedAt: new Date(),
+        intentExpiresAt: new Date(Date.now() + 3600000),
+        origin: 'SFO',
+        destination: 'JFK',
+        departureDate: new Date(),
+        adults: 1,
+        rawOfferSnapshot: {},
+      },
+    });
+    testIntentId = intent.id;
+
+    testBookingId = randomUUID();
+    await prisma.booking.create({
+      data: {
+        id: testBookingId,
+        userId: testUserId,
+        bookingIntentId: testIntentId,
+        status: 'CONFIRMED',
+        totalAmount: new Prisma.Decimal('199.99'),
+        currency: 'USD',
+        version: 1,
+      },
+    });
+
+    await prisma.bookingAgentProjection.create({
+      data: {
+        bookingId: testBookingId,
+        agentReference: `bkref_${randomUUID()}`,
+        status: 'CONFIRMED',
+        airline: 'Privacy Airways',
+        origin: 'SFO',
+        destination: 'JFK',
+        departureAt: new Date(),
+        arrivalAt: new Date(Date.now() + 18000000),
+        durationMinutes: 300,
+        stopCount: 0,
+        sourceVersion: 1,
+      },
+    });
   });
 
   afterAll(async () => {
-    await prisma.$disconnect();
+    try {
+      if (testBookingId) {
+        await prisma.bookingAgentProjection.deleteMany({
+          where: { bookingId: testBookingId },
+        });
+        await prisma.booking.deleteMany({
+          where: { id: testBookingId },
+        });
+      }
+      if (testIntentId) {
+        await prisma.bookingIntent.deleteMany({
+          where: { id: testIntentId },
+        });
+      }
+      if (testUserId) {
+        await prisma.user.deleteMany({
+          where: { id: testUserId },
+        });
+      }
+    } finally {
+      await prisma.$disconnect();
+    }
   });
 
   it('verifies exact allowlisted columns exist in information_schema for booking_agent_projections', async () => {
@@ -58,7 +157,12 @@ describe('BookingAgentProjection Privacy Invariants (E2E)', () => {
   });
 
   it('proves that stored agentReference is opaque, non-guessable, and not derived from internal DB id', async () => {
-    const projections = await prisma.bookingAgentProjection.findMany({ take: 10 });
+    const projections = await waitForCondition(async () => {
+      const rows = await prisma.bookingAgentProjection.findMany({ take: 10 });
+      return rows.length > 0 ? rows : null;
+    }, 5000);
+
+    expect(projections.length).toBeGreaterThan(0);
     for (const proj of projections) {
       expect(proj.agentReference).toMatch(/^bkref_[0-9a-fA-F-]+$/);
       expect(proj.agentReference).not.toBe(proj.bookingId);

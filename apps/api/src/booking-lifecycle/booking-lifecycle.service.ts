@@ -5,7 +5,6 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-  Optional,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import {
@@ -17,13 +16,13 @@ import {
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
-import { FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
-import { BookingAgentProjectionService } from '@/agent-gateway/booking-agent-projection.service';
+import { FlightSnapshot, FlightSegmentSnapshot, PassengerSnapshot } from '@shared/booking-types';
 import {
   BookingCreatedEvent,
   BookingConfirmedEvent,
   BookingFailedEvent,
   BookingCompletedEvent,
+  BookingRecoveryResolvedEvent,
   BookingCancellationPendingEvent,
   BookingCancelledEvent,
   BookingRefundUpdatedEvent,
@@ -97,7 +96,6 @@ export class BookingLifecycleService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly publisher: BookingEventPublisherService,
-    @Optional() private readonly bookingAgentProjectionService?: BookingAgentProjectionService,
   ) {}
 
   private async executeMutation<T>(
@@ -132,6 +130,7 @@ export class BookingLifecycleService {
     bookingIntentId: string,
     paymentId?: string,
     context?: TransactionEventContext,
+    flightSnapshot?: FlightSnapshot,
   ): Promise<Booking> {
     const client = context ? context.tx : this.prisma;
 
@@ -192,6 +191,16 @@ export class BookingLifecycleService {
       return existingById;
     }
 
+    let snapshotToStore = flightSnapshot;
+    if (!snapshotToStore && intent.rawOfferSnapshot && typeof intent.rawOfferSnapshot === 'object') {
+      const raw = intent.rawOfferSnapshot as Record<string, unknown>;
+      if (Array.isArray(raw.segments) && raw.segments.length > 0) {
+        snapshotToStore = intent.rawOfferSnapshot as unknown as FlightSnapshot;
+      } else if (Array.isArray(raw.slices) && raw.slices.length > 0) {
+        snapshotToStore = this.parseDuffelRawOfferSnapshot(raw) ?? undefined;
+      }
+    }
+
     let created: Booking;
     try {
       created = await client.booking.create({
@@ -203,6 +212,9 @@ export class BookingLifecycleService {
           currency: intent.currency,
           status: BookingStatus.PROCESSING,
           paymentId: paymentId || null,
+          ...(snapshotToStore
+            ? { flightSnapshot: snapshotToStore as unknown as Prisma.InputJsonValue }
+            : {}),
           version: 1,
         },
       });
@@ -314,7 +326,6 @@ export class BookingLifecycleService {
         );
       }
 
-      await this.bookingAgentProjectionService?.createOrUpdateProjection(bookingId, client);
       return booking;
     });
   }
@@ -385,11 +396,6 @@ export class BookingLifecycleService {
         );
       }
 
-      await this.bookingAgentProjectionService?.updateProjectionStatus(
-        bookingId,
-        BookingStatus.FAILED,
-        client,
-      );
       return booking;
     });
   }
@@ -567,12 +573,6 @@ export class BookingLifecycleService {
             return false;
           }
 
-          await this.bookingAgentProjectionService?.updateProjectionStatus(
-            booking.id,
-            BookingStatus.COMPLETED,
-            tx,
-          );
-
           if (hasActiveDisruption) {
             await tx.disruptionAuditEvent.create({
               data: {
@@ -651,7 +651,7 @@ export class BookingLifecycleService {
   async claimCancellation(
     bookingId: string,
     userId: string,
-    staleThreshold: Date,
+    staleThreshold: Date = new Date(Date.now() - 2 * 60 * 1000),
     tx?: Prisma.TransactionClient,
     context?: TransactionEventContext,
   ): Promise<{ count: number }> {
@@ -711,8 +711,8 @@ export class BookingLifecycleService {
 
   async cancelBooking(
     bookingId: string,
-    cancellationStatus: BookingStatus,
-    refundAmount: string,
+    cancellationStatus: BookingStatus = BookingStatus.CANCELLED_NO_REFUND,
+    refundAmount: string = '0.00',
     disruptionResolution?: {
       resolvedByType?: DisruptionActorType;
       resolvedById?: string;
@@ -810,7 +810,7 @@ export class BookingLifecycleService {
   async updateBookingRefundStatus(
     bookingId: string,
     targetStatus: BookingStatus,
-    refundStatus: string,
+    refundStatus: string = 'SUCCEEDED',
     reason?: string,
     tx?: Prisma.TransactionClient,
     context?: TransactionEventContext,
@@ -895,6 +895,331 @@ export class BookingLifecycleService {
         'Concurrent booking mutation detected during refund status update',
       );
     });
+  }
+
+  async recordRecoveryOutcome(
+    bookingId: string,
+    outcome: 'CONFIRMED' | 'FAILED',
+    details?: {
+      pnrReference?: string;
+      duffelOrderId?: string;
+      failureReason?: BookingFailureReason;
+      flightSnapshot?: FlightSnapshot;
+      passengerSnapshot?: PassengerSnapshot;
+      departureAt?: Date;
+      recoveryOutcome?: string;
+    },
+    tx?: Prisma.TransactionClient,
+    context?: TransactionEventContext,
+  ): Promise<Booking> {
+    const { tx: resolvedTx, context: resolvedContext } = resolveTxAndContext(tx, context);
+
+    return this.executeMutation(resolvedContext, resolvedTx, async (client, events) => {
+      let updateResult: { count: number };
+      const recoveryOutcome =
+        details?.recoveryOutcome ??
+        (outcome === 'CONFIRMED' ? 'CONFIRMED_AFTER_PROCESSING' : 'FAILED_AFTER_PROCESSING');
+
+      if (outcome === 'CONFIRMED') {
+        updateResult = await client.booking.updateMany({
+          where: { id: bookingId, status: { in: [BookingStatus.PROCESSING, BookingStatus.FAILED] } },
+          data: {
+            status: BookingStatus.CONFIRMED,
+            failureReason: null,
+            ...(details?.pnrReference ? { pnrReference: details.pnrReference } : {}),
+            ...(details?.duffelOrderId ? { duffelOrderId: details.duffelOrderId } : {}),
+            ...(details?.flightSnapshot
+              ? { flightSnapshot: details.flightSnapshot as unknown as Prisma.InputJsonValue }
+              : {}),
+            ...(details?.passengerSnapshot
+              ? { passengerSnapshot: details.passengerSnapshot as unknown as Prisma.InputJsonValue }
+              : {}),
+            ...(details?.departureAt ? { departureAt: details.departureAt } : {}),
+            version: { increment: 1 },
+          },
+        });
+      } else {
+        updateResult = await client.booking.updateMany({
+          where: { id: bookingId, status: BookingStatus.PROCESSING },
+          data: {
+            status: BookingStatus.FAILED,
+            failureReason: details?.failureReason ?? BookingFailureReason.SYSTEM_ERROR,
+            version: { increment: 1 },
+            ...(details?.flightSnapshot
+              ? { flightSnapshot: details.flightSnapshot as unknown as Prisma.InputJsonValue }
+              : {}),
+            ...(details?.passengerSnapshot
+              ? { passengerSnapshot: details.passengerSnapshot as unknown as Prisma.InputJsonValue }
+              : {}),
+            ...(details?.departureAt ? { departureAt: details.departureAt } : {}),
+          },
+        });
+      }
+
+      const booking = await client.booking.findUnique({ where: { id: bookingId } });
+      if (!booking) {
+        throw new NotFoundException('Booking not found');
+      }
+
+      if (updateResult.count > 0) {
+        events.push(
+          new BookingRecoveryResolvedEvent({
+            bookingId: booking.id,
+            eventId: randomUUID(),
+            sourceVersion: booking.version,
+            status: booking.status,
+            recoveryOutcome,
+            timestamp: new Date(),
+          }),
+        );
+      }
+
+      return booking;
+    });
+  }
+
+  private parseDuffelRawOfferSnapshot(raw: Record<string, unknown>): FlightSnapshot | null {
+    if (!Array.isArray(raw.slices) || raw.slices.length === 0) {
+      return null;
+    }
+
+    let totalDuration =
+      typeof raw.total_duration === 'string'
+        ? raw.total_duration
+        : typeof raw.totalDuration === 'string'
+        ? raw.totalDuration
+        : 'PT0H';
+    let totalMinutes = 0;
+    let stops = 0;
+    let cabinClass =
+      typeof raw.cabinClass === 'string'
+        ? raw.cabinClass
+        : typeof raw.cabin_class === 'string'
+        ? raw.cabin_class
+        : 'economy';
+    const segments: FlightSegmentSnapshot[] = [];
+    let globalOrder = 0;
+
+    for (let sliceOrder = 0; sliceOrder < raw.slices.length; sliceOrder++) {
+      const slice = raw.slices[sliceOrder] as Record<string, unknown> | null;
+      if (!slice) continue;
+      if (typeof slice.duration === 'string') {
+        totalMinutes += this.parseIsoDurationToMinutes(slice.duration);
+      }
+      if (Array.isArray(slice.segments)) {
+        stops += Math.max(0, slice.segments.length - 1);
+        for (let segmentOrder = 0; segmentOrder < slice.segments.length; segmentOrder++) {
+          const seg = slice.segments[segmentOrder] as Record<string, unknown> | null;
+          if (!seg || typeof seg !== 'object') continue;
+
+          const passengers = Array.isArray(seg.passengers) ? seg.passengers : null;
+          const firstPassenger =
+            passengers && passengers.length > 0 && typeof passengers[0] === 'object' && passengers[0] !== null
+              ? (passengers[0] as Record<string, unknown>)
+              : null;
+
+          if (typeof firstPassenger?.cabin_class === 'string' && firstPassenger.cabin_class) {
+            cabinClass = firstPassenger.cabin_class;
+          } else if (typeof firstPassenger?.cabinClass === 'string' && firstPassenger.cabinClass) {
+            cabinClass = firstPassenger.cabinClass;
+          } else if (typeof seg.cabin_class === 'string' && seg.cabin_class) {
+            cabinClass = seg.cabin_class;
+          } else if (typeof seg.cabinClass === 'string' && seg.cabinClass) {
+            cabinClass = seg.cabinClass;
+          }
+
+          const operatingCarrier =
+            typeof seg.operating_carrier === 'object' && seg.operating_carrier !== null
+              ? (seg.operating_carrier as Record<string, unknown>)
+              : typeof seg.operatingCarrier === 'object' && seg.operatingCarrier !== null
+              ? (seg.operatingCarrier as Record<string, unknown>)
+              : null;
+
+          const marketingCarrier =
+            typeof seg.marketing_carrier === 'object' && seg.marketing_carrier !== null
+              ? (seg.marketing_carrier as Record<string, unknown>)
+              : typeof seg.marketingCarrier === 'object' && seg.marketingCarrier !== null
+              ? (seg.marketingCarrier as Record<string, unknown>)
+              : null;
+
+          const airlineObj =
+            typeof seg.airline === 'object' && seg.airline !== null
+              ? (seg.airline as Record<string, unknown>)
+              : null;
+
+          const airlineName =
+            (typeof operatingCarrier?.name === 'string' && operatingCarrier.name) ||
+            (typeof marketingCarrier?.name === 'string' && marketingCarrier.name) ||
+            (typeof airlineObj?.name === 'string' && airlineObj.name) ||
+            'Unknown';
+
+          const airlineIata =
+            (typeof operatingCarrier?.iata_code === 'string' && operatingCarrier.iata_code) ||
+            (typeof operatingCarrier?.iataCode === 'string' && operatingCarrier.iataCode) ||
+            (typeof marketingCarrier?.iata_code === 'string' && marketingCarrier.iata_code) ||
+            (typeof marketingCarrier?.iataCode === 'string' && marketingCarrier.iataCode) ||
+            (typeof airlineObj?.iata_code === 'string' && airlineObj.iata_code) ||
+            (typeof airlineObj?.iataCode === 'string' && airlineObj.iataCode) ||
+            'XX';
+
+          const flightNumber =
+            (typeof seg.marketing_carrier_flight_number === 'string' && seg.marketing_carrier_flight_number) ||
+            (typeof seg.marketingCarrierFlightNumber === 'string' && seg.marketingCarrierFlightNumber) ||
+            (typeof seg.flight_number === 'string' && seg.flight_number) ||
+            (typeof seg.flightNumber === 'string' && seg.flightNumber) ||
+            '0000';
+
+          const origin =
+            typeof seg.origin === 'object' && seg.origin !== null
+              ? (seg.origin as Record<string, unknown>)
+              : null;
+          const destination =
+            typeof seg.destination === 'object' && seg.destination !== null
+              ? (seg.destination as Record<string, unknown>)
+              : null;
+
+          const depIata =
+            (typeof origin?.iata_code === 'string' && origin.iata_code) ||
+            (typeof origin?.iataCode === 'string' && origin.iataCode) ||
+            '';
+          const depName =
+            (typeof origin?.name === 'string' && origin.name) ||
+            '';
+          const originCityObj =
+            typeof origin?.city === 'object' && origin.city !== null
+              ? (origin.city as Record<string, unknown>)
+              : null;
+          const depCity =
+            (typeof origin?.city_name === 'string' && origin.city_name) ||
+            (typeof origin?.cityName === 'string' && origin.cityName) ||
+            (typeof originCityObj?.name === 'string' && originCityObj.name) ||
+            (typeof origin?.city === 'string' && origin.city) ||
+            depName ||
+            '';
+          const depTerminal =
+            typeof seg.origin_terminal === 'string'
+              ? seg.origin_terminal
+              : typeof seg.originTerminal === 'string'
+              ? seg.originTerminal
+              : undefined;
+
+          const arrIata =
+            (typeof destination?.iata_code === 'string' && destination.iata_code) ||
+            (typeof destination?.iataCode === 'string' && destination.iataCode) ||
+            '';
+          const arrName =
+            (typeof destination?.name === 'string' && destination.name) ||
+            '';
+          const destinationCityObj =
+            typeof destination?.city === 'object' && destination.city !== null
+              ? (destination.city as Record<string, unknown>)
+              : null;
+          const arrCity =
+            (typeof destination?.city_name === 'string' && destination.city_name) ||
+            (typeof destination?.cityName === 'string' && destination.cityName) ||
+            (typeof destinationCityObj?.name === 'string' && destinationCityObj.name) ||
+            (typeof destination?.city === 'string' && destination.city) ||
+            arrName ||
+            '';
+          const arrTerminal =
+            typeof seg.destination_terminal === 'string'
+              ? seg.destination_terminal
+              : typeof seg.destinationTerminal === 'string'
+              ? seg.destinationTerminal
+              : undefined;
+
+          const departureAt =
+            typeof seg.departing_at === 'string'
+              ? seg.departing_at
+              : typeof seg.departureAt === 'string'
+              ? seg.departureAt
+              : '';
+          const arrivalAt =
+            typeof seg.arriving_at === 'string'
+              ? seg.arriving_at
+              : typeof seg.arrivalAt === 'string'
+              ? seg.arrivalAt
+              : '';
+          const duration =
+            typeof seg.duration === 'string'
+              ? seg.duration
+              : '';
+
+          const aircraftObj =
+            typeof seg.aircraft === 'object' && seg.aircraft !== null
+              ? (seg.aircraft as Record<string, unknown>)
+              : null;
+          const aircraftType =
+            (typeof aircraftObj?.name === 'string' && aircraftObj.name) ||
+            (typeof seg.aircraftType === 'string' && seg.aircraftType) ||
+            undefined;
+
+          const duffelSegmentId =
+            (typeof seg.id === 'string' && seg.id) ||
+            (typeof seg.duffelSegmentId === 'string' && seg.duffelSegmentId) ||
+            undefined;
+
+          segments.push({
+            airline: {
+              name: airlineName,
+              iataCode: airlineIata,
+            },
+            flightNumber,
+            departureAirport: {
+              iataCode: depIata,
+              name: depName,
+              city: depCity,
+              terminal: depTerminal,
+            },
+            arrivalAirport: {
+              iataCode: arrIata,
+              name: arrName,
+              city: arrCity,
+              terminal: arrTerminal,
+            },
+            departureAt,
+            arrivalAt,
+            duration,
+            aircraftType,
+            duffelSegmentId,
+            sliceOrder,
+            segmentOrder,
+            globalOrder: globalOrder++,
+          });
+        }
+      }
+    }
+
+    if (totalMinutes > 0 && totalDuration === 'PT0H') {
+      totalDuration = this.formatMinutesToIsoDuration(totalMinutes);
+    }
+
+    return {
+      segments,
+      totalDuration,
+      stops,
+      cabinClass,
+    };
+  }
+
+  private parseIsoDurationToMinutes(durationStr: string): number {
+    if (!durationStr || typeof durationStr !== 'string') return 0;
+    const matches = durationStr.match(/P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?/);
+    if (!matches) return 0;
+    const days = parseInt(matches[1] || '0', 10);
+    const hours = parseInt(matches[2] || '0', 10);
+    const minutes = parseInt(matches[3] || '0', 10);
+    return days * 24 * 60 + hours * 60 + minutes;
+  }
+
+  private formatMinutesToIsoDuration(totalMinutes: number): string {
+    if (totalMinutes <= 0) return 'PT0H';
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    let result = 'PT';
+    if (hours > 0) result += `${hours}H`;
+    if (minutes > 0) result += `${minutes}M`;
+    return result;
   }
 }
 
