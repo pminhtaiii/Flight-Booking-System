@@ -18,6 +18,12 @@ import { RefundResponse } from '@shared/types/payment.types';
 import { enforceTransition } from '@/payment/payment-state-machine';
 import { BookingStatus, PaymentStatus, RefundStatus, RefundTriggerType } from '@prisma/client';
 import * as crypto from 'crypto';
+import { randomUUID } from 'crypto';
+import {
+  BookingEventPublisherService,
+  BookingRefundUpdatedEvent,
+  PublishableEvent,
+} from '@/domain-events';
 
 @Injectable()
 export class PaymentRefundService {
@@ -30,6 +36,7 @@ export class PaymentRefundService {
     private readonly auditService: AuditService,
     private readonly refundTransactionService: RefundTransactionService,
     private readonly refundSettlementService: RefundSettlementService,
+    private readonly publisher: BookingEventPublisherService,
   ) {}
 
   /**
@@ -595,7 +602,9 @@ export class PaymentRefundService {
     const bookingId = refund.cancellationRefundObligation.bookingId;
 
     if (action === 'RETRY_WITH_FRESH_KEY') {
+      let eventsToPublish: PublishableEvent[] = [];
       const result = await this.prisma.$transaction(async (tx) => {
+        const context = this.publisher.createContext(tx);
         const key = await tx.idempotencyKey.create({
           data: {
             key: `cancellation-refund:${bookingId}:${crypto.randomUUID()}`,
@@ -627,13 +636,35 @@ export class PaymentRefundService {
         }
         await tx.booking.update({
           where: { id: bookingId },
-          data: { status: BookingStatus.CANCELLED_PENDING_REFUND },
+          data: {
+            status: BookingStatus.CANCELLED_PENDING_REFUND,
+            version: { increment: 1 },
+          },
         });
+        const updatedBooking = await tx.booking.findUnique({
+          where: { id: bookingId },
+          select: { version: true },
+        });
+        context.events.push(
+          new BookingRefundUpdatedEvent({
+            bookingId,
+            eventId: randomUUID(),
+            sourceVersion: updatedBooking?.version ?? 1,
+            status: BookingStatus.CANCELLED_PENDING_REFUND,
+            refundStatus: RefundStatus.REFUND_RETRY_SCHEDULED,
+            timestamp: new Date(),
+          }),
+        );
+        eventsToPublish = [...context.events] as PublishableEvent[];
         return {
           refundStatus: RefundStatus.REFUND_RETRY_SCHEDULED,
           bookingStatus: BookingStatus.CANCELLED_PENDING_REFUND,
         };
       });
+
+      if (eventsToPublish.length > 0) {
+        await this.publisher.publish(eventsToPublish);
+      }
 
       await this.auditService.createLog(null, {
         userId: actorId ?? null,

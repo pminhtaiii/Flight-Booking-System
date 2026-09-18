@@ -17,6 +17,7 @@ import { BookingIntentModule } from '../booking-intent/booking-intent.module';
 import { RefundModule } from '../refund/refund.module';
 import { RefundSettlementModule } from '../refund-settlement/refund-settlement.module';
 import { PaymentFulfillmentModule } from '@/payment-fulfillment/payment-fulfillment.module';
+import { DomainEventsModule } from '@/domain-events/domain-events.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { PaymentFulfillmentModule } from '@/payment-fulfillment/payment-fulfillm
     BookingIntentModule,
     PaymentMethodsModule,
     PaymentFulfillmentModule,
+    DomainEventsModule,
   ],
   controllers: [PaymentController, PaymentWebhookController, AdminRefundController],
   providers: [

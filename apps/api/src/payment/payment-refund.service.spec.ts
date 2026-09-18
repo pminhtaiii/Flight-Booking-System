@@ -9,6 +9,10 @@ import { RefundTransactionService } from '../refund/refund-transaction.service';
 import { RefundSettlementService } from '../refund-settlement/refund-settlement.service';
 import { PaymentRefundService } from './payment-refund.service';
 import { ConflictException, ForbiddenException } from '@nestjs/common';
+import {
+  BookingEventPublisherService,
+  BookingRefundUpdatedEvent,
+} from '@/domain-events';
 
 describe('PaymentRefundService', () => {
   let service: PaymentRefundService;
@@ -43,9 +47,15 @@ describe('PaymentRefundService', () => {
   const audit = { createLog: jest.fn() };
   const refundTransactionService = { reserveTransaction: jest.fn() };
   const refundSettlementService = { settleVerifiedOutcome: jest.fn() };
+  const publisher = {
+    createContext: jest.fn(),
+    publish: jest.fn(),
+  };
 
   beforeEach(async () => {
     jest.resetAllMocks();
+    publisher.createContext.mockImplementation((tx) => ({ tx, events: [] }));
+    publisher.publish.mockResolvedValue(undefined);
     idempotency.acquireOrReplay.mockResolvedValue({ status: 'acquired' });
     idempotency.completeKey.mockResolvedValue(undefined);
     prisma.$transaction.mockImplementation(
@@ -84,6 +94,7 @@ describe('PaymentRefundService', () => {
         { provide: AuditService, useValue: audit },
         { provide: RefundTransactionService, useValue: refundTransactionService },
         { provide: RefundSettlementService, useValue: refundSettlementService },
+        { provide: BookingEventPublisherService, useValue: publisher },
       ],
     }).compile();
     service = module.get(PaymentRefundService);
@@ -524,7 +535,7 @@ describe('PaymentRefundService', () => {
       ).rejects.toThrow(ConflictException);
     });
 
-    it('handles RETRY_WITH_FRESH_KEY cleanly', async () => {
+    it('handles RETRY_WITH_FRESH_KEY cleanly and dispatches BookingRefundUpdatedEvent post-commit', async () => {
       prisma.refund.findUnique.mockResolvedValue({
         id: 'refund-1',
         cancellationRefundObligation: { bookingId: 'booking-1' },
@@ -537,6 +548,18 @@ describe('PaymentRefundService', () => {
       prisma.idempotencyKey.create.mockResolvedValue({ id: 'new-key-1' });
       prisma.refund.updateMany.mockResolvedValue({ count: 1 });
       prisma.booking.update.mockResolvedValue({ id: 'booking-1' });
+      prisma.booking.findUnique.mockResolvedValue({ version: 2 });
+
+      let publishCalledBeforeCommit = false;
+      prisma.$transaction.mockImplementation(
+        async (callback: (tx: typeof prisma) => Promise<unknown>) => {
+          const res = await callback(prisma);
+          if (publisher.publish.mock.calls.length > 0) {
+            publishCalledBeforeCommit = true;
+          }
+          return res;
+        },
+      );
 
       const res = await service.resolveEscalatedCancellationRefund(
         'refund-1',
@@ -546,6 +569,54 @@ describe('PaymentRefundService', () => {
 
       expect(res.refundStatus).toBe(RefundStatus.REFUND_RETRY_SCHEDULED);
       expect(res.bookingStatus).toBe(BookingStatus.CANCELLED_PENDING_REFUND);
+
+      // Verify atomic version increment on booking update
+      expect(prisma.booking.update).toHaveBeenCalledWith({
+        where: { id: 'booking-1' },
+        data: {
+          status: BookingStatus.CANCELLED_PENDING_REFUND,
+          version: { increment: 1 },
+        },
+      });
+
+      // Verify context created and event published post-commit
+      expect(publisher.createContext).toHaveBeenCalledWith(prisma);
+      expect(publishCalledBeforeCommit).toBe(false);
+      expect(publisher.publish).toHaveBeenCalledTimes(1);
+      expect(publisher.publish).toHaveBeenCalledWith([
+        expect.objectContaining({
+          bookingId: 'booking-1',
+          sourceVersion: 2,
+          status: BookingStatus.CANCELLED_PENDING_REFUND,
+          refundStatus: RefundStatus.REFUND_RETRY_SCHEDULED,
+        }),
+      ]);
+      const publishedEvent = publisher.publish.mock.calls[0][0][0];
+      expect(publishedEvent).toBeInstanceOf(BookingRefundUpdatedEvent);
+    });
+
+    it('discards events and does not publish if transaction rolls back on RETRY_WITH_FRESH_KEY', async () => {
+      prisma.refund.findUnique.mockResolvedValue({
+        id: 'refund-1',
+        cancellationRefundObligation: { bookingId: 'booking-1' },
+        paymentId: 'payment-1',
+        status: RefundStatus.REFUND_FAILED_NEEDS_ATTENTION,
+        amount: 12_500,
+        currency: 'usd',
+      });
+      prisma.booking.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
+      prisma.idempotencyKey.create.mockResolvedValue({ id: 'new-key-1' });
+      prisma.refund.updateMany.mockResolvedValue({ count: 0 }); // simulate conflict
+
+      await expect(
+        service.resolveEscalatedCancellationRefund(
+          'refund-1',
+          'RETRY_WITH_FRESH_KEY',
+          'admin-1',
+        ),
+      ).rejects.toThrow(ConflictException);
+
+      expect(publisher.publish).not.toHaveBeenCalled();
     });
   });
 
