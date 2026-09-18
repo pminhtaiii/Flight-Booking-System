@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -25,8 +26,9 @@ import {
   BookingCompletedEvent,
   BookingCancellationPendingEvent,
   BookingCancelledEvent,
+  BookingRefundUpdatedEvent,
   BookingEventPublisherService,
-  DomainEventBase,
+  PublishableEvent,
   TransactionEventContext,
 } from '@/domain-events';
 import { BookingPipelineOutcome, BookingWithRelations } from './booking-lifecycle.types';
@@ -65,6 +67,29 @@ function resolveTxAndContext(
   };
 }
 
+export const ALLOWED_REFUND_SOURCE_STATUSES: Partial<Record<BookingStatus, readonly BookingStatus[]>> = {
+  [BookingStatus.CANCELLED_AND_REFUNDED]: [
+    BookingStatus.CANCELLED_PENDING_REFUND,
+    BookingStatus.REFUND_FAILED_NEEDS_ATTENTION,
+    BookingStatus.CANCELLATION_PENDING,
+  ],
+  [BookingStatus.CANCELLED_NO_REFUND]: [
+    BookingStatus.CANCELLATION_PENDING,
+    BookingStatus.CANCELLED_PENDING_REFUND,
+    BookingStatus.REFUND_FAILED_NEEDS_ATTENTION,
+  ],
+  [BookingStatus.CANCELLED_PENDING_REFUND]: [
+    BookingStatus.REFUND_FAILED_NEEDS_ATTENTION,
+    BookingStatus.CANCELLATION_PENDING,
+    BookingStatus.CANCELLED_PENDING_REFUND,
+  ],
+  [BookingStatus.REFUND_FAILED_NEEDS_ATTENTION]: [
+    BookingStatus.CANCELLED_PENDING_REFUND,
+    BookingStatus.CANCELLATION_PENDING,
+    BookingStatus.REFUND_FAILED_NEEDS_ATTENTION,
+  ],
+};
+
 @Injectable()
 export class BookingLifecycleService {
   private readonly logger = new Logger(BookingLifecycleService.name);
@@ -78,18 +103,18 @@ export class BookingLifecycleService {
   private async executeMutation<T>(
     resolvedContext: TransactionEventContext | undefined,
     resolvedTx: Prisma.TransactionClient | undefined,
-    operation: (client: Prisma.TransactionClient, events: DomainEventBase[]) => Promise<T>,
+    operation: (client: Prisma.TransactionClient, events: PublishableEvent[]) => Promise<T>,
   ): Promise<T> {
     if (resolvedContext) {
       return operation(resolvedContext.tx, resolvedContext.events);
     }
 
     if (resolvedTx) {
-      const localEvents: DomainEventBase[] = [];
+      const localEvents: PublishableEvent[] = [];
       return operation(resolvedTx, localEvents);
     }
 
-    const localEvents: DomainEventBase[] = [];
+    const localEvents: PublishableEvent[] = [];
     const result = await this.prisma.$transaction(async (tx) => {
       return operation(tx, localEvents);
     });
@@ -485,8 +510,8 @@ export class BookingLifecycleService {
     const targetTime = booking.currentFinalArrivalAt || booking.departureAt;
     if (booking.status === BookingStatus.CONFIRMED && targetTime && targetTime <= now) {
       try {
-        const localEvents: DomainEventBase[] = [];
-        const eventSink: DomainEventBase[] = context ? context.events : localEvents;
+        const localEvents: PublishableEvent[] = [];
+        const eventSink: PublishableEvent[] = context ? context.events : localEvents;
 
         const executeUpdate = async (tx: Prisma.TransactionClient): Promise<boolean> => {
           // Re-fetch the booking inside transaction to make it safe and atomic
@@ -774,4 +799,102 @@ export class BookingLifecycleService {
       };
     });
   }
+
+  /**
+   * Updates booking refund status with no-op idempotency and audit event emission.
+   *
+   * Enforces the no-op invariant:
+   * - If current.status === targetStatus: returns { count: 0, updatedBooking: current } (no version bump, no event).
+   * - If different: updates status with version increment, emits BookingRefundUpdatedEvent, returns { count: 1, updatedBooking }.
+   */
+  async updateBookingRefundStatus(
+    bookingId: string,
+    targetStatus: BookingStatus,
+    refundStatus: string,
+    reason?: string,
+    tx?: Prisma.TransactionClient,
+    context?: TransactionEventContext,
+  ): Promise<{ count: number; updatedBooking?: Booking }> {
+    const { tx: resolvedTx, context: resolvedContext } = resolveTxAndContext(tx, context);
+
+    return this.executeMutation(resolvedContext, resolvedTx, async (client, events) => {
+      let current = await client.booking.findUnique({
+        where: { id: bookingId },
+      });
+
+      if (!current) {
+        throw new NotFoundException('Booking not found');
+      }
+
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        if (current.status === targetStatus) {
+          return { count: 0, updatedBooking: current };
+        }
+
+        const allowedSources = ALLOWED_REFUND_SOURCE_STATUSES[targetStatus];
+        if (allowedSources && !allowedSources.includes(current.status)) {
+          throw new ConflictException(
+            `Cannot transition booking ${bookingId} from ${current.status} to ${targetStatus}`,
+          );
+        }
+
+        const updateResult = await client.booking.updateMany({
+          where: {
+            id: bookingId,
+            status: current.status,
+            version: current.version,
+          },
+          data: {
+            status: targetStatus,
+            version: { increment: 1 },
+          },
+        });
+
+        if (updateResult.count === 0) {
+          const reloaded = await client.booking.findUnique({ where: { id: bookingId } });
+          if (!reloaded) {
+            throw new NotFoundException('Booking not found');
+          }
+          if (reloaded.status === targetStatus) {
+            return { count: 0, updatedBooking: reloaded };
+          }
+          if (allowedSources && !allowedSources.includes(reloaded.status)) {
+            throw new ConflictException(
+              `Cannot transition booking ${bookingId} from reloaded status ${reloaded.status} to ${targetStatus}`,
+            );
+          }
+          if (attempt < 3) {
+            current = reloaded;
+            continue;
+          }
+          throw new ConflictException(
+            'Concurrent booking mutation detected during refund status update',
+          );
+        }
+
+        const updatedBooking = await client.booking.findUnique({
+          where: { id: bookingId },
+        });
+
+        events.push(
+          new BookingRefundUpdatedEvent({
+            bookingId,
+            eventId: randomUUID(),
+            sourceVersion: updatedBooking?.version ?? (current.version ?? 1) + 1,
+            status: targetStatus,
+            refundStatus,
+            reason,
+            timestamp: new Date(),
+          }),
+        );
+
+        return { count: 1, updatedBooking: updatedBooking ?? undefined };
+      }
+
+      throw new ConflictException(
+        'Concurrent booking mutation detected during refund status update',
+      );
+    });
+  }
 }
+

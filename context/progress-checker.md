@@ -1,5 +1,62 @@
 # Progress Tracker
 
+### Feature 024 — Event-Driven Module Deepening: Phase 4 Slice 5 (Tasks T027, T028, T029, T030) Completed (2026-09-18)
+
+- **T027 [US2] Supplier Sync Service Event Routing**:
+  - `apps/api/src/disruption/sync/supplier-sync.service.ts`:
+    - Injected `BookingEventPublisherService`.
+    - Completely removed direct calls to `BookingAgentProjectionService`.
+    - Allocated fresh `TransactionEventContext` per retry loop attempt (`publisher.createContext(tx)`), guaranteeing collector isolation and zero phantom events leaked on P2002 version collisions.
+    - Atomically advanced `Booking.version` by 1 on committed revision creation and collected `BookingDisruptionSyncedEvent` (`booking.disruption.synced`).
+    - Enforced bookkeeping exclusions: lease touches, fingerprint unchanged checks, backoff sync touches, and row-lock touches emit 0 events and do NOT increment version.
+    - Strictly dispatched collected events post-commit via `this.publisher.publish(events)`.
+  - `apps/api/src/disruption/sync/supplier-sync.service.spec.ts`:
+    - Verified revision commits increment version and dispatch `booking.disruption.synced` post-commit.
+    - Verified retry loop collector isolation and rollback event suppression.
+    - Verified zero calls to `BookingAgentProjectionService`.
+
+- **T028 [US2] Disruption Acknowledge & Accept Aggregate Changes**:
+  - `apps/api/src/disruption/api/disruption.service.ts`:
+    - Injected `BookingEventPublisherService`.
+    - Routed traveler acknowledgement through lifecycle context: advances `Booking.version` by 1 and collects `BookingDisruptionAcknowledgedEvent`.
+    - Routed traveler acceptance through lifecycle context: advances `Booking.version` by 1 and collects `BookingDisruptionAcceptedEvent`.
+    - Enforced idempotency safety: replayed acknowledgement (already `ACKNOWLEDGED` or `RESOLVED`) or acceptance (already `RESOLVED`) returns existing record with 0 version increments and 0 events.
+    - Strictly dispatched collected events post-commit.
+  - `apps/api/src/disruption/api/disruption.service.spec.ts`:
+    - Verified acknowledge and accept transitions, version increments, and post-commit dispatch.
+    - Verified idempotent replays emit 0 events and 0 version increments.
+
+- **T029 [US2] Refund Settlement Booking Transitions & Separate `refund.settled` Fact**:
+  - `apps/api/src/refund-settlement/refund-settlement.module.ts`:
+    - Imported `BookingStateModule` (never `BookingLifecycleModule`) and `DomainEventsModule`.
+  - `apps/api/src/booking-lifecycle/booking-lifecycle.service.ts`:
+    - Added `updateBookingRefundStatus`: enforces no-op status guard (returns 0 count if already in target status), advances `Booking.version` by 1 on actual transition, and collects `BookingRefundUpdatedEvent`.
+  - `apps/api/src/refund-settlement/refund-settlement.service.ts`:
+    - Injected `BookingLifecycleService` and `BookingEventPublisherService`.
+    - Produced authoritative financial fact `RefundSettledEvent` (`refund.settled`) directly on eligible non-replay success branch.
+    - Delegated booking status transitions (cumulative refund complete or failure needs attention) to `this.bookingLifecycleService.updateBookingRefundStatus`.
+    - If refund succeeds with no booking state change, emits `refund.settled` without a booking event or version bump.
+    - Strictly dispatched collected events post-commit.
+  - `apps/api/src/refund-settlement/refund-settlement.service.spec.ts`:
+    - Verified `refund.settled` and `booking.refund.updated` emission, version increments, and no-op guards.
+
+- **T030 [US2] Payment Refund Manual Retry Reset**:
+  - `apps/api/src/payment/payment.module.ts`:
+    - Imported `BookingStateModule` and `DomainEventsModule`.
+  - `apps/api/src/payment/payment-refund.service.ts`:
+    - Injected `BookingLifecycleService` and `BookingEventPublisherService`.
+    - In `resolveFailedRefundManually` (`RETRY_WITH_FRESH_KEY`): delegated booking reset to `CANCELLED_PENDING_REFUND` through `this.bookingLifecycleService.updateBookingRefundStatus` within the retry transaction.
+    - Atomically incremented `Booking.version` by 1 and collected `BookingRefundUpdatedEvent`.
+    - Strictly dispatched collected events post-commit. Rollback discards events.
+  - `apps/api/src/payment/payment-refund.service.spec.ts`:
+    - Verified manual retry reset, version increment, event collection, and post-commit dispatch.
+
+- **Verification**:
+  - `pnpm exec eslint "apps/api/**/*.ts" --max-warnings 0` passed (0 errors, 0 warnings).
+  - `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` passed (0 errors).
+  - `pnpm --filter @api/backend test -- apps/api/src/disruption/ apps/api/src/refund-settlement/ apps/api/src/payment/ apps/api/src/booking-lifecycle/` passed (36 suites, 339/339 tests passed, exit code 0).
+  - Slice 6 (Tasks T031–T034) remains unstarted.
+
 ### Feature 024 — Event-Driven Module Deepening: Phase 4 Slice 4 (Tasks T024, T025, T026) Completed (2026-09-17)
 
 - **T024 [US2] Saga Post-Commit Event Dispatch**:

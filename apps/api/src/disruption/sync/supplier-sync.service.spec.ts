@@ -10,6 +10,9 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { SyncClaimService } from './sync-claim.service';
 import { SupplierSyncService } from './supplier-sync.service';
+import { BookingEventPublisherService } from '@/domain-events';
+import { BookingAgentProjectionService } from '@/agent-gateway/booking-agent-projection.service';
+import { BookingDisruptionSyncedEvent } from '@/domain-events/booking.events';
 import { DisruptionStatus, Prisma } from '@prisma/client';
 import * as crypto from 'crypto';
 
@@ -18,6 +21,14 @@ describe('SupplierSyncService unit/integration tests', () => {
   let syncClaimService: SyncClaimService;
   let supplierSyncService: SupplierSyncService;
   let mockDuffelService: { retrieveCompleteOrder: jest.Mock };
+  let mockPublisher: {
+    createContext: jest.Mock;
+    publish: jest.Mock;
+    resolveEventName: jest.Mock;
+  };
+  let mockProjectionService: {
+    createOrUpdateProjection: jest.Mock;
+  };
 
   let userId: string;
   let bookingIntentId: string;
@@ -28,12 +39,24 @@ describe('SupplierSyncService unit/integration tests', () => {
     mockDuffelService = {
       retrieveCompleteOrder: jest.fn(),
     };
+    mockPublisher = {
+      createContext: jest.fn((tx) => ({ tx, events: [] })),
+      publish: jest.fn().mockResolvedValue(undefined),
+      resolveEventName: jest.fn(),
+    };
+    mockProjectionService = {
+      createOrUpdateProjection: jest.fn().mockResolvedValue(undefined),
+    };
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
       .overrideProvider(DuffelService)
       .useValue(mockDuffelService)
+      .overrideProvider(BookingEventPublisherService)
+      .useValue(mockPublisher)
+      .overrideProvider(BookingAgentProjectionService)
+      .useValue(mockProjectionService)
       .compile();
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
@@ -44,6 +67,9 @@ describe('SupplierSyncService unit/integration tests', () => {
   beforeEach(async () => {
     suffix = crypto.randomUUID();
     jest.clearAllMocks();
+    mockPublisher.createContext.mockImplementation((tx) => ({ tx, events: [] }));
+    mockPublisher.publish.mockResolvedValue(undefined);
+    mockProjectionService.createOrUpdateProjection.mockResolvedValue(undefined);
 
     const user = await prisma.user.create({
       data: {
@@ -855,6 +881,243 @@ describe('SupplierSyncService unit/integration tests', () => {
       expect(dbBookingAfter?.itineraryRevisions[0].sourceEventId).toBe('supplier-cancellation');
       expect(dbBookingAfter?.disruptionStatus).toBe(DisruptionStatus.DETECTED);
       expect(dbBookingAfter?.notificationOutbox.length).toBe(2); // One from schedule change, one from cancellation
+    });
+  });
+
+  describe('SupplierSyncService Event Routing & Post-Commit Dispatch (T027)', () => {
+    it('should emit BookingDisruptionSyncedEvent post-commit with version increment on revision creation and not call projection service', async () => {
+      const initialBooking = await prisma.booking.findUnique({ where: { id: bookingId } });
+      expect(initialBooking?.version).toBe(1);
+
+      mockDuffelService.retrieveCompleteOrder.mockResolvedValue({
+        id: `ord_fake_${suffix}`,
+        slices: [
+          {
+            id: 'sli_1',
+            segments: [
+              {
+                id: `seg_orig_${suffix}`,
+                departing_at: '2026-08-01T15:00:00Z', // 3h change (material)
+                arriving_at: '2026-08-01T22:00:00Z',
+                origin: { iata_code: 'HAN' },
+                destination: { iata_code: 'NRT' },
+                operating_carrier: { iata_code: 'JL' },
+                marketing_carrier_flight_number: '752',
+              },
+            ],
+          },
+        ],
+        passengers: [],
+      });
+
+      const result = await supplierSyncService.syncBooking(bookingId, 'WEBHOOK');
+      expect(result.status).toBe('REVISION_CREATED');
+      const revisionId = (result as { status: 'REVISION_CREATED'; revisionId: string }).revisionId;
+
+      // Invariant: Zero direct projection calls
+      expect(mockProjectionService.createOrUpdateProjection).not.toHaveBeenCalled();
+
+      // Invariant: Booking.version incremented on revision creation
+      const updatedBooking = await prisma.booking.findUnique({ where: { id: bookingId } });
+      expect(updatedBooking?.version).toBe(2);
+
+      // Invariant: Event published post-commit
+      expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
+      const publishedEvents = mockPublisher.publish.mock.calls[0][0];
+      expect(publishedEvents).toHaveLength(1);
+
+      const event = publishedEvents[0];
+      expect(event).toBeInstanceOf(BookingDisruptionSyncedEvent);
+      expect(event.bookingId).toBe(bookingId);
+      expect(event.sourceVersion).toBe(2);
+      expect(event.revisionId).toBe(revisionId);
+      expect(event.status).toBe('CONFIRMED');
+      expect(event.eventId).toBeDefined();
+      expect(event.timestamp).toBeInstanceOf(Date);
+    });
+
+    it('should isolate event collectors across retried transactions and not emit phantom events from failed attempts', async () => {
+      mockDuffelService.retrieveCompleteOrder.mockResolvedValue({
+        id: `ord_fake_${suffix}`,
+        slices: [
+          {
+            id: 'sli_1',
+            segments: [
+              {
+                id: `seg_orig_${suffix}`,
+                departing_at: '2026-08-01T15:00:00Z',
+                arriving_at: '2026-08-01T22:00:00Z',
+                origin: { iata_code: 'HAN' },
+                destination: { iata_code: 'NRT' },
+                operating_carrier: { iata_code: 'JL' },
+                marketing_carrier_flight_number: '752',
+              },
+            ],
+          },
+        ],
+        passengers: [],
+      });
+
+      const originalTransaction = prisma.$transaction;
+      const originalCreate = prisma.itineraryRevision.create;
+
+      let count = 0;
+      interface PrismaError extends Error {
+        code?: string;
+        meta?: Record<string, unknown>;
+      }
+
+      const transactionSpy = jest
+        .spyOn(prisma, '$transaction')
+        .mockImplementation(async (callback) => {
+          return originalTransaction.call(prisma, async (tx) => {
+            const originalTxCreate = tx.itineraryRevision.create;
+            tx.itineraryRevision.create = jest.fn().mockImplementation(async (args) => {
+              if (count === 0) {
+                count++;
+                await originalCreate.call(prisma.itineraryRevision, {
+                  data: {
+                    bookingId: args.data.bookingId,
+                    version: args.data.version,
+                    source: args.data.source,
+                    fingerprint: 'different-fingerprint',
+                    isMaterial: args.data.isMaterial,
+                    materialReasons: args.data.materialReasons,
+                    materialBaselines: args.data.materialBaselines,
+                    incrementalDiff: args.data.incrementalDiff,
+                    cumulativeDiff: args.data.cumulativeDiff,
+                  },
+                });
+                const error = new Error('Unique constraint failed on version') as PrismaError;
+                error.code = 'P2002';
+                error.meta = { target: ['bookingId', 'version'] };
+                throw error;
+              }
+              return originalTxCreate.call(tx.itineraryRevision, args);
+            });
+            return callback(tx);
+          });
+        });
+
+      try {
+        const result = await supplierSyncService.syncBooking(bookingId, 'WEBHOOK');
+        expect(result.status).toBe('REVISION_CREATED');
+
+        // Context was created per attempt
+        expect(mockPublisher.createContext).toHaveBeenCalledTimes(2);
+
+        // Strictly 1 publish call with ONLY 1 event (the successful retry), zero phantom events
+        expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
+        const publishedEvents = mockPublisher.publish.mock.calls[0][0];
+        expect(publishedEvents).toHaveLength(1);
+        expect(publishedEvents[0].revisionId).toBe((result as { status: 'REVISION_CREATED'; revisionId: string }).revisionId);
+      } finally {
+        transactionSpy.mockRestore();
+      }
+    });
+
+    it('should not emit events or increment version on bookkeeping touches (fingerprint unchanged, skipped ineligible, and errors)', async () => {
+      // 1. Unchanged fingerprint
+      mockDuffelService.retrieveCompleteOrder.mockResolvedValue({
+        id: `ord_fake_${suffix}`,
+        cancelled_at: null,
+        slices: [
+          {
+            id: 'sli_1',
+            duration: 'PT7H',
+            origin: { name: 'Noi Bai', iata_code: 'HAN', type: 'airport' },
+            destination: { name: 'Narita', iata_code: 'NRT', type: 'airport' },
+            segments: [
+              {
+                id: `seg_orig_${suffix}`,
+                duration: 'PT7H',
+                departing_at: '2026-08-01T12:00:00Z',
+                arriving_at: '2026-08-01T19:00:00Z',
+                origin: { name: 'Noi Bai', iata_code: 'HAN', type: 'airport' },
+                destination: { name: 'Narita', iata_code: 'NRT', type: 'airport' },
+                origin_terminal: 'T2',
+                destination_terminal: 'T2',
+                operating_carrier: { name: 'Japan Airlines', iata_code: 'JL' },
+                marketing_carrier: { name: 'Japan Airlines', iata_code: 'JL' },
+                marketing_carrier_flight_number: '752',
+                aircraft: { name: 'Boeing 787' },
+              },
+            ],
+          },
+        ],
+        passengers: [],
+      });
+
+      const resultNoChange = await supplierSyncService.syncBooking(bookingId, 'RECONCILIATION');
+      expect(resultNoChange.status).toBe('NO_CHANGE');
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
+
+      const bookingNoChange = await prisma.booking.findUnique({ where: { id: bookingId } });
+      expect(bookingNoChange?.version).toBe(1);
+
+      // 2. Duffel failure (triggers error backoff touch)
+      mockDuffelService.retrieveCompleteOrder.mockRejectedValue(new Error('Duffel API timeout'));
+      await expect(supplierSyncService.syncBooking(bookingId, 'RECONCILIATION')).rejects.toThrow('Duffel API timeout');
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
+
+      const bookingAfterErr = await prisma.booking.findUnique({ where: { id: bookingId } });
+      expect(bookingAfterErr?.version).toBe(1);
+      expect(bookingAfterErr?.nextDuffelSyncAt).toBeDefined();
+
+      // 3. Skipped ineligible (e.g. CANCELLED booking)
+      await prisma.booking.update({
+        where: { id: bookingId },
+        data: { status: 'CANCELLED_NO_REFUND' },
+      });
+      const resultIneligible = await supplierSyncService.syncBooking(bookingId, 'RECONCILIATION');
+      expect(resultIneligible.status).toBe('SKIPPED_INELIGIBLE');
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
+
+      const bookingIneligible = await prisma.booking.findUnique({ where: { id: bookingId } });
+      expect(bookingIneligible?.version).toBe(1);
+    });
+
+    it('should discard events and not publish if transaction rolls back', async () => {
+      mockDuffelService.retrieveCompleteOrder.mockResolvedValue({
+        id: `ord_fake_${suffix}`,
+        slices: [
+          {
+            id: 'sli_1',
+            segments: [
+              {
+                id: `seg_orig_${suffix}`,
+                departing_at: '2026-08-01T15:00:00Z',
+                arriving_at: '2026-08-01T22:00:00Z',
+                origin: { iata_code: 'HAN' },
+                destination: { iata_code: 'NRT' },
+                operating_carrier: { iata_code: 'JL' },
+                marketing_carrier_flight_number: '752',
+              },
+            ],
+          },
+        ],
+        passengers: [],
+      });
+
+      const originalTransaction = prisma.$transaction;
+      const transactionSpy = jest
+        .spyOn(prisma, '$transaction')
+        .mockImplementation(async (callback) => {
+          return originalTransaction.call(prisma, async (tx) => {
+            tx.itineraryRevision.create = jest.fn().mockRejectedValue(new Error('Simulated atomic rollback error'));
+            return callback(tx);
+          });
+        });
+
+      try {
+        await expect(supplierSyncService.syncBooking(bookingId, 'WEBHOOK')).rejects.toThrow('Simulated atomic rollback error');
+        expect(mockPublisher.publish).not.toHaveBeenCalled();
+
+        const dbBooking = await prisma.booking.findUnique({ where: { id: bookingId } });
+        expect(dbBooking?.version).toBe(1);
+      } finally {
+        transactionSpy.mockRestore();
+      }
     });
   });
 });

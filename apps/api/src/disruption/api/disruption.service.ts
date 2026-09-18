@@ -5,6 +5,13 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
+import { BookingEventPublisherService } from '@/domain-events/booking-event-publisher.service';
+import {
+  BookingDisruptionAcknowledgedEvent,
+  BookingDisruptionAcceptedEvent,
+} from '@/domain-events/booking.events';
+import { PublishableEvent } from '@/domain-events';
+import { randomUUID } from 'crypto';
 import {
   DisruptionHistoryResponseDto,
   AcknowledgeDisruptionResponseDto,
@@ -15,7 +22,10 @@ import {
 
 @Injectable()
 export class DisruptionService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly publisher: BookingEventPublisherService,
+  ) {}
 
   async getDisruptionHistory(
     bookingId: string,
@@ -106,6 +116,7 @@ export class DisruptionService {
     userId: string,
   ): Promise<AcknowledgeDisruptionResponseDto> {
     const now = new Date();
+    let eventsToPublish: PublishableEvent[] = [];
 
     const updatedBooking = await this.prisma.$transaction(async (tx) => {
       const current = await tx.booking.findUnique({
@@ -139,13 +150,18 @@ export class DisruptionService {
         });
       }
 
+      const context = this.publisher.createContext(tx);
+
       const result = await tx.booking.updateMany({
         where: {
           id: bookingId,
           activeDisruptionRevisionId: revisionId,
           disruptionStatus: current.disruptionStatus,
         },
-        data: { disruptionStatus: 'ACKNOWLEDGED' },
+        data: {
+          disruptionStatus: 'ACKNOWLEDGED',
+          version: { increment: 1 },
+        },
       });
 
       if (result.count === 0) {
@@ -180,8 +196,24 @@ export class DisruptionService {
         },
       });
 
+      context.events.push(
+        new BookingDisruptionAcknowledgedEvent({
+          bookingId,
+          eventId: randomUUID(),
+          sourceVersion: updated.version,
+          disruptionId: revisionId,
+          status: 'ACKNOWLEDGED',
+          timestamp: now,
+        }),
+      );
+      eventsToPublish = context.events;
+
       return updated;
     });
+
+    if (eventsToPublish.length > 0) {
+      await this.publisher.publish(eventsToPublish);
+    }
 
     return {
       bookingId: updatedBooking.id,
@@ -198,6 +230,7 @@ export class DisruptionService {
     userId: string,
   ): Promise<AcceptDisruptionResponseDto> {
     const now = new Date();
+    let eventsToPublish: PublishableEvent[] = [];
 
     const updatedBooking = await this.prisma.$transaction(async (tx) => {
       const current = await tx.booking.findUnique({
@@ -231,6 +264,8 @@ export class DisruptionService {
         });
       }
 
+      const context = this.publisher.createContext(tx);
+
       const result = await tx.booking.updateMany({
         where: {
           id: bookingId,
@@ -243,6 +278,7 @@ export class DisruptionService {
           disruptionResolvedAt: now,
           disruptionResolvedByType: 'TRAVELLER',
           disruptionResolvedById: userId,
+          version: { increment: 1 },
         },
       });
 
@@ -282,8 +318,24 @@ export class DisruptionService {
         },
       });
 
+      context.events.push(
+        new BookingDisruptionAcceptedEvent({
+          bookingId,
+          eventId: randomUUID(),
+          sourceVersion: updated.version,
+          disruptionId: revisionId,
+          status: 'RESOLVED',
+          timestamp: now,
+        }),
+      );
+      eventsToPublish = context.events;
+
       return updated;
     });
+
+    if (eventsToPublish.length > 0) {
+      await this.publisher.publish(eventsToPublish);
+    }
 
     return {
       bookingId: updatedBooking.id,

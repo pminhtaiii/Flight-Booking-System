@@ -1,4 +1,9 @@
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   BookingFailureReason,
   BookingStatus,
@@ -13,6 +18,7 @@ import {
   BookingCompletedEvent,
   BookingCancellationPendingEvent,
   BookingCancelledEvent,
+  BookingRefundUpdatedEvent,
   BookingEventPublisherService,
   TransactionEventContext,
 } from '@/domain-events';
@@ -1254,6 +1260,376 @@ describe('BookingLifecycleService', () => {
       expect(result.count).toBe(1);
       expect(context.events).toHaveLength(1);
       expect(context.events[0]).toBeInstanceOf(BookingCancelledEvent);
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('updateBookingRefundStatus', () => {
+    it('enforces no-op invariant: returns count 0 with no version bump and zero events when status already matches', async () => {
+      const existingBooking = {
+        id: 'booking-noop-1',
+        status: BookingStatus.CANCELLED_AND_REFUNDED,
+        version: 3,
+      };
+      mockPrisma.booking.findUnique.mockResolvedValue(existingBooking);
+
+      const context: TransactionEventContext = {
+        tx: mockPrisma,
+        events: [],
+      };
+
+      const result = await service.updateBookingRefundStatus(
+        'booking-noop-1',
+        BookingStatus.CANCELLED_AND_REFUNDED,
+        'SUCCEEDED',
+        undefined,
+        mockPrisma,
+        context,
+      );
+
+      expect(result).toEqual({
+        count: 0,
+        updatedBooking: existingBooking,
+      });
+      expect(mockPrisma.booking.update).not.toHaveBeenCalled();
+      expect(context.events).toHaveLength(0);
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
+    });
+
+    it('updates status and increments version when status differs, pushing BookingRefundUpdatedEvent to context', async () => {
+      const currentBooking = {
+        id: 'booking-trans-1',
+        status: BookingStatus.CANCELLED_PENDING_REFUND,
+        version: 2,
+      };
+      const updatedBooking = {
+        ...currentBooking,
+        status: BookingStatus.CANCELLED_AND_REFUNDED,
+        version: 3,
+      };
+
+      mockPrisma.booking.findUnique
+        .mockResolvedValueOnce(currentBooking)
+        .mockResolvedValueOnce(updatedBooking);
+      mockPrisma.booking.updateMany.mockResolvedValue({ count: 1 });
+
+      const context: TransactionEventContext = {
+        tx: mockPrisma,
+        events: [],
+      };
+
+      const result = await service.updateBookingRefundStatus(
+        'booking-trans-1',
+        BookingStatus.CANCELLED_AND_REFUNDED,
+        'SUCCEEDED',
+        undefined,
+        mockPrisma,
+        context,
+      );
+
+      expect(result).toEqual({
+        count: 1,
+        updatedBooking,
+      });
+      expect(mockPrisma.booking.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'booking-trans-1',
+          status: BookingStatus.CANCELLED_PENDING_REFUND,
+          version: 2,
+        },
+        data: {
+          status: BookingStatus.CANCELLED_AND_REFUNDED,
+          version: { increment: 1 },
+        },
+      });
+      expect(context.events).toHaveLength(1);
+      const event = context.events[0] as BookingRefundUpdatedEvent;
+      expect(event).toBeInstanceOf(BookingRefundUpdatedEvent);
+      expect(event.bookingId).toBe('booking-trans-1');
+      expect(event.sourceVersion).toBe(3);
+      expect(event.status).toBe(BookingStatus.CANCELLED_AND_REFUNDED);
+      expect(event.refundStatus).toBe('SUCCEEDED');
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
+    });
+
+    it('publishes BookingRefundUpdatedEvent post-commit when called standalone without context', async () => {
+      const currentBooking = {
+        id: 'booking-standalone-1',
+        status: BookingStatus.CANCELLED_PENDING_REFUND,
+        version: 1,
+      };
+      const updatedBooking = {
+        ...currentBooking,
+        status: BookingStatus.REFUND_FAILED_NEEDS_ATTENTION,
+        version: 2,
+      };
+
+      mockPrisma.booking.findUnique
+        .mockResolvedValueOnce(currentBooking)
+        .mockResolvedValueOnce(updatedBooking);
+      mockPrisma.booking.updateMany.mockResolvedValue({ count: 1 });
+
+      const result = await service.updateBookingRefundStatus(
+        'booking-standalone-1',
+        BookingStatus.REFUND_FAILED_NEEDS_ATTENTION,
+        'REFUND_FAILED_NEEDS_ATTENTION',
+        'STRIPE_REQUIRES_ATTENTION',
+      );
+
+      expect(result.count).toBe(1);
+      expect(result.updatedBooking).toEqual(updatedBooking);
+      expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
+      const publishedBatch = mockPublisher.publish.mock.calls[0]?.[0];
+      expect(Array.isArray(publishedBatch)).toBe(true);
+      if (!Array.isArray(publishedBatch)) {
+        throw new Error('Expected publishedBatch to be an array');
+      }
+      expect(publishedBatch).toHaveLength(1);
+      const event = publishedBatch[0] as BookingRefundUpdatedEvent;
+      expect(event).toBeInstanceOf(BookingRefundUpdatedEvent);
+      expect(event.status).toBe(BookingStatus.REFUND_FAILED_NEEDS_ATTENTION);
+      expect(event.reason).toBe('STRIPE_REQUIRES_ATTENTION');
+      expect(event.sourceVersion).toBe(2);
+    });
+
+    it('retries on optimistic concurrency collision and succeeds if subsequent attempt succeeds', async () => {
+      const initialBooking = {
+        id: 'booking-retry-1',
+        status: BookingStatus.CANCELLED_PENDING_REFUND,
+        version: 1,
+      };
+      const concurrentlyMutatedBooking = {
+        id: 'booking-retry-1',
+        status: BookingStatus.CANCELLED_PENDING_REFUND,
+        version: 2,
+      };
+      const finalBooking = {
+        id: 'booking-retry-1',
+        status: BookingStatus.CANCELLED_AND_REFUNDED,
+        version: 3,
+      };
+
+      // 1. Initial read: initialBooking
+      // 2. Attempt 1 updateMany fails -> reload: concurrentlyMutatedBooking
+      // 3. Attempt 2 updateMany succeeds -> reload updated: finalBooking
+      mockPrisma.booking.findUnique
+        .mockResolvedValueOnce(initialBooking)
+        .mockResolvedValueOnce(concurrentlyMutatedBooking)
+        .mockResolvedValueOnce(finalBooking);
+
+      mockPrisma.booking.updateMany
+        .mockResolvedValueOnce({ count: 0 })
+        .mockResolvedValueOnce({ count: 1 });
+
+      const context: TransactionEventContext = {
+        tx: mockPrisma,
+        events: [],
+      };
+
+      const result = await service.updateBookingRefundStatus(
+        'booking-retry-1',
+        BookingStatus.CANCELLED_AND_REFUNDED,
+        'SUCCEEDED',
+        undefined,
+        mockPrisma,
+        context,
+      );
+
+      expect(result.count).toBe(1);
+      expect(result.updatedBooking).toEqual(finalBooking);
+      expect(mockPrisma.booking.updateMany).toHaveBeenCalledTimes(2);
+      expect(mockPrisma.booking.updateMany).toHaveBeenNthCalledWith(1, {
+        where: {
+          id: 'booking-retry-1',
+          status: BookingStatus.CANCELLED_PENDING_REFUND,
+          version: 1,
+        },
+        data: {
+          status: BookingStatus.CANCELLED_AND_REFUNDED,
+          version: { increment: 1 },
+        },
+      });
+      expect(mockPrisma.booking.updateMany).toHaveBeenNthCalledWith(2, {
+        where: {
+          id: 'booking-retry-1',
+          status: BookingStatus.CANCELLED_PENDING_REFUND,
+          version: 2,
+        },
+        data: {
+          status: BookingStatus.CANCELLED_AND_REFUNDED,
+          version: { increment: 1 },
+        },
+      });
+      expect(context.events).toHaveLength(1);
+      const event = context.events[0] as BookingRefundUpdatedEvent;
+      expect(event).toBeInstanceOf(BookingRefundUpdatedEvent);
+      expect(event.sourceVersion).toBe(3);
+      expect(event.status).toBe(BookingStatus.CANCELLED_AND_REFUNDED);
+    });
+
+    it('throws ConflictException if optimistic concurrency collisions persist across all retry attempts', async () => {
+      const b1 = { id: 'booking-collide-1', status: BookingStatus.CANCELLED_PENDING_REFUND, version: 1 };
+      const b2 = { id: 'booking-collide-1', status: BookingStatus.CANCELLED_PENDING_REFUND, version: 2 };
+      const b3 = { id: 'booking-collide-1', status: BookingStatus.CANCELLED_PENDING_REFUND, version: 3 };
+      const b4 = { id: 'booking-collide-1', status: BookingStatus.CANCELLED_PENDING_REFUND, version: 4 };
+
+      // Initial read + 3 reloads after 3 failed updateMany attempts
+      mockPrisma.booking.findUnique
+        .mockResolvedValueOnce(b1)
+        .mockResolvedValueOnce(b2)
+        .mockResolvedValueOnce(b3)
+        .mockResolvedValueOnce(b4);
+
+      mockPrisma.booking.updateMany
+        .mockResolvedValueOnce({ count: 0 })
+        .mockResolvedValueOnce({ count: 0 })
+        .mockResolvedValueOnce({ count: 0 });
+
+      const context: TransactionEventContext = {
+        tx: mockPrisma,
+        events: [],
+      };
+
+      await expect(
+        service.updateBookingRefundStatus(
+          'booking-collide-1',
+          BookingStatus.CANCELLED_AND_REFUNDED,
+          'SUCCEEDED',
+          undefined,
+          mockPrisma,
+          context,
+        ),
+      ).rejects.toThrow(
+        new ConflictException('Concurrent booking mutation detected during refund status update'),
+      );
+
+      expect(mockPrisma.booking.updateMany).toHaveBeenCalledTimes(3);
+      expect(context.events).toHaveLength(0);
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
+    });
+
+    it('returns count: 0 and emits no event if reloaded booking matches targetStatus after failed update', async () => {
+      const currentBooking = {
+        id: 'booking-concur-match',
+        status: BookingStatus.CANCELLED_PENDING_REFUND,
+        version: 1,
+      };
+      const reloadedMatchingBooking = {
+        id: 'booking-concur-match',
+        status: BookingStatus.CANCELLED_AND_REFUNDED,
+        version: 2,
+      };
+
+      // Initial read: currentBooking, reload after updateMany failure: reloadedMatchingBooking
+      mockPrisma.booking.findUnique
+        .mockResolvedValueOnce(currentBooking)
+        .mockResolvedValueOnce(reloadedMatchingBooking);
+      mockPrisma.booking.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      const context: TransactionEventContext = {
+        tx: mockPrisma,
+        events: [],
+      };
+
+      const result = await service.updateBookingRefundStatus(
+        'booking-concur-match',
+        BookingStatus.CANCELLED_AND_REFUNDED,
+        'SUCCEEDED',
+        undefined,
+        mockPrisma,
+        context,
+      );
+
+      expect(result.count).toBe(0);
+      expect(result.updatedBooking).toEqual(reloadedMatchingBooking);
+      expect(context.events).toHaveLength(0);
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException if booking does not exist', async () => {
+      mockPrisma.booking.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.updateBookingRefundStatus(
+          'non-existent',
+          BookingStatus.CANCELLED_AND_REFUNDED,
+          'SUCCEEDED',
+        ),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws ConflictException without updating or retrying if initial booking status is disallowed for refund target', async () => {
+      const confirmedBooking = {
+        id: 'booking-disallowed-init',
+        status: BookingStatus.CONFIRMED,
+        version: 1,
+      };
+      mockPrisma.booking.findUnique.mockResolvedValue(confirmedBooking);
+
+      const context: TransactionEventContext = {
+        tx: mockPrisma,
+        events: [],
+      };
+
+      await expect(
+        service.updateBookingRefundStatus(
+          'booking-disallowed-init',
+          BookingStatus.CANCELLED_AND_REFUNDED,
+          'SUCCEEDED',
+          undefined,
+          mockPrisma,
+          context,
+        ),
+      ).rejects.toThrow(
+        new ConflictException(
+          'Cannot transition booking booking-disallowed-init from CONFIRMED to CANCELLED_AND_REFUNDED',
+        ),
+      );
+
+      expect(mockPrisma.booking.updateMany).not.toHaveBeenCalled();
+      expect(context.events).toHaveLength(0);
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
+    });
+
+    it('throws ConflictException and does not retry if concurrent update moves booking to disallowed status (COMPLETED)', async () => {
+      const initialBooking = {
+        id: 'booking-disallowed-reload',
+        status: BookingStatus.CANCELLED_PENDING_REFUND,
+        version: 1,
+      };
+      const concurrentlyCompletedBooking = {
+        id: 'booking-disallowed-reload',
+        status: BookingStatus.COMPLETED,
+        version: 2,
+      };
+
+      mockPrisma.booking.findUnique
+        .mockResolvedValueOnce(initialBooking)
+        .mockResolvedValueOnce(concurrentlyCompletedBooking);
+      mockPrisma.booking.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      const context: TransactionEventContext = {
+        tx: mockPrisma,
+        events: [],
+      };
+
+      await expect(
+        service.updateBookingRefundStatus(
+          'booking-disallowed-reload',
+          BookingStatus.CANCELLED_AND_REFUNDED,
+          'SUCCEEDED',
+          undefined,
+          mockPrisma,
+          context,
+        ),
+      ).rejects.toThrow(
+        new ConflictException(
+          'Cannot transition booking booking-disallowed-reload from reloaded status COMPLETED to CANCELLED_AND_REFUNDED',
+        ),
+      );
+
+      expect(mockPrisma.booking.updateMany).toHaveBeenCalledTimes(1);
+      expect(context.events).toHaveLength(0);
       expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
   });

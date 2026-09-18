@@ -10,13 +10,14 @@ import { PaymentWebhookService } from './payment-webhook.service';
 import { DuffelModule } from '../duffel/duffel.module';
 import { AuditModule } from '../audit/audit.module';
 import { PaymentCronService } from './payment-cron.service';
-import { BookingLifecycleModule } from '../booking-lifecycle/booking-lifecycle.module';
+import { BookingStateModule } from '../booking-lifecycle/booking-state.module';
 import { AdminRefundController } from './admin-refund.controller';
 import { AncillaryPaymentValidationService } from './ancillary-payment-validation.service';
 import { BookingIntentModule } from '../booking-intent/booking-intent.module';
 import { RefundModule } from '../refund/refund.module';
 import { RefundSettlementModule } from '../refund-settlement/refund-settlement.module';
 import { PaymentFulfillmentModule } from '@/payment-fulfillment/payment-fulfillment.module';
+import { DomainEventsModule } from '@/domain-events/domain-events.module';
 
 @Module({
   imports: [
@@ -26,10 +27,11 @@ import { PaymentFulfillmentModule } from '@/payment-fulfillment/payment-fulfillm
     IdempotencyModule,
     RefundModule,
     RefundSettlementModule,
-    BookingLifecycleModule,
+    BookingStateModule,
     BookingIntentModule,
     PaymentMethodsModule,
     PaymentFulfillmentModule,
+    DomainEventsModule,
   ],
   controllers: [PaymentController, PaymentWebhookController, AdminRefundController],
   providers: [
