@@ -18,6 +18,8 @@ import {
 } from './booking.events';
 import { REFUND_EVENTS, RefundSettledEvent } from './refund.events';
 
+export type PublishableEvent = DomainEventBase | RefundSettledEvent;
+
 /**
  * Transaction Event Context
  *
@@ -27,7 +29,7 @@ import { REFUND_EVENTS, RefundSettledEvent } from './refund.events';
  */
 export interface TransactionEventContext {
   readonly tx: Prisma.TransactionClient;
-  readonly events: DomainEventBase[];
+  readonly events: PublishableEvent[];
 }
 
 /**
@@ -100,8 +102,6 @@ export function resolveEventName(event: unknown): string | null {
       return null;
   }
 }
-
-export type PublishableEvent = DomainEventBase | RefundSettledEvent;
 
 /**
  * BookingEventPublisherService

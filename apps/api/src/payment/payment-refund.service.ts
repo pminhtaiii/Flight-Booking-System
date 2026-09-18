@@ -18,12 +18,11 @@ import { RefundResponse } from '@shared/types/payment.types';
 import { enforceTransition } from '@/payment/payment-state-machine';
 import { BookingStatus, PaymentStatus, RefundStatus, RefundTriggerType } from '@prisma/client';
 import * as crypto from 'crypto';
-import { randomUUID } from 'crypto';
 import {
   BookingEventPublisherService,
-  BookingRefundUpdatedEvent,
   PublishableEvent,
 } from '@/domain-events';
+import { BookingLifecycleService } from '@/booking-lifecycle/booking-lifecycle.service';
 
 @Injectable()
 export class PaymentRefundService {
@@ -37,6 +36,7 @@ export class PaymentRefundService {
     private readonly refundTransactionService: RefundTransactionService,
     private readonly refundSettlementService: RefundSettlementService,
     private readonly publisher: BookingEventPublisherService,
+    private readonly bookingLifecycleService: BookingLifecycleService,
   ) {}
 
   /**
@@ -634,28 +634,15 @@ export class PaymentRefundService {
         if (claim.count !== 1) {
           throw new ConflictException('Refund is not awaiting manual resolution');
         }
-        await tx.booking.update({
-          where: { id: bookingId },
-          data: {
-            status: BookingStatus.CANCELLED_PENDING_REFUND,
-            version: { increment: 1 },
-          },
-        });
-        const updatedBooking = await tx.booking.findUnique({
-          where: { id: bookingId },
-          select: { version: true },
-        });
-        context.events.push(
-          new BookingRefundUpdatedEvent({
-            bookingId,
-            eventId: randomUUID(),
-            sourceVersion: updatedBooking?.version ?? 1,
-            status: BookingStatus.CANCELLED_PENDING_REFUND,
-            refundStatus: RefundStatus.REFUND_RETRY_SCHEDULED,
-            timestamp: new Date(),
-          }),
+        await this.bookingLifecycleService.updateBookingRefundStatus(
+          bookingId,
+          BookingStatus.CANCELLED_PENDING_REFUND,
+          RefundStatus.REFUND_RETRY_SCHEDULED,
+          undefined,
+          tx,
+          context,
         );
-        eventsToPublish = [...context.events] as PublishableEvent[];
+        eventsToPublish = [...context.events];
         return {
           refundStatus: RefundStatus.REFUND_RETRY_SCHEDULED,
           bookingStatus: BookingStatus.CANCELLED_PENDING_REFUND,

@@ -5,7 +5,7 @@ import { SyncClaimService } from './sync-claim.service';
 import { BookingAgentProjectionService } from '@/agent-gateway/booking-agent-projection.service';
 import { BookingEventPublisherService } from '@/domain-events/booking-event-publisher.service';
 import { BookingDisruptionSyncedEvent } from '@/domain-events/booking.events';
-import { DomainEventBase } from '@/domain-events/domain-event.base';
+import { PublishableEvent } from '@/domain-events';
 import {
   normalizeDuffelOrder,
   normalizeFlightSegments,
@@ -15,7 +15,7 @@ import {
 import { generateItineraryFingerprint } from '../domain/itinerary-fingerprint';
 import { computeItineraryDiff } from '../domain/itinerary-diff';
 import { classifyMateriality } from '../domain/materiality-classifier';
-import { ItineraryRevisionSource, DisruptionStatus, Prisma } from '@prisma/client';
+import { ItineraryRevisionSource, DisruptionStatus, BookingStatus, Prisma } from '@prisma/client';
 import { FlightSegmentSnapshot } from '@shared/booking-types';
 import { MaterialDisruptionReason, MaterialBaseline } from '@shared/disruption-types';
 import * as crypto from 'crypto';
@@ -234,7 +234,7 @@ export class SupplierSyncService {
       // 6. Execute db writes in a short transaction
       let attempts = 0;
       while (attempts < 3) {
-        let eventsToPublish: DomainEventBase[] = [];
+        let eventsToPublish: PublishableEvent[] = [];
         try {
           const result = await this.prisma.$transaction(
             async (tx): Promise<SyncResult> => {
@@ -515,7 +515,8 @@ export class SupplierSyncService {
                   eventId: randomUUID(),
                   sourceVersion: (dbBooking.version ?? 1) + 1,
                   revisionId: newRevision.id,
-                  status: ((bookingData as Record<string, unknown>).status as string) ?? dbBooking.status,
+                  // Safe cast: bookingData optionally overrides status, falling back to current dbBooking.status
+                  status: (bookingData.status as BookingStatus | undefined) ?? dbBooking.status,
                   timestamp: now,
                 }),
               );

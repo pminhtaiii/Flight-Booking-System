@@ -18,7 +18,7 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { PaymentRefundService } from '@/payment/payment-refund.service';
 import { BookingLifecycleService } from '@/booking-lifecycle/booking-lifecycle.service';
-import { BookingEventPublisherService, DomainEventBase } from '@/domain-events';
+import { BookingEventPublisherService, PublishableEvent } from '@/domain-events';
 import {
   CancellationQuoteResponseDto,
   CancellationResponseDto,
@@ -349,7 +349,7 @@ export class CancellationService {
     }
 
     const staleClaimThreshold = new Date(Date.now() - 2 * 60 * 1000);
-    let claimEvents: DomainEventBase[] = [];
+    let claimEvents: PublishableEvent[] = [];
     const claim = await this.prisma.$transaction(async (tx) => {
       const claimContext = this.publisher.createContext(tx);
       const claimResult = await this.bookingLifecycleService.claimCancellation(
@@ -402,7 +402,7 @@ export class CancellationService {
         ? BookingStatus.CANCELLED_PENDING_REFUND
         : BookingStatus.CANCELLED_NO_REFUND;
 
-    let finalEvents: DomainEventBase[] = [];
+    let finalEvents: PublishableEvent[] = [];
     const persistedCount = await this.prisma.$transaction(async (tx) => {
       const cancelContext = this.publisher.createContext(tx);
       const cancelResult = await this.bookingLifecycleService.cancelBooking(

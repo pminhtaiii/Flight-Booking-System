@@ -13,6 +13,7 @@ import {
   BookingEventPublisherService,
   BookingRefundUpdatedEvent,
 } from '@/domain-events';
+import { BookingLifecycleService } from '@/booking-lifecycle/booking-lifecycle.service';
 
 describe('PaymentRefundService', () => {
   let service: PaymentRefundService;
@@ -51,11 +52,32 @@ describe('PaymentRefundService', () => {
     createContext: jest.fn(),
     publish: jest.fn(),
   };
+  const bookingLifecycleService = {
+    updateBookingRefundStatus: jest.fn(),
+  };
 
   beforeEach(async () => {
     jest.resetAllMocks();
     publisher.createContext.mockImplementation((tx) => ({ tx, events: [] }));
     publisher.publish.mockResolvedValue(undefined);
+    bookingLifecycleService.updateBookingRefundStatus.mockImplementation(
+      async (bookingId, targetStatus, refundStatus, reason, tx, context) => {
+        if (context) {
+          context.events.push(
+            new BookingRefundUpdatedEvent({
+              bookingId,
+              eventId: 'mock-event-id',
+              sourceVersion: 2,
+              status: targetStatus,
+              refundStatus,
+              reason,
+              timestamp: new Date(),
+            }),
+          );
+        }
+        return { count: 1, updatedBooking: { id: bookingId, status: targetStatus, version: 2 } };
+      },
+    );
     idempotency.acquireOrReplay.mockResolvedValue({ status: 'acquired' });
     idempotency.completeKey.mockResolvedValue(undefined);
     prisma.$transaction.mockImplementation(
@@ -95,6 +117,7 @@ describe('PaymentRefundService', () => {
         { provide: RefundTransactionService, useValue: refundTransactionService },
         { provide: RefundSettlementService, useValue: refundSettlementService },
         { provide: BookingEventPublisherService, useValue: publisher },
+        { provide: BookingLifecycleService, useValue: bookingLifecycleService },
       ],
     }).compile();
     service = module.get(PaymentRefundService);
@@ -547,8 +570,6 @@ describe('PaymentRefundService', () => {
       prisma.booking.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
       prisma.idempotencyKey.create.mockResolvedValue({ id: 'new-key-1' });
       prisma.refund.updateMany.mockResolvedValue({ count: 1 });
-      prisma.booking.update.mockResolvedValue({ id: 'booking-1' });
-      prisma.booking.findUnique.mockResolvedValue({ version: 2 });
 
       let publishCalledBeforeCommit = false;
       prisma.$transaction.mockImplementation(
@@ -570,28 +591,33 @@ describe('PaymentRefundService', () => {
       expect(res.refundStatus).toBe(RefundStatus.REFUND_RETRY_SCHEDULED);
       expect(res.bookingStatus).toBe(BookingStatus.CANCELLED_PENDING_REFUND);
 
-      // Verify atomic version increment on booking update
-      expect(prisma.booking.update).toHaveBeenCalledWith({
-        where: { id: 'booking-1' },
-        data: {
-          status: BookingStatus.CANCELLED_PENDING_REFUND,
-          version: { increment: 1 },
-        },
-      });
+      // Verify delegation to BookingLifecycleService instead of raw prisma update
+      expect(bookingLifecycleService.updateBookingRefundStatus).toHaveBeenCalledWith(
+        'booking-1',
+        BookingStatus.CANCELLED_PENDING_REFUND,
+        RefundStatus.REFUND_RETRY_SCHEDULED,
+        undefined,
+        prisma,
+        expect.any(Object),
+      );
+      expect(prisma.booking.update).not.toHaveBeenCalled();
 
       // Verify context created and event published post-commit
       expect(publisher.createContext).toHaveBeenCalledWith(prisma);
       expect(publishCalledBeforeCommit).toBe(false);
       expect(publisher.publish).toHaveBeenCalledTimes(1);
-      expect(publisher.publish).toHaveBeenCalledWith([
-        expect.objectContaining({
-          bookingId: 'booking-1',
-          sourceVersion: 2,
-          status: BookingStatus.CANCELLED_PENDING_REFUND,
-          refundStatus: RefundStatus.REFUND_RETRY_SCHEDULED,
-        }),
-      ]);
-      const publishedEvent = publisher.publish.mock.calls[0][0][0];
+      const publishedBatch = publisher.publish.mock.calls[0]?.[0];
+      expect(Array.isArray(publishedBatch)).toBe(true);
+      if (!Array.isArray(publishedBatch)) {
+        throw new Error('Expected publishedBatch to be an array');
+      }
+      expect(publishedBatch[0]).toMatchObject({
+        bookingId: 'booking-1',
+        sourceVersion: 2,
+        status: BookingStatus.CANCELLED_PENDING_REFUND,
+        refundStatus: RefundStatus.REFUND_RETRY_SCHEDULED,
+      });
+      const publishedEvent = publishedBatch[0];
       expect(publishedEvent).toBeInstanceOf(BookingRefundUpdatedEvent);
     });
 

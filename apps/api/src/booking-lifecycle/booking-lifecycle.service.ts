@@ -25,8 +25,9 @@ import {
   BookingCompletedEvent,
   BookingCancellationPendingEvent,
   BookingCancelledEvent,
+  BookingRefundUpdatedEvent,
   BookingEventPublisherService,
-  DomainEventBase,
+  PublishableEvent,
   TransactionEventContext,
 } from '@/domain-events';
 import { BookingPipelineOutcome, BookingWithRelations } from './booking-lifecycle.types';
@@ -78,18 +79,18 @@ export class BookingLifecycleService {
   private async executeMutation<T>(
     resolvedContext: TransactionEventContext | undefined,
     resolvedTx: Prisma.TransactionClient | undefined,
-    operation: (client: Prisma.TransactionClient, events: DomainEventBase[]) => Promise<T>,
+    operation: (client: Prisma.TransactionClient, events: PublishableEvent[]) => Promise<T>,
   ): Promise<T> {
     if (resolvedContext) {
       return operation(resolvedContext.tx, resolvedContext.events);
     }
 
     if (resolvedTx) {
-      const localEvents: DomainEventBase[] = [];
+      const localEvents: PublishableEvent[] = [];
       return operation(resolvedTx, localEvents);
     }
 
-    const localEvents: DomainEventBase[] = [];
+    const localEvents: PublishableEvent[] = [];
     const result = await this.prisma.$transaction(async (tx) => {
       return operation(tx, localEvents);
     });
@@ -485,8 +486,8 @@ export class BookingLifecycleService {
     const targetTime = booking.currentFinalArrivalAt || booking.departureAt;
     if (booking.status === BookingStatus.CONFIRMED && targetTime && targetTime <= now) {
       try {
-        const localEvents: DomainEventBase[] = [];
-        const eventSink: DomainEventBase[] = context ? context.events : localEvents;
+        const localEvents: PublishableEvent[] = [];
+        const eventSink: PublishableEvent[] = context ? context.events : localEvents;
 
         const executeUpdate = async (tx: Prisma.TransactionClient): Promise<boolean> => {
           // Re-fetch the booking inside transaction to make it safe and atomic
@@ -774,4 +775,59 @@ export class BookingLifecycleService {
       };
     });
   }
+
+  /**
+   * Updates booking refund status with no-op idempotency and audit event emission.
+   *
+   * Enforces the no-op invariant:
+   * - If current.status === targetStatus: returns { count: 0, updatedBooking: current } (no version bump, no event).
+   * - If different: updates status with version increment, emits BookingRefundUpdatedEvent, returns { count: 1, updatedBooking }.
+   */
+  async updateBookingRefundStatus(
+    bookingId: string,
+    targetStatus: BookingStatus,
+    refundStatus: string,
+    reason?: string,
+    tx?: Prisma.TransactionClient,
+    context?: TransactionEventContext,
+  ): Promise<{ count: number; updatedBooking?: Booking }> {
+    const { tx: resolvedTx, context: resolvedContext } = resolveTxAndContext(tx, context);
+
+    return this.executeMutation(resolvedContext, resolvedTx, async (client, events) => {
+      const current = await client.booking.findUnique({
+        where: { id: bookingId },
+      });
+
+      if (!current) {
+        throw new NotFoundException('Booking not found');
+      }
+
+      if (current.status === targetStatus) {
+        return { count: 0, updatedBooking: current };
+      }
+
+      const updatedBooking = await client.booking.update({
+        where: { id: bookingId },
+        data: {
+          status: targetStatus,
+          version: { increment: 1 },
+        },
+      });
+
+      events.push(
+        new BookingRefundUpdatedEvent({
+          bookingId,
+          eventId: randomUUID(),
+          sourceVersion: updatedBooking.version,
+          status: targetStatus,
+          refundStatus,
+          reason,
+          timestamp: new Date(),
+        }),
+      );
+
+      return { count: 1, updatedBooking };
+    });
+  }
 }
+

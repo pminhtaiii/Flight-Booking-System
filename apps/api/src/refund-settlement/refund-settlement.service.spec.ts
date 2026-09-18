@@ -13,6 +13,7 @@ import {
   BookingRefundUpdatedEvent,
   RefundSettledEvent,
 } from '@/domain-events';
+import { BookingLifecycleService } from '@/booking-lifecycle/booking-lifecycle.service';
 import { RefundSettlementService } from './refund-settlement.service';
 import { RefundSettlementInput } from './refund-settlement.types';
 
@@ -48,6 +49,9 @@ describe('RefundSettlementService', () => {
   let mockPublisher: {
     createContext: jest.Mock;
     publish: jest.Mock;
+  };
+  let mockBookingLifecycleService: {
+    updateBookingRefundStatus: jest.Mock;
   };
   let logSpy: jest.SpyInstance;
   let warnSpy: jest.SpyInstance;
@@ -98,10 +102,35 @@ describe('RefundSettlementService', () => {
       publish: jest.fn().mockResolvedValue(undefined),
     };
 
+    mockBookingLifecycleService = {
+      updateBookingRefundStatus: jest.fn().mockImplementation(
+        async (bookingId, targetStatus, refundStatus, reason, tx, context) => {
+          if (targetStatus === BookingStatus.CANCELLED_PENDING_REFUND) {
+            return { count: 0, updatedBooking: { id: bookingId, status: targetStatus, version: 1 } };
+          }
+          if (context) {
+            context.events.push(
+              new BookingRefundUpdatedEvent({
+                bookingId,
+                eventId: 'mock-event-id',
+                sourceVersion: 2,
+                status: targetStatus,
+                refundStatus,
+                reason,
+                timestamp: new Date(),
+              }),
+            );
+          }
+          return { count: 1, updatedBooking: { id: bookingId, status: targetStatus, version: 2 } };
+        },
+      ),
+    };
+
     service = new RefundSettlementService(
       mockPrisma as unknown as PrismaService,
       mockAuditService as unknown as AuditService,
       mockPublisher as unknown as BookingEventPublisherService,
+      mockBookingLifecycleService as unknown as BookingLifecycleService,
     );
   });
 
@@ -230,13 +259,14 @@ describe('RefundSettlementService', () => {
         data: { status: PaymentStatus.REFUNDED },
       });
 
-      expect(mockTx.booking.update).toHaveBeenCalledWith({
-        where: { id: 'book_123' },
-        data: {
-          status: BookingStatus.CANCELLED_AND_REFUNDED,
-          version: { increment: 1 },
-        },
-      });
+      expect(mockBookingLifecycleService.updateBookingRefundStatus).toHaveBeenCalledWith(
+        'book_123',
+        BookingStatus.CANCELLED_AND_REFUNDED,
+        RefundStatus.SUCCEEDED,
+        undefined,
+        mockTx,
+        expect.any(Object),
+      );
 
       expect(mockTx.paymentEvent.create).toHaveBeenCalledWith({
         data: {
@@ -365,10 +395,17 @@ describe('RefundSettlementService', () => {
         paymentStatus: PaymentStatus.PARTIALLY_REFUNDED,
         bookingStatus: BookingStatus.CANCELLED_PENDING_REFUND,
       });
-      expect(mockTx.booking.update).not.toHaveBeenCalled();
+      expect(mockBookingLifecycleService.updateBookingRefundStatus).toHaveBeenCalledWith(
+        'book_300',
+        BookingStatus.CANCELLED_PENDING_REFUND,
+        RefundStatus.SUCCEEDED,
+        undefined,
+        mockTx,
+        expect.any(Object),
+      );
 
       // 2nd refund ($100, cumulative $200 of $300 obligation)
-      mockTx.booking.update.mockClear();
+      mockBookingLifecycleService.updateBookingRefundStatus.mockClear();
       mockTx.refund.findUnique.mockResolvedValue(multiRefundRow('ref_2', 10000));
       mockTx.refund.findMany.mockImplementation((args) => {
         if (args.where.paymentId) return [{ amount: 10000 }, { amount: 10000 }];
@@ -394,10 +431,17 @@ describe('RefundSettlementService', () => {
         paymentStatus: PaymentStatus.PARTIALLY_REFUNDED,
         bookingStatus: BookingStatus.CANCELLED_PENDING_REFUND,
       });
-      expect(mockTx.booking.update).not.toHaveBeenCalled();
+      expect(mockBookingLifecycleService.updateBookingRefundStatus).toHaveBeenCalledWith(
+        'book_300',
+        BookingStatus.CANCELLED_PENDING_REFUND,
+        RefundStatus.SUCCEEDED,
+        undefined,
+        mockTx,
+        expect.any(Object),
+      );
 
       // 3rd refund ($100, cumulative $300 of $300 obligation met, $300 of $500 payment)
-      mockTx.booking.update.mockClear();
+      mockBookingLifecycleService.updateBookingRefundStatus.mockClear();
       mockTx.refund.findUnique.mockResolvedValue(multiRefundRow('ref_3', 10000));
       mockTx.refund.findMany.mockImplementation((args) => {
         if (args.where.paymentId) return [{ amount: 10000 }, { amount: 10000 }, { amount: 10000 }];
@@ -423,13 +467,14 @@ describe('RefundSettlementService', () => {
         paymentStatus: PaymentStatus.PARTIALLY_REFUNDED,
         bookingStatus: BookingStatus.CANCELLED_AND_REFUNDED,
       });
-      expect(mockTx.booking.update).toHaveBeenCalledWith({
-        where: { id: 'book_300' },
-        data: {
-          status: BookingStatus.CANCELLED_AND_REFUNDED,
-          version: { increment: 1 },
-        },
-      });
+      expect(mockBookingLifecycleService.updateBookingRefundStatus).toHaveBeenCalledWith(
+        'book_300',
+        BookingStatus.CANCELLED_AND_REFUNDED,
+        RefundStatus.SUCCEEDED,
+        undefined,
+        mockTx,
+        expect.any(Object),
+      );
     });
 
     it('should return applied: false on duplicate delivery of SUCCEEDED without modifying database or logging audit', async () => {
@@ -461,7 +506,7 @@ describe('RefundSettlementService', () => {
       expect(mockTx.refund.update).not.toHaveBeenCalled();
       expect(mockTx.ledgerEntry.create).not.toHaveBeenCalled();
       expect(mockTx.payment.update).not.toHaveBeenCalled();
-      expect(mockTx.booking.update).not.toHaveBeenCalled();
+      expect(mockBookingLifecycleService.updateBookingRefundStatus).not.toHaveBeenCalled();
       expect(mockTx.paymentEvent.create).not.toHaveBeenCalled();
       expect(mockAuditService.createLog).not.toHaveBeenCalled();
       expect(logSpy).toHaveBeenCalledWith({
@@ -564,13 +609,14 @@ describe('RefundSettlementService', () => {
       const result = await service.settleVerifiedOutcome(baseInput);
 
       expect(result.bookingStatus).toBe(BookingStatus.CANCELLED_NO_REFUND);
-      expect(mockTx.booking.update).toHaveBeenCalledWith({
-        where: { id: 'book_123' },
-        data: {
-          status: BookingStatus.CANCELLED_NO_REFUND,
-          version: { increment: 1 },
-        },
-      });
+      expect(mockBookingLifecycleService.updateBookingRefundStatus).toHaveBeenCalledWith(
+        'book_123',
+        BookingStatus.CANCELLED_NO_REFUND,
+        RefundStatus.SUCCEEDED,
+        undefined,
+        mockTx,
+        expect.any(Object),
+      );
     });
 
     it('should handle refund without cancellation obligation correctly', async () => {
@@ -586,7 +632,7 @@ describe('RefundSettlementService', () => {
       const result = await service.settleVerifiedOutcome(baseInput);
 
       expect(result.bookingStatus).toBeUndefined();
-      expect(mockTx.booking.update).not.toHaveBeenCalled();
+      expect(mockBookingLifecycleService.updateBookingRefundStatus).not.toHaveBeenCalled();
       expect(result.applied).toBe(true);
       expect(result.transactionStatus).toBe('SUCCEEDED');
       expect(result.paymentStatus).toBe(PaymentStatus.REFUNDED);
@@ -746,24 +792,31 @@ describe('RefundSettlementService', () => {
     it('should increment booking version and emit BookingRefundUpdatedEvent post-commit on booking status transition', async () => {
       mockTx.refund.findUnique.mockResolvedValue(baseRefundRow);
       mockTx.refund.findMany.mockResolvedValue([{ amount: 20000 }]);
-      mockTx.booking.update.mockResolvedValue({ id: 'book_123', version: 2 });
 
       await service.settleVerifiedOutcome(baseInput);
 
-      expect(mockTx.booking.update).toHaveBeenCalledWith({
-        where: { id: 'book_123' },
-        data: {
-          status: BookingStatus.CANCELLED_AND_REFUNDED,
-          version: { increment: 1 },
-        },
-      });
+      expect(mockBookingLifecycleService.updateBookingRefundStatus).toHaveBeenCalledWith(
+        'book_123',
+        BookingStatus.CANCELLED_AND_REFUNDED,
+        RefundStatus.SUCCEEDED,
+        undefined,
+        mockTx,
+        expect.any(Object),
+      );
 
       expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
-      const publishedBatch = mockPublisher.publish.mock.calls[0][0];
+      const publishedBatch = mockPublisher.publish.mock.calls[0]?.[0];
+      expect(Array.isArray(publishedBatch)).toBe(true);
+      if (!Array.isArray(publishedBatch)) {
+        throw new Error('Expected publishedBatch to be an array');
+      }
       const bookingRefundUpdated = publishedBatch.find(
-        (e: any) => e instanceof BookingRefundUpdatedEvent,
+        (e: any): e is BookingRefundUpdatedEvent => e instanceof BookingRefundUpdatedEvent,
       );
       expect(bookingRefundUpdated).toBeDefined();
+      if (!bookingRefundUpdated) {
+        throw new Error('Expected BookingRefundUpdatedEvent in publishedBatch');
+      }
       expect(bookingRefundUpdated).toMatchObject({
         bookingId: 'book_123',
         status: BookingStatus.CANCELLED_AND_REFUNDED,
@@ -807,10 +860,21 @@ describe('RefundSettlementService', () => {
 
       await service.settleVerifiedOutcome(partialInput);
 
-      expect(mockTx.booking.update).not.toHaveBeenCalled();
+      expect(mockBookingLifecycleService.updateBookingRefundStatus).toHaveBeenCalledWith(
+        'book_123',
+        BookingStatus.CANCELLED_PENDING_REFUND,
+        RefundStatus.SUCCEEDED,
+        undefined,
+        mockTx,
+        expect.any(Object),
+      );
 
       expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
-      const publishedBatch = mockPublisher.publish.mock.calls[0][0];
+      const publishedBatch = mockPublisher.publish.mock.calls[0]?.[0];
+      expect(Array.isArray(publishedBatch)).toBe(true);
+      if (!Array.isArray(publishedBatch)) {
+        throw new Error('Expected publishedBatch to be an array');
+      }
       expect(publishedBatch).toHaveLength(1);
       expect(publishedBatch[0]).toBeInstanceOf(RefundSettledEvent);
       expect(publishedBatch[0]).toMatchObject({
@@ -838,7 +902,6 @@ describe('RefundSettlementService', () => {
         },
       });
       mockTx.refund.findMany.mockResolvedValue([]);
-      mockTx.booking.update.mockResolvedValue({ id: 'book_123', version: 2 });
 
       const attentionInput: RefundSettlementInput = {
         transactionId: 'ref_123',
@@ -855,28 +918,65 @@ describe('RefundSettlementService', () => {
 
       await service.settleVerifiedOutcome(attentionInput);
 
-      expect(mockTx.booking.update).toHaveBeenCalledWith({
-        where: { id: 'book_123' },
-        data: {
-          status: BookingStatus.REFUND_FAILED_NEEDS_ATTENTION,
-          version: { increment: 1 },
-        },
-      });
+      expect(mockBookingLifecycleService.updateBookingRefundStatus).toHaveBeenCalledWith(
+        'book_123',
+        BookingStatus.REFUND_FAILED_NEEDS_ATTENTION,
+        RefundStatus.REFUND_FAILED_NEEDS_ATTENTION,
+        'STRIPE_REQUIRES_ATTENTION',
+        mockTx,
+        expect.any(Object),
+      );
 
       expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
-      const publishedBatch = mockPublisher.publish.mock.calls[0][0];
+      const publishedBatch = mockPublisher.publish.mock.calls[0]?.[0];
+      expect(Array.isArray(publishedBatch)).toBe(true);
+      if (!Array.isArray(publishedBatch)) {
+        throw new Error('Expected publishedBatch to be an array');
+      }
       expect(publishedBatch).toHaveLength(1);
       const bookingRefundUpdated = publishedBatch[0];
       expect(bookingRefundUpdated).toBeInstanceOf(BookingRefundUpdatedEvent);
+      if (!bookingRefundUpdated) {
+        throw new Error('Expected event in publishedBatch');
+      }
       expect(bookingRefundUpdated).toMatchObject({
         bookingId: 'book_123',
         status: BookingStatus.REFUND_FAILED_NEEDS_ATTENTION,
         refundStatus: RefundStatus.REFUND_FAILED_NEEDS_ATTENTION,
         reason: 'STRIPE_REQUIRES_ATTENTION',
-        sourceVersion: 2,
       });
       const hasSettledFact = publishedBatch.some((e: any) => e instanceof RefundSettledEvent);
       expect(hasSettledFact).toBe(false);
+    });
+
+    it('verifies no-op on already in target state: no events emitted if booking already in status', async () => {
+      mockTx.refund.findUnique.mockResolvedValue(baseRefundRow);
+      mockTx.refund.findMany.mockResolvedValue([{ amount: 20000 }]);
+      // Simulate no-op when booking is already CANCELLED_AND_REFUNDED
+      mockBookingLifecycleService.updateBookingRefundStatus.mockResolvedValueOnce({
+        count: 0,
+        updatedBooking: { id: 'book_123', status: BookingStatus.CANCELLED_AND_REFUNDED, version: 1 },
+      });
+
+      const result = await service.settleVerifiedOutcome(baseInput);
+
+      expect(result.applied).toBe(true);
+      expect(mockBookingLifecycleService.updateBookingRefundStatus).toHaveBeenCalledWith(
+        'book_123',
+        BookingStatus.CANCELLED_AND_REFUNDED,
+        RefundStatus.SUCCEEDED,
+        undefined,
+        mockTx,
+        expect.any(Object),
+      );
+      // Only RefundSettledEvent should be published, no BookingRefundUpdatedEvent
+      expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
+      const publishedBatch = mockPublisher.publish.mock.calls[0]?.[0];
+      expect(Array.isArray(publishedBatch)).toBe(true);
+      if (!Array.isArray(publishedBatch)) {
+        throw new Error('Expected publishedBatch to be an array');
+      }
+      expect(publishedBatch.some((e: any) => e instanceof BookingRefundUpdatedEvent)).toBe(false);
     });
 
     it('should discard all events on transaction rollback', async () => {

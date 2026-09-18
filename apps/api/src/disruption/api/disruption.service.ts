@@ -10,7 +10,7 @@ import {
   BookingDisruptionAcknowledgedEvent,
   BookingDisruptionAcceptedEvent,
 } from '@/domain-events/booking.events';
-import { DomainEventBase } from '@/domain-events/domain-event.base';
+import { PublishableEvent } from '@/domain-events';
 import { randomUUID } from 'crypto';
 import {
   DisruptionHistoryResponseDto,
@@ -116,7 +116,7 @@ export class DisruptionService {
     userId: string,
   ): Promise<AcknowledgeDisruptionResponseDto> {
     const now = new Date();
-    let eventsToPublish: DomainEventBase[] = [];
+    let eventsToPublish: PublishableEvent[] = [];
 
     const updatedBooking = await this.prisma.$transaction(async (tx) => {
       const current = await tx.booking.findUnique({
@@ -230,7 +230,7 @@ export class DisruptionService {
     userId: string,
   ): Promise<AcceptDisruptionResponseDto> {
     const now = new Date();
-    let eventsToPublish: DomainEventBase[] = [];
+    let eventsToPublish: PublishableEvent[] = [];
 
     const updatedBooking = await this.prisma.$transaction(async (tx) => {
       const current = await tx.booking.findUnique({
