@@ -67,6 +67,29 @@ function resolveTxAndContext(
   };
 }
 
+export const ALLOWED_REFUND_SOURCE_STATUSES: Partial<Record<BookingStatus, readonly BookingStatus[]>> = {
+  [BookingStatus.CANCELLED_AND_REFUNDED]: [
+    BookingStatus.CANCELLED_PENDING_REFUND,
+    BookingStatus.REFUND_FAILED_NEEDS_ATTENTION,
+    BookingStatus.CANCELLATION_PENDING,
+  ],
+  [BookingStatus.CANCELLED_NO_REFUND]: [
+    BookingStatus.CANCELLATION_PENDING,
+    BookingStatus.CANCELLED_PENDING_REFUND,
+    BookingStatus.REFUND_FAILED_NEEDS_ATTENTION,
+  ],
+  [BookingStatus.CANCELLED_PENDING_REFUND]: [
+    BookingStatus.REFUND_FAILED_NEEDS_ATTENTION,
+    BookingStatus.CANCELLATION_PENDING,
+    BookingStatus.CANCELLED_PENDING_REFUND,
+  ],
+  [BookingStatus.REFUND_FAILED_NEEDS_ATTENTION]: [
+    BookingStatus.CANCELLED_PENDING_REFUND,
+    BookingStatus.CANCELLATION_PENDING,
+    BookingStatus.REFUND_FAILED_NEEDS_ATTENTION,
+  ],
+};
+
 @Injectable()
 export class BookingLifecycleService {
   private readonly logger = new Logger(BookingLifecycleService.name);
@@ -808,6 +831,13 @@ export class BookingLifecycleService {
           return { count: 0, updatedBooking: current };
         }
 
+        const allowedSources = ALLOWED_REFUND_SOURCE_STATUSES[targetStatus];
+        if (allowedSources && !allowedSources.includes(current.status)) {
+          throw new ConflictException(
+            `Cannot transition booking ${bookingId} from ${current.status} to ${targetStatus}`,
+          );
+        }
+
         const updateResult = await client.booking.updateMany({
           where: {
             id: bookingId,
@@ -822,10 +852,18 @@ export class BookingLifecycleService {
 
         if (updateResult.count === 0) {
           const reloaded = await client.booking.findUnique({ where: { id: bookingId } });
-          if (reloaded?.status === targetStatus) {
+          if (!reloaded) {
+            throw new NotFoundException('Booking not found');
+          }
+          if (reloaded.status === targetStatus) {
             return { count: 0, updatedBooking: reloaded };
           }
-          if (attempt < 3 && reloaded) {
+          if (allowedSources && !allowedSources.includes(reloaded.status)) {
+            throw new ConflictException(
+              `Cannot transition booking ${bookingId} from reloaded status ${reloaded.status} to ${targetStatus}`,
+            );
+          }
+          if (attempt < 3) {
             current = reloaded;
             continue;
           }

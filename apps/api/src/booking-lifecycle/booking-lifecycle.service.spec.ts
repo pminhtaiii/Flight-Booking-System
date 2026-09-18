@@ -1557,5 +1557,80 @@ describe('BookingLifecycleService', () => {
         ),
       ).rejects.toThrow(NotFoundException);
     });
+
+    it('throws ConflictException without updating or retrying if initial booking status is disallowed for refund target', async () => {
+      const confirmedBooking = {
+        id: 'booking-disallowed-init',
+        status: BookingStatus.CONFIRMED,
+        version: 1,
+      };
+      mockPrisma.booking.findUnique.mockResolvedValue(confirmedBooking);
+
+      const context: TransactionEventContext = {
+        tx: mockPrisma,
+        events: [],
+      };
+
+      await expect(
+        service.updateBookingRefundStatus(
+          'booking-disallowed-init',
+          BookingStatus.CANCELLED_AND_REFUNDED,
+          'SUCCEEDED',
+          undefined,
+          mockPrisma,
+          context,
+        ),
+      ).rejects.toThrow(
+        new ConflictException(
+          'Cannot transition booking booking-disallowed-init from CONFIRMED to CANCELLED_AND_REFUNDED',
+        ),
+      );
+
+      expect(mockPrisma.booking.updateMany).not.toHaveBeenCalled();
+      expect(context.events).toHaveLength(0);
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
+    });
+
+    it('throws ConflictException and does not retry if concurrent update moves booking to disallowed status (COMPLETED)', async () => {
+      const initialBooking = {
+        id: 'booking-disallowed-reload',
+        status: BookingStatus.CANCELLED_PENDING_REFUND,
+        version: 1,
+      };
+      const concurrentlyCompletedBooking = {
+        id: 'booking-disallowed-reload',
+        status: BookingStatus.COMPLETED,
+        version: 2,
+      };
+
+      mockPrisma.booking.findUnique
+        .mockResolvedValueOnce(initialBooking)
+        .mockResolvedValueOnce(concurrentlyCompletedBooking);
+      mockPrisma.booking.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      const context: TransactionEventContext = {
+        tx: mockPrisma,
+        events: [],
+      };
+
+      await expect(
+        service.updateBookingRefundStatus(
+          'booking-disallowed-reload',
+          BookingStatus.CANCELLED_AND_REFUNDED,
+          'SUCCEEDED',
+          undefined,
+          mockPrisma,
+          context,
+        ),
+      ).rejects.toThrow(
+        new ConflictException(
+          'Cannot transition booking booking-disallowed-reload from reloaded status COMPLETED to CANCELLED_AND_REFUNDED',
+        ),
+      );
+
+      expect(mockPrisma.booking.updateMany).toHaveBeenCalledTimes(1);
+      expect(context.events).toHaveLength(0);
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
+    });
   });
 });
