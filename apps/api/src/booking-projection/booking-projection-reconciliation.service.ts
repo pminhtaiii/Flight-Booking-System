@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { BookingProjectionRepository } from './booking-projection.repository';
 import { BookingProjectionService } from './booking-projection.service';
 import { BookingEventHydratorService } from '@/domain-events/booking-event-hydrator.service';
+import { BookingProjectionMetrics } from './booking-projection.metrics';
 
 export type CandidateOutcome = 'repaired' | 'current' | 'skipped' | 'failed';
 
@@ -16,6 +17,9 @@ export type ReconciliationPassSummary = {
   reachedEnd: boolean;
 };
 
+export const RECONCILIATION_CRON_JOB_NAME =
+  'BookingProjectionReconciliationService';
+
 @Injectable()
 export class BookingProjectionReconciliationService {
   private readonly logger = new Logger(BookingProjectionReconciliationService.name);
@@ -26,13 +30,15 @@ export class BookingProjectionReconciliationService {
     private readonly repository: BookingProjectionRepository,
     private readonly projectionService: BookingProjectionService,
     private readonly hydrator: BookingEventHydratorService,
+    @Optional()
+    private readonly metrics: BookingProjectionMetrics = new BookingProjectionMetrics(),
   ) {}
 
   getCursor(): string | undefined {
     return this.cursor;
   }
 
-  @Cron(CronExpression.EVERY_MINUTE)
+  @Cron(CronExpression.EVERY_MINUTE, { name: RECONCILIATION_CRON_JOB_NAME })
   async reconcileBatch(batchSize = 100): Promise<ReconciliationPassSummary | null> {
     if (this.isReconciling) {
       this.logger.warn({
@@ -42,6 +48,7 @@ export class BookingProjectionReconciliationService {
     }
 
     this.isReconciling = true;
+    const startTime = Date.now();
     try {
       const scanResult = await this.repository.findStaleOrMissingBookingIds(
         batchSize,
@@ -97,13 +104,26 @@ export class BookingProjectionReconciliationService {
         reachedEnd: scanResult.reachedEnd,
       };
 
+      const passEndTime = Date.now();
+      await this.metrics?.incrementReconciliationPassTotal('SUCCESS', 1, passEndTime);
+      this.metrics?.incrementReconciliationStaleFoundTotal(candidateIds.length);
+      this.metrics?.incrementReconciliationRepairedTotal(tallies.repaired);
+      this.metrics?.incrementReconciliationFailedTotal(tallies.failed);
+      this.metrics?.incrementReconciliationSkippedTotal(tallies.skipped);
+      this.metrics?.incrementReconciliationCurrentTotal(tallies.current);
+
       this.logger.log({
         message: '[reconcileBatch] Booking projection reconciliation pass completed',
         ...summary,
       });
 
       return summary;
+    } catch (error) {
+      const passEndTime = Date.now();
+      await this.metrics?.incrementReconciliationPassTotal('ERROR', 1, passEndTime);
+      throw error;
     } finally {
+      this.metrics?.recordReconciliationDuration(Date.now() - startTime);
       this.isReconciling = false;
     }
   }
@@ -119,6 +139,7 @@ export class BookingProjectionReconciliationService {
           bookingId,
           error: error instanceof Error ? error.message : String(error),
         });
+        this.metrics?.incrementFailureTotal('HYDRATION_FAILED');
         return 'failed';
       }
 
@@ -139,6 +160,7 @@ export class BookingProjectionReconciliationService {
           bookingId,
           error: error instanceof Error ? error.message : String(error),
         });
+        this.metrics?.incrementFailureTotal('EXTRACTION_FAILED');
         return 'failed';
       }
 
@@ -167,6 +189,7 @@ export class BookingProjectionReconciliationService {
         bookingId,
         error: error instanceof Error ? error.message : String(error),
       });
+      this.metrics?.incrementFailureTotal('UNEXPECTED_ERROR');
       return 'failed';
     }
   }

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '@/prisma/prisma.module';
+import { CacheModule } from '@/cache/cache.module';
 import { DomainEventsModule } from '@/domain-events/domain-events.module';
 import { BookingEventHydratorService } from '@/domain-events/booking-event-hydrator.service';
 import { BookingProjectionService } from './booking-projection.service';
@@ -9,7 +10,7 @@ import { BookingProjectionMetrics } from './booking-projection.metrics';
 import { BookingProjectionReconciliationService } from './booking-projection-reconciliation.service';
 
 @Module({
-  imports: [PrismaModule, DomainEventsModule],
+  imports: [PrismaModule, CacheModule, DomainEventsModule],
   providers: [
     BookingEventHydratorService,
     BookingProjectionService,
@@ -23,6 +24,7 @@ import { BookingProjectionReconciliationService } from './booking-projection-rec
     BookingProjectionRepository,
     BookingEventHydratorService,
     BookingProjectionReconciliationService,
+    BookingProjectionMetrics,
   ],
 })
 export class BookingProjectionModule {}

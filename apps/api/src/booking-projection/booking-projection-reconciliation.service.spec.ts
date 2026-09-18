@@ -13,9 +13,11 @@ import {
   BookingEventHydratorService,
   CoherentBookingSnapshot,
 } from '@/domain-events/booking-event-hydrator.service';
+import { BookingProjectionMetrics } from './booking-projection.metrics';
 
 describe('BookingProjectionReconciliationService', () => {
   let service: BookingProjectionReconciliationService;
+  let metrics: BookingProjectionMetrics;
   let repository: {
     findStaleOrMissingBookingIds: jest.Mock;
     upsertGuarded: jest.Mock;
@@ -79,6 +81,7 @@ describe('BookingProjectionReconciliationService', () => {
     hydrator = {
       hydrate: jest.fn(),
     };
+    metrics = new BookingProjectionMetrics();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -86,6 +89,7 @@ describe('BookingProjectionReconciliationService', () => {
         { provide: BookingProjectionRepository, useValue: repository },
         { provide: BookingProjectionService, useValue: projectionService },
         { provide: BookingEventHydratorService, useValue: hydrator },
+        { provide: BookingProjectionMetrics, useValue: metrics },
       ],
     }).compile();
 
@@ -479,4 +483,122 @@ describe('BookingProjectionReconciliationService', () => {
       expect(repository.findStaleOrMissingBookingIds).toHaveBeenNthCalledWith(2, 100, batch1Ids[99]);
     });
   });
+
+  describe('Reconciliation Metrics & Telemetry', () => {
+    it('records reconciliation pass success metrics, tallies, and pass duration on successful batch', async () => {
+      repository.findStaleOrMissingBookingIds.mockResolvedValueOnce({
+        bookingIds: ['b-rep', 'b-cur', 'b-skip'],
+        nextCursor: 'b-skip',
+        reachedEnd: true,
+      });
+
+      // 1. Repaired
+      hydrator.hydrate.mockResolvedValueOnce(createMockSnapshot('b-rep', 2));
+      projectionService.extractProjectionData.mockReturnValueOnce(mockSafeData);
+      repository.upsertGuarded.mockResolvedValueOnce({ outcome: 'SUCCESS' });
+
+      // 2. Current
+      hydrator.hydrate.mockResolvedValueOnce(createMockSnapshot('b-cur', 1));
+      projectionService.extractProjectionData.mockReturnValueOnce(mockSafeData);
+      repository.upsertGuarded.mockResolvedValueOnce({ outcome: 'STALE_IGNORED' });
+
+      // 3. Skipped (snapshot null)
+      hydrator.hydrate.mockResolvedValueOnce(null);
+
+      const summary = await service.reconcileBatch();
+
+      expect(summary?.processed).toBe(3);
+      expect(metrics.getReconciliationPassTotal('SUCCESS')).toBe(1);
+      expect(metrics.getReconciliationPassTotal('ERROR')).toBe(0);
+      expect(metrics.getReconciliationStaleFoundTotal()).toBe(3);
+      expect(metrics.getReconciliationRepairedTotal()).toBe(1);
+      expect(metrics.getReconciliationCurrentTotal()).toBe(1);
+      expect(metrics.getReconciliationSkippedTotal()).toBe(1);
+      expect(metrics.getReconciliationFailedTotal()).toBe(0);
+
+      const durations = metrics.getReconciliationDurations();
+      expect(durations.length).toBe(1);
+      expect(durations[0]).toBeGreaterThanOrEqual(0);
+
+      const stats = metrics.getReconciliationDurationStats();
+      expect(stats.count).toBe(1);
+    });
+
+    it('records reconciliation pass error outcome and duration when batch scanning throws', async () => {
+      repository.findStaleOrMissingBookingIds.mockRejectedValueOnce(
+        new Error('Prisma query failed'),
+      );
+
+      await expect(service.reconcileBatch()).rejects.toThrow('Prisma query failed');
+
+      expect(metrics.getReconciliationPassTotal('ERROR')).toBe(1);
+      expect(metrics.getReconciliationPassTotal('SUCCESS')).toBe(0);
+      expect(metrics.getReconciliationDurations().length).toBe(1);
+    });
+
+    it('records HYDRATION_FAILED failure metric when candidate hydration throws', async () => {
+      repository.findStaleOrMissingBookingIds.mockResolvedValueOnce({
+        bookingIds: ['b-hydrate-err'],
+        nextCursor: 'b-hydrate-err',
+        reachedEnd: true,
+      });
+
+      hydrator.hydrate.mockRejectedValueOnce(new Error('PostgreSQL hydration timeout'));
+
+      const summary = await service.reconcileBatch();
+
+      expect(summary?.failed).toBe(1);
+      expect(metrics.getFailureTotal('HYDRATION_FAILED')).toBe(1);
+      expect(metrics.getReconciliationFailedTotal()).toBe(1);
+    });
+
+    it('records EXTRACTION_FAILED failure metric when extractProjectionData throws', async () => {
+      repository.findStaleOrMissingBookingIds.mockResolvedValueOnce({
+        bookingIds: ['b-extract-err'],
+        nextCursor: 'b-extract-err',
+        reachedEnd: true,
+      });
+
+      hydrator.hydrate.mockResolvedValueOnce(createMockSnapshot('b-extract-err'));
+      projectionService.extractProjectionData.mockImplementationOnce(() => {
+        throw new MalformedRevisionError('Corrupted segments');
+      });
+
+      const summary = await service.reconcileBatch();
+
+      expect(summary?.failed).toBe(1);
+      expect(metrics.getFailureTotal('EXTRACTION_FAILED')).toBe(1);
+      expect(metrics.getReconciliationFailedTotal()).toBe(1);
+    });
+
+    it('records UNEXPECTED_ERROR failure metric when candidate processing throws unexpectedly', async () => {
+      repository.findStaleOrMissingBookingIds.mockResolvedValueOnce({
+        bookingIds: ['b-upsert-err'],
+        nextCursor: 'b-upsert-err',
+        reachedEnd: true,
+      });
+
+      hydrator.hydrate.mockResolvedValueOnce(createMockSnapshot('b-upsert-err'));
+      projectionService.extractProjectionData.mockReturnValueOnce(mockSafeData);
+      repository.upsertGuarded.mockRejectedValueOnce(new Error('Unexpected disk full'));
+
+      const summary = await service.reconcileBatch();
+
+      expect(summary?.failed).toBe(1);
+      expect(metrics.getFailureTotal('UNEXPECTED_ERROR')).toBe(1);
+      expect(metrics.getReconciliationFailedTotal()).toBe(1);
+    });
+  });
+
+  describe('Named Cron Metadata', () => {
+    it('declares named cron job BookingProjectionReconciliationService for runtime management', () => {
+      const metadata = Reflect.getMetadata(
+        'SCHEDULE_CRON_OPTIONS',
+        BookingProjectionReconciliationService.prototype.reconcileBatch,
+      );
+      expect(metadata?.name).toBe('BookingProjectionReconciliationService');
+    });
+  });
 });
+
+

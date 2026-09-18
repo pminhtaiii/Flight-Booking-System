@@ -1,5 +1,10 @@
 import { PrismaClient, Prisma, BookingIntentStatus } from '@prisma/client';
 import { randomUUID } from 'crypto';
+import { BookingProjectionReconciliationService } from '../src/booking-projection/booking-projection-reconciliation.service';
+import { BookingProjectionRepository } from '../src/booking-projection/booking-projection.repository';
+import { BookingProjectionService } from '../src/booking-projection/booking-projection.service';
+import { BookingEventHydratorService } from '../src/domain-events/booking-event-hydrator.service';
+import { PrismaService } from '../src/prisma/prisma.service';
 
 describe('Booking & BookingAgentProjection Version Migration (E2E)', () => {
   let prisma: PrismaClient;
@@ -42,6 +47,19 @@ describe('Booking & BookingAgentProjection Version Migration (E2E)', () => {
   afterAll(async () => {
     try {
       if (testBookingId) {
+        await prisma.ledgerEntry.deleteMany({
+          where: { payment: { bookingIntentId: testIntentId } },
+        });
+        await prisma.refund.deleteMany({
+          where: { payment: { bookingIntentId: testIntentId } },
+        });
+        await prisma.booking.updateMany({
+          where: { id: testBookingId },
+          data: { paymentId: null },
+        });
+        await prisma.payment.deleteMany({
+          where: { bookingIntentId: testIntentId },
+        });
         await prisma.bookingAgentProjection.deleteMany({
           where: { bookingId: testBookingId },
         });
@@ -55,6 +73,9 @@ describe('Booking & BookingAgentProjection Version Migration (E2E)', () => {
         });
       }
       if (testUserId) {
+        await prisma.idempotencyKey.deleteMany({
+          where: { customerId: testUserId },
+        });
         await prisma.user.deleteMany({
           where: { id: testUserId },
         });
@@ -73,6 +94,19 @@ describe('Booking & BookingAgentProjection Version Migration (E2E)', () => {
           totalAmount: new Prisma.Decimal('199.99'),
           currency: 'GBP',
           status: 'PROCESSING',
+          flightSnapshot: {
+            stops: 0,
+            segments: [
+              {
+                departureAirport: { iataCode: 'LHR' },
+                arrivalAirport: { iataCode: 'JFK' },
+                departureAt: '2026-12-01T10:00:00.000Z',
+                arrivalAt: '2026-12-01T18:00:00.000Z',
+                airline: { name: 'British Airways', iataCode: 'BA' },
+                flightNumber: '178',
+              },
+            ],
+          },
         },
       });
       testBookingId = booking.id;
@@ -260,6 +294,125 @@ describe('Booking & BookingAgentProjection Version Migration (E2E)', () => {
       expect(queriedProjAfterRaw.status).toBe('CONFIRMED');
       expect(queriedProjAfterRaw.flightNumber).toBe('BA178');
       expect(queriedProjAfterRaw.sourceVersion).toBe(0);
+
+      // 4. Link Payment, Refund, and LedgerEntry to verify they remain completely untouched by reconciliation
+      const paymentIdem = await prisma.idempotencyKey.create({
+        data: {
+          key: `idem-pay-${randomUUID()}`,
+          requestHash: randomUUID(),
+          customerId: testUserId,
+          requestPath: '/api/bookings/payment/confirm',
+          expiresAt: new Date(Date.now() + 86400000),
+        },
+      });
+
+      const payment = await prisma.payment.create({
+        data: {
+          bookingIntentId: testIntentId,
+          attemptNumber: 1,
+          idempotencyKeyId: paymentIdem.id,
+          stripePaymentIntentId: `pi_test_${randomUUID().replace(/-/g, '')}`,
+          amount: 19999,
+          currency: 'GBP',
+          status: 'SUCCEEDED',
+          version: 0,
+        },
+      });
+
+      await prisma.booking.update({
+        where: { id: testBookingId },
+        data: { paymentId: payment.id },
+      });
+
+      const refundIdem = await prisma.idempotencyKey.create({
+        data: {
+          key: `idem-ref-${randomUUID()}`,
+          requestHash: randomUUID(),
+          customerId: testUserId,
+          requestPath: '/api/bookings/payment/refund',
+          expiresAt: new Date(Date.now() + 86400000),
+        },
+      });
+
+      const refund = await prisma.refund.create({
+        data: {
+          paymentId: payment.id,
+          idempotencyKeyId: refundIdem.id,
+          stripeRefundId: `re_test_${randomUUID().replace(/-/g, '')}`,
+          amount: 5000,
+          currency: 'GBP',
+          triggerType: 'SYSTEM_AUTOMATED',
+          status: 'SUCCEEDED',
+        },
+      });
+
+      const ledgerEntry = await prisma.ledgerEntry.create({
+        data: {
+          paymentId: payment.id,
+          refundTransactionId: refund.id,
+          transactionId: `tx_${randomUUID()}`,
+          accountId: 'CUSTOMER_RECEIVABLE',
+          entryType: 'CREDIT',
+          amount: 5000,
+          currency: 'GBP',
+        },
+      });
+
+      // Record state of payment, refund, ledgerEntry, and projection before reconciliation
+      const paymentBefore = await prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
+      const refundBefore = await prisma.refund.findUniqueOrThrow({ where: { id: refund.id } });
+      const ledgerBefore = await prisma.ledgerEntry.findUniqueOrThrow({ where: { id: ledgerEntry.id } });
+      const projectionBefore = await prisma.bookingAgentProjection.findUniqueOrThrow({
+        where: { bookingId: testBookingId },
+      });
+      const recordedAgentRef = projectionBefore.agentReference;
+
+      // Reset projection freshness: source_version = 0
+      await prisma.$executeRaw`
+        UPDATE "booking_agent_projections"
+        SET "source_version" = 0
+        WHERE "bookingId" = ${testBookingId}
+      `;
+
+      const projAfterReset = await prisma.bookingAgentProjection.findUniqueOrThrow({
+        where: { bookingId: testBookingId },
+      });
+      expect(projAfterReset.sourceVersion).toBe(0);
+
+      // Trigger a reconciliation pass using BookingProjectionReconciliationService
+      const repo = new BookingProjectionRepository(prisma as unknown as PrismaService);
+      const projService = new BookingProjectionService();
+      const hydrator = new BookingEventHydratorService(prisma as unknown as PrismaService);
+      const reconciliationService = new BookingProjectionReconciliationService(
+        repo,
+        projService,
+        hydrator,
+      );
+
+      const passSummary = await reconciliationService.reconcileBatch();
+      expect(passSummary).not.toBeNull();
+      expect(passSummary!.repaired).toBeGreaterThanOrEqual(1);
+
+      // Verify projection repaired cleanly to booking.version with stable agentReference
+      const repairedProjection = await prisma.bookingAgentProjection.findUniqueOrThrow({
+        where: { bookingId: testBookingId },
+      });
+      const currentBooking = await prisma.booking.findUniqueOrThrow({
+        where: { id: testBookingId },
+      });
+
+      expect(repairedProjection.sourceVersion).toBe(currentBooking.version);
+      expect(repairedProjection.agentReference).toBe(recordedAgentRef);
+      expect(repairedProjection.status).toBe(currentBooking.status);
+
+      // Assert payments, refunds, and ledger_entries remain completely unmodified
+      const paymentAfter = await prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
+      const refundAfter = await prisma.refund.findUniqueOrThrow({ where: { id: refund.id } });
+      const ledgerAfter = await prisma.ledgerEntry.findUniqueOrThrow({ where: { id: ledgerEntry.id } });
+
+      expect(paymentAfter).toEqual(paymentBefore);
+      expect(refundAfter).toEqual(refundBefore);
+      expect(ledgerAfter).toEqual(ledgerBefore);
     });
   });
 });
