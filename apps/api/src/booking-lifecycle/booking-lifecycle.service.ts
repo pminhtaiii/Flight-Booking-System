@@ -806,19 +806,32 @@ export class BookingLifecycleService {
         return { count: 0, updatedBooking: current };
       }
 
-      const updatedBooking = await client.booking.update({
-        where: { id: bookingId },
+      const updateResult = await client.booking.updateMany({
+        where: {
+          id: bookingId,
+          status: current.status,
+          version: current.version,
+        },
         data: {
           status: targetStatus,
           version: { increment: 1 },
         },
       });
 
+      if (updateResult.count === 0) {
+        const reloaded = await client.booking.findUnique({ where: { id: bookingId } });
+        return { count: 0, updatedBooking: reloaded ?? current };
+      }
+
+      const updatedBooking = await client.booking.findUnique({
+        where: { id: bookingId },
+      });
+
       events.push(
         new BookingRefundUpdatedEvent({
           bookingId,
           eventId: randomUUID(),
-          sourceVersion: updatedBooking.version,
+          sourceVersion: updatedBooking?.version ?? (current.version ?? 1) + 1,
           status: targetStatus,
           refundStatus,
           reason,
@@ -826,7 +839,7 @@ export class BookingLifecycleService {
         }),
       );
 
-      return { count: 1, updatedBooking };
+      return { count: 1, updatedBooking: updatedBooking ?? undefined };
     });
   }
 }

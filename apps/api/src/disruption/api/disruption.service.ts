@@ -200,7 +200,7 @@ export class DisruptionService {
         new BookingDisruptionAcknowledgedEvent({
           bookingId,
           eventId: randomUUID(),
-          sourceVersion: (current.version ?? 1) + 1,
+          sourceVersion: updated.version,
           disruptionId: revisionId,
           status: 'ACKNOWLEDGED',
           timestamp: now,
@@ -322,7 +322,7 @@ export class DisruptionService {
         new BookingDisruptionAcceptedEvent({
           bookingId,
           eventId: randomUUID(),
-          sourceVersion: (current.version ?? 1) + 1,
+          sourceVersion: updated.version,
           disruptionId: revisionId,
           status: 'RESOLVED',
           timestamp: now,

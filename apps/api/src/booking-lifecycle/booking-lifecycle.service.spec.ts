@@ -1303,8 +1303,10 @@ describe('BookingLifecycleService', () => {
         version: 3,
       };
 
-      mockPrisma.booking.findUnique.mockResolvedValue(currentBooking);
-      mockPrisma.booking.update.mockResolvedValue(updatedBooking);
+      mockPrisma.booking.findUnique
+        .mockResolvedValueOnce(currentBooking)
+        .mockResolvedValueOnce(updatedBooking);
+      mockPrisma.booking.updateMany.mockResolvedValue({ count: 1 });
 
       const context: TransactionEventContext = {
         tx: mockPrisma,
@@ -1324,8 +1326,12 @@ describe('BookingLifecycleService', () => {
         count: 1,
         updatedBooking,
       });
-      expect(mockPrisma.booking.update).toHaveBeenCalledWith({
-        where: { id: 'booking-trans-1' },
+      expect(mockPrisma.booking.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'booking-trans-1',
+          status: BookingStatus.CANCELLED_PENDING_REFUND,
+          version: 2,
+        },
         data: {
           status: BookingStatus.CANCELLED_AND_REFUNDED,
           version: { increment: 1 },
@@ -1353,8 +1359,10 @@ describe('BookingLifecycleService', () => {
         version: 2,
       };
 
-      mockPrisma.booking.findUnique.mockResolvedValue(currentBooking);
-      mockPrisma.booking.update.mockResolvedValue(updatedBooking);
+      mockPrisma.booking.findUnique
+        .mockResolvedValueOnce(currentBooking)
+        .mockResolvedValueOnce(updatedBooking);
+      mockPrisma.booking.updateMany.mockResolvedValue({ count: 1 });
 
       const result = await service.updateBookingRefundStatus(
         'booking-standalone-1',
@@ -1377,6 +1385,43 @@ describe('BookingLifecycleService', () => {
       expect(event.status).toBe(BookingStatus.REFUND_FAILED_NEEDS_ATTENTION);
       expect(event.reason).toBe('STRIPE_REQUIRES_ATTENTION');
       expect(event.sourceVersion).toBe(2);
+    });
+
+    it('returns count: 0 and emits no event if concurrent write changed status/version before update', async () => {
+      const currentBooking = {
+        id: 'booking-concur-1',
+        status: BookingStatus.CANCELLED_PENDING_REFUND,
+        version: 1,
+      };
+      const concurrentlyUpdated = {
+        id: 'booking-concur-1',
+        status: BookingStatus.REFUND_FAILED_NEEDS_ATTENTION,
+        version: 2,
+      };
+
+      mockPrisma.booking.findUnique
+        .mockResolvedValueOnce(currentBooking)
+        .mockResolvedValueOnce(concurrentlyUpdated);
+      mockPrisma.booking.updateMany.mockResolvedValue({ count: 0 });
+
+      const context: TransactionEventContext = {
+        tx: mockPrisma,
+        events: [],
+      };
+
+      const result = await service.updateBookingRefundStatus(
+        'booking-concur-1',
+        BookingStatus.CANCELLED_AND_REFUNDED,
+        'SUCCEEDED',
+        undefined,
+        mockPrisma,
+        context,
+      );
+
+      expect(result.count).toBe(0);
+      expect(result.updatedBooking).toEqual(concurrentlyUpdated);
+      expect(context.events).toHaveLength(0);
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundException if booking does not exist', async () => {
