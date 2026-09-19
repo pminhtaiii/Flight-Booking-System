@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { CacheService } from '@/cache/cache.service';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -99,9 +100,10 @@ export const REDIS_LATEST_PASS_STATE_KEY =
   'metrics:booking_projection:latest_pass_state';
 export const REDIS_CONSECUTIVE_ERRORS_KEY =
   'metrics:booking_projection:consecutive_errors';
-const REDIS_LATEST_PASS_STATE_LOCK_KEY =
+export const REDIS_LATEST_PASS_STATE_LOCK_KEY =
   `${REDIS_LATEST_PASS_STATE_KEY}:lock`;
-const LATEST_PASS_STATE_LOCK_TTL_SECONDS = 30;
+export const LATEST_PASS_STATE_LOCK_TTL_SECONDS = 30;
+export const LATEST_PASS_STATE_LOCK_HEARTBEAT_MS = 10_000;
 const LATEST_PASS_STATE_LOCK_MAX_WAIT_MS = 1000;
 const LATEST_PASS_STATE_LOCK_RETRY_DELAY_MS = 5;
 
@@ -355,22 +357,18 @@ export class BookingProjectionMetrics {
       return async () => undefined;
     }
 
+    const ownerToken = randomUUID();
     const deadline = Date.now() + LATEST_PASS_STATE_LOCK_MAX_WAIT_MS;
+    let acquired = false;
+
     while (Date.now() < deadline) {
-      const lockAttempt = await this.cacheService.incrby(
+      acquired = await this.cacheService.acquireLock(
         REDIS_LATEST_PASS_STATE_LOCK_KEY,
-        1,
+        ownerToken,
         LATEST_PASS_STATE_LOCK_TTL_SECONDS,
       );
-      if (lockAttempt === 1) {
-        return async (): Promise<void> => {
-          try {
-            await this.cacheService?.del(REDIS_LATEST_PASS_STATE_LOCK_KEY);
-          } catch (err: unknown) {
-            const errMsg = err instanceof Error ? err.message : String(err);
-            this.logger.warn(`Failed to release latest pass state lock: ${errMsg}`);
-          }
-        };
+      if (acquired) {
+        break;
       }
 
       await new Promise<void>((resolve) => {
@@ -378,7 +376,44 @@ export class BookingProjectionMetrics {
       });
     }
 
-    throw new Error('Timed out acquiring latest pass state lock');
+    if (!acquired) {
+      throw new Error('Timed out acquiring latest pass state lock');
+    }
+
+    let renewalTimer: NodeJS.Timeout | null = setInterval(() => {
+      this.cacheService
+        ?.renewLock(
+          REDIS_LATEST_PASS_STATE_LOCK_KEY,
+          ownerToken,
+          LATEST_PASS_STATE_LOCK_TTL_SECONDS,
+        )
+        .catch((err: unknown) => {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          this.logger.warn(`Failed to renew latest pass state lock: ${errMsg}`);
+        });
+    }, LATEST_PASS_STATE_LOCK_HEARTBEAT_MS);
+    renewalTimer.unref();
+
+    return async (): Promise<void> => {
+      if (renewalTimer) {
+        clearInterval(renewalTimer);
+        renewalTimer = null;
+      }
+      try {
+        const released = await this.cacheService?.releaseLock(
+          REDIS_LATEST_PASS_STATE_LOCK_KEY,
+          ownerToken,
+        );
+        if (released === false) {
+          this.logger.warn(
+            `Latest pass state lock was lost before release for owner ${ownerToken}`,
+          );
+        }
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Failed to release latest pass state lock: ${errMsg}`);
+      }
+    };
   }
 
   private async persistLatestPassState(

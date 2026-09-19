@@ -387,4 +387,111 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     const expiry = ttlSeconds ? Date.now() + ttlSeconds * 1000 : Infinity;
     this.inMemoryStore.set(`${key}:${field}`, { value, expiry });
   }
+
+  async acquireLock(
+    key: string,
+    ownerToken: string,
+    ttlSeconds: number,
+  ): Promise<boolean> {
+    if (this.redisClient) {
+      try {
+        const result = await this.redisClient.set(
+          key,
+          ownerToken,
+          'EX',
+          ttlSeconds,
+          'NX',
+        );
+        return result === 'OK';
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(
+          `Redis acquireLock failed for key ${key}: ${errMsg}. Using in-memory fallback.`,
+        );
+      }
+    }
+
+    const now = Date.now();
+    const item = this.inMemoryStore.get(key);
+    if (!item || now > item.expiry) {
+      this.inMemoryStore.set(key, {
+        value: ownerToken,
+        expiry: now + ttlSeconds * 1000,
+      });
+      return true;
+    }
+    return false;
+  }
+
+  async releaseLock(key: string, ownerToken: string): Promise<boolean> {
+    if (this.redisClient) {
+      try {
+        const luaScript = `
+if redis.call('get', KEYS[1]) == ARGV[1] then
+  return redis.call('del', KEYS[1])
+else
+  return 0
+end
+`;
+        const result = (await this.redisClient.eval(
+          luaScript,
+          1,
+          key,
+          ownerToken,
+        )) as number;
+        return result === 1;
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(
+          `Redis releaseLock failed for key ${key}: ${errMsg}. Using in-memory fallback.`,
+        );
+      }
+    }
+
+    const item = this.inMemoryStore.get(key);
+    if (item && item.value === ownerToken) {
+      this.inMemoryStore.delete(key);
+      return true;
+    }
+    return false;
+  }
+
+  async renewLock(
+    key: string,
+    ownerToken: string,
+    ttlSeconds: number,
+  ): Promise<boolean> {
+    if (this.redisClient) {
+      try {
+        const luaScript = `
+if redis.call('get', KEYS[1]) == ARGV[1] then
+  return redis.call('expire', KEYS[1], ARGV[2])
+else
+  return 0
+end
+`;
+        const result = (await this.redisClient.eval(
+          luaScript,
+          1,
+          key,
+          ownerToken,
+          ttlSeconds,
+        )) as number;
+        return result === 1;
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(
+          `Redis renewLock failed for key ${key}: ${errMsg}. Using in-memory fallback.`,
+        );
+      }
+    }
+
+    const now = Date.now();
+    const item = this.inMemoryStore.get(key);
+    if (item && item.value === ownerToken && now <= item.expiry) {
+      item.expiry = now + ttlSeconds * 1000;
+      return true;
+    }
+    return false;
+  }
 }
