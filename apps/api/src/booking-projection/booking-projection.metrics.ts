@@ -99,6 +99,11 @@ export const REDIS_LATEST_PASS_STATE_KEY =
   'metrics:booking_projection:latest_pass_state';
 export const REDIS_CONSECUTIVE_ERRORS_KEY =
   'metrics:booking_projection:consecutive_errors';
+const REDIS_LATEST_PASS_STATE_LOCK_KEY =
+  `${REDIS_LATEST_PASS_STATE_KEY}:lock`;
+const LATEST_PASS_STATE_LOCK_TTL_SECONDS = 30;
+const LATEST_PASS_STATE_LOCK_MAX_WAIT_MS = 1000;
+const LATEST_PASS_STATE_LOCK_RETRY_DELAY_MS = 5;
 
 // Disallowed patterns in metric labels to avoid PII, booking IDs, user IDs or high cardinality
 const UNSAFE_LABEL_PATTERN =
@@ -124,6 +129,7 @@ export class BookingProjectionMetrics {
 
   private lastPassOutcome?: ReconciliationPassOutcome;
   private consecutivePassErrors = 0;
+  private latestPassStateUpdateTail: Promise<void> = Promise.resolve();
 
   constructor(
     @Optional() private readonly cacheService?: CacheService,
@@ -344,6 +350,95 @@ export class BookingProjectionMetrics {
     return this.computeDurationStats(this.durationSamples);
   }
 
+  private async acquireLatestPassStateRedisLock(): Promise<() => Promise<void>> {
+    if (!this.cacheService) {
+      return async () => undefined;
+    }
+
+    const deadline = Date.now() + LATEST_PASS_STATE_LOCK_MAX_WAIT_MS;
+    while (Date.now() < deadline) {
+      const lockAttempt = await this.cacheService.incrby(
+        REDIS_LATEST_PASS_STATE_LOCK_KEY,
+        1,
+        LATEST_PASS_STATE_LOCK_TTL_SECONDS,
+      );
+      if (lockAttempt === 1) {
+        return async (): Promise<void> => {
+          try {
+            await this.cacheService?.del(REDIS_LATEST_PASS_STATE_LOCK_KEY);
+          } catch (err: unknown) {
+            const errMsg = err instanceof Error ? err.message : String(err);
+            this.logger.warn(`Failed to release latest pass state lock: ${errMsg}`);
+          }
+        };
+      }
+
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, LATEST_PASS_STATE_LOCK_RETRY_DELAY_MS);
+      });
+    }
+
+    throw new Error('Timed out acquiring latest pass state lock');
+  }
+
+  private async persistLatestPassState(
+    outcome: ReconciliationPassOutcome,
+    amount: number,
+    passTimestamp: number,
+  ): Promise<void> {
+    if (!this.cacheService) {
+      return;
+    }
+
+    const previousUpdate = this.latestPassStateUpdateTail;
+    let releaseLocalUpdate: (() => void) | undefined;
+    this.latestPassStateUpdateTail = new Promise<void>((resolve) => {
+      releaseLocalUpdate = resolve;
+    });
+    await previousUpdate;
+
+    let releaseRedisLock: (() => Promise<void>) | undefined;
+    try {
+      releaseRedisLock = await this.acquireLatestPassStateRedisLock();
+      const existing = await this.cacheService.get(REDIS_LATEST_PASS_STATE_KEY);
+      if (existing) {
+        try {
+          const parsed = JSON.parse(existing) as ClusterPassState;
+          if (parsed.timestamp && parsed.timestamp > passTimestamp) {
+            return;
+          }
+        } catch {
+          // Unparseable existing state can be safely replaced by a valid state.
+        }
+      }
+
+      let consecutiveErrors = 0;
+      if (outcome === 'SUCCESS') {
+        await this.cacheService.del(REDIS_CONSECUTIVE_ERRORS_KEY);
+      } else {
+        consecutiveErrors = await this.cacheService.incrby(
+          REDIS_CONSECUTIVE_ERRORS_KEY,
+          amount,
+        );
+      }
+
+      const state: ClusterPassState = {
+        outcome,
+        consecutiveErrors,
+        timestamp: passTimestamp,
+      };
+      await this.cacheService.set(
+        REDIS_LATEST_PASS_STATE_KEY,
+        JSON.stringify(state),
+      );
+    } finally {
+      if (releaseRedisLock) {
+        await releaseRedisLock();
+      }
+      releaseLocalUpdate?.();
+    }
+  }
+
   async incrementReconciliationPassTotal(
     rawOutcome: ReconciliationPassOutcome | string,
     amount = 1,
@@ -375,38 +470,7 @@ export class BookingProjectionMetrics {
       }
 
       try {
-        let consecutiveErrors = 0;
-        if (outcome === 'SUCCESS') {
-          await this.cacheService.del(REDIS_CONSECUTIVE_ERRORS_KEY);
-        } else {
-          consecutiveErrors = await this.cacheService.incrby(
-            REDIS_CONSECUTIVE_ERRORS_KEY,
-            amount,
-          );
-        }
-
-        const existing = await this.cacheService.get(REDIS_LATEST_PASS_STATE_KEY);
-        if (existing) {
-          try {
-            const parsed = JSON.parse(existing) as ClusterPassState;
-            // Stale write rejection: reject write if Redis already holds a strictly newer pass state
-            if (parsed.timestamp && parsed.timestamp > passTimestamp) {
-              return;
-            }
-          } catch {
-            // unparseable existing state, proceed to overwrite
-          }
-        }
-
-        const state: ClusterPassState = {
-          outcome,
-          consecutiveErrors,
-          timestamp: passTimestamp,
-        };
-        await this.cacheService.set(
-          REDIS_LATEST_PASS_STATE_KEY,
-          JSON.stringify(state),
-        );
+        await this.persistLatestPassState(outcome, amount, passTimestamp);
       } catch (err: unknown) {
         const errMsg = err instanceof Error ? err.message : String(err);
         this.logger.warn(`Failed to sync latest pass state to cache: ${errMsg}`);

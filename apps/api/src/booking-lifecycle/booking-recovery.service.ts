@@ -10,32 +10,56 @@ import { BookingLifecycleService } from './booking-lifecycle.service';
 import { BookingWithRelations } from './booking-lifecycle.types';
 import { BookingEventPublisherService, TransactionEventContext } from '@/domain-events';
 
-function enrichRedactedDuffelOrder(duffelOrder: any, dbPassengers: any[], userEmail: string): any {
+type BookingIntentPassengerDetails = {
+  readonly duffelPassengerId: string | null;
+  readonly givenName: string;
+  readonly familyName: string;
+  readonly dateOfBirth: Date;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isUnknownArray(value: unknown): value is unknown[] {
+  return Array.isArray(value);
+}
+
+function enrichRedactedDuffelOrder(
+  duffelOrder: unknown,
+  dbPassengers: readonly BookingIntentPassengerDetails[],
+  userEmail: string,
+): unknown {
   if (!duffelOrder) return duffelOrder;
-  const copy = JSON.parse(JSON.stringify(duffelOrder));
-  if (Array.isArray(copy.passengers)) {
-    copy.passengers.forEach((p: any, i: number) => {
-      const dbPass =
-        dbPassengers.find((dbp: any) => dbp.duffelPassengerId === p.id) || dbPassengers[i];
-      if (dbPass) {
-        if (!p.given_name || p.given_name === 'REDACTED') {
-          p.given_name = dbPass.givenName;
-        }
-        if (!p.family_name || p.family_name === 'REDACTED') {
-          p.family_name = dbPass.familyName;
-        }
-        if (dbPass.dateOfBirth && (!p.born_on || p.born_on === 'REDACTED')) {
-          const d = new Date(dbPass.dateOfBirth);
-          if (!isNaN(d.getTime())) {
-            p.born_on = d.toISOString().split('T')[0];
-          }
-        }
-      }
-      if (!p.email || p.email === 'REDACTED') {
-        p.email = userEmail;
-      }
-    });
+  const copy: unknown = JSON.parse(JSON.stringify(duffelOrder));
+  if (!isRecord(copy) || !isUnknownArray(copy.passengers)) {
+    return copy;
   }
+
+  copy.passengers.forEach((passenger: unknown, index: number) => {
+    if (!isRecord(passenger)) return;
+
+    const dbPass =
+      dbPassengers.find((candidate) => candidate.duffelPassengerId === passenger.id) ??
+      dbPassengers[index];
+    if (dbPass) {
+      if (!passenger.given_name || passenger.given_name === 'REDACTED') {
+        passenger.given_name = dbPass.givenName;
+      }
+      if (!passenger.family_name || passenger.family_name === 'REDACTED') {
+        passenger.family_name = dbPass.familyName;
+      }
+      if (dbPass.dateOfBirth && (!passenger.born_on || passenger.born_on === 'REDACTED')) {
+        const dateOfBirth = new Date(dbPass.dateOfBirth);
+        if (!isNaN(dateOfBirth.getTime())) {
+          passenger.born_on = dateOfBirth.toISOString().split('T')[0];
+        }
+      }
+    }
+    if (!passenger.email || passenger.email === 'REDACTED') {
+      passenger.email = userEmail;
+    }
+  });
   return copy;
 }
 
@@ -95,8 +119,12 @@ export class BookingRecoveryService {
     for (const booking of staleBookings) {
       try {
         await this.reconcileBookingIfStale(booking as unknown as BookingWithRelations);
-      } catch (e: any) {
-        this.logger.error(`Failed to reconcile stale booking ${booking.id}: ${e.message}`, e.stack);
+      } catch (e: unknown) {
+        const error = e instanceof Error ? e : new Error(String(e));
+        this.logger.error(
+          `Failed to reconcile stale booking ${booking.id}: ${error.message}`,
+          error.stack,
+        );
       }
     }
   }
@@ -144,8 +172,9 @@ export class BookingRecoveryService {
         await this.bookingLifecycleService.checkAndCompleteBooking(
           booking as unknown as BookingWithRelations,
         );
-      } catch (e: any) {
-        this.logger.error(`Failed to complete booking ${booking.id}: ${e.message}`, e.stack);
+      } catch (e: unknown) {
+        const error = e instanceof Error ? e : new Error(String(e));
+        this.logger.error(`Failed to complete booking ${booking.id}: ${error.message}`, error.stack);
       }
     }
   }
@@ -279,8 +308,8 @@ export class BookingRecoveryService {
         orderBy: { createdAt: 'desc' },
       });
 
-      const rawOrder = duffelEvent?.metadata as any;
-      if (rawOrder && rawOrder.id) {
+      const rawOrder: unknown = duffelEvent?.metadata;
+      if (isRecord(rawOrder) && typeof rawOrder.id === 'string') {
         const bookingIntent = await this.prisma.bookingIntent.findUnique({
           where: { id: booking.bookingIntentId },
           include: { passengers: true, user: true },
@@ -296,6 +325,12 @@ export class BookingRecoveryService {
 
         const { flightSnapshot, passengerSnapshot } =
           this.duffelService.mapDuffelOrderToSnapshots(order);
+        const orderRecord = isRecord(order) ? order : rawOrder;
+        const bookingReference =
+          typeof orderRecord.booking_reference === 'string' ? orderRecord.booking_reference : null;
+        const duffelOrderId = typeof orderRecord.id === 'string' ? orderRecord.id : rawOrder.id;
+        // The lifecycle method persists a nullable PNR but retains a legacy string parameter type.
+        const lifecycleBookingReference = bookingReference as unknown as string;
         const departureAt = flightSnapshot.segments?.[0]?.departureAt
           ? new Date(flightSnapshot.segments[0].departureAt)
           : null;
@@ -306,8 +341,8 @@ export class BookingRecoveryService {
           eventContext = this.publisher ? this.publisher.createContext(tx) : { tx, events: [] };
           await this.bookingLifecycleService.confirmBooking(
             booking.id,
-            order.booking_reference || null,
-            order.id,
+            lifecycleBookingReference,
+            duffelOrderId,
             flightSnapshot,
             passengerSnapshot,
             tx,
@@ -327,8 +362,8 @@ export class BookingRecoveryService {
 
         if (didTransition) {
           booking.status = BookingStatus.CONFIRMED;
-          booking.pnrReference = order.booking_reference || null;
-          booking.duffelOrderId = order.id;
+          booking.pnrReference = bookingReference;
+          booking.duffelOrderId = duffelOrderId;
           booking.flightSnapshot = flightSnapshot as unknown as Prisma.JsonValue;
           booking.passengerSnapshot = passengerSnapshot as unknown as Prisma.JsonValue;
           booking.departureAt = departureAt;

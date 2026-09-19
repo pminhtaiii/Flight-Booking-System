@@ -49,10 +49,71 @@ export interface FulfillmentMetadata {
   paymentId: string;
 }
 
+export interface PersistedOrderLocation {
+  iata_code?: string;
+  name?: string;
+  city_name?: string;
+  city?: {
+    name?: string;
+  };
+}
+
+export interface PersistedOrderCarrier {
+  iata_code?: string;
+  name?: string;
+}
+
+export interface PersistedOrderSegmentPassenger {
+  cabin_class?: string;
+}
+
+export interface PersistedOrderSegment {
+  id?: string;
+  duration?: string;
+  departing_at?: string;
+  arriving_at?: string;
+  origin?: PersistedOrderLocation;
+  destination?: PersistedOrderLocation;
+  origin_terminal?: string | null;
+  destination_terminal?: string | null;
+  operating_carrier?: PersistedOrderCarrier;
+  marketing_carrier?: PersistedOrderCarrier;
+  marketing_carrier_flight_number?: string;
+  aircraft?: {
+    name?: string;
+  };
+  passengers?: PersistedOrderSegmentPassenger[];
+}
+
+export interface PersistedOrderSlice {
+  duration?: string;
+  segments?: PersistedOrderSegment[];
+}
+
+export interface PersistedOrderPassenger {
+  id: string;
+  type?: string;
+  title?: string | null;
+  given_name?: string | null;
+  family_name?: string | null;
+  born_on?: string | null;
+  email?: string | null;
+  phone_number?: string | null;
+}
+
+/**
+ * The allowlisted, privacy-safe evidence retained for checkpoint recovery.
+ *
+ * `booking_reference` remains readable for legacy payment events. New writes also
+ * include the normalized `bookingReference` field. No provider response fields
+ * outside this explicit recovery shape may cross the fulfillment port.
+ */
 export interface PersistedOrderEvidence {
   id: string;
   bookingReference?: string;
-  [key: string]: unknown;
+  booking_reference?: string;
+  slices?: PersistedOrderSlice[];
+  passengers?: PersistedOrderPassenger[];
 }
 
 export interface PassengerEnrichmentInput {

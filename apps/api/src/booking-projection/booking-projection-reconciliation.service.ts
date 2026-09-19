@@ -19,6 +19,7 @@ export type ReconciliationPassSummary = {
 
 export const RECONCILIATION_CRON_JOB_NAME =
   'BookingProjectionReconciliationService';
+export const MAX_RECONCILIATION_BATCH_SIZE = 100;
 
 @Injectable()
 export class BookingProjectionReconciliationService {
@@ -50,8 +51,11 @@ export class BookingProjectionReconciliationService {
     this.isReconciling = true;
     const startTime = Date.now();
     try {
+      const boundedBatchSize = Number.isFinite(batchSize)
+        ? Math.min(Math.max(Math.trunc(batchSize), 0), MAX_RECONCILIATION_BATCH_SIZE)
+        : MAX_RECONCILIATION_BATCH_SIZE;
       const scanResult = await this.repository.findStaleOrMissingBookingIds(
-        batchSize,
+        boundedBatchSize,
         this.cursor,
       );
 

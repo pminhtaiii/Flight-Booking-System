@@ -20,39 +20,54 @@ export class BookingEventHydratorService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async hydrate(bookingId: string, minVersion?: number): Promise<CoherentBookingSnapshot | null> {
-    const existing = this.inFlight.get(bookingId);
+  async hydrate(
+    bookingId: string,
+    minVersion?: number,
+    processingCycleId?: string,
+  ): Promise<CoherentBookingSnapshot | null> {
+    // Event listeners retain the existing `(bookingId, sourceVersion)` call shape. A
+    // caller with an explicit event ID can provide it as the cycle key so deliveries
+    // for the same booking do not share a read across processing cycles.
+    const explicitCycleKey = processingCycleId?.trim();
+    const cacheKey = explicitCycleKey
+      ? `${explicitCycleKey}:${bookingId}`
+      : `booking:${bookingId}`;
+    const existing = this.inFlight.get(cacheKey);
     if (existing) {
       const snapshot = await existing;
-      if (!minVersion || (snapshot && snapshot.version >= minVersion)) {
+      if (minVersion === undefined || (snapshot && snapshot.version >= minVersion)) {
         return snapshot;
       }
       // If snapshot has lower version than minVersion, pending query was started before commit.
       // Fall through to query database freshly.
     }
 
-    const promise = this.prisma.booking
-      .findUnique({
-        where: { id: bookingId },
-        include: {
-          itineraryRevisions: {
-            orderBy: { version: 'desc' },
-            take: 1,
+    const promise = this.prisma
+      .$transaction(
+        (tx) =>
+          tx.booking.findUnique({
+            where: { id: bookingId },
             include: {
-              segments: {
-                orderBy: { globalOrder: 'asc' },
+              itineraryRevisions: {
+                orderBy: { version: 'desc' },
+                take: 1,
+                include: {
+                  segments: {
+                    orderBy: { globalOrder: 'asc' },
+                  },
+                },
               },
             },
-          },
-        },
-      })
+          }),
+        { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+      )
       .finally(() => {
-        if (this.inFlight.get(bookingId) === promise) {
-          this.inFlight.delete(bookingId);
+        if (this.inFlight.get(cacheKey) === promise) {
+          this.inFlight.delete(cacheKey);
         }
       });
 
-    this.inFlight.set(bookingId, promise);
+    this.inFlight.set(cacheKey, promise);
     return promise;
   }
 }

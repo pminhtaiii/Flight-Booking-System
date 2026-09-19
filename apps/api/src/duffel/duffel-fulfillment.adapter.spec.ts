@@ -172,7 +172,9 @@ describe('DuffelFulfillmentAdapter', () => {
       expect(outcome.bookingReference).toBe('ABCDEF');
 
       // Verify PII redaction on evidence
-      const passengers = outcome.evidence.passengers as Array<Record<string, unknown>>;
+      const passengers = outcome.evidence.passengers as unknown as Array<
+        Record<string, unknown>
+      >;
       const passengerEvidence = passengers[0];
       expect(passengerEvidence.email).toBe('REDACTED');
       expect(passengerEvidence.born_on).toBe('REDACTED');
@@ -472,6 +474,7 @@ describe('DuffelFulfillmentAdapter', () => {
       const order = {
         id: 'ord_privacy_123',
         booking_reference: 'XYZ987',
+        private_provider_payload: 'must-not-persist',
         passengers: [
           {
             id: 'pas_1',
@@ -496,7 +499,7 @@ describe('DuffelFulfillmentAdapter', () => {
 
       expect(redacted.id).toBe('ord_privacy_123');
       expect(redacted.bookingReference).toBe('XYZ987');
-      const passengers = redacted.passengers as Array<Record<string, unknown>>;
+      const passengers = redacted.passengers as unknown as Array<Record<string, unknown>>;
       const p1 = passengers[0];
       const p2 = passengers[1];
       expect(p1.email).toBe('REDACTED');
@@ -509,6 +512,10 @@ describe('DuffelFulfillmentAdapter', () => {
       expect(p2.given_name).toBe('REDACTED');
       expect(p2.family_name).toBe('REDACTED');
       expect(p2.phone_number).toBe('REDACTED');
+      expect(redacted).not.toHaveProperty('private_provider_payload');
+      expect(Object.keys(redacted).sort()).toEqual(
+        ['bookingReference', 'booking_reference', 'id', 'passengers'].sort(),
+      );
     });
 
     it('enrichRedactedDuffelOrder restores passenger PII matching by id or index', () => {
@@ -596,4 +603,3 @@ describe('DuffelFulfillmentAdapter', () => {
     });
   });
 });
-

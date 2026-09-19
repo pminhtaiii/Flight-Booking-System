@@ -18,7 +18,30 @@ import {
   AcceptDisruptionResponseDto,
   DisruptionStatus,
   DisruptionResolvedReason,
+  MaterialBaseline,
+  MaterialDisruptionReason,
 } from '@shared/disruption-types';
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function readPresentationSummary(value: unknown): Record<string, unknown> {
+  if (!isRecord(value) || !isRecord(value.presentationSummary)) {
+    return {};
+  }
+  return value.presentationSummary;
+}
+
+function mapMaterialReasons(values: readonly string[]): MaterialDisruptionReason[] {
+  // Prisma and shared DTOs use separate string enum declarations for the same persisted values.
+  return values.map((value) => value as unknown as MaterialDisruptionReason);
+}
+
+function mapMaterialBaselines(values: readonly string[]): MaterialBaseline[] {
+  // Prisma and shared DTOs use separate string enum declarations for the same persisted values.
+  return values.map((value) => value as unknown as MaterialBaseline);
+}
 
 @Injectable()
 export class DisruptionService {
@@ -67,10 +90,10 @@ export class DisruptionService {
         version: rev.version,
         observedAt: rev.createdAt.toISOString(),
         isMaterial: rev.isMaterial,
-        materialReasons: rev.materialReasons as any[],
-        materialBaselines: rev.materialBaselines as any[],
-        incrementalSummary: (rev.incrementalDiff as any)?.presentationSummary || {},
-        cumulativeSummary: (rev.cumulativeDiff as any)?.presentationSummary || {},
+        materialReasons: mapMaterialReasons(rev.materialReasons),
+        materialBaselines: mapMaterialBaselines(rev.materialBaselines),
+        incrementalSummary: readPresentationSummary(rev.incrementalDiff),
+        cumulativeSummary: readPresentationSummary(rev.cumulativeDiff),
         segments: rev.segments.map((seg) => ({
           airline: {
             name: seg.airlineName,

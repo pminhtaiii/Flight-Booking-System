@@ -623,6 +623,98 @@ describe('BookingProjectionMetrics', () => {
       expect(mockCacheService.set).not.toHaveBeenCalled();
     });
 
+    it('keeps the newer pass state when concurrent stale and current writers overlap', async () => {
+      const initialState = JSON.stringify({
+        outcome: 'ERROR',
+        consecutiveErrors: 1,
+        timestamp: 0,
+      });
+      let storedState: string | null = initialState;
+      let stateReadCount = 0;
+      let redisLockHeld = false;
+      let resolveOlderRead: (() => void) | undefined;
+      let resolveOlderSetStarted: (() => void) | undefined;
+      let resolveNewerSet: (() => void) | undefined;
+      const olderRead = new Promise<void>((resolve) => {
+        resolveOlderRead = resolve;
+      });
+      const olderSetStarted = new Promise<void>((resolve) => {
+        resolveOlderSetStarted = resolve;
+      });
+      const newerSet = new Promise<void>((resolve) => {
+        resolveNewerSet = resolve;
+      });
+
+      mockCacheService.incrby.mockImplementation(
+        async (key: string, amount: number) => {
+          if (key.endsWith(':lock')) {
+            if (redisLockHeld) {
+              return 2;
+            }
+            redisLockHeld = true;
+            return 1;
+          }
+          if (key === REDIS_CONSECUTIVE_ERRORS_KEY) {
+            return amount;
+          }
+          return amount;
+        },
+      );
+      mockCacheService.del.mockImplementation(async (key: string) => {
+        if (key.endsWith(':lock')) {
+          redisLockHeld = false;
+        }
+      });
+      mockCacheService.get.mockImplementation(async (key: string) => {
+        if (key !== REDIS_LATEST_PASS_STATE_KEY) {
+          return null;
+        }
+        stateReadCount += 1;
+        if (stateReadCount === 1) {
+          resolveOlderRead?.();
+        }
+        return storedState;
+      });
+      mockCacheService.set.mockImplementation(
+        async (key: string, value: string) => {
+          if (key !== REDIS_LATEST_PASS_STATE_KEY) {
+            return;
+          }
+          const parsed = JSON.parse(value) as { timestamp: number };
+          if (parsed.timestamp === 1000) {
+            resolveOlderSetStarted?.();
+            if (!redisLockHeld) {
+              await newerSet;
+            }
+          } else if (parsed.timestamp === 2000) {
+            resolveNewerSet?.();
+          }
+          storedState = value;
+        },
+      );
+
+      const olderWrite = distributedMetrics.incrementReconciliationPassTotal(
+        'ERROR',
+        1,
+        1000,
+      );
+      await olderRead;
+      await olderSetStarted;
+
+      const newerWrite = distributedMetrics.incrementReconciliationPassTotal(
+        'SUCCESS',
+        1,
+        2000,
+      );
+      await Promise.all([olderWrite, newerWrite]);
+
+      expect(JSON.parse(storedState ?? '{}')).toEqual({
+        outcome: 'SUCCESS',
+        consecutiveErrors: 0,
+        timestamp: 2000,
+      });
+    });
+
     it('overwrites Redis pass state when incoming pass has newer timestamp', async () => {
       const t1Older = 1000;
       const t2Newer = 2000;
@@ -703,5 +795,4 @@ describe('BookingProjectionMetrics', () => {
     });
   });
 });
-
 

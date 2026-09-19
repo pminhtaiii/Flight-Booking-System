@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import {
   BookingEventHydratorService,
@@ -12,6 +13,7 @@ describe('BookingEventHydratorService', () => {
     booking: {
       findUnique: jest.Mock;
     };
+    $transaction: jest.Mock;
   };
 
   const sampleDate = new Date('2026-09-17T12:00:00.000Z');
@@ -130,10 +132,12 @@ describe('BookingEventHydratorService', () => {
     }) as unknown as CoherentBookingSnapshot;
 
   beforeEach(() => {
+    const findUnique = jest.fn();
     prisma = {
-      booking: {
-        findUnique: jest.fn(),
-      },
+      booking: { findUnique },
+      $transaction: jest.fn(async (callback: (tx: unknown) => unknown) =>
+        callback({ booking: { findUnique } }),
+      ),
     };
 
     service = new BookingEventHydratorService(prisma as unknown as PrismaService);
@@ -296,6 +300,49 @@ describe('BookingEventHydratorService', () => {
       const secondResult = await service.hydrate('book_subsequent_01');
       expect(secondResult).toBe(snapshotV2);
       expect(prisma.booking.findUnique).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('f) Cycle-scoped coherent reads', () => {
+    it('uses a RepeatableRead transaction and isolates concurrent processing cycles', async () => {
+      let resolveCycleOne: (value: CoherentBookingSnapshot) => void = () => {};
+      let resolveCycleTwo: (value: CoherentBookingSnapshot) => void = () => {};
+      const cycleOne = new Promise<CoherentBookingSnapshot>((resolve) => {
+        resolveCycleOne = resolve;
+      });
+      const cycleTwo = new Promise<CoherentBookingSnapshot>((resolve) => {
+        resolveCycleTwo = resolve;
+      });
+
+      prisma.booking.findUnique
+        .mockReturnValueOnce(cycleOne)
+        .mockReturnValueOnce(cycleTwo);
+
+      const eventOne = service.hydrate('book_cycle_01', 3, 'event-1');
+      const eventOneDuplicate = service.hydrate('book_cycle_01', 3, 'event-1');
+      const eventTwo = service.hydrate('book_cycle_01', 3, 'event-2');
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+      expect(prisma.$transaction).toHaveBeenNthCalledWith(
+        1,
+        expect.any(Function),
+        { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+      );
+
+      const snapshotOne = createSampleSnapshot('book_cycle_01');
+      const snapshotTwo = { ...snapshotOne, version: 4 };
+      resolveCycleOne(snapshotOne);
+      resolveCycleTwo(snapshotTwo);
+
+      const [resultOne, duplicateResult, resultTwo] = await Promise.all([
+        eventOne,
+        eventOneDuplicate,
+        eventTwo,
+      ]);
+
+      expect(resultOne).toBe(snapshotOne);
+      expect(duplicateResult).toBe(snapshotOne);
+      expect(resultTwo).toBe(snapshotTwo);
     });
   });
 

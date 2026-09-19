@@ -71,14 +71,20 @@ For T026–T030 specifically, each named service owns invoking the publisher aft
 
 ## Phase 6 — Closure and cross-cutting verification
 
-- [ ] T041 Re-run the full mutation/import inventory and module boot test in `apps/api/test/module-deepening.e2e-spec.ts`; prove no direct projection calls remain in core and every contract mutation has version/commit coverage, without altering unrelated cycles.
-- [ ] T042 Run all quickstart static/API/unit/database E2E gates and controlled-provider smoke; adjust `tests/smoke/sanity.test.mjs` only if existing synchronous projection assumptions require bounded waits, and record final exit codes/scenario coverage in `specs/024-event-driven-module-deepening/validation-evidence.md`.
-- [ ] T043 Synchronize implemented boundaries, dependencies and completion evidence in `context/architecture.md`, `context/progress-checker.md`, `context/library-docs.md` and `context/code-standards.md`; do not label planned code as implemented.
-- [ ] T044 Review implemented code against `specs/024-event-driven-module-deepening/spec.md`, `plan.md` and `tasks.md` with subagents; append actionable gaps as tasks and resolve HIGH/CRITICAL findings before recording implementation signoff in `validation-evidence.md`.
+- [x] T041 Re-run the full mutation/import inventory and module boot test in `apps/api/test/module-deepening.e2e-spec.ts`; prove no direct projection calls remain in core and every contract mutation has version/commit coverage, without altering unrelated cycles.
+- [x] T042 Run all quickstart static/API/unit/database E2E gates and controlled-provider smoke; adjust `tests/smoke/sanity.test.mjs` only if existing synchronous projection assumptions require bounded waits, and record final exit codes/scenario coverage in `specs/024-event-driven-module-deepening/validation-evidence.md`.
+- [x] T043 Synchronize implemented boundaries, dependencies and completion evidence in `context/architecture.md`, `context/progress-checker.md`, `context/library-docs.md` and `context/code-standards.md`; do not label planned code as implemented.
+- [x] T044 Review implemented code against `specs/024-event-driven-module-deepening/spec.md`, `plan.md` and `tasks.md` with subagents; append actionable gaps as tasks and resolve HIGH/CRITICAL findings before recording implementation signoff in `validation-evidence.md`.
+
+## Phase 7 — Final-review convergence
+
+- [x] T045 Make the Redis latest-pass timestamp comparison and state update atomic in `apps/api/src/booking-projection/booking-projection.metrics.ts`; add a concurrent stale-writer regression test in `booking-projection.metrics.spec.ts`.
+- [x] T046 Replace unrecognized-event payload serialization in `apps/api/src/domain-events/booking-event-publisher.service.ts` with bounded event metadata logging and add a privacy regression test in `booking-event-publisher.service.spec.ts`.
+- [x] T047 Remove remaining explicit `any` uses from Feature 024 production paths in `apps/api/src/booking-lifecycle/booking-recovery.service.ts` and `apps/api/src/disruption/api/disruption.service.ts` using `unknown` plus narrowing, preserving behavior with focused tests.
 
 ## Dependencies and parallel execution
 
-T001–T004 → US1 (T005–T014) → US2 (T015–T034) → US3 (T035–T040) → closure. US2/US3 are separate testable stories but one deployment boundary. Do not activate incomplete event-only writes.
+T001–T004 → US1 (T005–T014) → US2 (T015–T034) → US3 (T035–T040) → closure (T041–T044) → final-review convergence (T045–T047). US2/US3 are separate testable stories but one deployment boundary. Do not activate incomplete event-only writes.
 
 - US1: T007 and T008 can run in parallel after T006; separate files and SDK modules. T010 waits for T005–T009; T011–T014 follow sequentially.
 - US2: keep writer/module tasks sequential because lifecycle interfaces and shared composition overlap. After T032, T033 database event suite and T034 privacy fixtures may run independently if their databases are isolated; no automatic [P] designation while setup is shared.
