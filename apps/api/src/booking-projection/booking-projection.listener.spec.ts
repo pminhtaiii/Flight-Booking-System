@@ -124,7 +124,7 @@ describe('BookingProjectionListener', () => {
 
       await listener.handleBookingEvent(event);
 
-      expect(hydrator.hydrate).toHaveBeenCalledWith('bk_valid_001', 2);
+      expect(hydrator.hydrate).toHaveBeenCalledWith('bk_valid_001', 2, event.eventId);
       expect(projectionService.extractProjectionData).toHaveBeenCalledWith(snapshot);
       expect(repository.upsertGuarded).toHaveBeenCalledWith({
         bookingId: 'bk_valid_001',
@@ -152,7 +152,7 @@ describe('BookingProjectionListener', () => {
 
       await listener.handleBookingEvent(event);
 
-      expect(hydrator.hydrate).toHaveBeenCalledWith('bk_valid_002', 3);
+      expect(hydrator.hydrate).toHaveBeenCalledWith('bk_valid_002', 3, event.eventId);
       expect(repository.upsertGuarded).toHaveBeenCalledWith({
         bookingId: 'bk_valid_002',
         status: 'CONFIRMED',
@@ -457,4 +457,3 @@ describe('BookingProjectionListener', () => {
     });
   });
 });
-

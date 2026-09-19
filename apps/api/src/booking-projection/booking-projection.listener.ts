@@ -72,7 +72,11 @@ export class BookingProjectionListener {
 
       let snapshot;
       try {
-        snapshot = await this.hydrator.hydrate(event.bookingId, event.sourceVersion);
+        snapshot = await this.hydrator.hydrate(
+          event.bookingId,
+          event.sourceVersion,
+          event.eventId,
+        );
       } catch (error) {
         this.metrics.incrementFailureTotal('HYDRATION_FAILED');
         failureRecorded = true;

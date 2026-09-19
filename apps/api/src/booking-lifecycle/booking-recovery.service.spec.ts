@@ -281,6 +281,60 @@ describe('BookingRecoveryService', () => {
       ]);
     });
 
+    it('skips malformed persisted passenger entries while recovering a valid Duffel order', async () => {
+      const booking = {
+        id: 'b-1',
+        bookingIntentId: 'intent-1',
+        status: BookingStatus.PROCESSING,
+        createdAt: staleDate,
+        payment: {
+          id: 'pay-1',
+          stripePaymentIntentId: 'pi_123',
+        },
+      } as unknown as BookingWithRelations;
+
+      mockStripeService.retrievePaymentIntent.mockResolvedValue({ status: 'succeeded' });
+      mockPrisma.paymentEvent.findFirst.mockResolvedValue({
+        metadata: {
+          id: 'ord_123',
+          booking_reference: 'PNR999',
+          passengers: [null],
+        },
+      });
+      mockPrisma.bookingIntent.findUnique.mockResolvedValue({
+        id: 'intent-1',
+        passengers: [
+          {
+            givenName: 'John',
+            familyName: 'Doe',
+            dateOfBirth: new Date('1980-01-01T00:00:00.000Z'),
+            duffelPassengerId: null,
+          },
+        ],
+        user: { email: 'john@example.com' },
+      });
+      mockDuffelService.mapDuffelOrderToSnapshots.mockReturnValue({
+        flightSnapshot: { segments: [{ departureAt: '2026-09-01T10:00:00.000Z' }] },
+        passengerSnapshot: { passengers: [] },
+      });
+
+      await expect(service.reconcileBookingIfStale(booking)).resolves.toMatchObject({
+        status: BookingStatus.CONFIRMED,
+        pnrReference: 'PNR999',
+        duffelOrderId: 'ord_123',
+      });
+      expect(mockDuffelService.mapDuffelOrderToSnapshots).toHaveBeenCalled();
+      expect(mockBookingLifecycleService.confirmBooking).toHaveBeenCalledWith(
+        'b-1',
+        'PNR999',
+        'ord_123',
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({ events: expect.any(Array) }),
+      );
+    });
+
     it('handles Stripe payment succeeded but NO Duffel order: marks FAILED with SYSTEM_ERROR and triggers automated refund (Branch 3)', async () => {
       const booking = {
         id: 'b-1',

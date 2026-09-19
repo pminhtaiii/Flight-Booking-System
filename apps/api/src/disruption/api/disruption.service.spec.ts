@@ -113,6 +113,29 @@ describe('DisruptionService', () => {
       expect(result.items[0].revisionId).toBe(revisionId);
       expect(result.items[0].segments[0].flightNumber).toBe('100');
     });
+
+    it('returns empty summaries when persisted diff metadata is not an object', async () => {
+      mockPrisma.booking.findUnique.mockResolvedValue({ id: bookingId, userId });
+      mockPrisma.itineraryRevision.count.mockResolvedValue(1);
+      mockPrisma.itineraryRevision.findMany.mockResolvedValue([
+        {
+          id: revisionId,
+          version: 2,
+          createdAt: new Date('2026-09-18T00:00:00.000Z'),
+          isMaterial: false,
+          materialReasons: [],
+          materialBaselines: [],
+          incrementalDiff: { presentationSummary: ['unexpected-array'] },
+          cumulativeDiff: { presentationSummary: 'unexpected-string' },
+          segments: [],
+        },
+      ]);
+
+      const result = await service.getDisruptionHistory(bookingId, userId, 1, 10);
+
+      expect(result.items[0].incrementalSummary).toEqual({});
+      expect(result.items[0].cumulativeSummary).toEqual({});
+    });
   });
 
   describe('acknowledgeDisruption', () => {

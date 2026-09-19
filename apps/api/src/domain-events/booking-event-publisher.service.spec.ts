@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
   BookingEventPublisherService,
@@ -465,6 +466,30 @@ describe('BookingEventPublisherService', () => {
         BOOKING_EVENTS.CREATED,
         validEvent,
       );
+    });
+
+    it('logs only bounded metadata for unrecognized events without exposing payload data', async () => {
+      const secret = 'passenger@example.com / passport-123 / card-456';
+      const unrecognized: Record<string, unknown> = {
+        bookingId: secret,
+        passenger: { email: secret },
+      };
+      unrecognized.self = unrecognized;
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+
+      try {
+        await expect(
+          publisher.publish([unrecognized as unknown as DomainEventBase]),
+        ).resolves.not.toThrow();
+
+        expect(warnSpy).toHaveBeenCalledTimes(1);
+        const warning = String(warnSpy.mock.calls[0]?.[0]);
+        expect(warning).toContain('Could not resolve event name for domain event');
+        expect(warning).not.toContain(secret);
+        expect(warning.length).toBeLessThan(256);
+      } finally {
+        warnSpy.mockRestore();
+      }
     });
   });
 

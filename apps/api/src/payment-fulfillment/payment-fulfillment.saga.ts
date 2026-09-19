@@ -714,7 +714,7 @@ export class PaymentFulfillmentSaga {
               newStatus: 'AUTHORIZED',
               amount: payment.amount,
               source: 'API',
-              metadata: orderOutcome.evidence as Prisma.InputJsonValue,
+              metadata: orderOutcome.evidence as unknown as Prisma.InputJsonValue,
               createdBy: userId,
             },
           });
@@ -865,7 +865,7 @@ export class PaymentFulfillmentSaga {
 
                 const snaps = await this.fulfillmentGateway.retrieveOrderSnapshot(
                   duffelOrderId,
-                  rawOrder as PersistedOrderEvidence,
+                  rawOrder as unknown as PersistedOrderEvidence,
                   passengerEnrichment,
                   contactEmail,
                   control,
@@ -971,7 +971,7 @@ export class PaymentFulfillmentSaga {
               const rawOrder = duffelEvent?.metadata as Record<string, unknown> | null;
               const duffelOrder = (rawOrder?.data || rawOrder || {}) as Record<string, unknown>;
 
-              return {
+              const successResponse = {
                 success: true,
                 paymentId: payment.id,
                 status: 'SUCCEEDED',
@@ -980,6 +980,14 @@ export class PaymentFulfillmentSaga {
                   '') as string,
                 duffelOrderId: (duffelOrder.id || '') as string,
               };
+
+              await this.idempotency.completeSagaKeyAtomic(
+                currentOwnership,
+                HttpStatus.OK,
+                successResponse,
+              );
+
+              return successResponse;
             }
 
             const failureResponse = {
@@ -1029,7 +1037,7 @@ export class PaymentFulfillmentSaga {
 
         const snapshotOutcome = await this.fulfillmentGateway.retrieveOrderSnapshot(
           rawOrder.id as string,
-          rawOrder as PersistedOrderEvidence,
+          rawOrder as unknown as PersistedOrderEvidence,
           passengerEnrichment,
           contactEmail,
           control,
@@ -1347,7 +1355,7 @@ export class PaymentFulfillmentSaga {
 
             const snaps = await this.fulfillmentGateway.retrieveOrderSnapshot(
               rawOrder.id as string,
-              rawOrder as PersistedOrderEvidence,
+              rawOrder as unknown as PersistedOrderEvidence,
               passengerEnrichment,
               contactEmail,
               control,
@@ -1455,6 +1463,24 @@ export class PaymentFulfillmentSaga {
       }
 
       if (compensationAborted) {
+        const rawOrder = duffelEvent?.metadata as Record<string, unknown> | null;
+        const duffelOrder = (rawOrder?.data || rawOrder || {}) as Record<string, unknown>;
+        const successResponse = {
+          success: true,
+          paymentId,
+          status: 'SUCCEEDED',
+          bookingReference: (duffelOrder.bookingReference ||
+            duffelOrder.booking_reference ||
+            '') as string,
+          duffelOrderId: (duffelOrder.id || '') as string,
+        };
+
+        await this.idempotency.completeSagaKeyAtomic(
+          ownership,
+          HttpStatus.OK,
+          successResponse,
+        );
+
         return;
       }
 

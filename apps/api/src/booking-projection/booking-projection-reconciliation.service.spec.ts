@@ -99,6 +99,18 @@ describe('BookingProjectionReconciliationService', () => {
   });
 
   describe('Single pass candidate processing', () => {
+    it('caps any caller-provided batch size at the contract maximum of 100', async () => {
+      repository.findStaleOrMissingBookingIds.mockResolvedValueOnce({
+        bookingIds: [],
+        nextCursor: null,
+        reachedEnd: true,
+      });
+
+      await service.reconcileBatch(250);
+
+      expect(repository.findStaleOrMissingBookingIds).toHaveBeenCalledWith(100, undefined);
+    });
+
     it('processes candidate IDs using findStaleOrMissingBookingIds(100, this.cursor)', async () => {
       repository.findStaleOrMissingBookingIds.mockResolvedValueOnce({
         bookingIds: ['booking-001', 'booking-002'],
@@ -600,5 +612,4 @@ describe('BookingProjectionReconciliationService', () => {
     });
   });
 });
-
 

@@ -74,6 +74,25 @@ export const CABIN_RANK = {
 export type CabinClass = keyof typeof CABIN_RANK;
 export type CabinAdjacency = 'exact' | 'adjacent' | 'mismatch';
 
+function getCabinRank(cabin: string): number | undefined {
+  switch (cabin) {
+    case 'economy': return 0;
+    case 'premium_economy': return 1;
+    case 'business': return 2;
+    case 'first': return 3;
+    default: {
+      const trimmed = cabin.trim().toLowerCase();
+      switch (trimmed) {
+        case 'economy': return 0;
+        case 'premium_economy': return 1;
+        case 'business': return 2;
+        case 'first': return 3;
+        default: return undefined;
+      }
+    }
+  }
+}
+
 /**
  * Evaluates adjacency between a requested cabin class and an offer's cabin class.
  * - 'exact': rank distance = 0
@@ -84,12 +103,8 @@ export function getCabinAdjacency(
   requestedCabin: string,
   offerCabin: string,
 ): CabinAdjacency {
-  const reqKey = requestedCabin.toLowerCase().trim();
-  const offerKey = offerCabin.toLowerCase().trim();
-
-  // Validate cabin class keys against CABIN_RANK mapping
-  const reqRank = reqKey in CABIN_RANK ? CABIN_RANK[reqKey as CabinClass] : undefined;
-  const offerRank = offerKey in CABIN_RANK ? CABIN_RANK[offerKey as CabinClass] : undefined;
+  const reqRank = getCabinRank(requestedCabin);
+  const offerRank = getCabinRank(offerCabin);
 
   if (reqRank === undefined || offerRank === undefined) {
     return 'mismatch';
@@ -153,7 +168,7 @@ export const RED_EYE_HOURS = [0, 1, 2, 3, 4] as const;
  */
 export function isRedEyeDeparture(hour: number): boolean {
   // RED_EYE_HOURS defines hours 0..4 as red-eye departure times
-  return Number.isInteger(hour) && (RED_EYE_HOURS as readonly number[]).includes(hour);
+  return Number.isInteger(hour) && hour >= 0 && hour <= 4;
 }
 
 /**
@@ -208,6 +223,9 @@ export function clamp(value: number, min: number, max: number): number {
  * Handles floating-point quirks and avoids negative zero (-0).
  */
 export function round6(value: number): number {
+  if (value === 0) return 0;
+  if (value === 1) return 1;
+  if (value === 0.5) return 0.5;
   const rounded = Math.round(value * 1_000_000) / 1_000_000;
   return rounded === 0 ? 0 : rounded;
 }
@@ -244,16 +262,23 @@ export function determineSignal(subScore: number): DimensionSignal {
  * - Even length returns arithmetic mean of the two middle elements rounded to 6 decimal places.
  */
 export function calculateMedian(values: readonly number[]): number {
-  if (values.length === 0) {
+  const len = values.length;
+  if (len === 0) {
     return 0;
   }
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  if (sorted.length % 2 === 1) {
+  if (len === 1) {
+    return values[0];
+  }
+  if (len === 2) {
+    return round6((values[0] + values[1]) / 2);
+  }
+
+  const sorted = values.slice().sort((a, b) => a - b);
+  const mid = len >> 1;
+  if ((len & 1) === 1) {
     return sorted[mid];
   }
-  const mean = (sorted[mid - 1] + sorted[mid]) / 2;
-  return round6(mean);
+  return round6((sorted[mid - 1] + sorted[mid]) / 2);
 }
 
 /**
@@ -261,10 +286,10 @@ export function calculateMedian(values: readonly number[]): number {
  * Result is in the range [0, 12].
  */
 export function circularHourDistance(h1: number, h2: number): number {
-  const norm1 = ((h1 % 24) + 24) % 24;
-  const norm2 = ((h2 % 24) + 24) % 24;
+  const norm1 = h1 >= 0 && h1 < 24 ? h1 : ((h1 % 24) + 24) % 24;
+  const norm2 = h2 >= 0 && h2 < 24 ? h2 : ((h2 % 24) + 24) % 24;
   const diff = Math.abs(norm1 - norm2);
-  return Math.min(diff, 24 - diff);
+  return diff <= 12 ? diff : 24 - diff;
 }
 
 /** Specification of a local-clock hour window. */
@@ -272,6 +297,24 @@ export type HourWindow = {
   readonly start: number;
   readonly end: number;
 };
+
+/** Precomputed formatted clock hour strings '00:00' .. '23:00' to eliminate string allocations. */
+const FORMATTED_HOURS: readonly string[] = [
+  '00:00', '01:00', '02:00', '03:00', '04:00', '05:00',
+  '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
+  '12:00', '13:00', '14:00', '15:00', '16:00', '17:00',
+  '18:00', '19:00', '20:00', '21:00', '22:00', '23:00',
+];
+
+/**
+ * Formats an integer hour (0..23) as 'HH:00' without string allocation in hot paths.
+ */
+export function formatHour(hour: number): string {
+  if (hour >= 0 && hour <= 23 && Number.isInteger(hour)) {
+    return FORMATTED_HOURS[hour];
+  }
+  return `${String(hour).padStart(2, '0')}:00`;
+}
 
 /**
  * Checks whether a local-clock hour falls within a specified hour window.
@@ -328,8 +371,8 @@ export function compareObjectiveTiers(
   }
 
   // Tier 4: departure red-eye penalty ascending
-  const aPenalty = getRedEyePenalty(a.outboundDepartureHour);
-  const bPenalty = getRedEyePenalty(b.outboundDepartureHour);
+  const aPenalty = isRedEyeDeparture(a.outboundDepartureHour) ? 1 : 0;
+  const bPenalty = isRedEyeDeparture(b.outboundDepartureHour) ? 1 : 0;
   if (aPenalty !== bPenalty) {
     return aPenalty - bPenalty;
   }
