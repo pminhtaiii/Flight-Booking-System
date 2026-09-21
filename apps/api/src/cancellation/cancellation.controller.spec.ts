@@ -1,9 +1,10 @@
-import { ParseUUIDPipe } from '@nestjs/common';
+import { ParseUUIDPipe, ValidationPipe } from '@nestjs/common';
 import { GUARDS_METADATA, ROUTE_ARGS_METADATA } from '@nestjs/common/constants';
 import { Reflector } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
 import { CancellationController } from './cancellation.controller';
 import { CancellationService } from './cancellation.service';
+import { CancelBookingDto } from './cancellation.types';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 
 describe('CancellationController', () => {
@@ -96,5 +97,46 @@ describe('CancellationController', () => {
 
     expect(result).toBe(mockResponse);
     expect(service.cancelBooking).toHaveBeenCalledWith('b-123', 'user-123', 'q-123');
+  });
+
+  describe('CancelBookingDto Validation', () => {
+    const pipe = new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    });
+
+    it('accepts valid quoteId payload', async () => {
+      const result = await pipe.transform(
+        { quoteId: 'quote-123' },
+        { type: 'body', metatype: CancelBookingDto },
+      );
+      expect(result).toEqual({ quoteId: 'quote-123' });
+    });
+
+    it('rejects missing or empty quoteId', async () => {
+      await expect(
+        pipe.transform({}, { type: 'body', metatype: CancelBookingDto }),
+      ).rejects.toThrow();
+
+      await expect(
+        pipe.transform({ quoteId: '' }, { type: 'body', metatype: CancelBookingDto }),
+      ).rejects.toThrow();
+    });
+
+    it('rejects non-string quoteId', async () => {
+      await expect(
+        pipe.transform({ quoteId: 12345 }, { type: 'body', metatype: CancelBookingDto }),
+      ).rejects.toThrow();
+    });
+
+    it('rejects non-whitelisted extra fields', async () => {
+      await expect(
+        pipe.transform(
+          { quoteId: 'quote-123', extraField: 'invalid' },
+          { type: 'body', metatype: CancelBookingDto },
+        ),
+      ).rejects.toThrow();
+    });
   });
 });
