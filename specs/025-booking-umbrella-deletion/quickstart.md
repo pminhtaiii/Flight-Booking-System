@@ -26,6 +26,7 @@
 2. Use the booking detail UI to request status, quote, and execute. Confirm all web requests stay under `/api/booking-management/` and target the new paths.
 3. Confirm old irregular routes are not registered or called. Verify quote expiry, refund transitions, and error mappings remain intact.
 4. Directly call the new Next route handlers to verify GET/POST method exports, quote POST forwarding, and outcome-to-status mapping; mocked browser interception alone does not cover those handlers.
+5. Check that the ZAP registry and route contract test target `POST /bookings/:id/cancellation`, the OpenAPI fixture targets `POST /bookings/{id}/cancellation`, and none of the three files retains its corresponding legacy `/cancel` path. Run `node --test tests/security/zap/routes-config.test.mjs`.
 
 ## Final gates
 

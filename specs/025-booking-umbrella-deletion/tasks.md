@@ -102,6 +102,7 @@
 - [ ] T033 [US3] Update `getCancellationQuote()` and `cancelBooking()` upstream paths in `apps/web/lib/server/booking-management.ts` to `/api/bookings/:bookingId/cancellation/quote` and `/api/bookings/:bookingId/cancellation`, keeping status on `/api/bookings/:bookingId/cancellation`
 - [ ] T034 [US3] Update cancellation status polling, quote requests, and execute requests in `apps/web/components/bookings/BookingDetail.tsx` to call the normalized frontend proxy paths under `/api/booking-management/bookings/:bookingId/cancellation`
 - [ ] T035 [US3] Verify no Jest or CI configuration references the generated JavaScript fixture, then delete stale `apps/api/test/cancellation.e2e-spec.js` because `apps/api/test/jest-e2e.json` runs the TypeScript E2E source; document that rationale in `specs/025-booking-umbrella-deletion/quickstart.md`
+- [ ] T036 [US3] Migrate the existing ZAP cancellation execution entry from `POST /bookings/:id/cancel` to `POST /bookings/:id/cancellation` in `tests/security/zap/routes.json`, replace the legacy required route in `tests/security/zap/routes-config.test.mjs`, and move its OpenAPI operation to `POST /bookings/{id}/cancellation` in `tests/security/zap/openapi.json`; preserve the route ID, bearer authentication, and high sensitivity, and verify registry/OpenAPI parity
 
 **Checkpoint**: All three cancellation operations share the normalized backend and frontend resource hierarchy, and the full booking cancellation browser journey passes through the new paths.
 
@@ -111,9 +112,9 @@
 
 **Purpose**: Validate the complete phase and keep implementation documentation synchronized.
 
-- [ ] T036 [P] Update `context/architecture.md` and `context/progress-checker.md` with the final module graph, event/lock behavior, route map, and verification status when those project context files are present
-- [ ] T037 Run API lint, typecheck, focused unit/E2E tests, web unit tests, frontend lint/typecheck, and the relevant Next.js build checks from `specs/025-booking-umbrella-deletion/quickstart.md`
-- [ ] T038 Run `rg` checks over `apps/api/src`, `apps/api/test`, `apps/web/app/api`, `apps/web/lib/server`, and `apps/web/components/bookings` to prove production code has no remaining `BookingModule` imports, synchronous read-path reconciliation calls, or legacy cancellation URL calls; allow legacy strings only in explicit negative route assertions and historical design documents
+- [ ] T037 [P] Update `context/architecture.md` and `context/progress-checker.md` with the final module graph, event/lock behavior, route map, and verification status when those project context files are present
+- [ ] T038 Run API lint, typecheck, focused unit/E2E tests, web unit tests, frontend lint/typecheck, the relevant Next.js build checks, and `node --test tests/security/zap/routes-config.test.mjs` as directed by `specs/025-booking-umbrella-deletion/quickstart.md`
+- [ ] T039 Run `rg` checks over `apps/api/src`, `apps/api/test`, `apps/web/app/api`, `apps/web/lib/server`, `apps/web/components/bookings`, and `tests/security/zap/routes.json`, `tests/security/zap/routes-config.test.mjs`, `tests/security/zap/openapi.json` to prove production code and ZAP fixtures have no remaining `BookingModule` imports, synchronous read-path reconciliation calls, or legacy cancellation URL calls; allow legacy strings only in explicit negative route assertions and historical design documents
 
 ---
 
@@ -148,7 +149,7 @@
 - T005-T007 are independent test-file changes for User Story 1.
 - T014-T017 are independent test suites for User Story 2.
 - T026-T029 are independent backend, server-loader, route-handler, and browser contract updates for User Story 3.
-- T036 can be prepared in parallel with the final verification run.
+- T037 can be prepared in parallel with the final verification run.
 
 ## Implementation Strategy
 

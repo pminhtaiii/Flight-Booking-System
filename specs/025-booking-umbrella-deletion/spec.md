@@ -77,6 +77,7 @@ As a traveler, I can check cancellation status, request a quote, and confirm can
 - **FR-011**: Frontend route handlers and booking detail actions MUST use the matching cancellation paths under `/api/booking-management/`; the old irregular paths MUST be removed.
 - **FR-012**: Existing cancellation result shapes, authorization behavior, and quote safeguards MUST remain unchanged by route normalization.
 - **FR-013**: A reconciliation request MUST NOT be processed as a committed booking transition or update the booking projection.
+- **FR-014**: The security route inventory, contract checks, and API description MUST target the normalized cancellation execution endpoint so automated scanning continues to exercise the live route.
 
 ### Key Entities
 
@@ -96,6 +97,7 @@ As a traveler, I can check cancellation status, request a quote, and confirm can
 - **SC-005**: The application completes the status, quote, and execute cancellation journey using only the three specified method/path combinations, with no calls to the removed paths.
 - **SC-006**: Existing booking, cancellation, and refund regression suites pass after the change.
 - **SC-007**: A `booking.reconciliation.requested` event alone causes zero booking-projection hydration, upsert, or projection metrics; committed booking transitions still update the projection.
+- **SC-008**: The security route contract passes with the normalized cancellation execution path and no security fixture points to the removed `/cancel` path.
 
 ## Assumptions
 

@@ -20,3 +20,7 @@ The architecture reviewer rechecked the revised design against feature 024 and r
 ## Implementation gate
 
 This is planning convergence, not implementation evidence. Tests must still prove provider side-effect safety after lease expiry or Redis fallback, projection isolation, route-handler dispatch, and preserved authorization before implementation is considered complete.
+
+## Post-PR route inventory correction
+
+The project owner identified that the ZAP registry, contract test, and OpenAPI fixture still named `POST /bookings/:id/cancel`. The finding is valid: the route would disappear in US3 while the security scan would keep targeting it. US3 now includes migration of all three fixtures, and the final gate runs their contract test and scans them for legacy paths. The current security contract test passed 9/9 before implementation; that baseline still describes the old endpoint until US3 executes.

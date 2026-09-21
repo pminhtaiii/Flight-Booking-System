@@ -55,7 +55,7 @@ Feature 024's `BookingProjectionListener` subscribes to `booking.**`, which also
 
 ### US3: Normalize cancellation URLs together
 
-Change cancellation controller routes to `@Controller('bookings/:bookingId/cancellation')`, with `@Get()` status, `@Post('quote')` quote, and `@Post()` execute. Move Next route handlers to `apps/web/app/api/booking-management/bookings/[bookingId]/cancellation/route.ts` (GET status and POST execute) and `.../cancellation/quote/route.ts` (POST quote). Update `apps/web/lib/server/booking-management.ts` upstream paths and `apps/web/components/bookings/BookingDetail.tsx` client paths. Remove old `cancel/`, `cancellation-quote/`, and `cancellation-status/` routes. Update Playwright interception and API E2E paths. Retain result/error mappings and ownership checks. Check the installed Next route-handler docs in `node_modules/next/dist/docs/` before writing route code, per repository rule.
+Change cancellation controller routes to `@Controller('bookings/:bookingId/cancellation')`, with `@Get()` status, `@Post('quote')` quote, and `@Post()` execute. Move Next route handlers to `apps/web/app/api/booking-management/bookings/[bookingId]/cancellation/route.ts` (GET status and POST execute) and `.../cancellation/quote/route.ts` (POST quote). Update `apps/web/lib/server/booking-management.ts` upstream paths and `apps/web/components/bookings/BookingDetail.tsx` client paths. Move the existing ZAP cancellation execution entry to the new POST path in `tests/security/zap/routes.json`, `tests/security/zap/routes-config.test.mjs`, and `tests/security/zap/openapi.json` so the security workflow scans the live endpoint. Remove old `cancel/`, `cancellation-quote/`, and `cancellation-status/` routes. Update Playwright interception and API E2E paths. Retain result/error mappings and ownership checks. Check the installed Next route-handler docs in `node_modules/next/dist/docs/` before writing route code, per repository rule.
 
 ## Project Structure
 
@@ -98,6 +98,10 @@ apps/web/
   lib/server/booking-management.ts
   components/bookings/BookingDetail.tsx
   tests/characterization/booking-seam.characterization.spec.ts
+tests/security/zap/
+  routes.json
+  routes-config.test.mjs
+  openapi.json
 ```
 
 **Structure Decision**: Existing domain modules own controllers and services. Next route handlers remain grouped by traveler booking management, as decided in the grilling record.
