@@ -1,8 +1,8 @@
 import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { BookingStatus } from '@prisma/client';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '@/prisma/prisma.service';
 import { BookingLifecycleService } from '@/booking-lifecycle/booking-lifecycle.service';
-import { BookingRecoveryService } from '@/booking-lifecycle/booking-recovery.service';
 import { BookingWithRelations } from '@/booking-lifecycle/booking-lifecycle.types';
 import { FlightSnapshot } from '@shared/booking-types';
 import {
@@ -28,7 +28,7 @@ export class BookingManagementService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly bookingLifecycleService: BookingLifecycleService,
-    private readonly bookingRecoveryService: BookingRecoveryService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async listBookings(
@@ -88,22 +88,9 @@ export class BookingManagementService {
     const staleThreshold = new Date(Date.now() - 15 * 60 * 1000);
     const reconciledBookings = await Promise.all(
       bookings.map(async (b) => {
-        let updated = b;
-        if (b.status === BookingStatus.PROCESSING && b.createdAt <= staleThreshold) {
-          try {
-            updated = (await this.bookingRecoveryService.reconcileBookingIfStale(
-              b as unknown as BookingWithRelations,
-            )) as typeof b;
-          } catch (e: unknown) {
-            const err = e instanceof Error ? e : new Error(String(e));
-            this.logger.error(
-              `Reactive stale booking reconciliation failed for ${b.id}: ${err.message}`,
-              err.stack,
-            );
-          }
-        }
-        updated = (await this.bookingLifecycleService.checkAndCompleteBooking(
-          updated as unknown as BookingWithRelations,
+        this.requestReconciliationIfStale(b, staleThreshold);
+        const updated = (await this.bookingLifecycleService.checkAndCompleteBooking(
+          b as unknown as BookingWithRelations,
         )) as typeof b;
         return updated;
       }),
@@ -166,20 +153,11 @@ export class BookingManagementService {
       throw new ForbiddenException('You do not have access to this booking');
     }
 
-    let booking = initialBooking;
-    try {
-      booking = (await this.bookingRecoveryService.reconcileBookingIfStale(
-        initialBooking as unknown as BookingWithRelations,
-      )) as unknown as typeof initialBooking;
-    } catch (e: unknown) {
-      const err = e instanceof Error ? e : new Error(String(e));
-      this.logger.error(
-        `Reactive stale booking reconciliation failed for ${initialBooking.id}: ${err.message}`,
-        err.stack,
-      );
-    }
-    booking = (await this.bookingLifecycleService.checkAndCompleteBooking(
-      booking as unknown as BookingWithRelations,
+    const staleThreshold = new Date(Date.now() - 15 * 60 * 1000);
+    this.requestReconciliationIfStale(initialBooking, staleThreshold);
+
+    const booking = (await this.bookingLifecycleService.checkAndCompleteBooking(
+      initialBooking as unknown as BookingWithRelations,
     )) as unknown as typeof initialBooking;
 
     const passengers = booking.bookingIntent?.passengers || [];
@@ -435,5 +413,27 @@ export class BookingManagementService {
       ...this.mapDisruptionAndItinerary(booking),
       createdAt: booking.createdAt.toISOString(),
     };
+  }
+
+  private requestReconciliationIfStale(
+    booking: { id: string; status: BookingStatus; createdAt: Date },
+    staleThreshold: Date,
+  ): void {
+    if (
+      booking.status === BookingStatus.PROCESSING &&
+      new Date(booking.createdAt).getTime() <= staleThreshold.getTime()
+    ) {
+      try {
+        this.eventEmitter.emit('booking.reconciliation.requested', {
+          bookingId: booking.id,
+        });
+      } catch (e: unknown) {
+        const err = e instanceof Error ? e : new Error(String(e));
+        this.logger.error(
+          `Failed to emit reconciliation event for booking ${booking.id}: ${err.message}`,
+          err.stack,
+        );
+      }
+    }
   }
 }

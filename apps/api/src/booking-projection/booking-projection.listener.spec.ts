@@ -5,7 +5,7 @@ import { BookingProjectionMetrics } from './booking-projection.metrics';
 import { BookingProjectionService, MalformedRevisionError, SafeBookingProjectionData } from './booking-projection.service';
 import { BookingProjectionRepository } from './booking-projection.repository';
 import { BookingEventHydratorService, CoherentBookingSnapshot } from '@/domain-events/booking-event-hydrator.service';
-import { BookingCreatedEvent, BookingConfirmedEvent } from '@/domain-events/booking.events';
+import { BookingCreatedEvent, BookingConfirmedEvent, BookingCancelledEvent } from '@/domain-events/booking.events';
 import { RefundSettledEvent } from '@/domain-events/refund.events';
 
 describe('BookingProjectionListener', () => {
@@ -403,14 +403,18 @@ describe('BookingProjectionListener', () => {
 
   describe('Missing payload fields and null returns', () => {
     it('handles missing bookingId by logging warn and recording ERROR metric', async () => {
-      const event = { eventId: 'evt_missing_id', sourceVersion: 1 } as any;
+      const event = new BookingCreatedEvent({
+        bookingId: undefined as any,
+        eventId: 'evt_missing_id',
+        sourceVersion: 1,
+      });
 
       const loggerWarnSpy = jest.spyOn((listener as any).logger, 'warn').mockImplementation(() => {});
 
       await expect(listener.handleBookingEvent(event)).resolves.not.toThrow();
 
       expect(loggerWarnSpy).toHaveBeenCalled();
-      expect(metrics.getEventsTotal('booking.unknown', 'ERROR')).toBe(1);
+      expect(metrics.getEventsTotal('booking.created', 'ERROR')).toBe(1);
       expect(metrics.getFailureTotal('INVALID_EVENT')).toBe(1);
       expect(hydrator.hydrate).not.toHaveBeenCalled();
       expect(metrics.getDurations().length).toBe(1);
@@ -453,6 +457,126 @@ describe('BookingProjectionListener', () => {
       expect(metrics.getEventsTotal('booking.created', 'ERROR')).toBe(1);
       expect(metrics.getFailureTotal('EXTRACTION_FAILED')).toBe(1);
       expect(repository.upsertGuarded).not.toHaveBeenCalled();
+      expect(metrics.getDurations().length).toBe(1);
+    });
+  });
+
+  describe('Coordination and uncatalogued event early-return guard (T017, T022)', () => {
+    it('ignores coordination event booking.reconciliation.requested (payload { bookingId: "bk_coord_001" }) with zero hydrator, repository, and metric calls', async () => {
+      const coordPayload = { bookingId: 'bk_coord_001' } as any;
+
+      await listener.handleBookingEvent(coordPayload);
+
+      expect(hydrator.hydrate).not.toHaveBeenCalled();
+      expect(repository.upsertGuarded).not.toHaveBeenCalled();
+      expect(projectionService.extractProjectionData).not.toHaveBeenCalled();
+      expect(metrics.getDurations().length).toBe(0);
+      expect(metrics.getFailureTotal('INVALID_EVENT')).toBe(0);
+      expect(metrics.getFailureTotal('HYDRATION_FAILED')).toBe(0);
+      expect(metrics.getFailureTotal('EXTRACTION_FAILED')).toBe(0);
+      expect(metrics.getFailureTotal('DATABASE_ERROR')).toBe(0);
+      expect(metrics.getFailureTotal('UNEXPECTED_ERROR')).toBe(0);
+      expect(metrics.getEventsTotal('booking.reconciliation.requested', 'SUCCESS')).toBe(0);
+      expect(metrics.getEventsTotal('booking.reconciliation.requested', 'ERROR')).toBe(0);
+      expect(metrics.getEventsTotal('booking.unknown', 'ERROR')).toBe(0);
+    });
+
+    it('ignores coordination event with explicit eventName booking.reconciliation.requested even if eventId and sourceVersion are provided', async () => {
+      const coordEvent = {
+        eventName: 'booking.reconciliation.requested',
+        bookingId: 'bk_coord_001',
+        eventId: 'evt_coord_001',
+        sourceVersion: 1,
+      } as any;
+
+      await listener.handleBookingEvent(coordEvent);
+
+      expect(hydrator.hydrate).not.toHaveBeenCalled();
+      expect(repository.upsertGuarded).not.toHaveBeenCalled();
+      expect(metrics.getDurations().length).toBe(0);
+      expect(metrics.getFailureTotal('INVALID_EVENT')).toBe(0);
+      expect(metrics.getEventsTotal('booking.reconciliation.requested', 'SUCCESS')).toBe(0);
+      expect(metrics.getEventsTotal('booking.reconciliation.requested', 'ERROR')).toBe(0);
+    });
+
+    it('ignores uncatalogued events with zero hydrator, repository, and metric calls', async () => {
+      const uncataloguedEvent = {
+        eventName: 'booking.custom.unrecognized',
+        bookingId: 'bk_custom_001',
+        eventId: 'evt_custom_001',
+        sourceVersion: 1,
+      } as any;
+
+      await listener.handleBookingEvent(uncataloguedEvent);
+
+      expect(hydrator.hydrate).not.toHaveBeenCalled();
+      expect(repository.upsertGuarded).not.toHaveBeenCalled();
+      expect(metrics.getDurations().length).toBe(0);
+      expect(metrics.getEventsTotal('booking.custom.unrecognized', 'ERROR')).toBe(0);
+    });
+
+    it('ignores events missing or empty eventId with zero hydrator, repository, and metric calls', async () => {
+      const missingEventId = {
+        eventName: 'booking.created',
+        bookingId: 'bk_valid_001',
+        eventId: '   ',
+        sourceVersion: 1,
+      } as any;
+
+      await listener.handleBookingEvent(missingEventId);
+
+      expect(hydrator.hydrate).not.toHaveBeenCalled();
+      expect(repository.upsertGuarded).not.toHaveBeenCalled();
+      expect(metrics.getDurations().length).toBe(0);
+    });
+
+    it('ignores events missing sourceVersion with zero hydrator, repository, and metric calls', async () => {
+      const missingSourceVersion = {
+        eventName: 'booking.created',
+        bookingId: 'bk_valid_001',
+        eventId: 'evt_001',
+        sourceVersion: undefined,
+      } as any;
+
+      await listener.handleBookingEvent(missingSourceVersion);
+
+      expect(hydrator.hydrate).not.toHaveBeenCalled();
+      expect(repository.upsertGuarded).not.toHaveBeenCalled();
+      expect(metrics.getDurations().length).toBe(0);
+    });
+
+    it('ignores null or undefined events with zero hydrator, repository, and metric calls', async () => {
+      await listener.handleBookingEvent(null as any);
+      await listener.handleBookingEvent(undefined as any);
+
+      expect(hydrator.hydrate).not.toHaveBeenCalled();
+      expect(repository.upsertGuarded).not.toHaveBeenCalled();
+      expect(metrics.getDurations().length).toBe(0);
+    });
+
+    it('verifies catalogued transition events still hydrate and upsert normally', async () => {
+      const cancelledEvent = new BookingCancelledEvent({
+        bookingId: 'bk_cancel_001',
+        eventId: 'evt_cancel_001',
+        sourceVersion: 4,
+        reason: 'Customer request',
+      });
+
+      const snapshot = createMockSnapshot({ id: 'bk_cancel_001', version: 4, status: 'CONFIRMED' });
+      hydrator.hydrate.mockResolvedValue(snapshot);
+      projectionService.extractProjectionData.mockReturnValue(mockSafeData);
+      repository.upsertGuarded.mockResolvedValue({ outcome: 'SUCCESS' });
+
+      await listener.handleBookingEvent(cancelledEvent);
+
+      expect(hydrator.hydrate).toHaveBeenCalledWith('bk_cancel_001', 4, cancelledEvent.eventId);
+      expect(repository.upsertGuarded).toHaveBeenCalledWith({
+        bookingId: 'bk_cancel_001',
+        status: 'CONFIRMED',
+        sourceVersion: 4,
+        data: mockSafeData,
+      });
+      expect(metrics.getEventsTotal('booking.cancelled', 'SUCCESS')).toBe(1);
       expect(metrics.getDurations().length).toBe(1);
     });
   });
