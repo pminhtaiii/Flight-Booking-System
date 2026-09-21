@@ -1,6 +1,6 @@
 # Architecture
 
-## Feature 025 — Booking Umbrella Deletion (Phase 1 Setup & Phase 3 US1 MVP Implemented)
+## Feature 025 — Booking Umbrella Deletion (Phase 1 Setup, Phase 3 US1 MVP & Phase 4 Slice 1 Implemented)
 
 Planning artifacts: [specification](../specs/025-booking-umbrella-deletion/spec.md), [plan](../specs/025-booking-umbrella-deletion/plan.md), and [tasks](../specs/025-booking-umbrella-deletion/tasks.md).
 
@@ -15,6 +15,20 @@ Planning artifacts: [specification](../specs/025-booking-umbrella-deletion/spec.
   - Handles legacy cancellation endpoints: `GET /bookings/:bookingId/cancellation`, `POST /bookings/:bookingId/cancellation-quote`, and `POST /bookings/:bookingId/cancel`.
   - Protected with `@UseGuards(JwtAuthGuard)` and `ParseUUIDPipe({ version: '4' })`.
   - Service boundaries and HTTP status/response contracts remain 100% backward-compatible.
+
+#### Non-Blocking Stale Read Path & Projection Guard (US2 Phase 4 Slice 1 Complete)
+- **Non-Blocking Stale Read Path (`BookingManagementService`)**:
+  - `BookingManagementService` read path is decoupled from synchronous provider recovery (`BookingRecoveryService` dependency and `reconcileBookingIfStale()` calls removed).
+  - When traveler queries bookings (`GET /bookings` or `GET /bookings/:bookingId`), any booking in `PROCESSING` status older than 15 minutes (`updatedAt < 15m ago`) triggers an asynchronous fire-and-forget event emission: `booking.reconciliation.requested` with payload `{ bookingId }`.
+  - The read completes immediately without awaiting provider repair or blocking the traveler on Duffel/Stripe API calls.
+  - Inline local terminal completion (`checkAndCompleteBooking()`) remains immediate and synchronously evaluated on read.
+- **Early-Return Guard in `BookingProjectionListener` (`apps/api/src/booking-projection/`)**:
+  - `BookingProjectionListener` guards its event handler (`handleBookingEvent`) against coordination requests and non-domain events.
+  - Events that do not match catalogued `BOOKING_EVENTS` (such as `booking.reconciliation.requested`), or payloads lacking valid `eventId` or `sourceVersion`, are rejected via an early return before entering the `try/finally` block.
+  - This early exit ensures coordination requests bypass the hydrator, repository upsert, and all metric recordings/duration timers with zero operational overhead.
+- **`BookingManagementModule` Decoupling**:
+  - `BookingManagementModule` has been decoupled to import `BookingStateModule` directly instead of `BookingLifecycleModule`.
+  - Isolates traveler-facing read services from background reconciliation loops and recovery cron jobs, while `BookingLifecycleModule` retains ownership of `BookingRecoveryService` and its scheduled sweep.
 
 ## Feature 024 — Event-Driven Module Deepening (Phase 6 closure in progress; T001–T040 implemented)
 
