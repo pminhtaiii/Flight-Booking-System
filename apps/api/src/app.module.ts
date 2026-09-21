@@ -19,7 +19,6 @@ import { AirportsModule } from './airports/airports.module';
 import { DuffelModule } from './duffel/duffel.module';
 import { FlightsModule } from './flights/flights.module';
 import { BookingIntentModule } from './booking-intent/booking-intent.module';
-import { BookingModule } from './booking/booking.module';
 import { BookingLifecycleModule } from './booking-lifecycle/booking-lifecycle.module';
 import { BookingProjectionModule } from './booking-projection/booking-projection.module';
 import { BookingManagementModule } from './booking-management/booking-management.module';
@@ -137,7 +136,6 @@ export const envSchema = z
     DuffelModule,
     FlightsModule,
     BookingIntentModule,
-    BookingModule,
     BookingLifecycleModule,
     /**
      * Architectural Note: Feature 024 Event-Driven Projection Cutover

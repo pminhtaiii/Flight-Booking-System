@@ -1,5 +1,23 @@
 # Progress Tracker
 
+### Feature 025 — Booking Umbrella Deletion: Phase 1 Setup & Phase 3 US1 MVP Complete (Tasks T001–T013 Implemented) (2026-09-21)
+
+- **Phase 1 (Setup) & Phase 2 (Foundational) Verified (T001–T004)**:
+  - Verified Feature 024's `BookingStateModule`, `EventEmitterModule.forRoot`, and `CacheService.acquireLock` / `releaseLock` (Lua owner validation).
+  - Reconciled contracts in `specs/025-booking-umbrella-deletion/contracts/` with plan and ADR.
+  - Baseline tests confirmed passing; confirmed no Prisma schema changes or migrations needed.
+- **Phase 3 User Story 1 (Domain-Owned Booking Controllers) Delivered (T005–T013)**:
+  - Created `BookingManagementController` in `apps/api/src/booking-management/` (`GET /bookings`, `GET /bookings/:bookingId`) with `JwtAuthGuard` and `ParseUUIDPipe`.
+  - Created `CancellationController` in `apps/api/src/cancellation/` (`GET /bookings/:bookingId/cancellation`, `POST /bookings/:bookingId/cancellation-quote`, `POST /bookings/:bookingId/cancel`).
+  - Registered controllers in `BookingManagementModule` and `CancellationModule`.
+  - Directly registered both domain modules in `AppModule` and removed `BookingModule`.
+  - Deleted obsolete umbrella files in `apps/api/src/booking/` (`booking.module.ts`, `booking.controller.ts`, `booking.controller.spec.ts`, `booking/dto/*`).
+  - Updated characterization E2E suite (`booking-characterization.e2e-spec.ts`) and `app.module.spec.ts` asserting domain controller registration and zero references to `BookingModule`.
+- **Dual-Axis Review Remediated**:
+  - Replaced `interface AuthenticatedRequest` with `type AuthenticatedRequest` per `code-standards.md`.
+  - Added unit test metadata checks for guards and pipes.
+  - Verified clean compilation, typecheck, lint (0 errors, 0 warnings), and test passes.
+
 ### Feature 024 — Event-Driven Module Deepening: Complete & Verified (Tasks T001–T047 100% Implemented) (2026-09-19)
 
 - Complete delivery across all 6 phases and convergence: US1 (Payment Fulfillment extraction), US2 (Event-Driven Safe Booking Projection), US3 (Projection Keyset Keconciliation & Repair), Phase 6 (Closure & Gate Validation), Phase 7 (Convergence Remediation).

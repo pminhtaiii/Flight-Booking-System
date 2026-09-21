@@ -1,5 +1,21 @@
 # Architecture
 
+## Feature 025 — Booking Umbrella Deletion (Phase 1 Setup & Phase 3 US1 MVP Implemented)
+
+Planning artifacts: [specification](../specs/025-booking-umbrella-deletion/spec.md), [plan](../specs/025-booking-umbrella-deletion/plan.md), and [tasks](../specs/025-booking-umbrella-deletion/tasks.md).
+
+#### Domain-Owned Booking Controllers (US1 Complete)
+- **Elimination of `BookingModule` Facade**:
+  - The umbrella forwarding module `BookingModule` (`apps/api/src/booking/`) and its facade DTO directory have been deleted.
+  - `AppModule` now directly imports and mounts `BookingManagementModule` and `CancellationModule`.
+- **`BookingManagementController` (`apps/api/src/booking-management/`)**:
+  - Directly handles authenticated traveler booking reads: `GET /bookings` (list with pagination & tab filtering) and `GET /bookings/:bookingId` (detail view).
+  - Protected with `@UseGuards(JwtAuthGuard)` and parameter UUID validation via `ParseUUIDPipe({ version: '4' })`.
+- **`CancellationController` (`apps/api/src/cancellation/`)**:
+  - Handles legacy cancellation endpoints: `GET /bookings/:bookingId/cancellation`, `POST /bookings/:bookingId/cancellation-quote`, and `POST /bookings/:bookingId/cancel`.
+  - Protected with `@UseGuards(JwtAuthGuard)` and `ParseUUIDPipe({ version: '4' })`.
+  - Service boundaries and HTTP status/response contracts remain 100% backward-compatible.
+
 ## Feature 024 — Event-Driven Module Deepening (Phase 6 closure in progress; T001–T040 implemented)
 
 Planning artifacts: [specification](../specs/024-event-driven-module-deepening/spec.md), [plan](../specs/024-event-driven-module-deepening/plan.md), and [tasks](../specs/024-event-driven-module-deepening/tasks.md).
