@@ -2,57 +2,32 @@ import {
   Body,
   Controller,
   Get,
-  Post,
   Param,
   ParseUUIDPipe,
-  Query,
+  Post,
   Req,
   UseGuards,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
-import { BookingManagementService } from '@/booking-management/booking-management.service';
-import { CancellationService } from '@/cancellation/cancellation.service';
-import { BookingDetailResponseDto, BookingListQueryDto, BookingListResponseDto } from './dto';
+import { CancellationService } from './cancellation.service';
 import {
   CancelBookingDto,
   CancellationQuoteResponseDto,
   CancellationResponseDto,
   CancellationStatusResponseDto,
-} from '@/cancellation/cancellation.types';
+} from './cancellation.types';
 
-interface AuthenticatedRequest extends Request {
+type AuthenticatedRequest = Request & {
   user: { id: string };
-}
+};
 
 @Controller('bookings')
 @UseGuards(JwtAuthGuard)
-export class BookingController {
+export class CancellationController {
   constructor(
-    private readonly bookingManagementService: BookingManagementService,
     private readonly cancellationService: CancellationService,
   ) {}
-
-  @Get()
-  async listBookings(
-    @Req() req: AuthenticatedRequest,
-    @Query() query: BookingListQueryDto,
-  ): Promise<BookingListResponseDto> {
-    return this.bookingManagementService.listBookings(
-      req.user.id,
-      query.tab,
-      query.page,
-      query.limit,
-    );
-  }
-
-  @Get(':bookingId')
-  async getBookingDetail(
-    @Req() req: AuthenticatedRequest,
-    @Param('bookingId', new ParseUUIDPipe({ version: '4' })) bookingId: string,
-  ): Promise<BookingDetailResponseDto> {
-    return this.bookingManagementService.getBookingDetail(bookingId, req.user.id);
-  }
 
   @Get(':bookingId/cancellation')
   async getCancellationStatus(

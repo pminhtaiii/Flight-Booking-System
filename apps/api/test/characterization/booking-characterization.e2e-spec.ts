@@ -22,6 +22,11 @@ import { DuffelService } from '@/duffel/duffel.service';
 import { BookingLifecycleService } from '@/booking-lifecycle/booking-lifecycle.service';
 import { BookingRecoveryService } from '@/booking-lifecycle/booking-recovery.service';
 import { BookingManagementService } from '@/booking-management/booking-management.service';
+import { BookingManagementModule } from '@/booking-management/booking-management.module';
+import { BookingManagementController } from '@/booking-management/booking-management.controller';
+import { CancellationModule } from '@/cancellation/cancellation.module';
+import { CancellationController } from '@/cancellation/cancellation.controller';
+import { MODULE_METADATA } from '@nestjs/common/constants';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { BookingStatus, BookingFailureReason, PaymentStatus, Prisma } from '@prisma/client';
 import { FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
@@ -682,26 +687,47 @@ describe('Booking Characterization (E2E)', () => {
       const rootDir = path.resolve(__dirname, '../../src');
 
       const paymentServicePath = path.join(rootDir, 'payment/payment.service.ts');
-      const bookingModulePath = path.join(rootDir, 'booking/booking.module.ts');
+      const bookingManagementModulePath = path.join(
+        rootDir,
+        'booking-management/booking-management.module.ts',
+      );
+      const cancellationModulePath = path.join(rootDir, 'cancellation/cancellation.module.ts');
       const paymentModulePath = path.join(rootDir, 'payment/payment.module.ts');
 
       const paymentServiceContent = fs.readFileSync(paymentServicePath, 'utf8');
-      const bookingModuleContent = fs.readFileSync(bookingModulePath, 'utf8');
+      const bookingManagementModuleContent = fs.readFileSync(bookingManagementModulePath, 'utf8');
+      const cancellationModuleContent = fs.readFileSync(cancellationModulePath, 'utf8');
       const paymentModuleContent = fs.readFileSync(paymentModulePath, 'utf8');
 
       // Assert NO forwardRef injection in PaymentService
       const hasBookingServiceForwardRef = paymentServiceContent.includes('forwardRef');
       expect(hasBookingServiceForwardRef).toBe(false);
 
-      // Assert NO forwardRef in BookingModule
-      const hasForwardRefInBooking = bookingModuleContent.includes('forwardRef');
-      expect(hasForwardRefInBooking).toBe(false);
+      // Assert NO forwardRef in BookingManagementModule and CancellationModule
+      expect(bookingManagementModuleContent.includes('forwardRef')).toBe(false);
+      expect(cancellationModuleContent.includes('forwardRef')).toBe(false);
 
-      // Assert NO forwardRef in PaymentModule for BookingModule
-      const hasBookingModuleForwardRefInPayment = paymentModuleContent.includes(
-        'forwardRef(() => BookingModule)',
-      );
-      expect(hasBookingModuleForwardRefInPayment).toBe(false);
+      // Assert NO forwardRef in PaymentModule
+      expect(paymentModuleContent.includes('forwardRef')).toBe(false);
+    });
+
+    it('verifies controllers are registered in domain modules and umbrella BookingModule is removed from AppModule', () => {
+      const bookingManagementControllers =
+        Reflect.getMetadata(MODULE_METADATA.CONTROLLERS, BookingManagementModule) ?? [];
+      expect(bookingManagementControllers).toContain(BookingManagementController);
+
+      const cancellationControllers =
+        Reflect.getMetadata(MODULE_METADATA.CONTROLLERS, CancellationModule) ?? [];
+      expect(cancellationControllers).toContain(CancellationController);
+
+      const appImports = (Reflect.getMetadata(MODULE_METADATA.IMPORTS, AppModule) ?? []) as any[];
+      const appControllers = (Reflect.getMetadata(MODULE_METADATA.CONTROLLERS, AppModule) ?? []) as any[];
+
+      const importedNames = appImports.map((m) => (typeof m === 'function' ? m.name : m?.module?.name));
+      const controllerNames = appControllers.map((c) => (typeof c === 'function' ? c.name : c));
+
+      expect(importedNames).not.toContain('BookingModule');
+      expect(controllerNames).not.toContain('BookingController');
     });
   });
 });

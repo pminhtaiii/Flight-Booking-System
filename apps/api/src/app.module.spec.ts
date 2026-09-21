@@ -8,6 +8,7 @@ import { DashboardService } from './dashboard/dashboard.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { PrismaService } from './prisma/prisma.service';
 import { BookingManagementModule } from './booking-management/booking-management.module';
+import { CancellationModule } from './cancellation/cancellation.module';
 import { ProfileModule } from './profile/profile.module';
 import { PaymentModule } from './payment/payment.module';
 import { CacheModule } from './cache/cache.module';
@@ -198,5 +199,19 @@ describe('AppModule Dependency Graph & DashboardModule Registration (T017 / T018
     expect(controller).toBeInstanceOf(DashboardController);
     expect(service).toBeDefined();
     expect(service).toBeInstanceOf(DashboardService);
+  });
+});
+
+describe('AppModule Booking Domain Wiring (T007)', () => {
+  it('registers BookingManagementModule and CancellationModule directly and excludes BookingModule', () => {
+    const imports = Reflect.getMetadata(MODULE_METADATA.IMPORTS, AppModule) as unknown[];
+    expect(imports).toBeDefined();
+    expect(imports).toContain(BookingManagementModule);
+    expect(imports).toContain(CancellationModule);
+
+    const importNames = (imports as any[]).map(
+      (m) => m?.name || m?.constructor?.name,
+    );
+    expect(importNames).not.toContain('BookingModule');
   });
 });

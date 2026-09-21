@@ -12,8 +12,8 @@
 
 **Purpose**: Confirm the prerequisite design artifacts and the existing seams that the implementation will change.
 
-- [ ] T001 [P] Verify Feature 024's `BookingStateModule`, global `EventEmitterModule.forRoot`, and owner-token cache locks in `apps/api/src/booking-lifecycle/booking-state.module.ts`, `apps/api/src/app.module.ts`, and `apps/api/src/cache/cache.service.ts`
-- [ ] T002 [P] Reconcile `docs/adr/research-booking-umbrella-deletion-grilling-session.md`, `specs/025-booking-umbrella-deletion/contracts/booking-http.md`, and `specs/025-booking-umbrella-deletion/contracts/reconciliation-event.md` against the implementation plan before editing source
+- [X] T001 [P] Verify Feature 024's `BookingStateModule`, global `EventEmitterModule.forRoot`, and owner-token cache locks in `apps/api/src/booking-lifecycle/booking-state.module.ts`, `apps/api/src/app.module.ts`, and `apps/api/src/cache/cache.service.ts`
+- [X] T002 [P] Reconcile `docs/adr/research-booking-umbrella-deletion-grilling-session.md`, `specs/025-booking-umbrella-deletion/contracts/booking-http.md`, and `specs/025-booking-umbrella-deletion/contracts/reconciliation-event.md` against the implementation plan before editing source
 
 ---
 
@@ -23,8 +23,8 @@
 
 **⚠️ CRITICAL**: Do not start user story implementation until Feature 024 is present and the current booking route and module tests have been identified.
 
-- [ ] T003 [P] Capture the current booking module graph and endpoint baseline in `apps/api/src/app.module.spec.ts`, `apps/api/test/booking.e2e-spec.ts`, and `apps/api/test/cancellation.e2e-spec.ts`
-- [ ] T004 [P] Confirm no Prisma migration or durable queue is needed by checking `apps/api/prisma/schema.prisma`, `specs/025-booking-umbrella-deletion/data-model.md`, and `specs/025-booking-umbrella-deletion/research.md`
+- [X] T003 [P] Capture the current booking module graph and endpoint baseline in `apps/api/src/app.module.spec.ts`, `apps/api/test/booking.e2e-spec.ts`, and `apps/api/test/cancellation.e2e-spec.ts`
+- [X] T004 [P] Confirm no Prisma migration or durable queue is needed by checking `apps/api/prisma/schema.prisma`, `specs/025-booking-umbrella-deletion/data-model.md`, and `specs/025-booking-umbrella-deletion/research.md`
 
 ---
 
@@ -36,18 +36,18 @@
 
 ### Tests for User Story 1
 
-- [ ] T005 [P] [US1] Add `BookingManagementController` delegation and authenticated-user tests in `apps/api/src/booking-management/booking-management.controller.spec.ts`
-- [ ] T006 [P] [US1] Add `CancellationController` delegation, body validation, and authenticated-user tests for the legacy cancellation paths in `apps/api/src/cancellation/cancellation.controller.spec.ts`
-- [ ] T007 [P] [US1] Update module metadata assertions in `apps/api/src/app.module.spec.ts` to require direct `BookingManagementModule` and `CancellationModule` registration and the absence of `BookingModule`
+- [X] T005 [P] [US1] Add `BookingManagementController` delegation and authenticated-user tests in `apps/api/src/booking-management/booking-management.controller.spec.ts`
+- [X] T006 [P] [US1] Add `CancellationController` delegation, body validation, and authenticated-user tests for the legacy cancellation paths in `apps/api/src/cancellation/cancellation.controller.spec.ts`
+- [X] T007 [P] [US1] Update module metadata assertions in `apps/api/src/app.module.spec.ts` to require direct `BookingManagementModule` and `CancellationModule` registration and the absence of `BookingModule`
 
 ### Implementation for User Story 1
 
-- [ ] T008 [US1] Create `BookingManagementController` in `apps/api/src/booking-management/booking-management.controller.ts` with the guarded `GET /bookings` and `GET /bookings/:bookingId` methods moved from `apps/api/src/booking/booking.controller.ts`
-- [ ] T009 [US1] Create `CancellationController` in `apps/api/src/cancellation/cancellation.controller.ts` with the guarded legacy cancellation status, quote, and execute methods moved from `apps/api/src/booking/booking.controller.ts`
-- [ ] T010 [US1] Register `BookingManagementController` in `apps/api/src/booking-management/booking-management.module.ts` and `CancellationController` in `apps/api/src/cancellation/cancellation.module.ts` without changing the existing service boundaries
-- [ ] T011 [US1] Remove the `BookingModule` import and registration from `apps/api/src/app.module.ts`, leaving the two domain modules registered directly
-- [ ] T012 [US1] Delete the obsolete umbrella files `apps/api/src/booking/booking.module.ts` and `apps/api/src/booking/booking.controller.ts`, remove `apps/api/src/booking/booking.controller.spec.ts`, and delete the duplicate DTO facade files under `apps/api/src/booking/dto/` after all imports point to `apps/api/src/booking-management/dto/` or `apps/api/src/cancellation/cancellation.types.ts`
-- [ ] T013 [US1] Update API characterization and E2E fixtures in `apps/api/test/characterization/booking-characterization.e2e-spec.ts`, `apps/api/test/booking.e2e-spec.ts`, and `apps/api/test/cancellation.e2e-spec.ts` to assert domain-owned controllers while retaining the legacy route behavior
+- [X] T008 [US1] Create `BookingManagementController` in `apps/api/src/booking-management/booking-management.controller.ts` with the guarded `GET /bookings` and `GET /bookings/:bookingId` methods moved from `apps/api/src/booking/booking.controller.ts`
+- [X] T009 [US1] Create `CancellationController` in `apps/api/src/cancellation/cancellation.controller.ts` with the guarded legacy cancellation status, quote, and execute methods moved from `apps/api/src/booking/booking.controller.ts`
+- [X] T010 [US1] Register `BookingManagementController` in `apps/api/src/booking-management/booking-management.module.ts` and `CancellationController` in `apps/api/src/cancellation/cancellation.module.ts` without changing the existing service boundaries
+- [X] T011 [US1] Remove the `BookingModule` import and registration from `apps/api/src/app.module.ts`, leaving the two domain modules registered directly
+- [X] T012 [US1] Delete the obsolete umbrella files `apps/api/src/booking/booking.module.ts` and `apps/api/src/booking/booking.controller.ts`, remove `apps/api/src/booking/booking.controller.spec.ts`, and delete the duplicate DTO facade files under `apps/api/src/booking/dto/` after all imports point to `apps/api/src/booking-management/dto/` or `apps/api/src/cancellation/cancellation.types.ts`
+- [X] T013 [US1] Update API characterization and E2E fixtures in `apps/api/test/characterization/booking-characterization.e2e-spec.ts`, `apps/api/test/booking.e2e-spec.ts`, and `apps/api/test/cancellation.e2e-spec.ts` to assert domain-owned controllers while retaining the legacy route behavior
 
 **Checkpoint**: User Story 1 is independently functional. The umbrella module and DTO facade are gone, direct domain modules own the controllers, and all pre-migration routes still pass.
 
