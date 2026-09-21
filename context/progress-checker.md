@@ -1,5 +1,17 @@
 # Progress Tracker
 
+### Feature 025 — Booking Umbrella Deletion: Phase 4 Slice 1 Complete (Tasks T014, T016, T017, T019, T022, T023 Implemented & Verified) (2026-09-21)
+
+- **Phase 4 User Story 2 (Non-Blocking Stale Read Path & Projection Guard) Delivered (T014, T016, T017, T019, T022, T023)**:
+  - **Non-Blocking Stale Read Emission (T014, T019)**: Decoupled `BookingManagementService` from synchronous recovery by removing `BookingRecoveryService` dependency and `reconcileBookingIfStale()` calls. Reads emit fire-and-forget `booking.reconciliation.requested` with payload `{ bookingId }` only for stale `PROCESSING` bookings (>15m) without awaiting provider repair. Preserved immediate inline local `checkAndCompleteBooking()`.
+  - **Cache Lock Verification (T016)**: Added unit test suite in `apps/api/src/cache/cache.service.spec.ts` testing atomic lock acquisition with TTL, unique-token ownership, and owner-matched release via Lua scripts under high concurrency and failure cases.
+  - **Projection Listener Guard (T017, T022)**: Hardened `BookingProjectionListener` in `apps/api/src/booking-projection/booking-projection.listener.ts` with an early-return guard rejecting non-catalogued events, coordination payloads (e.g. `booking.reconciliation.requested`), missing/empty `eventId`, or undefined `sourceVersion` before `try/finally` latency tracking, ensuring strictly zero hydrations, upserts, or metric emissions.
+  - **Module Decoupling (T023)**: Refactored `BookingManagementModule` to import `BookingStateModule` directly rather than `BookingLifecycleModule`, isolating the read path from background reconciliation and recovery cron jobs.
+- **Verification & Review Remediations**:
+  - Replaced all `any` usages in `booking-projection.listener.spec.ts` with `as unknown as DomainEventBase` and strongly typed helpers (`ListenerPrivateMembers`), achieving zero `any` across the test suite.
+  - All unit test suites passed (`booking-management.service.spec.ts`, `cache.service.spec.ts`, `booking-projection.listener.spec.ts`).
+  - Strict boundary respected: Task T020 retained for Slice 2 scope.
+
 ### Feature 025 — Booking Umbrella Deletion: Phase 1 Setup & Phase 3 US1 MVP Complete (Tasks T001–T013 Implemented) (2026-09-21)
 
 - **Phase 1 (Setup) & Phase 2 (Foundational) Verified (T001–T004)**:

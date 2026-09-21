@@ -16,8 +16,8 @@ describe('BookingManagementService', () => {
   let bookingLifecycleService: {
     checkAndCompleteBooking: jest.Mock;
   };
-  let bookingRecoveryService: {
-    reconcileBookingIfStale: jest.Mock;
+  let eventEmitter: {
+    emit: jest.Mock;
   };
 
   const originalEnv = process.env.FEATURE_FLAG_DISRUPTION_SURFACING;
@@ -32,14 +32,14 @@ describe('BookingManagementService', () => {
     bookingLifecycleService = {
       checkAndCompleteBooking: jest.fn().mockImplementation((booking) => Promise.resolve(booking)),
     };
-    bookingRecoveryService = {
-      reconcileBookingIfStale: jest.fn().mockImplementation((booking) => Promise.resolve(booking)),
+    eventEmitter = {
+      emit: jest.fn(),
     };
 
     service = new BookingManagementService(
       prisma as never,
       bookingLifecycleService as never,
-      bookingRecoveryService as never,
+      eventEmitter as never,
     );
   });
 
@@ -255,7 +255,7 @@ describe('BookingManagementService', () => {
       expect(result.bookings[1].id).toBe('b-4');
     });
 
-    it('delegates stale check for stale PROCESSING bookings to BookingRecoveryService.reconcileBookingIfStale', async () => {
+    it('emits non-blocking booking.reconciliation.requested for stale PROCESSING bookings only', async () => {
       const staleDate = new Date(Date.now() - 20 * 60 * 1000); // 20 mins ago
       const recentDate = new Date(Date.now() - 5 * 60 * 1000); // 5 mins ago
 
@@ -281,10 +281,13 @@ describe('BookingManagementService', () => {
         staleConfirmed,
       ]);
 
-      await service.listBookings('user-1', 'upcoming', 1, 20);
+      const result = await service.listBookings('user-1', 'upcoming', 1, 20);
 
-      expect(bookingRecoveryService.reconcileBookingIfStale).toHaveBeenCalledTimes(1);
-      expect(bookingRecoveryService.reconcileBookingIfStale).toHaveBeenCalledWith(staleProcessing);
+      expect(eventEmitter.emit).toHaveBeenCalledTimes(1);
+      expect(eventEmitter.emit).toHaveBeenCalledWith('booking.reconciliation.requested', {
+        bookingId: 'stale-proc',
+      });
+      expect(result.bookings).toHaveLength(3);
     });
 
     it('delegates completion check to BookingLifecycleService.checkAndCompleteBooking for all bookings', async () => {
@@ -300,7 +303,7 @@ describe('BookingManagementService', () => {
       expect(bookingLifecycleService.checkAndCompleteBooking).toHaveBeenCalledWith(b2);
     });
 
-    it('handles reconciliation error without throwing in listBookings', async () => {
+    it('handles event emission error without throwing or blocking listBookings', async () => {
       const staleDate = new Date(Date.now() - 20 * 60 * 1000);
       const staleProcessing = mockBaseBooking({
         id: 'stale-proc',
@@ -309,12 +312,15 @@ describe('BookingManagementService', () => {
       });
 
       prisma.booking.findMany.mockResolvedValue([staleProcessing]);
-      bookingRecoveryService.reconcileBookingIfStale.mockRejectedValueOnce(
-        new Error('Stripe timeout'),
-      );
+      eventEmitter.emit.mockImplementationOnce(() => {
+        throw new Error('EventEmitter sync failure');
+      });
 
       const result = await service.listBookings('user-1', 'upcoming', 1, 20);
 
+      expect(eventEmitter.emit).toHaveBeenCalledWith('booking.reconciliation.requested', {
+        bookingId: 'stale-proc',
+      });
       expect(result.bookings).toHaveLength(1);
       expect(result.bookings[0].id).toBe('stale-proc');
     });
@@ -549,13 +555,67 @@ describe('BookingManagementService', () => {
       expect(result.duffelCancellationQuoteId).toBe('can_quo_999');
     });
 
-    it('delegates stale check and completion check in getBookingDetail', async () => {
-      const booking = mockDetailBooking();
+    it('emits non-blocking booking.reconciliation.requested for stale PROCESSING booking in getBookingDetail', async () => {
+      const staleDate = new Date(Date.now() - 20 * 60 * 1000);
+      const booking = mockDetailBooking({
+        id: 'stale-proc-detail',
+        status: BookingStatus.PROCESSING,
+        createdAt: staleDate,
+      });
       prisma.booking.findUnique.mockResolvedValue(booking);
 
-      await service.getBookingDetail('booking-1', 'user-1');
+      const result = await service.getBookingDetail('stale-proc-detail', 'user-1');
 
-      expect(bookingRecoveryService.reconcileBookingIfStale).toHaveBeenCalledWith(booking);
+      expect(eventEmitter.emit).toHaveBeenCalledTimes(1);
+      expect(eventEmitter.emit).toHaveBeenCalledWith('booking.reconciliation.requested', {
+        bookingId: 'stale-proc-detail',
+      });
+      expect(bookingLifecycleService.checkAndCompleteBooking).toHaveBeenCalledWith(booking);
+      expect(result.id).toBe('stale-proc-detail');
+      expect(result.status).toBe(BookingStatus.PROCESSING);
+    });
+
+    it('does not emit reconciliation event for recent or non-PROCESSING booking in getBookingDetail', async () => {
+      const recentDate = new Date(Date.now() - 5 * 60 * 1000);
+      const recentBooking = mockDetailBooking({
+        id: 'recent-proc-detail',
+        status: BookingStatus.PROCESSING,
+        createdAt: recentDate,
+      });
+      prisma.booking.findUnique.mockResolvedValue(recentBooking);
+
+      await service.getBookingDetail('recent-proc-detail', 'user-1');
+
+      expect(eventEmitter.emit).not.toHaveBeenCalled();
+
+      const confirmedBooking = mockDetailBooking({
+        id: 'conf-detail',
+        status: BookingStatus.CONFIRMED,
+        createdAt: new Date(Date.now() - 30 * 60 * 1000),
+      });
+      prisma.booking.findUnique.mockResolvedValue(confirmedBooking);
+
+      await service.getBookingDetail('conf-detail', 'user-1');
+
+      expect(eventEmitter.emit).not.toHaveBeenCalled();
+      expect(bookingLifecycleService.checkAndCompleteBooking).toHaveBeenCalledWith(confirmedBooking);
+    });
+
+    it('handles event emission error without throwing or blocking getBookingDetail', async () => {
+      const staleDate = new Date(Date.now() - 20 * 60 * 1000);
+      const booking = mockDetailBooking({
+        id: 'stale-proc-error',
+        status: BookingStatus.PROCESSING,
+        createdAt: staleDate,
+      });
+      prisma.booking.findUnique.mockResolvedValue(booking);
+      eventEmitter.emit.mockImplementationOnce(() => {
+        throw new Error('EventEmitter sync error in getBookingDetail');
+      });
+
+      const result = await service.getBookingDetail('stale-proc-error', 'user-1');
+
+      expect(result.id).toBe('stale-proc-error');
       expect(bookingLifecycleService.checkAndCompleteBooking).toHaveBeenCalledWith(booking);
     });
   });

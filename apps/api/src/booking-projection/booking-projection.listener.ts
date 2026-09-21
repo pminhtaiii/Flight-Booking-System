@@ -5,7 +5,10 @@ import { BookingEventHydratorService } from '@/domain-events/booking-event-hydra
 import { BookingProjectionService } from './booking-projection.service';
 import { BookingProjectionRepository } from './booking-projection.repository';
 import { BookingProjectionMetrics } from './booking-projection.metrics';
+import { BOOKING_EVENTS } from '@/domain-events/booking.events';
 export const PROJECTION_BOOKING_EVENTS = 'booking.**';
+
+const CATALOGUED_BOOKING_EVENTS = new Set<string>(Object.values(BOOKING_EVENTS));
 
 @Injectable()
 export class BookingProjectionListener {
@@ -53,8 +56,21 @@ export class BookingProjectionListener {
 
   @OnEvent(PROJECTION_BOOKING_EVENTS)
   async handleBookingEvent(event: DomainEventBase): Promise<void> {
-    const startTime = Date.now();
     const eventName = this.resolveEventName(event);
+    const anyEvent = event as Record<string, unknown> | null | undefined;
+
+    if (
+      !CATALOGUED_BOOKING_EVENTS.has(eventName) ||
+      !anyEvent ||
+      typeof anyEvent.eventId !== 'string' ||
+      anyEvent.eventId.trim().length === 0 ||
+      typeof anyEvent.sourceVersion !== 'number' ||
+      !Number.isFinite(anyEvent.sourceVersion)
+    ) {
+      return;
+    }
+
+    const startTime = Date.now();
     let failureRecorded = false;
 
     try {
