@@ -40,6 +40,6 @@ Executed on 2026-09-22:
 | --- | :---: | --- |
 | `pnpm exec eslint "apps/api/**/*.ts" --max-warnings 0` | `0` | Clean, 0 warnings/errors across `apps/api`. |
 | `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` | `0` | Clean compile, 0 TypeScript diagnostic errors. |
-| Focused API Unit Tests (with `node-network-guard.cjs`):<br>`booking-management.service.spec.ts`<br>`booking-recovery.service.spec.ts`<br>`cache.service.spec.ts`<br>`booking-projection.listener.spec.ts`<br>`app.module.spec.ts` | `0` | **5 test suites passed, 117 tests passed, 0 failures**. Preserved inline completion, non-blocking reconciliation event emission, 5-minute lock deduplication, and projection guard ignoring coordination events. |
+| Focused API Unit Tests (with `node-network-guard.cjs`):<br>`booking-management.service.spec.ts`<br>`booking-recovery.service.spec.ts`<br>`cache.service.spec.ts`<br>`booking-projection.listener.spec.ts`<br>`app.module.spec.ts` | `0` | **5 test suites passed, 120 tests passed, 0 failures**. Preserved inline completion, non-blocking reconciliation event emission, 5-minute lock deduplication, and projection guard ignoring coordination events. |
 | API Booking E2E Test:<br>`pnpm --filter @api/backend test:e2e -- booking.e2e-spec.ts` | `0` | **1 test suite passed, 7 tests passed, 0 failures** (Time: 168.4s). Validated upcoming processing order, query validation, cross-user security, detail null payment, and concurrent terminal transitions. |
 

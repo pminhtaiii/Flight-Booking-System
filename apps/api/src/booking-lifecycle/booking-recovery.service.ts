@@ -173,7 +173,10 @@ export class BookingRecoveryService {
           return;
         }
 
-        await this.reconcileBookingIfStale(booking as unknown as BookingWithRelations);
+        await this.reconcileBookingIfStale(booking as unknown as BookingWithRelations, {
+          lockKey,
+          token,
+        });
       } finally {
         await this.cacheService.releaseLock(lockKey, token);
       }
@@ -236,12 +239,29 @@ export class BookingRecoveryService {
     }
   }
 
-  async reconcileBookingIfStale(booking: BookingWithRelations): Promise<BookingWithRelations> {
+  async reconcileBookingIfStale(
+    booking: BookingWithRelations,
+    lockContext?: { lockKey: string; token: string },
+  ): Promise<BookingWithRelations> {
     if (booking.status !== BookingStatus.PROCESSING) return booking;
 
     const staleThreshold = new Date(Date.now() - STALE_THRESHOLD_MS);
     if (booking.createdAt > staleThreshold) {
       return booking;
+    }
+
+    if (lockContext) {
+      const stillOwned = await this.cacheService.renewLock(
+        lockContext.lockKey,
+        lockContext.token,
+        300,
+      );
+      if (!stillOwned) {
+        this.logger.warn(
+          `Reconciliation lock lease lost or expired for booking ${booking.id} (${lockContext.lockKey}); aborting stale reconciliation.`,
+        );
+        return booking;
+      }
     }
 
     try {
@@ -290,63 +310,83 @@ export class BookingRecoveryService {
         this.stripeService.retrievePaymentIntent(payment.stripePaymentIntentId),
       );
       if (intent.status !== 'succeeded') {
-        const isAlreadyCancelledOrRefunded =
+        const isPaymentAlreadyCancelledOrRefunded =
           payment.status === 'CANCELLED' || payment.status === 'REFUNDED';
 
-        if (!isAlreadyCancelledOrRefunded) {
-          try {
-            const duffelCancelledEvent = await this.prisma.paymentEvent.findFirst({
-              where: { paymentId: payment.id, eventType: 'duffel_order_cancelled' },
+        try {
+          const duffelCancelledEvent = await this.prisma.paymentEvent.findFirst({
+            where: { paymentId: payment.id, eventType: 'duffel_order_cancelled' },
+          });
+          if (!duffelCancelledEvent) {
+            const duffelEvent = await this.prisma.paymentEvent.findFirst({
+              where: { paymentId: payment.id, eventType: 'duffel_order_created' },
+              orderBy: { createdAt: 'desc' },
             });
-            if (!duffelCancelledEvent) {
-              const duffelEvent = await this.prisma.paymentEvent.findFirst({
-                where: { paymentId: payment.id, eventType: 'duffel_order_created' },
-                orderBy: { createdAt: 'desc' },
+            const duffelOrder = duffelEvent?.metadata as Record<string, unknown> | null;
+            if (duffelOrder && typeof duffelOrder.id === 'string') {
+              const marker = await this.prisma.paymentEvent.create({
+                data: {
+                  paymentId: payment.id,
+                  eventType: 'duffel_order_cancelled',
+                  previousStatus: payment.status ?? PaymentStatus.AUTHORIZED,
+                  newStatus: payment.status ?? PaymentStatus.AUTHORIZED,
+                  source: PaymentEventSource.SYSTEM,
+                  createdBy: 'system',
+                  metadata: { duffelOrderId: duffelOrder.id },
+                },
               });
-              const duffelOrder = duffelEvent?.metadata as Record<string, unknown> | null;
-              if (duffelOrder && typeof duffelOrder.id === 'string') {
+
+              try {
                 await this.duffelService.cancelOrder(duffelOrder.id);
-                await this.prisma.paymentEvent.create({
-                  data: {
-                    paymentId: payment.id,
-                    eventType: 'duffel_order_cancelled',
-                    previousStatus: payment.status ?? PaymentStatus.AUTHORIZED,
-                    newStatus: payment.status ?? PaymentStatus.AUTHORIZED,
-                    source: PaymentEventSource.SYSTEM,
-                    createdBy: 'system',
-                    metadata: { duffelOrderId: duffelOrder.id },
-                  },
-                });
                 this.logger.log(
                   `Successfully cancelled orphaned Duffel order ${duffelOrder.id} during stale booking sweep.`,
                 );
+              } catch (cancelError: unknown) {
+                const err =
+                  cancelError instanceof Error ? cancelError : new Error(String(cancelError));
+                if (/already_cancelled|already cancelled|cannot be cancelled/i.test(err.message)) {
+                  this.logger.log(
+                    `Orphaned Duffel order ${duffelOrder.id} already cancelled: ${err.message}. Treating as idempotent success.`,
+                  );
+                } else {
+                  await this.prisma.paymentEvent
+                    .delete({ where: { id: marker.id } })
+                    .catch(() => {});
+                  this.logger.error(
+                    `Duffel order cancellation failed during stale booking sweep: ${err.message}`,
+                    err.stack,
+                  );
+                }
               }
             }
-          } catch (cancelError: unknown) {
-            const err = cancelError instanceof Error ? cancelError : new Error(String(cancelError));
+          }
+        } catch (duffelLookupError: unknown) {
+          const err =
+            duffelLookupError instanceof Error
+              ? duffelLookupError
+              : new Error(String(duffelLookupError));
+          this.logger.error(
+            `Duffel order cancellation failed during stale booking sweep: ${err.message}`,
+            err.stack,
+          );
+        }
+
+        // Release the Stripe authorization hold (cancel intent)
+        if (!isPaymentAlreadyCancelledOrRefunded && intent.status !== 'canceled') {
+          try {
+            await this.stripeService.cancelPaymentIntent(payment.stripePaymentIntentId);
+            this.logger.log(
+              `Successfully cancelled Stripe PaymentIntent ${payment.stripePaymentIntentId} during stale booking sweep.`,
+            );
+          } catch (stripeCancelError: unknown) {
+            const err =
+              stripeCancelError instanceof Error
+                ? stripeCancelError
+                : new Error(String(stripeCancelError));
             this.logger.error(
-              `Duffel order cancellation failed during stale booking sweep: ${err.message}`,
+              `Stripe cancelPaymentIntent failed during stale booking sweep: ${err.message}`,
               err.stack,
             );
-          }
-
-          // Release the Stripe authorization hold (cancel intent)
-          if (intent.status !== 'canceled') {
-            try {
-              await this.stripeService.cancelPaymentIntent(payment.stripePaymentIntentId);
-              this.logger.log(
-                `Successfully cancelled Stripe PaymentIntent ${payment.stripePaymentIntentId} during stale booking sweep.`,
-              );
-            } catch (stripeCancelError: unknown) {
-              const err =
-                stripeCancelError instanceof Error
-                  ? stripeCancelError
-                  : new Error(String(stripeCancelError));
-              this.logger.error(
-                `Stripe cancelPaymentIntent failed during stale booking sweep: ${err.message}`,
-                err.stack,
-              );
-            }
           }
         }
 
