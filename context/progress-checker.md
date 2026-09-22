@@ -1,5 +1,29 @@
 # Progress Tracker
  
+### Feature 025 — Booking Umbrella Deletion: Phase 6 Complete (Tasks T001–T039 100% Complete) (2026-09-22)
+
+- **Phase 6 (Polish & Cross-Cutting Verification) & Feature 025 100% Delivered (T001–T039)**:
+  - **Static Ripgrep Census (T039)**:
+    - Zero (0) references to `BookingModule` in production code or module registrations across `apps/api/src`, `apps/api/test`, `apps/web/app/api`, `apps/web/lib/server`, `apps/web/components/bookings`, and `tests/security/zap/` (only permitted in negative assertions in test files: `app.module.spec.ts` and `booking-characterization.e2e-spec.ts`).
+    - Zero (0) synchronous `reconcileBookingIfStale` calls in `BookingManagementService`. Read paths emit fire-and-forget `booking.reconciliation.requested` with payload `{ bookingId }` for stale `PROCESSING` bookings (>15m) without blocking travelers.
+    - Zero (0) references to legacy sibling paths (`/cancellation-quote`, `/cancellation-status`, `/cancel`) in production code, web client, or ZAP catalogs (only permitted in explicit negative HTTP 404 test assertions in `cancellation.e2e-spec.ts`).
+  - **Documentation Synchronization (T037)**:
+    - Updated `context/architecture.md` heading to `## Feature 025 — Booking Umbrella Deletion (Complete - Tasks T001–T039)`.
+    - Verified and documented domain-owned controllers: `BookingManagementController` (`GET /bookings`, `GET /bookings/:bookingId`) in `BookingManagementModule` and `CancellationController` (`GET /bookings/:bookingId/cancellation`, `POST /bookings/:bookingId/cancellation/quote`, `POST /bookings/:bookingId/cancellation`) in `CancellationModule`.
+    - Verified and documented non-blocking read architecture, background lock coordination under Redis lock `booking:recon:lock:{bookingId}` with unique UUID token and 300s TTL, and normalized frontend proxy architecture under `apps/web/app/api/booking-management/bookings/[bookingId]/cancellation/`.
+    - Updated `specs/025-booking-umbrella-deletion/tasks.md` marking T001–T039 100% complete.
+  - **Comprehensive Verification Evidence (T038)**:
+    - API ESLint: Clean (`pnpm exec eslint "apps/api/**/*.ts" --max-warnings 0`), exit code 0.
+    - API Typecheck: Clean (`pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`), exit code 0.
+    - Web Lint: Clean (`pnpm --filter @web/frontend lint`), exit code 0.
+    - Web Typecheck: Clean (`pnpm --filter @web/frontend typecheck`), exit code 0.
+    - Server-Loader Unit Suite (`apps/web/lib/server/booking-management.spec.ts`): 27/27 tests passed, exit code 0.
+    - Route Handlers Direct Unit Suite (`apps/web/app/api/.../cancellation/route.spec.ts` & `quote/route.spec.ts`): 10/10 tests passed, exit code 0.
+    - Security / ZAP Route Catalog Suite (`tests/security/zap/routes-config.test.mjs`): 9/9 tests passed, exit code 0.
+    - API Cancellation Unit Suite (`apps/api/src/cancellation/cancellation.controller.spec.ts`): 13/13 tests passed, exit code 0.
+    - API Cancellation E2E Suite (`apps/api/test/cancellation.e2e-spec.ts`): 11/11 tests passed, exit code 0.
+  - **Feature Completion Status**: Feature 025 (Booking Umbrella Deletion) is 100% complete, fully verified, and ready for integration.
+
 ### Feature 025 — Booking Umbrella Deletion: Phase 5 Complete (User Story 3: Tasks T026–T036 Implemented & Verified) (2026-09-22)
 
 - **Phase 5 User Story 3 (Normalized Cancellation Sub-Resource & UI Migration) 100% Delivered (T026–T036)**:

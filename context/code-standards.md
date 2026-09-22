@@ -62,7 +62,7 @@ To maintain strict boundaries and prevent circular dependencies across domains:
   - Module import graphs MUST remain strictly acyclic (DAG). Circular module dependencies (`A -> B -> A`) are strictly forbidden.
   - Using `forwardRef()` in production code to patch circular dependencies is prohibited. Cycles must be eliminated by architectural extraction or inversion of control.
   - Strict one-way dependency boundaries:
-    - `BookingModule` (umbrella) imports `BookingLifecycleModule`, `BookingManagementModule`, `CancellationModule`.
+    - `AppModule` directly imports domain modules `BookingManagementModule` and `CancellationModule` (umbrella `BookingModule` deleted).
     - `CancellationModule` may import `PaymentModule` to trigger refunds through `PaymentRefundService`, while `PaymentModule` does not import `CancellationModule`.
     - `PaymentModule` owns payment CRUD/webhooks/refunds and imports `PaymentFulfillmentModule`, `BookingStateModule`, `RefundModule`, and `RefundSettlementModule`; it does not import `BookingLifecycleModule`.
     - `PaymentFulfillmentModule` may import `BookingLifecycleModule` for provider-blind lifecycle transitions, but NEVER imports `PaymentModule`.

@@ -47,4 +47,18 @@ Executed on 2026-09-22:
 | Focused API Unit Test (with `node-network-guard.cjs`):<br>`Push-Location apps/api; $env:NODE_OPTIONS = '-r ../../tests/ci/node-network-guard.cjs'; pnpm test -- src/cancellation/cancellation.controller.spec.ts; Pop-Location` | `0` | **1 test suite passed, 13 tests passed, 0 failures** (Time: 17.874s). Verified routing metadata for `@Controller('bookings/:bookingId/cancellation')`, `@Get()`, `@Post('quote')`, `@Post()`, `ParseUUIDPipe`, and service delegation. |
 | API Cancellation E2E Test:<br>`pnpm --filter @api/backend test:e2e -- cancellation.e2e-spec.ts` | `0` | **1 test suite passed, 11 tests passed, 0 failures** (Time: 29.035s). Verified normalized sub-resource paths, full cancellation flow, and explicit 404 rejections for removed legacy sibling routes (`:bookingId/cancellation-quote`, `:bookingId/cancel`). |
 
+## Verification Evidence (Phase 6 Final Gate: Tasks T037, T038, T039)
 
+Executed on 2026-09-22:
+
+| Gate / Command | Exit Code | Result Summary |
+| --- | :---: | --- |
+| `pnpm exec eslint "apps/api/**/*.ts" --max-warnings 0` | `0` | Clean, 0 warnings, 0 errors across `apps/api`. |
+| `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` | `0` | Clean compile, 0 TypeScript diagnostic errors. |
+| Network-Guarded API Unit Suites:<br>`$env:NODE_OPTIONS = "--require=$PWD/tests/ci/node-network-guard.cjs"; pnpm --filter @api/backend test -- apps/api/src/booking-management/ apps/api/src/booking-lifecycle/ apps/api/src/cancellation/ apps/api/src/cache/ apps/api/src/booking-projection/ apps/api/src/app.module.spec.ts` | `0` | **13 test suites passed, 332 tests passed, 0 failures** (Time: 119.79s). Verified `BookingManagementService`, `BookingRecoveryService`, `CancellationService`, `CacheService`, `BookingProjectionListener`, `AppModule`, and related specs. |
+| API Database E2E Tests:<br>`pnpm --filter @api/backend test:e2e -- booking.e2e-spec.ts cancellation.e2e-spec.ts` | `0` | **2 test suites passed, 18 tests passed, 0 failures** (Time: 124.89s). Verified full booking and cancellation flows, non-blocking reads, and 404 rejections for legacy sibling routes. |
+| `pnpm --filter @web/frontend lint` | `0` | Clean, 0 warnings, 0 errors across `@web/frontend`. |
+| `pnpm --filter @web/frontend typecheck` | `0` | Clean compile, 0 TypeScript diagnostic errors. |
+| Web Unit Tests:<br>`& '.\node_modules\.bin\tsx.CMD' --test apps/web/lib/server/booking-management.spec.ts apps/web/app/api/booking-management/bookings/[bookingId]/cancellation/route.spec.ts apps/web/app/api/booking-management/bookings/[bookingId]/cancellation/quote/route.spec.ts` | `0` | **37 tests passed, 0 failures** (Time: ~4s). Verified server-loader, cancellation route handler (GET/POST), and quote route handler (POST). |
+| `pnpm --filter @web/frontend build` | `0` | Clean production build, 34 routes compiled successfully. |
+| `node --test tests/security/zap/routes-config.test.mjs` | `0` | **9 tests passed, 0 failures** (Time: 638ms). Verified route registry parity with OpenAPI and live route paths. |
