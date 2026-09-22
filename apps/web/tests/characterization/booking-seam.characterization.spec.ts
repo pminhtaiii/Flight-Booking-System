@@ -264,7 +264,7 @@ test.describe('Booking Seam Characterization - User Flows', () => {
     ]);
 
     await page.route(
-      `**/api/booking-management/bookings/${bookingId}/cancellation-quote`,
+      `**/api/booking-management/bookings/${bookingId}/cancellation/quote`,
       async (route) => {
         quoteRequested = true;
         await route.fulfill({
@@ -282,7 +282,7 @@ test.describe('Booking Seam Characterization - User Flows', () => {
       },
     );
 
-    await page.route(`**/api/booking-management/bookings/${bookingId}/cancel`, async (route) => {
+    await page.route(`**/api/booking-management/bookings/${bookingId}/cancellation`, async (route) => {
       cancelRequested = true;
       capturedCancelPayload = route.request().postDataJSON();
       await route.fulfill({

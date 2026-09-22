@@ -55,7 +55,7 @@ export function BookingDetail({ booking: initialBooking }: BookingDetailProps) {
   const fetchCancellationStatus = useCallback(async () => {
     try {
       if (!booking) return;
-      const res = await fetch(`/api/booking-management/bookings/${booking.id}/cancellation-status`);
+      const res = await fetch(`/api/booking-management/bookings/${booking.id}/cancellation`);
       if (res.ok) {
         const data: CancellationStatusView = await res.json();
         setCancellationStatus(data);
@@ -102,7 +102,7 @@ export function BookingDetail({ booking: initialBooking }: BookingDetailProps) {
     setLoadingQuote(true);
     setError(null);
     try {
-      const res = await fetch(`/api/booking-management/bookings/${booking.id}/cancellation-quote`, {
+      const res = await fetch(`/api/booking-management/bookings/${booking.id}/cancellation/quote`, {
         method: 'POST',
       });
       if (!res.ok) {
@@ -111,8 +111,8 @@ export function BookingDetail({ booking: initialBooking }: BookingDetailProps) {
       }
       const data: CancellationQuoteView = await res.json();
       setQuote(data);
-    } catch (err: any) {
-      setError(err.message || 'An error occurred while fetching the quote.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred while fetching the quote.');
     } finally {
       setLoadingQuote(false);
     }
@@ -123,7 +123,7 @@ export function BookingDetail({ booking: initialBooking }: BookingDetailProps) {
     setCancelling(true);
     setError(null);
     try {
-      const res = await fetch(`/api/booking-management/bookings/${booking.id}/cancel`, {
+      const res = await fetch(`/api/booking-management/bookings/${booking.id}/cancellation`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -136,8 +136,8 @@ export function BookingDetail({ booking: initialBooking }: BookingDetailProps) {
       }
       setShowCancelModal(false);
       router.refresh();
-    } catch (err: any) {
-      setError(err.message || 'An error occurred during cancellation.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred during cancellation.');
     } finally {
       setCancelling(false);
     }
@@ -176,8 +176,8 @@ export function BookingDetail({ booking: initialBooking }: BookingDetailProps) {
         `Successfully ${action === 'acknowledge' ? 'acknowledged' : 'accepted'} the changes.`,
       );
       router.refresh();
-    } catch (err: any) {
-      setConflictError(err.message || 'An error occurred. Please try again.');
+    } catch (err: unknown) {
+      setConflictError(err instanceof Error ? err.message : 'An error occurred. Please try again.');
     } finally {
       setLoadingAction(false);
     }

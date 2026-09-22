@@ -22,14 +22,14 @@ type AuthenticatedRequest = Request & {
   user: { id: string };
 };
 
-@Controller('bookings')
+@Controller('bookings/:bookingId/cancellation')
 @UseGuards(JwtAuthGuard)
 export class CancellationController {
   constructor(
     private readonly cancellationService: CancellationService,
   ) {}
 
-  @Get(':bookingId/cancellation')
+  @Get()
   async getCancellationStatus(
     @Req() req: AuthenticatedRequest,
     @Param('bookingId', new ParseUUIDPipe({ version: '4' })) bookingId: string,
@@ -37,7 +37,7 @@ export class CancellationController {
     return this.cancellationService.getCancellationStatus(bookingId, req.user.id);
   }
 
-  @Post(':bookingId/cancellation-quote')
+  @Post('quote')
   async getCancellationQuote(
     @Req() req: AuthenticatedRequest,
     @Param('bookingId', new ParseUUIDPipe({ version: '4' })) bookingId: string,
@@ -45,7 +45,7 @@ export class CancellationController {
     return this.cancellationService.getCancellationQuote(bookingId, req.user.id);
   }
 
-  @Post(':bookingId/cancel')
+  @Post()
   async cancelBooking(
     @Req() req: AuthenticatedRequest,
     @Param('bookingId', new ParseUUIDPipe({ version: '4' })) bookingId: string,

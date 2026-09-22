@@ -1,4 +1,34 @@
 # Progress Tracker
+ 
+### Feature 025 — Booking Umbrella Deletion: Phase 5 Complete (User Story 3: Tasks T026–T036 Implemented & Verified) (2026-09-22)
+
+- **Phase 5 User Story 3 (Normalized Cancellation Sub-Resource & UI Migration) 100% Delivered (T026–T036)**:
+  - **Normalized App Router Route Handlers (T031)**: Created `cancellation/route.ts` (GET status, POST execute) and `cancellation/quote/route.ts` (POST quote) with `force-dynamic`, params extraction, and `'Cache-Control': 'private, no-store'`.
+  - **Legacy Proxy Cleanup (T032)**: Deleted obsolete directories `cancel/`, `cancellation-quote/`, and `cancellation-status/`.
+  - **Server Client Loader (T033)**: Updated `getCancellationQuote()`, `cancelBooking()`, and `getCancellationStatus()` upstream URLs.
+  - **Client UI Migration (T034)**: Updated `apps/web/components/bookings/BookingDetail.tsx` polling, quote, and execute requests to use `/api/booking-management/bookings/${booking.id}/cancellation` and `/cancellation/quote`. Replaced `err: any` with typed `err: unknown`.
+  - **Browser Journey Characterization (T029)**: Updated `apps/web/tests/characterization/booking-seam.characterization.spec.ts` route intercepts to normalized proxy paths `/cancellation/quote` and `/cancellation`.
+  - **ZAP Security Catalog & OpenAPI Migration (T036)**: Migrated `POST /bookings/:id/cancel` to `POST /bookings/:id/cancellation` across `tests/security/zap/routes.json`, `tests/security/zap/routes-config.test.mjs`, and `tests/security/zap/openapi.json`.
+  - **Unit & Security Tests (T027, T028, T036)**:
+    - Server-loader unit suite: 27/27 passed.
+    - Route handlers direct unit suite: 10/10 passed (7 cancellation, 3 quote).
+    - ZAP routes config test suite: 9/9 passed.
+  - **Verification Gate**:
+    - ESLint: 0 warnings, 0 errors.
+    - TypeScript (`tsc --noEmit`): 0 errors.
+  - **Status**: User Story 3 is 100% complete and verified. Ready for Phase 6 (Polish & Cross-Cutting Verification, T037).
+
+ ### Feature 025 — Booking Umbrella Deletion: Phase 5 Slice 1 Complete (Tasks T026, T030, T035 Implemented & Verified) (2026-09-22)
+
+- **Phase 5 User Story 3 (Normalized Cancellation Sub-Resource Backend & E2E) Delivered (T026, T030, T035)**:
+  - **Backend Route Normalization (T030)**: Normalized `CancellationController` (`apps/api/src/cancellation/cancellation.controller.ts`) to `@Controller('bookings/:bookingId/cancellation')` with `@Get()` (cancellation status), `@Post('quote')` (cancellation quote), and `@Post()` (execute cancellation with `CancelBookingDto`). Preserved `JwtAuthGuard`, `ParseUUIDPipe` on `:bookingId`, and service delegation without modifying business logic.
+  - **Controller Spec & E2E Route Updates with Negative Assertions (T026)**:
+    - Updated `cancellation.controller.spec.ts` with route path metadata, parameter metadata, guard checks, DTO validation, and service delegation assertions (13/13 passed).
+    - Updated `cancellation.e2e-spec.ts` HTTP requests to target `/api/bookings/:bookingId/cancellation` and `/api/bookings/:bookingId/cancellation/quote`.
+    - Added explicit negative assertions proving legacy sibling routes (`POST /api/bookings/:bookingId/cancellation-quote` and `POST /api/bookings/:bookingId/cancel`) return HTTP 404 Not Found (11/11 passed).
+  - **Stale Fixture Removal (T035)**: Confirmed `jest-e2e.json` targets `.e2e-spec.ts$` via `ts-jest` and deleted tracked compiled fixture `apps/api/test/cancellation.e2e-spec.js`. Documented rationale in `specs/025-booking-umbrella-deletion/quickstart.md`.
+  - **Verification Gate**: Executed verification matrix with exit code 0: ESLint (0 errors, 0 warnings), TypeScript (`tsc --noEmit`, 0 errors), network-guarded unit test (13/13 passed), and cancellation E2E test (`test:e2e`, 11/11 passed).
+  - **Status**: Phase 5 / Slice 1 is 100% complete and verified. Ready for Phase 5 / Slice 2 (Frontend Proxy & Next Route Handlers, T027–T029, T031–T034, T036).
 
 ### Feature 025 — Booking Umbrella Deletion: Phase 4 Slice 2 Complete (Tasks T015, T018, T020, T021, T024, T025 Implemented & Verified) (2026-09-22)
 

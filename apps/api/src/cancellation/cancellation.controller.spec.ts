@@ -1,5 +1,5 @@
 import { ParseUUIDPipe, ValidationPipe } from '@nestjs/common';
-import { GUARDS_METADATA, ROUTE_ARGS_METADATA } from '@nestjs/common/constants';
+import { GUARDS_METADATA, PATH_METADATA, ROUTE_ARGS_METADATA } from '@nestjs/common/constants';
 import { Reflector } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
 import { CancellationController } from './cancellation.controller';
@@ -32,6 +32,28 @@ describe('CancellationController', () => {
       .compile();
 
     controller = module.get<CancellationController>(CancellationController);
+  });
+
+  describe('routing metadata', () => {
+    it('mounts controller under bookings/:bookingId/cancellation', () => {
+      const controllerPath = Reflect.getMetadata(PATH_METADATA, CancellationController);
+      expect(controllerPath).toBe('bookings/:bookingId/cancellation');
+    });
+
+    it('mounts getCancellationStatus at root of controller sub-resource', () => {
+      const path = Reflect.getMetadata(PATH_METADATA, controller.getCancellationStatus);
+      expect(['', '/', undefined]).toContain(path);
+    });
+
+    it('mounts getCancellationQuote at quote sub-path', () => {
+      const path = Reflect.getMetadata(PATH_METADATA, controller.getCancellationQuote);
+      expect(path).toBe('quote');
+    });
+
+    it('mounts cancelBooking at root of controller sub-resource', () => {
+      const path = Reflect.getMetadata(PATH_METADATA, controller.cancelBooking);
+      expect(['', '/', undefined]).toContain(path);
+    });
   });
 
   describe('guard and pipe metadata', () => {
