@@ -1,6 +1,6 @@
 # Architecture
 
-## Feature 025 — Booking Umbrella Deletion (Phase 1 Setup, Phase 3 US1 MVP & Phase 4 US2 Complete)
+## Feature 025 — Booking Umbrella Deletion (Complete - Tasks T001–T039)
 
 Planning artifacts: [specification](../specs/025-booking-umbrella-deletion/spec.md), [plan](../specs/025-booking-umbrella-deletion/plan.md), and [tasks](../specs/025-booking-umbrella-deletion/tasks.md).
 
@@ -36,13 +36,10 @@ Planning artifacts: [specification](../specs/025-booking-umbrella-deletion/spec.
   - Migrated `POST /bookings/:id/cancel` to `POST /bookings/:id/cancellation` in `routes.json` and `routes-config.test.mjs`.
   - Migrated OpenAPI operation from `/bookings/{id}/cancel` to `/bookings/{id}/cancellation` in `openapi.json`, maintaining parity with live route catalog.
 
-
-
-
 #### Non-Blocking Stale Read Path & Projection Guard (US2 Phase 4 Slice 1 Complete)
 - **Non-Blocking Stale Read Path (`BookingManagementService`)**:
   - `BookingManagementService` read path is decoupled from synchronous provider recovery (`BookingRecoveryService` dependency and `reconcileBookingIfStale()` calls removed).
-  - When traveler queries bookings (`GET /bookings` or `GET /bookings/:bookingId`), any booking in `PROCESSING` status older than 15 minutes (`updatedAt < 15m ago`) triggers an asynchronous fire-and-forget event emission: `booking.reconciliation.requested` with payload `{ bookingId }`.
+  - When traveler queries bookings (`GET /bookings` or `GET /bookings/:bookingId`), any booking in `PROCESSING` status older than 15 minutes (`createdAt <= now - 15m`) triggers an asynchronous fire-and-forget event emission: `booking.reconciliation.requested` with payload `{ bookingId }`.
   - The read completes immediately without awaiting provider repair or blocking the traveler on Duffel/Stripe API calls.
   - Inline local terminal completion (`checkAndCompleteBooking()`) remains immediate and synchronously evaluated on read.
 - **Early-Return Guard in `BookingProjectionListener` (`apps/api/src/booking-projection/`)**:
@@ -73,6 +70,16 @@ Planning artifacts: [specification](../specs/025-booking-umbrella-deletion/spec.
 - **Module Graph Boundary Assertions (`apps/api/src/app.module.spec.ts`)**:
   - Validates `BookingManagementModule` imports `BookingStateModule` directly and strictly excludes `BookingLifecycleModule`.
   - Validates `BookingLifecycleModule` provides `BookingRecoveryService` and re-exports `BookingStateModule`.
+
+#### Cross-Cutting Verification & Ripgrep Census (Phase 6 Complete - Tasks T037–T039)
+- **Static Census Verification (T039)**:
+  - 0 references to `BookingModule` in production code or module registrations (only permitted in negative assertions in test files).
+  - 0 synchronous `reconcileBookingIfStale` calls in `BookingManagementService`.
+  - 0 references to legacy paths (`/cancellation-quote`, `/cancellation-status`, `/cancel`) in production code, web client, or ZAP catalogs (only permitted in explicit negative 404 test assertions in E2E suites).
+- **Comprehensive Quality Gates (T038)**:
+  - API and Web lint gates pass with 0 errors and 0 warnings (`eslint`, `next lint`).
+  - API and Web TypeScript compiles pass with 0 diagnostic errors (`tsc --noEmit`).
+  - Full suite of focused unit, server-loader, route-handler, and ZAP configuration tests pass with 100% success.
 
 ## Feature 024 — Event-Driven Module Deepening (Phase 6 closure in progress; T001–T040 implemented)
 

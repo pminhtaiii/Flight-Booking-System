@@ -112,9 +112,9 @@
 
 **Purpose**: Validate the complete phase and keep implementation documentation synchronized.
 
-- [ ] T037 [P] Update `context/architecture.md` and `context/progress-checker.md` with the final module graph, event/lock behavior, route map, and verification status when those project context files are present
-- [ ] T038 Run API lint, typecheck, focused unit/E2E tests, web unit tests, frontend lint/typecheck, the relevant Next.js build checks, and `node --test tests/security/zap/routes-config.test.mjs` as directed by `specs/025-booking-umbrella-deletion/quickstart.md`
-- [ ] T039 Run `rg` checks over `apps/api/src`, `apps/api/test`, `apps/web/app/api`, `apps/web/lib/server`, `apps/web/components/bookings`, and `tests/security/zap/routes.json`, `tests/security/zap/routes-config.test.mjs`, `tests/security/zap/openapi.json` to prove production code and ZAP fixtures have no remaining `BookingModule` imports, synchronous read-path reconciliation calls, or legacy cancellation URL calls; allow legacy strings only in explicit negative route assertions and historical design documents
+- [X] T037 [P] Update `context/architecture.md` and `context/progress-checker.md` with the final module graph, event/lock behavior, route map, and verification status when those project context files are present
+- [X] T038 Run API lint, typecheck, focused unit/E2E tests, web unit tests, frontend lint/typecheck, the relevant Next.js build checks, and `node --test tests/security/zap/routes-config.test.mjs` as directed by `specs/025-booking-umbrella-deletion/quickstart.md`
+- [X] T039 Run `rg` checks over `apps/api/src`, `apps/api/test`, `apps/web/app/api`, `apps/web/lib/server`, `apps/web/components/bookings`, and `tests/security/zap/routes.json`, `tests/security/zap/routes-config.test.mjs`, `tests/security/zap/openapi.json` to prove production code and ZAP fixtures have no remaining `BookingModule` imports, synchronous read-path reconciliation calls, or legacy cancellation URL calls; allow legacy strings only in explicit negative route assertions and historical design documents
 
 ---
 
