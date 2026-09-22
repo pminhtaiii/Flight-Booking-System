@@ -1,5 +1,15 @@
 # Progress Tracker
 
+### Feature 025 — Booking Umbrella Deletion: Phase 4 Slice 2 Complete (Tasks T015, T018, T020, T021, T024, T025 Implemented & Verified) (2026-09-22)
+
+- **Phase 4 User Story 2 (Non-Blocking Stale Booking Reconciliation) Fully Delivered (T014–T025 100% Complete)**:
+  - **Asynchronous Reconciliation Event Handler & Distributed Lock (T015, T018, T020)**: Implemented `@OnEvent('booking.reconciliation.requested', { async: true })` in `BookingRecoveryService`. Unified event-triggered and cron-triggered (`sweepStaleBookings`) flows under private helper `reconcileBookingWithLock(bookingId)` with an atomic 300s TTL Redis lock lease (`booking:recon:lock:${bookingId}`), unique UUID token, and token-checked release in `finally`.
+  - **State Reload & Eligibility Recheck (T018, T020)**: Reloads booking with all relations from DB inside the lock; rechecks that status is still `PROCESSING` and age is >= 15m before executing provider recovery, preventing race conditions against concurrent completions.
+  - **Duplicate Side-Effect Hardening (T021)**: Hardened provider operations against repeated execution: skips Duffel and Stripe cancellations if `payment.status` is already `'CANCELLED'` or `'REFUNDED'`; skips Stripe cancellation if `intent.status === 'canceled'`; skips Duffel cancellation if `duffel_order_cancelled` `PaymentEvent` exists, and records `duffel_order_cancelled` on successful Duffel cancel. Guarded concurrent transitions with 0 count to prevent state regression.
+  - **Module Graph Assertions (T024)**: Added assertions in `apps/api/src/app.module.spec.ts` confirming `BookingManagementModule` imports `BookingStateModule` directly and excludes `BookingLifecycleModule`, while `BookingLifecycleModule` provides `BookingRecoveryService` for the background cron sweep.
+  - **Verification Gate (T025)**: Executed full verification gate with exit code 0: ESLint (0 errors, 0 warnings), TypeScript (`tsc --noEmit`, 0 errors), 5 focused unit test suites under network guard (120/120 passed), and API Booking E2E suite (`booking.e2e-spec.ts`, 7/7 passed).
+- **Status**: Phase 4 / User Story 2 is 100% complete and verified. Ready for Phase 5 (User Story 3: Normalized Cancellation Sub-Resource, T026–T036).
+
 ### Feature 025 — Booking Umbrella Deletion: Phase 4 Slice 1 Complete (Tasks T014, T016, T017, T019, T022, T023 Implemented & Verified) (2026-09-21)
 
 - **Phase 4 User Story 2 (Non-Blocking Stale Read Path & Projection Guard) Delivered (T014, T016, T017, T019, T022, T023)**:

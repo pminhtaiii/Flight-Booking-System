@@ -5,6 +5,7 @@ import { DuffelModule } from '@/duffel/duffel.module';
 import { RefundModule } from '@/refund/refund.module';
 import { RefundSettlementModule } from '@/refund-settlement/refund-settlement.module';
 import { StripeModule } from '@/common/stripe.module';
+import { CacheModule } from '@/cache/cache.module';
 import { BookingStateModule } from './booking-state.module';
 import { BookingRecoveryService } from './booking-recovery.service';
 import { DomainEventsModule } from '@/domain-events/domain-events.module';
@@ -18,6 +19,7 @@ import { DomainEventsModule } from '@/domain-events/domain-events.module';
     RefundSettlementModule,
     ScheduleModule,
     StripeModule,
+    CacheModule,
     DomainEventsModule,
   ],
   providers: [BookingRecoveryService],

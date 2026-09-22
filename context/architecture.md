@@ -1,6 +1,6 @@
 # Architecture
 
-## Feature 025 — Booking Umbrella Deletion (Phase 1 Setup, Phase 3 US1 MVP & Phase 4 Slice 1 Implemented)
+## Feature 025 — Booking Umbrella Deletion (Phase 1 Setup, Phase 3 US1 MVP & Phase 4 US2 Complete)
 
 Planning artifacts: [specification](../specs/025-booking-umbrella-deletion/spec.md), [plan](../specs/025-booking-umbrella-deletion/plan.md), and [tasks](../specs/025-booking-umbrella-deletion/tasks.md).
 
@@ -29,6 +29,27 @@ Planning artifacts: [specification](../specs/025-booking-umbrella-deletion/spec.
 - **`BookingManagementModule` Decoupling**:
   - `BookingManagementModule` has been decoupled to import `BookingStateModule` directly instead of `BookingLifecycleModule`.
   - Isolates traveler-facing read services from background reconciliation loops and recovery cron jobs, while `BookingLifecycleModule` retains ownership of `BookingRecoveryService` and its scheduled sweep.
+
+#### Locked Background Recovery Handler & Provider Hardening (US2 Phase 4 Slice 2 Complete)
+- **Asynchronous Reconciliation Handler & Distributed Lock (`BookingRecoveryService`)**:
+  - Subscribes to `booking.reconciliation.requested` via `@OnEvent('booking.reconciliation.requested', { async: true })`.
+  - Unified routing: Both incoming read-triggered events and scheduled cron sweeps (`sweepStaleBookings`) delegate to private helper `reconcileBookingWithLock(bookingId)`.
+  - Distributed Locking: Acquires an atomic 300s TTL lock via `CacheService.acquireLock('booking:recon:lock:' + bookingId, token, 300)` using a fresh `randomUUID()` token. If lock acquisition fails (collision or active recovery in-flight), execution silently returns.
+  - Guarantees token-verified release inside `finally` via `this.cacheService.releaseLock(lockKey, token)` even if recovery throws, preventing deadlock or premature release by stale workers.
+  - Catches and logs all errors, guaranteeing zero unhandled promise rejections or emitter crashes.
+- **Latest-State Reload & Pre-Flight Recheck**:
+  - Reloads latest full relations directly from database under the lock before initiating any recovery work.
+  - Enforces pre-flight eligibility recheck: Verifies `status === BookingStatus.PROCESSING` and `createdAt <= now - 15m`. If booking has already been confirmed, cancelled, or failed concurrently, recovery aborts with zero side effects.
+- **Duplicate Provider Side-Effect Hardening**:
+  - Reconcile logic guards against repeated remote actions across race conditions and lease expirations:
+    - Skips Duffel and Stripe cancellations if `payment.status` is already `'CANCELLED'` or `'REFUNDED'`.
+    - Skips Stripe cancellation if Stripe `intent.status === 'canceled'`.
+    - Skips Duffel cancellation if `duffel_order_cancelled` `PaymentEvent` already exists.
+    - Records `duffel_order_cancelled` `PaymentEvent` (with `source: SYSTEM`, `createdBy: 'system'`) upon successful Duffel cancellation.
+    - Handles concurrent state transitions: If `failBooking` or `confirmBooking` returns 0 affected rows, payment updates and event publications are completely skipped, preventing state regression.
+- **Module Graph Boundary Assertions (`apps/api/src/app.module.spec.ts`)**:
+  - Validates `BookingManagementModule` imports `BookingStateModule` directly and strictly excludes `BookingLifecycleModule`.
+  - Validates `BookingLifecycleModule` provides `BookingRecoveryService` and re-exports `BookingStateModule`.
 
 ## Feature 024 — Event-Driven Module Deepening (Phase 6 closure in progress; T001–T040 implemented)
 
@@ -251,11 +272,10 @@ Planning artifacts: [specification](../specs/024-event-driven-module-deepening/s
 │   │   │   │   ├── auth/                  → AgentAuthModule (API key & claim token guards)
 │   │   │   │   └── audit/                 → AgentToolAuditModule (privacy-safe telemetry)
 │   │   │   ├── ancillaries/           → Ancillary services (seats, baggage) importing IdempotencyModule directly
-│   │   │   ├── booking/               → Pure umbrella BookingModule aggregating submodules
-│   │   │   ├── booking-lifecycle/     → Provider-blind lifecycle transitions & recovery
+│   │   │   ├── booking-lifecycle/     → Provider-blind lifecycle transitions & recovery (BookingStateModule, BookingRecoveryService)
 │   │   │   ├── booking-projection/    → Version-fenced safe projection listener, writer, metrics & reconciliation
-│   │   │   ├── booking-management/    → Owner read models, disruption & revision queries
-│   │   │   ├── cancellation/          → Cancellation quotes, locks & obligation generation
+│   │   │   ├── booking-management/    → Owner read models, disruption & revision queries (BookingManagementController)
+│   │   │   ├── cancellation/          → Cancellation quotes, locks & obligation generation (CancellationController)
 │   │   │   ├── chat/                  → Chat persistence & AgentChatController (JTI checks)
 │   │   │   ├── dashboard/             → Direct Prisma booking summary read model & stats
 │   │   │   ├── idempotency/           → IdempotencyModule providing PaymentIdempotencyService
