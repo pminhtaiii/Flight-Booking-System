@@ -1,14 +1,56 @@
+import { randomUUID } from 'crypto';
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { BookingFailureReason, BookingStatus, Prisma, RefundStatus, RefundTriggerType } from '@prisma/client';
+import { OnEvent } from '@nestjs/event-emitter';
+import {
+  BookingFailureReason,
+  BookingStatus,
+  PaymentEventSource,
+  PaymentStatus,
+  Prisma,
+  RefundStatus,
+  RefundTriggerType,
+} from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { StripeService } from '@/common/stripe.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { RefundTransactionService } from '@/refund/refund-transaction.service';
 import { RefundSettlementService } from '@/refund-settlement/refund-settlement.service';
+import { CacheService } from '@/cache/cache.service';
 import { BookingLifecycleService } from './booking-lifecycle.service';
 import { BookingWithRelations } from './booking-lifecycle.types';
 import { BookingEventPublisherService, TransactionEventContext } from '@/domain-events';
+
+const STALE_THRESHOLD_MS = 15 * 60 * 1000;
+
+const BOOKING_RECOVERY_INCLUDE = {
+  payment: {
+    include: {
+      ancillarySelection: {
+        include: {
+          seatSelections: true,
+          baggageSelections: true,
+        },
+      },
+    },
+  },
+  bookingIntent: {
+    include: {
+      passengers: true,
+    },
+  },
+  activeDisruptionRevision: {
+    include: {
+      segments: { orderBy: { globalOrder: 'asc' } },
+      notificationOutbox: true,
+    },
+  },
+  itineraryRevisions: {
+    orderBy: { version: 'desc' },
+    take: 1,
+    include: { segments: { orderBy: { globalOrder: 'asc' } } },
+  },
+} as const;
 
 type BookingIntentPassengerDetails = {
   readonly duffelPassengerId: string | null;
@@ -74,58 +116,73 @@ export class BookingRecoveryService {
     private readonly refundTransactionService: RefundTransactionService,
     private readonly refundSettlementService: RefundSettlementService,
     private readonly bookingLifecycleService: BookingLifecycleService,
+    private readonly cacheService: CacheService,
     @Optional() private readonly publisher?: BookingEventPublisherService,
   ) {}
+
+  @OnEvent('booking.reconciliation.requested', { async: true })
+  async handleReconciliationRequested(event: { bookingId: string }): Promise<void> {
+    if (!event?.bookingId) return;
+    await this.reconcileBookingWithLock(event.bookingId);
+  }
 
   @Cron(CronExpression.EVERY_10_MINUTES)
   async sweepStaleBookings(): Promise<void> {
     this.logger.log('Running stale PROCESSING bookings sweeper');
-    const staleThreshold = new Date(Date.now() - 15 * 60 * 1000);
+    const staleThreshold = new Date(Date.now() - STALE_THRESHOLD_MS);
     const staleBookings = await this.prisma.booking.findMany({
       where: {
         status: BookingStatus.PROCESSING,
         createdAt: { lte: staleThreshold },
       },
-      include: {
-        payment: {
-          include: {
-            ancillarySelection: {
-              include: {
-                seatSelections: true,
-                baggageSelections: true,
-              },
-            },
-          },
-        },
-        bookingIntent: {
-          include: {
-            passengers: true,
-          },
-        },
-        activeDisruptionRevision: {
-          include: {
-            segments: { orderBy: { globalOrder: 'asc' } },
-            notificationOutbox: true,
-          },
-        },
-        itineraryRevisions: {
-          orderBy: { version: 'desc' },
-          take: 1,
-          include: { segments: { orderBy: { globalOrder: 'asc' } } },
-        },
-      },
     });
 
     for (const booking of staleBookings) {
-      try {
-        await this.reconcileBookingIfStale(booking as unknown as BookingWithRelations);
-      } catch (e: unknown) {
-        const error = e instanceof Error ? e : new Error(String(e));
-        this.logger.error(
-          `Failed to reconcile stale booking ${booking.id}: ${error.message}`,
-          error.stack,
+      await this.reconcileBookingWithLock(booking.id);
+    }
+  }
+
+  private async reconcileBookingWithLock(bookingId: string): Promise<void> {
+    try {
+      const token = randomUUID();
+      const lockKey = 'booking:recon:lock:' + bookingId;
+      const acquired = await this.cacheService.acquireLock(lockKey, token, 300);
+      if (!acquired) {
+        this.logger.log(
+          `Reconciliation lock collision for booking ${bookingId}; skipping attempt.`,
         );
+        return;
       }
+
+      try {
+        const booking = await this.prisma.booking.findUnique({
+          where: { id: bookingId },
+          include: BOOKING_RECOVERY_INCLUDE,
+        });
+
+        if (!booking) {
+          this.logger.warn(`Booking ${bookingId} not found during locked reconciliation; skipping.`);
+          return;
+        }
+
+        const staleThreshold = new Date(Date.now() - STALE_THRESHOLD_MS);
+        if (booking.status !== BookingStatus.PROCESSING || booking.createdAt > staleThreshold) {
+          this.logger.log(
+            `Booking ${bookingId} is not eligible for stale processing recovery (status: ${booking.status}); skipping.`,
+          );
+          return;
+        }
+
+        await this.reconcileBookingIfStale(booking as unknown as BookingWithRelations);
+      } finally {
+        await this.cacheService.releaseLock(lockKey, token);
+      }
+    } catch (e: unknown) {
+      const error = e instanceof Error ? e : new Error(String(e));
+      this.logger.error(
+        `[reconcileBookingWithLock] Error during locked reconciliation for booking ${bookingId}: ${error.message}`,
+        error.stack,
+      );
     }
   }
 
@@ -182,7 +239,7 @@ export class BookingRecoveryService {
   async reconcileBookingIfStale(booking: BookingWithRelations): Promise<BookingWithRelations> {
     if (booking.status !== BookingStatus.PROCESSING) return booking;
 
-    const staleThreshold = new Date(Date.now() - 15 * 60 * 1000);
+    const staleThreshold = new Date(Date.now() - STALE_THRESHOLD_MS);
     if (booking.createdAt > staleThreshold) {
       return booking;
     }
@@ -233,41 +290,64 @@ export class BookingRecoveryService {
         this.stripeService.retrievePaymentIntent(payment.stripePaymentIntentId),
       );
       if (intent.status !== 'succeeded') {
-        try {
-          const duffelEvent = await this.prisma.paymentEvent.findFirst({
-            where: { paymentId: payment.id, eventType: 'duffel_order_created' },
-            orderBy: { createdAt: 'desc' },
-          });
-          const duffelOrder = duffelEvent?.metadata as Record<string, unknown> | null;
-          if (duffelOrder && typeof duffelOrder.id === 'string') {
-            await this.duffelService.cancelOrder(duffelOrder.id);
-            this.logger.log(
-              `Successfully cancelled orphaned Duffel order ${duffelOrder.id} during stale booking sweep.`,
+        const isAlreadyCancelledOrRefunded =
+          payment.status === 'CANCELLED' || payment.status === 'REFUNDED';
+
+        if (!isAlreadyCancelledOrRefunded) {
+          try {
+            const duffelCancelledEvent = await this.prisma.paymentEvent.findFirst({
+              where: { paymentId: payment.id, eventType: 'duffel_order_cancelled' },
+            });
+            if (!duffelCancelledEvent) {
+              const duffelEvent = await this.prisma.paymentEvent.findFirst({
+                where: { paymentId: payment.id, eventType: 'duffel_order_created' },
+                orderBy: { createdAt: 'desc' },
+              });
+              const duffelOrder = duffelEvent?.metadata as Record<string, unknown> | null;
+              if (duffelOrder && typeof duffelOrder.id === 'string') {
+                await this.duffelService.cancelOrder(duffelOrder.id);
+                await this.prisma.paymentEvent.create({
+                  data: {
+                    paymentId: payment.id,
+                    eventType: 'duffel_order_cancelled',
+                    previousStatus: payment.status ?? PaymentStatus.AUTHORIZED,
+                    newStatus: payment.status ?? PaymentStatus.AUTHORIZED,
+                    source: PaymentEventSource.SYSTEM,
+                    createdBy: 'system',
+                    metadata: { duffelOrderId: duffelOrder.id },
+                  },
+                });
+                this.logger.log(
+                  `Successfully cancelled orphaned Duffel order ${duffelOrder.id} during stale booking sweep.`,
+                );
+              }
+            }
+          } catch (cancelError: unknown) {
+            const err = cancelError instanceof Error ? cancelError : new Error(String(cancelError));
+            this.logger.error(
+              `Duffel order cancellation failed during stale booking sweep: ${err.message}`,
+              err.stack,
             );
           }
-        } catch (cancelError: unknown) {
-          const err = cancelError instanceof Error ? cancelError : new Error(String(cancelError));
-          this.logger.error(
-            `Duffel order cancellation failed during stale booking sweep: ${err.message}`,
-            err.stack,
-          );
-        }
 
-        // Release the Stripe authorization hold (cancel intent)
-        try {
-          await this.stripeService.cancelPaymentIntent(payment.stripePaymentIntentId);
-          this.logger.log(
-            `Successfully cancelled Stripe PaymentIntent ${payment.stripePaymentIntentId} during stale booking sweep.`,
-          );
-        } catch (stripeCancelError: unknown) {
-          const err =
-            stripeCancelError instanceof Error
-              ? stripeCancelError
-              : new Error(String(stripeCancelError));
-          this.logger.error(
-            `Stripe cancelPaymentIntent failed during stale booking sweep: ${err.message}`,
-            err.stack,
-          );
+          // Release the Stripe authorization hold (cancel intent)
+          if (intent.status !== 'canceled') {
+            try {
+              await this.stripeService.cancelPaymentIntent(payment.stripePaymentIntentId);
+              this.logger.log(
+                `Successfully cancelled Stripe PaymentIntent ${payment.stripePaymentIntentId} during stale booking sweep.`,
+              );
+            } catch (stripeCancelError: unknown) {
+              const err =
+                stripeCancelError instanceof Error
+                  ? stripeCancelError
+                  : new Error(String(stripeCancelError));
+              this.logger.error(
+                `Stripe cancelPaymentIntent failed during stale booking sweep: ${err.message}`,
+                err.stack,
+              );
+            }
+          }
         }
 
         let eventContext: TransactionEventContext | undefined;
