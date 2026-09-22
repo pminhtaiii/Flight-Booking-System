@@ -681,7 +681,7 @@ describe('BookingRecoveryService', () => {
       expect(result.failureReason).toBe(BookingFailureReason.CAPTURE_FAILED);
     });
 
-    it('deletes duffel_order_cancelled marker when Duffel cancellation fails with unexpected error', async () => {
+    it('does not create duffel_order_cancelled marker when Duffel cancellation fails with unexpected error', async () => {
       const booking = {
         id: 'b-1',
         status: BookingStatus.PROCESSING,
@@ -701,16 +701,13 @@ describe('BookingRecoveryService', () => {
         if (where?.eventType === 'duffel_order_created') return { metadata: { id: 'ord_123' } };
         return null;
       });
-      mockPrisma.paymentEvent.create.mockResolvedValue({ id: BigInt(888) });
       mockDuffelService.cancelOrder.mockRejectedValue(new Error('Network failure'));
       mockStripeService.cancelPaymentIntent.mockResolvedValue({});
 
       const result = await service.reconcileBookingIfStale(booking);
 
       expect(mockDuffelService.cancelOrder).toHaveBeenCalledWith('ord_123');
-      expect(mockPrisma.paymentEvent.delete).toHaveBeenCalledWith({
-        where: { id: BigInt(888) },
-      });
+      expect(mockPrisma.paymentEvent.create).not.toHaveBeenCalled();
       expect(mockStripeService.cancelPaymentIntent).toHaveBeenCalledWith('pi_123');
       expect(result.status).toBe(BookingStatus.FAILED);
     });

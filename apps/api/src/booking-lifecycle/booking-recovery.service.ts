@@ -324,23 +324,13 @@ export class BookingRecoveryService {
             });
             const duffelOrder = duffelEvent?.metadata as Record<string, unknown> | null;
             if (duffelOrder && typeof duffelOrder.id === 'string') {
-              const marker = await this.prisma.paymentEvent.create({
-                data: {
-                  paymentId: payment.id,
-                  eventType: 'duffel_order_cancelled',
-                  previousStatus: payment.status ?? PaymentStatus.AUTHORIZED,
-                  newStatus: payment.status ?? PaymentStatus.AUTHORIZED,
-                  source: PaymentEventSource.SYSTEM,
-                  createdBy: 'system',
-                  metadata: { duffelOrderId: duffelOrder.id },
-                },
-              });
-
+              let wasCancelledOrAlreadyCancelled = false;
               try {
                 await this.duffelService.cancelOrder(duffelOrder.id);
                 this.logger.log(
                   `Successfully cancelled orphaned Duffel order ${duffelOrder.id} during stale booking sweep.`,
                 );
+                wasCancelledOrAlreadyCancelled = true;
               } catch (cancelError: unknown) {
                 const err =
                   cancelError instanceof Error ? cancelError : new Error(String(cancelError));
@@ -348,15 +338,27 @@ export class BookingRecoveryService {
                   this.logger.log(
                     `Orphaned Duffel order ${duffelOrder.id} already cancelled: ${err.message}. Treating as idempotent success.`,
                   );
+                  wasCancelledOrAlreadyCancelled = true;
                 } else {
-                  await this.prisma.paymentEvent
-                    .delete({ where: { id: marker.id } })
-                    .catch(() => {});
                   this.logger.error(
                     `Duffel order cancellation failed during stale booking sweep: ${err.message}`,
                     err.stack,
                   );
                 }
+              }
+
+              if (wasCancelledOrAlreadyCancelled) {
+                await this.prisma.paymentEvent.create({
+                  data: {
+                    paymentId: payment.id,
+                    eventType: 'duffel_order_cancelled',
+                    previousStatus: payment.status ?? PaymentStatus.AUTHORIZED,
+                    newStatus: payment.status ?? PaymentStatus.AUTHORIZED,
+                    source: PaymentEventSource.SYSTEM,
+                    createdBy: 'system',
+                    metadata: { duffelOrderId: duffelOrder.id },
+                  },
+                });
               }
             }
           }
