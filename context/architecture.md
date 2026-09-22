@@ -12,9 +12,10 @@ Planning artifacts: [specification](../specs/025-booking-umbrella-deletion/spec.
   - Directly handles authenticated traveler booking reads: `GET /bookings` (list with pagination & tab filtering) and `GET /bookings/:bookingId` (detail view).
   - Protected with `@UseGuards(JwtAuthGuard)` and parameter UUID validation via `ParseUUIDPipe({ version: '4' })`.
 - **`CancellationController` (`apps/api/src/cancellation/`)**:
-  - Handles legacy cancellation endpoints: `GET /bookings/:bookingId/cancellation`, `POST /bookings/:bookingId/cancellation-quote`, and `POST /bookings/:bookingId/cancel`.
-  - Protected with `@UseGuards(JwtAuthGuard)` and `ParseUUIDPipe({ version: '4' })`.
-  - Service boundaries and HTTP status/response contracts remain 100% backward-compatible.
+  - Normalized to canonical REST sub-resource hierarchy under `@Controller('bookings/:bookingId/cancellation')`: `GET /bookings/:bookingId/cancellation` (status), `POST /bookings/:bookingId/cancellation/quote` (quote), and `POST /bookings/:bookingId/cancellation` (cancellation execution with `CancelBookingDto`). Legacy sibling paths (`:bookingId/cancellation-quote` and `:bookingId/cancel`) are rejected with `404 Not Found`.
+  - Protected with `@UseGuards(JwtAuthGuard)` and parameter UUID validation via `ParseUUIDPipe({ version: '4' })`.
+  - Service boundaries, ownership checks, and DTO validation remain strictly preserved.
+
 
 #### Non-Blocking Stale Read Path & Projection Guard (US2 Phase 4 Slice 1 Complete)
 - **Non-Blocking Stale Read Path (`BookingManagementService`)**:

@@ -1,5 +1,17 @@
 # Progress Tracker
 
+### Feature 025 — Booking Umbrella Deletion: Phase 5 Slice 1 Complete (Tasks T026, T030, T035 Implemented & Verified) (2026-09-22)
+
+- **Phase 5 User Story 3 (Normalized Cancellation Sub-Resource Backend & E2E) Delivered (T026, T030, T035)**:
+  - **Backend Route Normalization (T030)**: Normalized `CancellationController` (`apps/api/src/cancellation/cancellation.controller.ts`) to `@Controller('bookings/:bookingId/cancellation')` with `@Get()` (cancellation status), `@Post('quote')` (cancellation quote), and `@Post()` (execute cancellation with `CancelBookingDto`). Preserved `JwtAuthGuard`, `ParseUUIDPipe` on `:bookingId`, and service delegation without modifying business logic.
+  - **Controller Spec & E2E Route Updates with Negative Assertions (T026)**:
+    - Updated `cancellation.controller.spec.ts` with route path metadata, parameter metadata, guard checks, DTO validation, and service delegation assertions (13/13 passed).
+    - Updated `cancellation.e2e-spec.ts` HTTP requests to target `/api/bookings/:bookingId/cancellation` and `/api/bookings/:bookingId/cancellation/quote`.
+    - Added explicit negative assertions proving legacy sibling routes (`POST /api/bookings/:bookingId/cancellation-quote` and `POST /api/bookings/:bookingId/cancel`) return HTTP 404 Not Found (11/11 passed).
+  - **Stale Fixture Removal (T035)**: Confirmed `jest-e2e.json` targets `.e2e-spec.ts$` via `ts-jest` and deleted tracked compiled fixture `apps/api/test/cancellation.e2e-spec.js`. Documented rationale in `specs/025-booking-umbrella-deletion/quickstart.md`.
+  - **Verification Gate**: Executed verification matrix with exit code 0: ESLint (0 errors, 0 warnings), TypeScript (`tsc --noEmit`, 0 errors), network-guarded unit test (13/13 passed), and cancellation E2E test (`test:e2e`, 11/11 passed).
+  - **Status**: Phase 5 / Slice 1 is 100% complete and verified. Ready for Phase 5 / Slice 2 (Frontend Proxy & Next Route Handlers, T027–T029, T031–T034, T036).
+
 ### Feature 025 — Booking Umbrella Deletion: Phase 4 Slice 2 Complete (Tasks T015, T018, T020, T021, T024, T025 Implemented & Verified) (2026-09-22)
 
 - **Phase 4 User Story 2 (Non-Blocking Stale Booking Reconciliation) Fully Delivered (T014–T025 100% Complete)**:

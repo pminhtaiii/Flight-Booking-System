@@ -202,7 +202,7 @@ describe('Cancellation and refund recovery (E2E)', () => {
         key: `cancellation-refund:${booking.id}`,
         requestHash: crypto.randomUUID(),
         customerId: owner.id,
-        requestPath: `/api/bookings/${booking.id}/cancel`,
+        requestPath: `/api/bookings/${booking.id}/cancellation`,
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       },
     });
@@ -226,7 +226,7 @@ describe('Cancellation and refund recovery (E2E)', () => {
     const booking = await createCancellationBooking(owner.id);
 
     await request(app.getHttpServer())
-      .post(`/api/bookings/${booking.id}/cancellation-quote`)
+      .post(`/api/bookings/${booking.id}/cancellation/quote`)
       .set('Authorization', `Bearer ${otherUser.token}`)
       .expect(403);
     await request(app.getHttpServer())
@@ -244,7 +244,7 @@ describe('Cancellation and refund recovery (E2E)', () => {
     const quoteSpy = jest.spyOn(duffelService, 'createCancellationQuote');
 
     const quoteResponse = await request(app.getHttpServer())
-      .post(`/api/bookings/${validBooking.id}/cancellation-quote`)
+      .post(`/api/bookings/${validBooking.id}/cancellation/quote`)
       .set('Authorization', `Bearer ${owner.token}`)
       .expect(201);
 
@@ -261,7 +261,7 @@ describe('Cancellation and refund recovery (E2E)', () => {
     });
     const confirmSpy = jest.spyOn(duffelService, 'confirmCancellationQuote');
     await request(app.getHttpServer())
-      .post(`/api/bookings/${expiredBooking.id}/cancel`)
+      .post(`/api/bookings/${expiredBooking.id}/cancellation`)
       .set('Authorization', `Bearer ${owner.token}`)
       .send({ quoteId: expiredBooking.quoteId })
       .expect(400);
@@ -294,11 +294,11 @@ describe('Cancellation and refund recovery (E2E)', () => {
 
     const responses = await Promise.all([
       request(app.getHttpServer())
-        .post(`/api/bookings/${booking.id}/cancel`)
+        .post(`/api/bookings/${booking.id}/cancellation`)
         .set('Authorization', `Bearer ${owner.token}`)
         .send({ quoteId: booking.quoteId }),
       request(app.getHttpServer())
-        .post(`/api/bookings/${booking.id}/cancel`)
+        .post(`/api/bookings/${booking.id}/cancellation`)
         .set('Authorization', `Bearer ${owner.token}`)
         .send({ quoteId: booking.quoteId }),
     ]);
@@ -351,7 +351,7 @@ describe('Cancellation and refund recovery (E2E)', () => {
     const stripeSpy = jest.spyOn(stripeService, 'createRefund');
 
     const response = await request(app.getHttpServer())
-      .post(`/api/bookings/${booking.id}/cancel`)
+      .post(`/api/bookings/${booking.id}/cancellation`)
       .set('Authorization', `Bearer ${owner.token}`)
       .send({ quoteId: booking.quoteId })
       .expect(201);
@@ -418,7 +418,7 @@ describe('Cancellation and refund recovery (E2E)', () => {
       .mockResolvedValue({ id: `re-${crypto.randomUUID()}` } as never);
 
     const response = await request(app.getHttpServer())
-      .post(`/api/bookings/${booking.id}/cancel`)
+      .post(`/api/bookings/${booking.id}/cancellation`)
       .set('Authorization', `Bearer ${owner.token}`)
       .send({ quoteId: booking.quoteId })
       .expect(201);
@@ -447,7 +447,7 @@ describe('Cancellation and refund recovery (E2E)', () => {
     const stripeSpy = jest.spyOn(stripeService, 'createRefund');
 
     await request(app.getHttpServer())
-      .post(`/api/bookings/${booking.id}/cancel`)
+      .post(`/api/bookings/${booking.id}/cancellation`)
       .set('Authorization', `Bearer ${owner.token}`)
       .send({ quoteId: booking.quoteId })
       .expect(502);
@@ -484,7 +484,7 @@ describe('Cancellation and refund recovery (E2E)', () => {
       .mockResolvedValueOnce({ id: `re-${crypto.randomUUID()}` } as never);
 
     await request(app.getHttpServer())
-      .post(`/api/bookings/${booking.id}/cancel`)
+      .post(`/api/bookings/${booking.id}/cancellation`)
       .set('Authorization', `Bearer ${owner.token}`)
       .send({ quoteId: booking.quoteId })
       .expect(201);
@@ -557,7 +557,7 @@ describe('Cancellation and refund recovery (E2E)', () => {
       .mockResolvedValue({ id: `re-${crypto.randomUUID()}` } as never);
 
     await request(app.getHttpServer())
-      .post(`/api/bookings/${booking.id}/cancel`)
+      .post(`/api/bookings/${booking.id}/cancellation`)
       .set('Authorization', `Bearer ${owner.token}`)
       .send({ quoteId: booking.quoteId })
       .expect(201);
@@ -593,5 +593,20 @@ describe('Cancellation and refund recovery (E2E)', () => {
       where: { bookingId: booking.id },
     });
     expect(revisionsCount).toBe(0);
+  });
+
+  it('returns 404 Not Found for legacy sibling paths', async (): Promise<void> => {
+    const booking = await createCancellationBooking(owner.id);
+
+    await request(app.getHttpServer())
+      .post(`/api/bookings/${booking.id}/cancellation-quote`)
+      .set('Authorization', `Bearer ${owner.token}`)
+      .expect(404);
+
+    await request(app.getHttpServer())
+      .post(`/api/bookings/${booking.id}/cancel`)
+      .set('Authorization', `Bearer ${owner.token}`)
+      .send({ quoteId: booking.quoteId })
+      .expect(404);
   });
 });
