@@ -39,7 +39,7 @@ Planning artifacts: [specification](../specs/025-booking-umbrella-deletion/spec.
 #### Non-Blocking Stale Read Path & Projection Guard (US2 Phase 4 Slice 1 Complete)
 - **Non-Blocking Stale Read Path (`BookingManagementService`)**:
   - `BookingManagementService` read path is decoupled from synchronous provider recovery (`BookingRecoveryService` dependency and `reconcileBookingIfStale()` calls removed).
-  - When traveler queries bookings (`GET /bookings` or `GET /bookings/:bookingId`), any booking in `PROCESSING` status older than 15 minutes (`updatedAt < 15m ago`) triggers an asynchronous fire-and-forget event emission: `booking.reconciliation.requested` with payload `{ bookingId }`.
+  - When traveler queries bookings (`GET /bookings` or `GET /bookings/:bookingId`), any booking in `PROCESSING` status older than 15 minutes (`createdAt <= now - 15m`) triggers an asynchronous fire-and-forget event emission: `booking.reconciliation.requested` with payload `{ bookingId }`.
   - The read completes immediately without awaiting provider repair or blocking the traveler on Duffel/Stripe API calls.
   - Inline local terminal completion (`checkAndCompleteBooking()`) remains immediate and synchronously evaluated on read.
 - **Early-Return Guard in `BookingProjectionListener` (`apps/api/src/booking-projection/`)**:
