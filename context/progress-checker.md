@@ -1,6 +1,28 @@
 # Progress Tracker
-
-### Feature 025 — Booking Umbrella Deletion: Phase 5 Slice 1 Complete (Tasks T026, T030, T035 Implemented & Verified) (2026-09-22)
+ 
++### Feature 025 — Booking Umbrella Deletion: Phase 5 Slice 2 Complete (Tasks T027, T028, T031, T032, T033 Implemented & Verified) (2026-09-22)
++
++- **Phase 5 User Story 3 (Normalized Cancellation Frontend Proxy & Server Client Layer) Delivered (T027, T028, T031, T032, T033)**:
++  - **Normalized App Router Route Handlers (T031)**:
++    - Created `apps/web/app/api/booking-management/bookings/[bookingId]/cancellation/route.ts` with `GET` (cancellation status) and `POST` (cancel execution with `quoteId`).
++    - Created `apps/web/app/api/booking-management/bookings/[bookingId]/cancellation/quote/route.ts` with `POST` (cancellation quote).
++    - Enforced `force-dynamic`, params extraction, outcome status mapping, and `'Cache-Control': 'private, no-store'` across all responses.
++  - **Obsolete Proxy Route Directory Cleanup (T032)**:
++    - Deleted legacy routes `cancel/`, `cancellation-quote/`, and `cancellation-status/` under `apps/web/app/api/booking-management/bookings/[bookingId]/`.
++  - **Server Client Loader Upstream URLs (T033)**:
++    - Updated `getCancellationQuote()` to `/api/bookings/:bookingId/cancellation/quote` (POST, fast-fail).
++    - Updated `cancelBooking()` to `/api/bookings/:bookingId/cancellation` (POST, fast-fail).
++    - Confirmed `getCancellationStatus()` remains `/api/bookings/:bookingId/cancellation` (GET, bounded retry).
++  - **Server-Loader & Route-Handler Unit Tests (T027, T028)**:
++    - Updated `apps/web/lib/server/booking-management.spec.ts` (27/27 passed) asserting exact URLs, methods, headers, payload forwarding, fast-fail on 500 error, and error status mappings.
++    - Added `cancellation/route.spec.ts` (7/7 passed) and `cancellation/quote/route.spec.ts` (3/3 passed) testing route delegation, cache headers, body parsing, and status mappings.
++  - **Verification Gate**:
++    - ESLint: 0 warnings, 0 errors.
++    - TypeScript (`tsc --noEmit`): 0 errors.
++    - All 37 unit tests passed with exit code 0.
++  - **Status**: Phase 5 / Slice 2 is 100% complete and verified. Ready for Phase 5 / Slice 3 (UI component, browser characterization, and ZAP route migration: T029, T034, T036).
++
+ ### Feature 025 — Booking Umbrella Deletion: Phase 5 Slice 1 Complete (Tasks T026, T030, T035 Implemented & Verified) (2026-09-22)
 
 - **Phase 5 User Story 3 (Normalized Cancellation Sub-Resource Backend & E2E) Delivered (T026, T030, T035)**:
   - **Backend Route Normalization (T030)**: Normalized `CancellationController` (`apps/api/src/cancellation/cancellation.controller.ts`) to `@Controller('bookings/:bookingId/cancellation')` with `@Get()` (cancellation status), `@Post('quote')` (cancellation quote), and `@Post()` (execute cancellation with `CancelBookingDto`). Preserved `JwtAuthGuard`, `ParseUUIDPipe` on `:bookingId`, and service delegation without modifying business logic.

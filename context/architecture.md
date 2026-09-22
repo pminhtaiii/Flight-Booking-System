@@ -16,6 +16,20 @@ Planning artifacts: [specification](../specs/025-booking-umbrella-deletion/spec.
   - Protected with `@UseGuards(JwtAuthGuard)` and parameter UUID validation via `ParseUUIDPipe({ version: '4' })`.
   - Service boundaries, ownership checks, and DTO validation remain strictly preserved.
 
+#### Normalized Frontend Cancellation Proxy & Server Client (US3 Phase 5 Slice 2 Complete)
+- **Next.js App Router Route Handlers (`apps/web/app/api/booking-management/bookings/[bookingId]/cancellation/`)**:
+  - Normalized proxy handlers matching the backend REST sub-resource hierarchy:
+    - `cancellation/route.ts`: `GET` (cancellation status) and `POST` (cancel execution forwarding `quoteId`).
+    - `cancellation/quote/route.ts`: `POST` (cancellation quote request).
+  - All route handlers enforce `export const dynamic = 'force-dynamic'`, standard Next.js route params extraction (`{ params }: { params: { bookingId: string } }`), and `Cache-Control: private, no-store` header on all responses (success and mapped failure).
+  - Outcome-to-HTTP mapping preserves `BookingManagementOutcome` contract: `UNAUTHENTICATED` (401), `FORBIDDEN` (403), `NOT_FOUND` (404), `STALE_REVISION` (409), `INVALID_COMMAND` (400), `UPSTREAM_UNAVAILABLE` (503).
+  - Obsolete sibling proxy routes deleted: `cancel/`, `cancellation-quote/`, and `cancellation-status/`.
+- **Server Client Loader Updates (`apps/web/lib/server/booking-management.ts`)**:
+  - `getCancellationQuote()` targets `/api/bookings/${encodeURIComponent(bookingId.trim())}/cancellation/quote` (POST, fast-fail mutation).
+  - `cancelBooking()` targets `/api/bookings/${encodeURIComponent(bookingId.trim())}/cancellation` (POST, fast-fail mutation).
+  - `getCancellationStatus()` retains `/api/bookings/${encodeURIComponent(bookingId.trim())}/cancellation` (GET, bounded retry).
+
+
 
 #### Non-Blocking Stale Read Path & Projection Guard (US2 Phase 4 Slice 1 Complete)
 - **Non-Blocking Stale Read Path (`BookingManagementService`)**:
