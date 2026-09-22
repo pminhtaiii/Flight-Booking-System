@@ -16,7 +16,7 @@ Planning artifacts: [specification](../specs/025-booking-umbrella-deletion/spec.
   - Protected with `@UseGuards(JwtAuthGuard)` and parameter UUID validation via `ParseUUIDPipe({ version: '4' })`.
   - Service boundaries, ownership checks, and DTO validation remain strictly preserved.
 
-#### Normalized Frontend Cancellation Proxy & Server Client (US3 Phase 5 Slice 2 Complete)
+#### Normalized Frontend Cancellation Proxy, Client UI & Security Catalog (US3 Phase 5 Complete)
 - **Next.js App Router Route Handlers (`apps/web/app/api/booking-management/bookings/[bookingId]/cancellation/`)**:
   - Normalized proxy handlers matching the backend REST sub-resource hierarchy:
     - `cancellation/route.ts`: `GET` (cancellation status) and `POST` (cancel execution forwarding `quoteId`).
@@ -28,6 +28,14 @@ Planning artifacts: [specification](../specs/025-booking-umbrella-deletion/spec.
   - `getCancellationQuote()` targets `/api/bookings/${encodeURIComponent(bookingId.trim())}/cancellation/quote` (POST, fast-fail mutation).
   - `cancelBooking()` targets `/api/bookings/${encodeURIComponent(bookingId.trim())}/cancellation` (POST, fast-fail mutation).
   - `getCancellationStatus()` retains `/api/bookings/${encodeURIComponent(bookingId.trim())}/cancellation` (GET, bounded retry).
+- **Client UI Migration (`apps/web/components/bookings/BookingDetail.tsx`)**:
+  - Status polling targets `/api/booking-management/bookings/${booking.id}/cancellation` (GET).
+  - Cancellation quote requests target `/api/booking-management/bookings/${booking.id}/cancellation/quote` (POST).
+  - Cancellation executions target `/api/booking-management/bookings/${booking.id}/cancellation` (POST).
+- **Security Catalog & OpenAPI Parity (`tests/security/zap/`)**:
+  - Migrated `POST /bookings/:id/cancel` to `POST /bookings/:id/cancellation` in `routes.json` and `routes-config.test.mjs`.
+  - Migrated OpenAPI operation from `/bookings/{id}/cancel` to `/bookings/{id}/cancellation` in `openapi.json`, maintaining parity with live route catalog.
+
 
 
 
