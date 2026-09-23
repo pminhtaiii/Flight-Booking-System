@@ -20,9 +20,9 @@
 
 **Purpose**: Establish behavior and change-scope baselines before either refactor starts.
 
-- [ ] T001 Run the concrete pre-refactor NestJS unit, API E2E, lint, shared-types, typecheck, and build commands in `specs/026-agent-boundary-simplification/quickstart.md`; record command, timestamp, commit SHA, exit code, and concise output in planned `specs/026-agent-boundary-simplification/verification/api-baseline.md`.
-- [ ] T002 [P] Run the concrete pre-refactor Python focused guardrail, runner, SSE, security, Ruff, and non-Redis commands in `specs/026-agent-boundary-simplification/quickstart.md`; record command, timestamp, commit SHA, exit code, and concise output in planned `specs/026-agent-boundary-simplification/verification/agent-baseline.md`.
-- [ ] T003 [P] Capture the initial import/deletion census from `apps/api/src/`, `apps/api/test/`, `apps/agent/src/agent/`, and `apps/agent/tests/`, using the zero-result searches in `specs/026-agent-boundary-simplification/quickstart.md` as the post-change acceptance baseline.
+- [x] T001 Run the concrete pre-refactor NestJS unit, API E2E, lint, shared-types, typecheck, and build commands in `specs/026-agent-boundary-simplification/quickstart.md`; record command, timestamp, commit SHA, exit code, and concise output in planned `specs/026-agent-boundary-simplification/verification/api-baseline.md`.
+- [x] T002 [P] Run the concrete pre-refactor Python focused guardrail, runner, SSE, security, Ruff, and non-Redis commands in `specs/026-agent-boundary-simplification/quickstart.md`; record command, timestamp, commit SHA, exit code, and concise output in planned `specs/026-agent-boundary-simplification/verification/agent-baseline.md`.
+- [x] T003 [P] Capture the initial import/deletion census from `apps/api/src/`, `apps/api/test/`, `apps/agent/src/agent/`, and `apps/agent/tests/`, using the zero-result searches in `specs/026-agent-boundary-simplification/quickstart.md` as the post-change acceptance baseline.
 
 ---
 
@@ -32,8 +32,8 @@
 
 **⚠️ CRITICAL**: Complete this phase before changing either ownership boundary.
 
-- [ ] T004 Reconcile characterization assertions with the frozen route, controller guard declaration/order (`AgentApiKeyGuard` followed by `ClaimTokenGuard`), the `/access/check` claim-guard bypass (accepting API key and `{ sub }` body without `X-User-Claim`), crypto, layer-order, response-key, stream-lifecycle, health, and compatibility contracts in `specs/026-agent-boundary-simplification/contracts/internal-boundaries.md`, `apps/api/test/agent-chat-gateway.e2e-spec.ts`, and `apps/agent/tests/security/test_characterization.py` without changing expected external behavior.
-- [ ] T005 [P] Establish a diff guard for the no-schema/no-dependency scope by recording clean baselines for `apps/api/prisma/`, `pnpm-lock.yaml`, `apps/api/package.json`, and `apps/agent/pyproject.toml`.
+- [x] T004 Reconcile characterization assertions with the frozen route, controller guard declaration/order (`AgentApiKeyGuard` followed by `ClaimTokenGuard`), the `/access/check` claim-guard bypass (accepting API key and `{ sub }` body without `X-User-Claim`), crypto, layer-order, response-key, stream-lifecycle, health, and compatibility contracts in `specs/026-agent-boundary-simplification/contracts/internal-boundaries.md`, `apps/api/test/agent-chat-gateway.e2e-spec.ts`, and `apps/agent/tests/security/test_characterization.py` without changing expected external behavior.
+- [x] T005 [P] Establish a diff guard for the no-schema/no-dependency scope by recording clean baselines for `apps/api/prisma/`, `pnpm-lock.yaml`, `apps/api/package.json`, and `apps/agent/pyproject.toml`.
 
 **Checkpoint**: Existing behavior and prohibited change areas are explicit; either story may now proceed independently.
 
