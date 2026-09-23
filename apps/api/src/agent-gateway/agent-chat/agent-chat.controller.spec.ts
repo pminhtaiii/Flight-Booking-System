@@ -5,11 +5,11 @@ import {
   METHOD_METADATA,
   HTTP_CODE_METADATA,
 } from '@nestjs/common/constants';
-import { AgentChatController } from '@/chat/agent-chat.controller';
+import { AgentChatController } from './agent-chat.controller';
 import { AgentApiKeyGuard } from '@/agent-gateway/auth/agent-api-key.guard';
 import { ClaimTokenGuard } from '@/agent-gateway/auth/claim-token.guard';
 import { ChatService } from '@/chat/chat.service';
-import { AgentChatAccessService } from '@/chat/agent-chat-access.service';
+import { AgentChatAccessService } from './agent-chat-access.service';
 import { ClaimTokenService } from '@/agent-gateway/auth/claim-token.service';
 import { MessageSender, MessageType } from '@prisma/client';
 

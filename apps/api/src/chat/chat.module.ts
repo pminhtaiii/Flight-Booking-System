@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { ChatController } from './chat.controller';
-import { AgentChatController } from './agent-chat.controller';
-import { AgentChatAccessService } from './agent-chat-access.service';
+import { AgentChatController } from '@/agent-gateway/agent-chat/agent-chat.controller';
+import { AgentChatAccessService } from '@/agent-gateway/agent-chat/agent-chat-access.service';
 import { PrismaModule } from '@/prisma/prisma.module';
 import { AuditModule } from '@/audit/audit.module';
 import { CacheModule } from '@/cache/cache.module';
