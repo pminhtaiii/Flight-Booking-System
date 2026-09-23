@@ -1,5 +1,29 @@
 # Architecture
 
+## Feature 026 — Agent Boundary Simplification (Phase 3 / Slice 1 Characterization Complete - Tasks T001–T010)
+
+Planning artifacts: [specification](../specs/026-agent-boundary-simplification/spec.md), [plan](../specs/026-agent-boundary-simplification/plan.md), and [tasks](../specs/026-agent-boundary-simplification/tasks.md).
+
+#### Agent-Gateway Chat Boundary & Shared Crypto Characterization (US1 Slice 1 Complete)
+- **Controller-Level Guard Reflection & Order**:
+  - `AgentChatController` declares `@UseGuards(AgentApiKeyGuard, ClaimTokenGuard)` at the class level.
+  - Guard execution order strictly evaluates `AgentApiKeyGuard` before `ClaimTokenGuard`.
+- **Claim Token Guard Bypass for `/access/check`**:
+  - `ClaimTokenGuard` explicitly bypasses `POST /agent-gateway/chat/access/check` when `X-User-Claim` header is absent, requiring only `X-Agent-API-Key` and `{ sub }` in the request body.
+  - Identity verification and token revocation are delegated directly to `AgentChatAccessService.checkUserAccess`.
+  - All remaining six session routes (`/sessions`, `/sessions/:sessionId/memory`, `/sessions/:sessionId/messages`, `/sessions/:sessionId/turns`, `/sessions/:sessionId/summaries`, `DELETE /sessions/:sessionId`) strictly enforce `X-User-Claim` and reject missing claims with HTTP 401 `INVALID_CLAIM_TOKEN`.
+- **Fencing Token Headers**:
+  - Write routes support both lowercase `x-fencing-token` and canonical `X-Fencing-Token` header spellings.
+- **Record-Bound Chat Crypto Compatibility**:
+  - `ChatMessageCryptoService` operates with AES-256-GCM, 12-byte random nonce, 16-byte authentication tag, keyVersion `1`, and hex-encoded envelope format with record-bound AAD.
+  - Fail-closed behavior on corrupted envelopes, tampered AAD/ciphertext/tags, unconfigured key, and unsupported key versions.
+- **Relocated Spec Topology**:
+  - Controller spec: relocated to `apps/api/src/agent-gateway/agent-chat/agent-chat.controller.spec.ts`.
+  - Access service spec: relocated to `apps/api/src/agent-gateway/agent-chat/agent-chat-access.service.spec.ts`.
+  - Shared crypto spec: relocated to `apps/api/src/common/chat-message-crypto.service.spec.ts`.
+  - Gateway E2E: strengthened in `apps/api/test/agent-chat-gateway.e2e-spec.ts` covering all 7 routes with Supertest.
+  - Production code relocation (Tasks T011–T016) deferred to Phase 3 / Slice 2.
+
 ## Feature 025 — Booking Umbrella Deletion (Complete - Tasks T001–T039)
 
 Planning artifacts: [specification](../specs/025-booking-umbrella-deletion/spec.md), [plan](../specs/025-booking-umbrella-deletion/plan.md), and [tasks](../specs/025-booking-umbrella-deletion/tasks.md).

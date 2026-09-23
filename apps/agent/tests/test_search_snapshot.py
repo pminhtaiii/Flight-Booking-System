@@ -861,14 +861,15 @@ async def test_serialized_redis_payload_under_snapshot_key_is_score_free():
     fake_redis = FakeAsyncRedis()
     repo = TrustedSnapshotRepository(fake_redis)
 
+    now = datetime.now(timezone.utc)
     valid_snapshot = TrustedSearchSnapshot.model_validate(
         {
             "schemaVersion": 1,
             "snapshotVersion": 1,
             "userId": "user-score-free-1",
             "sessionId": "session-score-free-1",
-            "createdAt": "2026-09-20T00:00:00Z",
-            "expiresAt": "2026-09-20T01:00:00Z",
+            "createdAt": (now - timedelta(minutes=5)).isoformat(),
+            "expiresAt": (now + timedelta(hours=1)).isoformat(),
             "fingerprint": "fp-clean",
             "selectionAttestation": "att-clean",
             "results": [
@@ -879,8 +880,8 @@ async def test_serialized_redis_payload_under_snapshot_key_is_score_free():
                     "airline": "VN",
                     "origin": "SGN",
                     "destination": "HAN",
-                    "departureAt": "2026-09-20T02:00:00Z",
-                    "arrivalAt": "2026-09-20T08:30:00Z",
+                    "departureAt": (now + timedelta(hours=2)).isoformat(),
+                    "arrivalAt": (now + timedelta(hours=8, minutes=30)).isoformat(),
                     "price": "420.00",
                     "currency": "USD",
                 }
