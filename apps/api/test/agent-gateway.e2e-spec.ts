@@ -8,7 +8,7 @@ import { DuffelOfferRequest } from '@/duffel/duffel.types';
 import * as crypto from 'crypto';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { User } from '@prisma/client';
-import { ChatMessageCryptoService } from '@/chat/chat-message-crypto.service';
+import { ChatMessageCryptoService } from '@/common/chat-message-crypto.service';
 
 function mintClaimToken(userId: string, iat: number, secret = 'test-claim-token-secret'): string {
   const payload = { userId, iat };

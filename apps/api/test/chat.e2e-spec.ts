@@ -6,7 +6,7 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { MessageSender, MessageType, User, ChatSession } from '@prisma/client';
-import { ChatMessageCryptoService } from '@/chat/chat-message-crypto.service';
+import { ChatMessageCryptoService } from '@/common/chat-message-crypto.service';
 import * as crypto from 'crypto';
 
 describe('Chat API (E2E)', () => {

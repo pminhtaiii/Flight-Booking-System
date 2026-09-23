@@ -6,7 +6,7 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { CacheService } from '@/cache/cache.service';
 import { JwtService } from '@nestjs/jwt';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
-import { AgentChatController } from '@/chat/agent-chat.controller';
+import { AgentChatController } from '@/agent-gateway/agent-chat/agent-chat.controller';
 import { AgentApiKeyGuard } from '@/agent-gateway/auth/agent-api-key.guard';
 import { ClaimTokenGuard } from '@/agent-gateway/auth/claim-token.guard';
 import { GUARDS_METADATA } from '@nestjs/common/constants';

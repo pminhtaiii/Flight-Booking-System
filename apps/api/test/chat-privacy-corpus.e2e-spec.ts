@@ -18,7 +18,7 @@ import request from 'supertest';
 import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
-import { ChatMessageCryptoService } from '@/chat/chat-message-crypto.service';
+import { ChatMessageCryptoService } from '@/common/chat-message-crypto.service';
 import { ClaimTokenService } from '@/agent-gateway/auth/claim-token.service';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 

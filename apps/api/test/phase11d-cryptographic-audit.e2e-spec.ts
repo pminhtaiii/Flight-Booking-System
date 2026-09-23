@@ -29,7 +29,7 @@ import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { ChatService } from '@/chat/chat.service';
-import { ChatMessageCryptoService } from '@/chat/chat-message-crypto.service';
+import { ChatMessageCryptoService } from '@/common/chat-message-crypto.service';
 import { SelectionAttestationService } from '@/agent-gateway/selection-attestation.service';
 import { ChatHandoffService } from '@/chat-handoff/chat-handoff.service';
 import { BookingProjectionRepository } from '@/booking-projection/booking-projection.repository';
