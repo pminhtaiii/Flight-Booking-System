@@ -96,3 +96,23 @@
   - `apps/agent/src/agent/guardrails/output_pipeline.py:71` (`def deterministic_pii_match`)
   - `apps/agent/src/agent/guardrails/output_pipeline.py:130` (`def _is_output_guardrail_disabled`)
   - `apps/agent/src/agent/guardrails/output_pipeline.py:158` (`async def approved_model_content`)
+
+---
+
+## Scope & Dependency Diff Guard (Task T005)
+- **Command**:
+  ```powershell
+  git diff -- apps/api/prisma pnpm-lock.yaml apps/api/package.json apps/agent/pyproject.toml
+  ```
+- **Execution Timestamp**: `2026-09-23T15:04:36+07:00`
+- **Commit SHA Anchor**: `8c7ef172b027e90a3715c77f35783ed59f88751a`
+- **Exit Code**: `0`
+- **Output**: Clean (0 lines changed, empty stdout/stderr)
+- **Protected File Hash Manifest (SHA-256 Baseline)**:
+  | File | SHA-256 Hash |
+  |---|---|
+  | `apps/api/prisma/schema.prisma` | `5B318AC83E798EF1EBFB9942068280EA400752D70C8EA0B41EDEDEE2D7C7C4E8` |
+  | `pnpm-lock.yaml` | `C2FDDF0F65CAA381AE382CE79DFC227309646F3D1A35A9C56EE44912231B8807` |
+  | `apps/api/package.json` | `F2988B020A4971F1A14530E33BC4346C2BE4FB03138A7A749DBB0DFFBA8BF022` |
+  | `apps/agent/pyproject.toml` | `258D2E2FAFAF8FC1D714998399C9F6F2E755A84EE356B5A9F02FE1D1DE34B806` |
+

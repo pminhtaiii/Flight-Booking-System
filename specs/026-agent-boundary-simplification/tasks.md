@@ -32,8 +32,8 @@
 
 **⚠️ CRITICAL**: Complete this phase before changing either ownership boundary.
 
-- [x] T004 Reconcile characterization assertions with the frozen route, controller guard declaration/order (`AgentApiKeyGuard` followed by `ClaimTokenGuard`), the `/access/check` claim-guard bypass (accepting API key and `{ sub }` body without `X-User-Claim`), crypto, layer-order, response-key, stream-lifecycle, health, and compatibility contracts in `specs/026-agent-boundary-simplification/contracts/internal-boundaries.md`, `apps/api/test/agent-chat-gateway.e2e-spec.ts`, and `apps/agent/tests/security/test_characterization.py` without changing expected external behavior.
-- [x] T005 [P] Establish a diff guard for the no-schema/no-dependency scope by recording clean baselines for `apps/api/prisma/`, `pnpm-lock.yaml`, `apps/api/package.json`, and `apps/agent/pyproject.toml`.
+- [ ] T004 Reconcile characterization assertions with the frozen route, controller guard declaration/order (`AgentApiKeyGuard` followed by `ClaimTokenGuard`), the `/access/check` claim-guard bypass (accepting API key and `{ sub }` body without `X-User-Claim`), crypto, layer-order, response-key, stream-lifecycle, health, and compatibility contracts in `specs/026-agent-boundary-simplification/contracts/internal-boundaries.md`, `apps/api/test/agent-chat-gateway.e2e-spec.ts`, and `apps/agent/tests/security/test_characterization.py` without changing expected external behavior (contract reconciliation documented; characterization test suite assertions remain open and deferred to T010 and T017–T022 prior to production refactor).
+- [x] T005 [P] Establish a diff guard for the no-schema/no-dependency scope by recording clean baselines for `apps/api/prisma/`, `pnpm-lock.yaml`, `apps/api/package.json`, and `apps/agent/pyproject.toml` (recorded with exact command, SHA-256 hash manifest, timestamp, and exit code in `specs/026-agent-boundary-simplification/verification/api-baseline.md` and `agent-baseline.md`).
 
 **Checkpoint**: Existing behavior and prohibited change areas are explicit; either story may now proceed independently.
 
