@@ -30,11 +30,11 @@ from agent.guardrails.base import (
     GUARDRAIL_RESPONSE_KEYS,
     GUARDRAIL_TOOL_SCHEMA,
     AdmissionContext,
+    OutputGuardrailBlockedError,
     ValidatedInput,
 )
+from agent.guardrails.gateway import OutputStreamSession
 from agent.guardrails.output_pipeline import (
-    OutputGuardrailBlockedError,
-    OutputGuardrailPipeline,
     payload_free_config,
 )
 from agent.guardrails.schemas.tools import TOOL_INPUT_SCHEMAS
@@ -193,7 +193,7 @@ class ChatTurnRunner:
         req_id: Optional[str],
         queue_manager: Any,
         client: Any,
-        pipeline: Optional[OutputGuardrailPipeline],
+        pipeline: Optional[OutputStreamSession],
         partial_response: str,
         user_msg_content: str,
         user_msg_persisted: bool,
@@ -251,9 +251,12 @@ class ChatTurnRunner:
                 logger.error("cleanup_partial_persistence_failed")
 
         # 2. Finalize / close output guardrail pipeline
-        if pipeline is not None:
+        if pipeline is not None and not getattr(pipeline, "closed", False):
             try:
-                await asyncio.wait_for(pipeline.aclose(), timeout=1.0)
+                if hasattr(pipeline, "aclose"):
+                    await asyncio.wait_for(pipeline.aclose(), timeout=1.0)
+                elif hasattr(pipeline, "close"):
+                    pipeline.close()
             except Exception:  # noqa: BLE001
                 logger.warning("guardrail_pipeline_close_failed")
 
@@ -355,7 +358,7 @@ class ChatTurnRunner:
         session_id = command.session_id
         req_id: Optional[str] = None
         released = False
-        pipeline: Optional[OutputGuardrailPipeline] = None
+        pipeline: Optional[OutputStreamSession] = None
         partial_response = ""
         user_msg_persisted = False
         persisted = False
@@ -439,14 +442,14 @@ class ChatTurnRunner:
                     yield err_event
                 return
 
+            mem_context = AdmissionContext(
+                user_id=command.user_id,
+                chat_session_id=session_id or "unassigned",
+                trace_id=command.trace_id or "trace-default",
+                correlation_id=command.correlation_id,
+                policy_version="2026-09-05",
+            )
             if self.gateway is not None:
-                mem_context = AdmissionContext(
-                    user_id=command.user_id,
-                    chat_session_id=session_id or "unassigned",
-                    trace_id=command.trace_id or "trace-default",
-                    correlation_id=command.correlation_id,
-                    policy_version="2026-09-05",
-                )
                 if summary:
                     summary_content = (
                         summary.get("content")
@@ -542,12 +545,19 @@ class ChatTurnRunner:
                 fields={"outcome": snapshot_state},
             )
 
-            # 5. Output guardrails initialization
             output_config = getattr(settings, "output_guardrail", None)
-            pipeline = OutputGuardrailPipeline(
-                config=output_config,
-                session_id=session_id,
-            )
+            if self.gateway is not None:
+                pipeline = self.gateway.stream_output(
+                    context=mem_context,
+                    config=output_config,
+                    session_id=session_id,
+                )
+            else:
+                pipeline = OutputStreamSession(
+                    context=mem_context,
+                    config=output_config,
+                    session_id=session_id,
+                )
 
             # 6. User message pre-persistence
             if command.message:

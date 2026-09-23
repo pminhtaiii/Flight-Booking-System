@@ -9,7 +9,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from agent.config import get_settings
 from agent.guardrails.gateway import GuardrailGateway
-from agent.guardrails.registry import create_production_registry
 from agent.middleware.auth import JWTAuthMiddleware
 from agent.middleware.body_limit import BodyLimitMiddleware
 from agent.queue.message_queue import MessageQueueManager
@@ -19,6 +18,35 @@ settings = get_settings()
 
 active_streams: Set[asyncio.Queue] = set()
 active_runners: Set[asyncio.Task] = set()
+
+_guardrail_gateway_singleton: GuardrailGateway | None = None
+
+
+def get_guardrail_gateway(target_app: FastAPI | None = None) -> GuardrailGateway:
+    """Canonical factory for resolving or constructing the GuardrailGateway singleton."""
+    global _guardrail_gateway_singleton
+    target = target_app if target_app is not None else globals().get("app")
+
+    if target is not None and hasattr(target, "state"):
+        existing = getattr(target.state, "guardrail_gateway", None)
+        if (
+            isinstance(existing, GuardrailGateway)
+            if isinstance(GuardrailGateway, type)
+            else existing is not None
+        ):
+            _guardrail_gateway_singleton = existing
+            return existing
+
+    if _guardrail_gateway_singleton is not None:
+        if target is not None and hasattr(target, "state"):
+            target.state.guardrail_gateway = _guardrail_gateway_singleton
+        return _guardrail_gateway_singleton
+
+    gateway = GuardrailGateway()
+    _guardrail_gateway_singleton = gateway
+    if target is not None and hasattr(target, "state"):
+        target.state.guardrail_gateway = gateway
+    return gateway
 
 
 @asynccontextmanager
@@ -33,7 +61,7 @@ async def lifespan(app: FastAPI):
         lock_ttl_ms=settings.SESSION_LOCK_TTL_MS,
         refresh_interval=settings.SESSION_LOCK_REFRESH_INTERVAL_SECONDS,
     )
-    app.state.guardrail_gateway = GuardrailGateway(create_production_registry())
+    app.state.guardrail_gateway = get_guardrail_gateway(app)
     yield
     if active_runners:
         tasks_to_cancel = [t for t in active_runners if not t.done()]
@@ -67,7 +95,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="AI Chatbot Agent Service", version="0.1.0", lifespan=lifespan)
-app.state.guardrail_gateway = GuardrailGateway(create_production_registry())
+app.state.guardrail_gateway = get_guardrail_gateway(app)
 app.include_router(sse_router)
 
 allowed_origins = [url.strip() for url in settings.FRONTEND_URL.split(",") if url.strip()]

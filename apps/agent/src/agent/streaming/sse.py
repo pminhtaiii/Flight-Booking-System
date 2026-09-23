@@ -16,7 +16,15 @@ from agent.chat_turn.controller import ChatController
 from agent.chat_turn.runner import _persist_response
 from agent.config import get_settings
 from agent.graph.graph import graph
+from agent.guardrails.base import (
+    GUARDRAIL_INPUT_INJECTION,
+    GUARDRAIL_INPUT_PII,
+    AdmissionContext,
+    PipelineDecision,
+    ValidatedInput,
+)
 from agent.guardrails.gateway import GuardrailGateway
+from agent.guardrails.pii import deterministic_pii_match
 from agent.infrastructure.redis import get_redis_client
 from agent.models.requests import ChatStreamRequest
 from agent.observability.chat_observability import ChatTelemetry, safe_opaque_id
@@ -26,7 +34,6 @@ from agent.repositories.chat_budget_repository import (
     ChatBudgetRepository,
     RedisUnavailableException,
 )
-from agent.sanitization.pii_scrubber import detect_pii
 from agent.tools.nestjs_client import NestJSClient
 from agent.trusted_search_snapshot import TrustedSnapshotRepository
 
@@ -117,27 +124,58 @@ async def chat_stream(
     if body.message and len(body.message) > settings.MAX_MESSAGE_LENGTH:
         raise HTTPException(status_code=400, detail="Message exceeds maximum length")
 
-    if body.message and detect_pii(body.message):
-        guardrails_logger.warning("Ingress PII detected in user message: REDACTED")
-
-        async def pii_error_generator():
-            event = ErrorEvent(
-                data=ErrorPayload(
-                    code="GUARDRAIL_BLOCKED",
-                    message="Your message contains protected personal information and cannot be processed.",
-                    partialMessageId=None,
-                )
-            )
-            yield {"event": event.event, "data": event.data.model_dump_json()}
-
-        return EventSourceResponse(pii_error_generator())
-
     gateway = getattr(request.app.state, "guardrail_gateway", None)
     if gateway is None or not isinstance(gateway, GuardrailGateway) or not gateway.is_healthy():
         raise HTTPException(
             status_code=503,
             detail="GUARDRAIL_GATEWAY_UNAVAILABLE: Guardrail gateway is uninitialized or degraded",
         )
+
+    decision = None
+    if body.message:
+        admission_context = AdmissionContext(
+            user_id=user_id,
+            chat_session_id=body.sessionId or "unassigned",
+            trace_id=trace_id,
+            correlation_id=correlation_id,
+            policy_version="2026-09-05",
+        )
+        try:
+            decision = await gateway.validate_input(admission_context, body.message)
+        except Exception:
+            decision = PipelineDecision(
+                status="BLOCK",
+                response_key=GUARDRAIL_INPUT_INJECTION,
+                reason="Input validation failed closed",
+            )
+
+        if not isinstance(decision, PipelineDecision):
+            if deterministic_pii_match(body.message):
+                decision = PipelineDecision(
+                    status="BLOCK",
+                    response_key=GUARDRAIL_INPUT_PII,
+                    reason="PII detected",
+                )
+            else:
+                decision = PipelineDecision(
+                    status="PASS",
+                    validated_data=ValidatedInput(content=body.message),
+                )
+
+        if decision.status == "BLOCK" and decision.response_key == GUARDRAIL_INPUT_PII:
+            guardrails_logger.warning("Ingress PII detected in user message: REDACTED")
+
+            async def pii_error_generator():
+                event = ErrorEvent(
+                    data=ErrorPayload(
+                        code="GUARDRAIL_BLOCKED",
+                        message="Your message contains protected personal information and cannot be processed.",
+                        partialMessageId=None,
+                    )
+                )
+                yield {"event": event.event, "data": event.data.model_dump_json()}
+
+            return EventSourceResponse(pii_error_generator())
 
     quota_started = time.perf_counter()
     try:
@@ -238,7 +276,7 @@ async def chat_stream(
                 pass
 
         controller = ChatController(runner=runner, gateway=gateway)
-        generator = controller.stream(command)
+        generator = controller.stream(command, admission_decision=decision)
         try:
             async for event in generator:
                 try:
