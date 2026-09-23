@@ -4,7 +4,7 @@ import { AttestedFlightSearchController } from './attested-flight-search.control
 import { SelectionAttestationService } from '../selection-attestation.service';
 import { PrismaModule } from '@/prisma/prisma.module';
 import { AuditModule } from '@/audit/audit.module';
-import { ChatModule } from '@/chat/chat.module';
+import { ChatMessageCryptoModule } from '@/common/chat-message-crypto.module';
 import { AgentAuthModule } from '../auth/agent-auth.module';
 import { AgentToolAuditModule } from '../audit/agent-tool-audit.module';
 import { FlightsModule } from '@/flights/flights.module';
@@ -13,7 +13,7 @@ import { FlightsModule } from '@/flights/flights.module';
   imports: [
     PrismaModule,
     AuditModule,
-    ChatModule,
+    ChatMessageCryptoModule,
     AgentAuthModule,
     AgentToolAuditModule,
     FlightsModule,

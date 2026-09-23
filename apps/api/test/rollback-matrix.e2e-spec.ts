@@ -25,7 +25,7 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { SelectionAttestationService } from '@/agent-gateway/selection-attestation.service';
 import { ChatHandoffTokenService } from '@/chat-handoff/chat-handoff-token.service';
-import { ChatMessageCryptoService } from '@/chat/chat-message-crypto.service';
+import { ChatMessageCryptoService } from '@/common/chat-message-crypto.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { JwtService } from '@nestjs/jwt';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';

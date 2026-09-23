@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpException, HttpStatus } from '@nestjs/common';
-import { AgentChatAccessService } from '@/chat/agent-chat-access.service';
+import { AgentChatAccessService } from './agent-chat-access.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CacheService } from '@/cache/cache.service';
 

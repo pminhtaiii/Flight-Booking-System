@@ -14,7 +14,7 @@ import { FlightMatchScorerService } from '@/flight-match/flight-match-scorer.ser
 import { CategoryRankerService } from '@/flight-match/category-ranker.service';
 import { FlightsService } from '@/flights/flights.service';
 import { FlightSearchOrchestratorService } from '@/flights/flight-search-orchestrator.service';
-import { ChatMessageCryptoService } from '@/chat/chat-message-crypto.service';
+import { ChatMessageCryptoService } from '@/common/chat-message-crypto.service';
 import { ChatHandoffService } from '@/chat-handoff/chat-handoff.service';
 import { ChatHandoffTokenService } from '@/chat-handoff/chat-handoff-token.service';
 import { SelectionAttestationService } from '../selection-attestation.service';

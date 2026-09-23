@@ -24,7 +24,7 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { DuffelService } from '@/duffel/duffel.service';
 import { ChatService } from '@/chat/chat.service';
-import { ChatMessageCryptoService } from '@/chat/chat-message-crypto.service';
+import { ChatMessageCryptoService } from '@/common/chat-message-crypto.service';
 import { SelectionAttestationService } from '@/agent-gateway/selection-attestation.service';
 import { ChatHandoffService } from '@/chat-handoff/chat-handoff.service';
 import { BookingIntentService } from '@/booking-intent/booking-intent.service';

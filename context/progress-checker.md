@@ -1,5 +1,37 @@
 # Progress Tracker
  
+### Feature 026 — Agent Boundary Simplification: Phase 3 / Slice 2 Complete (Tasks T011–T016 Verified, US1 Complete) (2026-09-23)
+
+- **Phase 3 / Slice 2 (Production Edge Relocation, Shared Crypto Extraction & US1 Completion) Delivered (Tasks T011–T016)**:
+  - **Shared Crypto Extraction (T011)**:
+    - Relocated `ChatMessageCryptoService` to `apps/api/src/common/chat-message-crypto.service.ts` preserving all cryptographic logic, error classes, AES-256-GCM algorithms, and AAD parameters verbatim.
+    - Created `apps/api/src/common/chat-message-crypto.module.ts` as the sole provider and export owner.
+    - Updated `apps/api/src/chat/chat.service.ts` and `apps/api/src/common/chat-message-crypto.service.spec.ts` imports.
+  - **Edge Controller & Access Service Relocation (T012)**:
+    - Relocated `AgentChatController` and `AgentChatAccessService` to `apps/api/src/agent-gateway/agent-chat/`.
+    - Preserved class-level `@Controller('agent-gateway/chat')` and `@UseGuards(AgentApiKeyGuard, ClaimTokenGuard)`.
+    - Preserved `/access/check` claim token guard bypass, all 7 routes, DTOs, casing-insensitive fencing headers (`x-fencing-token` / `X-Fencing-Token`), and `CHAT_SESSION_NOT_FOUND` error mapping.
+  - **AgentChatModule Creation & ChatModule Isolation (T013)**:
+    - Created `apps/api/src/agent-gateway/agent-chat/agent-chat.module.ts` importing `ChatModule`, `AgentAuthModule`, `PrismaModule`, and `CacheModule`. Composed cleanly in `AgentGatewayModule`.
+    - Isolated `ChatModule`: removed `AgentAuthModule` import, removed edge controller/access service, imported `ChatMessageCryptoModule`, and exported strictly only `ChatService`.
+    - Deleted old files from `apps/api/src/chat/`.
+  - **Attested Flight Search Decoupling (T014)**:
+    - Replaced `ChatModule` import in `AttestedFlightSearchModule` with `ChatMessageCryptoModule`.
+    - Updated `ChatMessageCryptoService` imports in `attested-flight-search.service.ts` and its specs to `@/common/chat-message-crypto.service`. Kept `EncryptionService` completely separate.
+  - **E2E Consumer Migration (T015)**:
+    - Updated 9 E2E test suites (`agent-gateway`, `chat`, `chat-plaintext-cleanup`, `chat-privacy-corpus`, `negative-privacy-audit`, `phase11d-cryptographic-audit`, `phase11e-continuous-reliability`, `privacy-and-telemetry-audit`, `rollback-matrix`) to consume `@/common/chat-message-crypto.service`.
+    - Updated `agent-chat-gateway.e2e-spec.ts` to consume edge controller. All 10 suites passed (123/123 tests).
+  - **Verification Gate & Static Import Census (T016)**:
+    - Static census: 0 matches for `agent-gateway` in `apps/api/src/chat`, 0 matches for `@/chat/chat-message-crypto.service` in `apps/api`.
+    - Unit tests: 5 suites, 98 tests passed.
+    - E2E tests: 10 suites, 123 tests passed.
+    - ESLint: 0 errors, 0 warnings.
+    - Shared types: 110/110 tests passed.
+    - TypeScript: `tsc --noEmit` clean (code 0).
+    - API Build: `nest build` clean (code 0).
+    - Tasks T011–T016 marked `[x]` in `specs/026-agent-boundary-simplification/tasks.md`. User Story 1 100% complete.
+    - Phase 4 (Tasks T017–T032) untouched.
+
 ### Feature 026 — Agent Boundary Simplification: Phase 3 / Slice 1 Complete (Tasks T006–T010 Verified) (2026-09-23)
 
 - **Phase 3 / Slice 1 (User Story 1 Characterization & Boundary Specs) Delivered (Tasks T006–T010)**:

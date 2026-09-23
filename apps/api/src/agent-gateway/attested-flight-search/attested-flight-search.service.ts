@@ -21,7 +21,7 @@ import {
   ChatMessageCryptoService,
   CryptoKeyUnavailableError,
   UnsupportedKeyVersionError,
-} from '@/chat/chat-message-crypto.service';
+} from '@/common/chat-message-crypto.service';
 import { AgentToolAuditService } from '../audit/agent-tool-audit.service';
 import { FlightsService } from '@/flights/flights.service';
 import { FlightSearchRequestDto } from '@/flights/dto/search-flight.dto';
