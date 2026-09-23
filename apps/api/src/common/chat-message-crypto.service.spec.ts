@@ -5,7 +5,7 @@ import {
   ChatMessageCryptoService,
   CryptoKeyUnavailableError,
   UnsupportedKeyVersionError,
-} from '@/chat/chat-message-crypto.service';
+} from './chat-message-crypto.service';
 
 describe('ChatMessageCryptoService (common)', () => {
   let service: ChatMessageCryptoService;
