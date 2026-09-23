@@ -1,18 +1,15 @@
 import { Module } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { ChatController } from './chat.controller';
-import { AgentChatController } from '@/agent-gateway/agent-chat/agent-chat.controller';
-import { AgentChatAccessService } from '@/agent-gateway/agent-chat/agent-chat-access.service';
 import { PrismaModule } from '@/prisma/prisma.module';
 import { AuditModule } from '@/audit/audit.module';
 import { CacheModule } from '@/cache/cache.module';
-import { AgentAuthModule } from '@/agent-gateway/auth/agent-auth.module';
-import { ChatMessageCryptoService } from './chat-message-crypto.service';
+import { ChatMessageCryptoModule } from '@/common/chat-message-crypto.module';
 
 @Module({
-  imports: [PrismaModule, AuditModule, CacheModule, AgentAuthModule],
-  controllers: [ChatController, AgentChatController],
-  providers: [ChatService, ChatMessageCryptoService, AgentChatAccessService],
-  exports: [ChatService, ChatMessageCryptoService, AgentChatAccessService],
+  imports: [PrismaModule, AuditModule, CacheModule, ChatMessageCryptoModule],
+  controllers: [ChatController],
+  providers: [ChatService],
+  exports: [ChatService],
 })
 export class ChatModule {}
