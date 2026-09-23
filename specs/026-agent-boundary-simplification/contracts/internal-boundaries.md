@@ -4,17 +4,17 @@ These contracts freeze behavior while ownership changes; they define no new publ
 
 ## Agent-chat HTTP boundary
 
-Base path: `/agent-gateway/chat`. Every route retains `AgentApiKeyGuard` followed by `ClaimTokenGuard`.
+Base path: `/agent-gateway/chat`. Controller-level guard declaration and order retain `AgentApiKeyGuard` followed by `ClaimTokenGuard`. As in existing production code, `ClaimTokenGuard` deliberately bypasses `/access/check` (`/chat/access/check`), allowing requests to supply only `X-Agent-API-Key` and `{ sub }` body without `X-User-Claim`; `AgentChatAccessService` validates identity and token status from that body. All remaining six session routes require a valid `X-User-Claim`.
 
-| Method | Relative path |
-|---|---|
-| POST | `/access/check` |
-| POST | `/sessions` |
-| GET | `/sessions/:sessionId/memory` |
-| POST | `/sessions/:sessionId/messages` |
-| POST | `/sessions/:sessionId/turns` |
-| POST | `/sessions/:sessionId/summaries` |
-| DELETE | `/sessions/:sessionId` |
+| Method | Relative path | Authentication & Guard Behavior |
+|---|---|---|
+| POST | `/access/check` | `AgentApiKeyGuard` + `ClaimTokenGuard` (bypassed in guard; accepts API key + `{ sub }` body without `X-User-Claim`) |
+| POST | `/sessions` | `AgentApiKeyGuard` + `ClaimTokenGuard` (requires `X-User-Claim`) |
+| GET | `/sessions/:sessionId/memory` | `AgentApiKeyGuard` + `ClaimTokenGuard` (requires `X-User-Claim`) |
+| POST | `/sessions/:sessionId/messages` | `AgentApiKeyGuard` + `ClaimTokenGuard` (requires `X-User-Claim`) |
+| POST | `/sessions/:sessionId/turns` | `AgentApiKeyGuard` + `ClaimTokenGuard` (requires `X-User-Claim`) |
+| POST | `/sessions/:sessionId/summaries` | `AgentApiKeyGuard` + `ClaimTokenGuard` (requires `X-User-Claim`) |
+| DELETE | `/sessions/:sessionId` | `AgentApiKeyGuard` + `ClaimTokenGuard` (requires `X-User-Claim`) |
 
 DTOs, claims, ownership/access checks, fencing behavior, statuses, and bodies remain unchanged.
 

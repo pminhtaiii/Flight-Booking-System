@@ -51,13 +51,14 @@ As a security maintainer, I can verify one fixed orchestration path without a sp
 - Test-only disabled output-guardrail behavior remains compatible.
 - Accepted non-Latin input is not rewritten; normalization remains detection-only.
 - Invalid production or injected test layer composition aborts construction; `is_healthy()` reports only post-construction runtime readiness and is not a recovery path for constructor failure.
+- `/agent-gateway/chat/access/check` bypasses `ClaimTokenGuard` evaluation and validates user identity and status from the `{ sub }` body with API key only, while the other six session routes enforce `X-User-Claim`.
 
 ## Requirements
 
 ### Functional Requirements
 
 - **FR-001**: Move `AgentChatController`, `AgentChatAccessService`, and colocated tests to `apps/api/src/agent-gateway/agent-chat/` under `AgentChatModule`.
-- **FR-002**: Preserve every `/agent-gateway/chat/*` path, guard order, body/response, status, fencing header, and `CHAT_SESSION_NOT_FOUND` mapping.
+- **FR-002**: Preserve every `/agent-gateway/chat/*` path, guard declaration and order (`AgentApiKeyGuard` followed by `ClaimTokenGuard`), the existing `/access/check` bypass within `ClaimTokenGuard` (which requires only API key and `{ sub }` body), body/response, status, fencing header, and `CHAT_SESSION_NOT_FOUND` mapping.
 - **FR-003**: Compose/export `AgentChatModule` from `AgentGatewayModule`; `ChatModule` MUST remove both the `AgentAuthModule` source import and imports-array entry, contain no agent-gateway dependency, and export only `ChatService`.
 - **FR-004**: Move `ChatMessageCryptoService` unchanged in behavior to `apps/api/src/common/` behind `ChatMessageCryptoModule`.
 - **FR-005**: Preserve `CHAT_ENCRYPTION_KEY`, AES-256-GCM, 12-byte nonce, 16-byte tag, key version `1`, hex structured envelope, record-bound AAD, and strict decryption.

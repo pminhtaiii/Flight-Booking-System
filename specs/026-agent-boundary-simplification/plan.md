@@ -24,7 +24,7 @@ Deliver two independently testable refactors. P1 moves agent-chat routes into a 
 
 **Performance Goals**: No route/streaming regression; no per-request dynamic layer sort
 
-**Constraints**: Preserve HTTP/SSE, auth guards, encryption/AAD, layer order, disabled-config behavior, PII priority, buffering, and fail-closed outcomes
+**Constraints**: Preserve HTTP/SSE, auth guards (including the `/access/check` bypass in `ClaimTokenGuard`), encryption/AAD, layer order, disabled-config behavior, PII priority, buffering, and fail-closed outcomes
 
 **Scale/Scope**: Two internal slices; no frontend, booking/payment, database, or provider changes
 
@@ -50,7 +50,7 @@ Pre-research result: **PASS**.
 
 ### P1: NestJS boundary
 
-1. Move `AgentChatController` and `AgentChatAccessService` with tests to `apps/api/src/agent-gateway/agent-chat/`; add `AgentChatModule` importing `ChatModule`, `AgentAuthModule`, `PrismaModule`, and `CacheModule`.
+1. Move `AgentChatController` and `AgentChatAccessService` with tests to `apps/api/src/agent-gateway/agent-chat/`; add `AgentChatModule` importing `ChatModule`, `AgentAuthModule`, `PrismaModule`, and `CacheModule`. Preserve controller-level `@UseGuards(AgentApiKeyGuard, ClaimTokenGuard)` and the deliberate `/access/check` bypass in `ClaimTokenGuard`.
 2. Register it from `AgentGatewayModule`; do not duplicate registration in `AppModule`.
 3. Move `ChatMessageCryptoService` with tests to `common/`; add `ChatMessageCryptoModule` as sole provider/export owner.
 4. Make `ChatModule` import crypto, remove the `AgentAuthModule` source import and its imports-array entry, drop gateway controller/access providers, and export only `ChatService`. Add a static/module-metadata assertion that `apps/api/src/chat/chat.module.ts` contains no agent-gateway dependency.

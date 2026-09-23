@@ -4,7 +4,7 @@
 
 **Decision**: Move the agent controller/access service to `agent-gateway/agent-chat/` behind `AgentChatModule`.
 
-**Rationale**: The routes and both guards are edge concerns. This removes the core chat module's dependency on gateway authentication and matches existing gateway locality.
+**Rationale**: The routes and both guards are edge concerns. This removes the core chat module's dependency on gateway authentication and matches existing gateway locality. Controller guard declaration retains `AgentApiKeyGuard` followed by `ClaimTokenGuard`, and `ClaimTokenGuard` explicitly retains its existing `/access/check` bypass (validating `{ sub }` via the access service with API key only), while session routes enforce `X-User-Claim`.
 
 **Alternatives**: Keeping a module in `chat/` leaves ownership scattered; leaving the current wiring preserves the inversion.
 
