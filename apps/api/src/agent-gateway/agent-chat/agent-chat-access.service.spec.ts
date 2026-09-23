@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpException, HttpStatus } from '@nestjs/common';
-import { AgentChatAccessService } from './agent-chat-access.service';
+import { AgentChatAccessService } from '@/chat/agent-chat-access.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CacheService } from '@/cache/cache.service';
 
@@ -18,6 +18,7 @@ describe('AgentChatAccessService', () => {
 
     cacheService = {
       get: jest.fn(),
+      hget: jest.fn(),
     } as unknown as jest.Mocked<CacheService>;
 
     const module: TestingModule = await Test.createTestingModule({
@@ -36,7 +37,7 @@ describe('AgentChatAccessService', () => {
   });
 
   describe('checkUserAccess', () => {
-    it('returns allowed: true for active user with no jti/exp', async () => {
+    it('returns allowed: true for active user status check', async () => {
       (prismaService.user.findUnique as jest.Mock).mockResolvedValueOnce({
         id: 'usr_1',
         status: 'ACTIVE',
@@ -94,7 +95,7 @@ describe('AgentChatAccessService', () => {
       }
     });
 
-    it('throws 401 UNAUTHORIZED for expired token (exp in the past)', async () => {
+    it('throws 401 UNAUTHORIZED for expired token (exp * 1000 <= Date.now())', async () => {
       (prismaService.user.findUnique as jest.Mock).mockResolvedValueOnce({
         id: 'usr_1',
         status: 'ACTIVE',
@@ -123,7 +124,7 @@ describe('AgentChatAccessService', () => {
       }
     });
 
-    it('returns allowed: true for valid unexpired token (exp in the future)', async () => {
+    it('returns allowed: true for valid unexpired token', async () => {
       (prismaService.user.findUnique as jest.Mock).mockResolvedValueOnce({
         id: 'usr_1',
         status: 'ACTIVE',
@@ -135,7 +136,7 @@ describe('AgentChatAccessService', () => {
       expect(res).toEqual({ allowed: true });
     });
 
-    it('throws 401 UNAUTHORIZED if JTI is revoked in cache', async () => {
+    it('throws 401 UNAUTHORIZED if JTI is revoked in Redis (blacklist:jti:${jti})', async () => {
       (prismaService.user.findUnique as jest.Mock).mockResolvedValueOnce({
         id: 'usr_1',
         status: 'ACTIVE',
@@ -166,7 +167,7 @@ describe('AgentChatAccessService', () => {
       }
     });
 
-    it('returns allowed: true for valid unrevoked JTI in cache (null or false)', async () => {
+    it('returns allowed: true for valid unrevoked JTI', async () => {
       (prismaService.user.findUnique as jest.Mock).mockResolvedValueOnce({
         id: 'usr_1',
         status: 'ACTIVE',
@@ -193,6 +194,110 @@ describe('AgentChatAccessService', () => {
       });
       expect(resFalse).toEqual({ allowed: true });
       expect(cacheService.get).toHaveBeenCalledWith('blacklist:jti:jti_valid_789');
+    });
+
+    describe('fail-closed behavior', () => {
+      it('fails closed immediately when user is missing without checking token expiration or cache', async () => {
+        (prismaService.user.findUnique as jest.Mock).mockResolvedValueOnce(null);
+
+        await expect(
+          service.checkUserAccess({
+            sub: 'missing_user',
+            jti: 'jti_any',
+            exp: Math.floor(Date.now() / 1000) + 3600,
+          }),
+        ).rejects.toThrow(HttpException);
+
+        expect(cacheService.get).not.toHaveBeenCalled();
+      });
+
+      it('fails closed immediately when user status is not ACTIVE (e.g. SUSPENDED or DELETED)', async () => {
+        (prismaService.user.findUnique as jest.Mock).mockResolvedValueOnce({
+          id: 'usr_suspended',
+          status: 'SUSPENDED',
+        });
+
+        await expect(
+          service.checkUserAccess({
+            sub: 'usr_suspended',
+            jti: 'jti_any',
+            exp: Math.floor(Date.now() / 1000) + 3600,
+          }),
+        ).rejects.toThrow(HttpException);
+
+        expect(cacheService.get).not.toHaveBeenCalled();
+      });
+
+      it('fails closed when token is expired without checking JTI blacklist', async () => {
+        (prismaService.user.findUnique as jest.Mock).mockResolvedValueOnce({
+          id: 'usr_1',
+          status: 'ACTIVE',
+        });
+
+        const expiredTimestamp = Math.floor(Date.now() / 1000) - 10;
+        await expect(
+          service.checkUserAccess({
+            sub: 'usr_1',
+            jti: 'jti_any',
+            exp: expiredTimestamp,
+          }),
+        ).rejects.toThrow(HttpException);
+
+        expect(cacheService.get).not.toHaveBeenCalled();
+      });
+
+      it('fails closed when JTI is revoked even if user is active and token is unexpired', async () => {
+        (prismaService.user.findUnique as jest.Mock).mockResolvedValueOnce({
+          id: 'usr_1',
+          status: 'ACTIVE',
+        });
+        (cacheService.get as jest.Mock).mockResolvedValueOnce('1');
+
+        await expect(
+          service.checkUserAccess({
+            sub: 'usr_1',
+            jti: 'jti_revoked',
+            exp: Math.floor(Date.now() / 1000) + 3600,
+          }),
+        ).rejects.toThrow(HttpException);
+
+        expect(cacheService.get).toHaveBeenCalledWith('blacklist:jti:jti_revoked');
+      });
+    });
+  });
+
+  describe('fencing token validation semantics against session state', () => {
+    it('operates at user/token scope and does not query or mutate session lock/fencing cache keys', async () => {
+      (prismaService.user.findUnique as jest.Mock).mockResolvedValueOnce({
+        id: 'usr_1',
+        status: 'ACTIVE',
+      });
+      (cacheService.get as jest.Mock).mockResolvedValueOnce(null);
+
+      const res = await service.checkUserAccess({
+        sub: 'usr_1',
+        jti: 'jti_valid_123',
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      });
+
+      expect(res).toEqual({ allowed: true });
+      expect(cacheService.hget).not.toHaveBeenCalled();
+      expect(cacheService.get).toHaveBeenCalledWith('blacklist:jti:jti_valid_123');
+    });
+
+    it('preserves fail-closed user authentication regardless of session-level fencing state', async () => {
+      (prismaService.user.findUnique as jest.Mock).mockResolvedValueOnce({
+        id: 'usr_inactive',
+        status: 'INACTIVE',
+      });
+
+      await expect(
+        service.checkUserAccess({
+          sub: 'usr_inactive',
+        }),
+      ).rejects.toThrow(HttpException);
+
+      expect(cacheService.hget).not.toHaveBeenCalled();
     });
   });
 });

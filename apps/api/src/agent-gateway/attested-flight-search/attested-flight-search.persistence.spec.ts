@@ -142,6 +142,7 @@ describe('Attested flight search persistence boundary', () => {
             ATTESTATION_SECRET: 'attestation-test-secret',
             CHAT_HANDOFF_SECRET: 'handoff-test-secret',
             FEATURE_FLAG_CHAT_HANDOFF_ISSUE: 'true',
+            CHAT_ENCRYPTION_KEY: 'ab'.repeat(32),
           }),
         },
         { provide: CacheService, useValue: {} },
@@ -241,5 +242,59 @@ describe('Attested flight search persistence boundary', () => {
     commit.resolve();
     const result = await service.searchFlightsV2('user-1', request);
     expect(result.results[0].baggageAllowance).toBe('23kg checked');
+  });
+
+  describe('ChatMessageCryptoService provider contract', () => {
+    it('provides ChatMessageCryptoService adhering to contract separate from EncryptionService', () => {
+      const cryptoService = module.get<ChatMessageCryptoService>(ChatMessageCryptoService);
+      const encryptionService = module.get<EncryptionService>(EncryptionService);
+
+      expect(cryptoService).toBeDefined();
+      expect(cryptoService).toBeInstanceOf(ChatMessageCryptoService);
+      expect(encryptionService).toBeDefined();
+      expect(encryptionService).toBeInstanceOf(EncryptionService);
+      expect(cryptoService).not.toBe(encryptionService);
+
+      expect(typeof cryptoService.decryptMessageContent).toBe('function');
+      expect(typeof cryptoService.encryptMessageContent).toBe('function');
+      expect(typeof cryptoService.isConfigured).toBe('function');
+      expect(cryptoService.isConfigured()).toBe(true);
+    });
+
+    it('verifies ChatMessageCryptoService contract encrypts and decrypts with record-bound AAD', async () => {
+      const cryptoService = module.get<ChatMessageCryptoService>(ChatMessageCryptoService);
+
+      const messageId = 'msg-persist-test';
+      const sessionId = 'session-1';
+      const sender = 'USER';
+      const type = 'TEXT';
+      const plaintext = 'Search flights from HAN to SGN';
+
+      const encrypted = await cryptoService.encryptMessageContent(
+        messageId,
+        sessionId,
+        sender,
+        type,
+        plaintext,
+      );
+
+      expect(encrypted).toHaveProperty('ciphertext');
+      expect(encrypted).toHaveProperty('nonce');
+      expect(encrypted).toHaveProperty('authTag');
+      expect(encrypted.keyVersion).toBe(1);
+
+      const decrypted = await cryptoService.decryptMessageContent({
+        id: messageId,
+        sessionId,
+        sender,
+        type,
+        contentCiphertext: encrypted.ciphertext,
+        contentNonce: encrypted.nonce,
+        contentAuthTag: encrypted.authTag,
+        contentKeyVersion: encrypted.keyVersion,
+      });
+
+      expect(decrypted).toBe(plaintext);
+    });
   });
 });

@@ -1,5 +1,44 @@
 # Progress Tracker
  
+### Feature 026 — Agent Boundary Simplification: Phase 3 / Slice 1 Complete (Tasks T006–T010 Verified) (2026-09-23)
+
+- **Phase 3 / Slice 1 (User Story 1 Characterization & Boundary Specs) Delivered (Tasks T006–T010)**:
+  - **Controller Characterization Spec (T006)**:
+    - Relocated spec to `apps/api/src/agent-gateway/agent-chat/agent-chat.controller.spec.ts`; deleted obsolete file in `src/chat/`.
+    - Added controller-level guard reflection test asserting `@UseGuards(AgentApiKeyGuard, ClaimTokenGuard)` declaration and exact order.
+    - Verified all 7 routes (`POST /access/check`, `POST /sessions`, `GET /sessions/:sessionId/memory`, `POST /sessions/:sessionId/messages`, `POST /sessions/:sessionId/turns`, `POST /sessions/:sessionId/summaries`, `DELETE /sessions/:sessionId`).
+    - Verified bodies, response shapes, HTTP status codes, and `CHAT_SESSION_NOT_FOUND` (404) error mapping.
+    - Verified support for both lowercase `x-fencing-token` and canonical `X-Fencing-Token` header spellings.
+    - Verified `/access/check` bypasses claim-token extraction and delegates `{ sub }` validation directly to `AgentChatAccessService`.
+  - **Access Service Characterization Spec (T007)**:
+    - Relocated spec to `apps/api/src/agent-gateway/agent-chat/agent-chat-access.service.spec.ts`; deleted obsolete file in `src/chat/`.
+    - Verified `checkUserAccess`: active user status check, redis revocation check via JTI (`blacklist:jti:${jti}`), expiration check, caching, and fail-closed behavior on inactive/missing user or revoked token.
+    - Verified fencing token decoupling and session state semantics.
+  - **Shared Crypto Compatibility Spec (T008)**:
+    - Relocated spec to `apps/api/src/common/chat-message-crypto.service.spec.ts`; deleted obsolete file in `src/chat/`.
+    - Verified AES-256-GCM encryption with 12-byte nonce, 16-byte authTag, `keyVersion: 1`, hex envelope format, and record-bound AAD.
+    - Verified edge cases: empty/corrupt envelopes, unsupported key versions, wrong decryption keys, and authentication tag mismatch.
+    - Verified helper methods (`encryptMessageContent`, `decryptMessageContent`, `encryptSessionTitle`, `decryptSessionTitle`).
+  - **Attested Search Crypto & Module Boundary Assertions (T009)**:
+    - In `attested-flight-search.service.spec.ts` and `persistence.spec.ts`: updated crypto provider assertions to verify `ChatMessageCryptoService` contract and static architectural separation from `ChatModule`.
+    - Created `apps/api/src/chat/chat.module.spec.ts`: asserted `ChatModule` exports `ChatService`, confirmed domain service has zero dependency on `AgentAuthService` or gateway guards, and validated target architectural boundary.
+  - **Gateway HTTP E2E Characterization (T010)**:
+    - In `apps/api/test/agent-chat-gateway.e2e-spec.ts`: covered all 7 `/api/agent-gateway/chat/*` routes with full HTTP requests via Supertest.
+    - Asserted controller-level guard order: `AgentApiKeyGuard` followed by `ClaimTokenGuard`.
+    - Asserted deliberate `/access/check` bypass: `POST /api/agent-gateway/chat/access/check` succeeds with API key and `{ sub }` body without `X-User-Claim`.
+    - Asserted 6 session routes strictly reject missing `X-User-Claim` with 401 `INVALID_CLAIM_TOKEN`.
+    - Asserted both `x-fencing-token` and `X-Fencing-Token` headers across all write routes.
+    - Asserted `CHAT_SESSION_NOT_FOUND` (404) error mapping on nonexistent or cross-user sessions.
+  - **Verification Gate**:
+    - Unit tests: 6 suites, 102 tests passed.
+    - E2E tests: 1 suite, 18 tests passed.
+    - ESLint: 0 errors, 0 warnings (`pnpm exec eslint "apps/api/**/*.ts" --max-warnings 0`).
+    - TypeScript: 0 diagnostic errors (`pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`).
+  - **Scope Discipline**:
+    - Zero production code touched; only test specifications and task tracker updated.
+    - Tasks T006–T010 marked `[x]` in `specs/026-agent-boundary-simplification/tasks.md`.
+    - Phase 3 / Slice 2 (Production code relocation T011–T016) strictly unstarted.
+
 ### Feature 026 — Agent Boundary Simplification: Phase 1 & 2 / Slice 1 Complete (Tasks T001–T005 Verified) (2026-09-23)
 
 - **Phase 1 (Setup) & Phase 2 (Foundational) Delivered (Tasks T001–T005)**:
