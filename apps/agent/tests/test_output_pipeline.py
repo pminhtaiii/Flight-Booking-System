@@ -8,8 +8,6 @@ from __future__ import annotations
 
 import ast
 import hashlib
-import importlib
-import importlib.util
 import inspect
 from types import SimpleNamespace
 from typing import Any
@@ -115,79 +113,75 @@ def test_output_guardrail_blocked_error_ownership_contract() -> None:
 
 
 def test_output_pipeline_pii_utility_migration_contract() -> None:
-    """Contract: output_pipeline imports matcher and predicate from agent.guardrails.pii once migrated."""
+    """Contract: output_pipeline imports matcher, predicate, and approved_model_content from agent.guardrails.pii."""
+    import agent.guardrails.pii as pii_mod
+
     import agent.guardrails.output_pipeline as pipeline_mod
 
-    pii_spec = importlib.util.find_spec("agent.guardrails.pii")
-    if pii_spec is not None:
-        import agent.guardrails.pii as pii_mod
+    # 1. Canonical source is pii.py
+    assert hasattr(pii_mod, "deterministic_pii_match")
+    assert hasattr(pii_mod, "_is_output_guardrail_disabled")
+    assert hasattr(pii_mod, "approved_model_content")
 
-        # 1. Canonical source is pii.py
-        assert hasattr(pii_mod, "deterministic_pii_match")
-        assert hasattr(pii_mod, "_is_output_guardrail_disabled")
+    # 2. output_pipeline imports directly from pii.py
+    assert getattr(pipeline_mod, "deterministic_pii_match") is getattr(
+        pii_mod, "deterministic_pii_match"
+    )
+    assert getattr(pipeline_mod, "_is_output_guardrail_disabled") is getattr(
+        pii_mod, "_is_output_guardrail_disabled"
+    )
+    assert getattr(pipeline_mod, "approved_model_content") is getattr(
+        pii_mod, "approved_model_content"
+    )
 
-        # 2. output_pipeline imports directly from pii.py
-        assert getattr(pipeline_mod, "deterministic_pii_match") is getattr(
-            pii_mod, "deterministic_pii_match"
-        )
-        assert getattr(pipeline_mod, "_is_output_guardrail_disabled") is getattr(
-            pii_mod, "_is_output_guardrail_disabled"
-        )
-
-        # 3. Ensure no duplicate function definition in output_pipeline.py AST
-        pipeline_source = inspect.getsource(pipeline_mod)
-        tree = ast.parse(pipeline_source)
-        defined_functions = [
-            node.name
-            for node in ast.walk(tree)
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-        ]
-        assert "deterministic_pii_match" not in defined_functions, (
-            "deterministic_pii_match must be imported from agent.guardrails.pii, not defined in output_pipeline.py"
-        )
-        assert "_is_output_guardrail_disabled" not in defined_functions, (
-            "_is_output_guardrail_disabled must be imported from agent.guardrails.pii, not defined in output_pipeline.py"
-        )
-    else:
-        # Transitional state: functions are available in output_pipeline
-        assert hasattr(pipeline_mod, "deterministic_pii_match")
-        assert hasattr(pipeline_mod, "_is_output_guardrail_disabled")
-        assert callable(pipeline_mod.deterministic_pii_match)
-        assert callable(pipeline_mod._is_output_guardrail_disabled)
+    # 3. Ensure no duplicate function definition in output_pipeline.py AST
+    pipeline_source = inspect.getsource(pipeline_mod)
+    tree = ast.parse(pipeline_source)
+    defined_functions = [
+        node.name
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    ]
+    assert "deterministic_pii_match" not in defined_functions, (
+        "deterministic_pii_match must be imported from agent.guardrails.pii, not defined in output_pipeline.py"
+    )
+    assert "_is_output_guardrail_disabled" not in defined_functions, (
+        "_is_output_guardrail_disabled must be imported from agent.guardrails.pii, not defined in output_pipeline.py"
+    )
+    assert "approved_model_content" not in defined_functions, (
+        "approved_model_content must be imported from agent.guardrails.pii, not defined in output_pipeline.py"
+    )
 
 
 def test_zero_duplicate_definitions_and_no_import_cycles() -> None:
     """Contract: zero duplicate definitions and zero import cycles between output_pipeline and pii."""
+    import agent.guardrails.pii as pii_mod
+
     import agent.guardrails.output_pipeline as pipeline_mod
 
-    pii_spec = importlib.util.find_spec("agent.guardrails.pii")
-    if pii_spec is not None and pii_spec.origin:
-        with open(pii_spec.origin, "r", encoding="utf-8") as f:
-            pii_tree = ast.parse(f.read(), filename=pii_spec.origin)
-        for node in ast.walk(pii_tree):
-            if isinstance(node, ast.Import):
-                for alias in node.names:
-                    assert "output_pipeline" not in alias.name, (
-                        "pii.py must not import output_pipeline (would create import cycle)"
-                    )
-            elif isinstance(node, ast.ImportFrom):
-                if node.module:
-                    assert "output_pipeline" not in node.module, (
-                        "pii.py must not import from output_pipeline (would create import cycle)"
-                    )
+    pii_tree = ast.parse(inspect.getsource(pii_mod))
+    for node in ast.walk(pii_tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                assert "output_pipeline" not in alias.name, (
+                    "pii.py must not import output_pipeline (would create import cycle)"
+                )
+        elif isinstance(node, ast.ImportFrom):
+            if node.module:
+                assert "output_pipeline" not in node.module, (
+                    "pii.py must not import from output_pipeline (would create import cycle)"
+                )
 
-        # Check output_pipeline does not define duplicate functions
-        pipeline_tree = ast.parse(inspect.getsource(pipeline_mod))
-        pipeline_defs = [
-            node.name
-            for node in ast.walk(pipeline_tree)
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-        ]
-        assert "deterministic_pii_match" not in pipeline_defs
-        assert "_is_output_guardrail_disabled" not in pipeline_defs
-        assert "approved_model_content" not in pipeline_defs
-
-    assert pipeline_mod is not None
+    # Check output_pipeline does not define duplicate functions
+    pipeline_tree = ast.parse(inspect.getsource(pipeline_mod))
+    pipeline_defs = [
+        node.name
+        for node in ast.walk(pipeline_tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    ]
+    assert "deterministic_pii_match" not in pipeline_defs
+    assert "_is_output_guardrail_disabled" not in pipeline_defs
+    assert "approved_model_content" not in pipeline_defs
 
 
 def test_payload_free_config_retained_as_stateless_helper() -> None:

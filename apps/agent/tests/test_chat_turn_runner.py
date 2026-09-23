@@ -678,8 +678,6 @@ async def test_runner_causal_failure_cleanup_on_guardrail_block():
 
     mock_graph.astream_events = mock_astream_events
 
-    import agent.chat_turn.runner as runner_mod
-
     mock_gateway = MagicMock(spec=GuardrailGateway)
     mock_gateway.stream_output = MagicMock(return_value=fake_session)
     mock_gateway.validate_input = AsyncMock(
@@ -688,13 +686,7 @@ async def test_runner_causal_failure_cleanup_on_guardrail_block():
         )
     )
 
-    patch_target = (
-        "agent.chat_turn.runner.OutputGuardrailPipeline"
-        if hasattr(runner_mod, "OutputGuardrailPipeline")
-        else "agent.guardrails.gateway.GuardrailGateway.stream_output"
-    )
-
-    with patch(patch_target, return_value=fake_session):
+    with patch.object(GuardrailGateway, "stream_output", return_value=fake_session):
         # Instrument persist_response and queue_release to track order
         orig_persist = mock_client.create_message_batch
 
@@ -731,6 +723,9 @@ async def test_runner_causal_failure_cleanup_on_guardrail_block():
         )
 
         events = [e async for e in runner.run(command)]
+
+        # Assert that the runner delegated to the gateway-owned stream_output session
+        mock_gateway.stream_output.assert_called_once()
 
         # Verify causal ordering: partial_persist -> aclose/close -> release
         close_action = "aclose" if "aclose" in call_order else "close"
@@ -896,8 +891,6 @@ async def test_stream_session_covers_all_three_runner_branches_per_turn():
 
     mock_queue.release = tracked_release
 
-    import agent.chat_turn.runner as runner_mod
-
     mock_gateway = MagicMock(spec=GuardrailGateway)
     mock_gateway.stream_output = MagicMock(return_value=session)
     mock_gateway.validate_input = AsyncMock(
@@ -906,12 +899,7 @@ async def test_stream_session_covers_all_three_runner_branches_per_turn():
         )
     )
 
-    patch_target = (
-        "agent.chat_turn.runner.OutputGuardrailPipeline"
-        if hasattr(runner_mod, "OutputGuardrailPipeline")
-        else "agent.guardrails.gateway.GuardrailGateway.stream_output"
-    )
-    with patch(patch_target, return_value=session):
+    with patch.object(GuardrailGateway, "stream_output", return_value=session):
         runner = ChatTurnRunner(
             graph=mock_graph,
             queue_manager=mock_queue,
@@ -928,6 +916,9 @@ async def test_stream_session_covers_all_three_runner_branches_per_turn():
         )
 
         events = [e async for e in runner.run(command)]
+
+        # Assert that the runner delegated to the gateway-owned stream_output session
+        mock_gateway.stream_output.assert_called_once()
 
     # Assert stream session covers all three branches
     assert "Streaming chunk. " in processed_tokens

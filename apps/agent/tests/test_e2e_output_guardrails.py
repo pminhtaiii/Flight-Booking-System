@@ -477,25 +477,25 @@ def test_ast_single_definition_and_no_circular_dependencies() -> None:
         assert len(files) == 1, (
             f"Expected exactly one definition of '{fn_name}', but found in: {files}"
         )
-        assert files[0] in ("pii.py", "output_pipeline.py"), (
-            f"'{fn_name}' defined in unexpected file: {files[0]}"
+        assert files[0] == "pii.py", (
+            f"'{fn_name}' must be defined in pii.py, but found in: {files[0]}"
         )
 
-    # If pii.py exists, verify it does not import output_pipeline (acyclic dependency)
+    # pii.py must exist and must not import output_pipeline (acyclic dependency)
     pii_path = guardrails_dir / "pii.py"
-    if pii_path.exists():
-        pii_tree = ast.parse(pii_path.read_text(encoding="utf-8"), filename=str(pii_path))
-        for node in ast.walk(pii_tree):
-            if isinstance(node, ast.Import):
-                for alias in node.names:
-                    assert "output_pipeline" not in alias.name, (
-                        f"Circular dependency: pii.py imports {alias.name}"
-                    )
-            elif isinstance(node, ast.ImportFrom):
-                module = node.module or ""
-                assert "output_pipeline" not in module, (
-                    f"Circular dependency: pii.py imports from {module}"
+    assert pii_path.exists(), "pii.py must exist as the canonical owner of PII utilities"
+    pii_tree = ast.parse(pii_path.read_text(encoding="utf-8"), filename=str(pii_path))
+    for node in ast.walk(pii_tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                assert "output_pipeline" not in alias.name, (
+                    f"Circular dependency: pii.py imports {alias.name}"
                 )
+        elif isinstance(node, ast.ImportFrom):
+            module = node.module or ""
+            assert "output_pipeline" not in module, (
+                f"Circular dependency: pii.py imports from {module}"
+            )
 
     # Verify importing output_pipeline does not raise circular import errors
     importlib.invalidate_caches()
