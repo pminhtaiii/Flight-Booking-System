@@ -5,12 +5,12 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from agent.agents.checkout_orchestrator import checkout_orchestrator_node
 from agent.agents.general_agent import general_agent_node
 from agent.agents.travel_assistant import travel_assistant_node
-from agent.chat_turn import ChatTurnCommand
+from agent.chat_turn import ChatTurnCommand, ErrorEvent, TokenEvent
 from agent.chat_turn.runner import ChatTurnRunner
 from agent.graph.nodes import final_answer_node
 from agent.graph.router import invoke_router
@@ -239,3 +239,234 @@ async def test_model_exception_payload_is_not_logged_or_exported() -> None:
     client.create_message.assert_not_awaited()
     assert len(model.invocations) == 1
     _assert_payload_free_dispatch(model.invocations[0][1])
+
+
+# ============================================================================
+# Non-Streamed Output, Tool Calls & Model Dispatch Boundary Tests (T020)
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_non_streamed_model_output_blocks_canary_through_output_pipeline() -> None:
+    """Non-streamed model output (on_chat_model_end without chunks) routes through
+    the output pipeline and blocks the output canary."""
+    msg = AIMessage(content=f"Your card is {OUTPUT_CANARY}")
+
+    class NonStreamedGraph:
+        async def astream_events(self, _state, *, config, version):
+            yield {"event": "on_chain_start", "name": "final_answer"}
+            yield {
+                "event": "on_chat_model_end",
+                "run_id": "run-non-streamed",
+                "data": {"output": msg},
+            }
+            yield {
+                "event": "on_chain_end",
+                "name": "final_answer",
+                "data": {"output": {"messages": [msg]}},
+            }
+
+    client = MagicMock()
+    client.get_memory = AsyncMock(
+        return_value={"recentMessages": [], "summary": None, "totalMessageCount": 0}
+    )
+    client.create_message_batch = AsyncMock(return_value={"messages": []})
+    queue = MagicMock()
+    queue.acquire = AsyncMock(return_value="req-nonstream")
+    queue.get_fence = MagicMock(return_value=12)
+    queue.validate_active_fence = AsyncMock(return_value=True)
+    queue.release = AsyncMock()
+
+    settings = SimpleNamespace(
+        NESTJS_API_URL="http://localhost:3001/api",
+        REQUIRE_GUARDRAIL_GATEWAY=False,
+        MEMORY_WINDOW_SIZE=20,
+        MEMORY_TOKEN_BUDGET=4000,
+        output_guardrail=SimpleNamespace(enabled=True),
+    )
+
+    runner = ChatTurnRunner(
+        settings=settings,
+        graph=NonStreamedGraph(),
+        queue_manager=queue,
+        redis_client=MagicMock(),
+        client_factory=lambda **_kwargs: client,
+    )
+
+    events = [
+        event
+        async for event in runner.run(
+            ChatTurnCommand(
+                user_id="user-nonstream",
+                session_id="session-nonstream",
+                message="Show info",
+                token="test-token",
+            )
+        )
+    ]
+
+    # Verify that the output canary was intercepted by the output pipeline
+    error_events = [e for e in events if isinstance(e, ErrorEvent)]
+    assert len(error_events) == 1
+    assert error_events[0].data.code == "OUTPUT_GUARDRAIL_BLOCKED"
+
+    # Canary was never emitted as a token event
+    token_events = [e for e in events if isinstance(e, TokenEvent)]
+    assert not any(OUTPUT_CANARY in e.data.content for e in token_events)
+
+    # Queue release occurred in cleanup
+    queue.release.assert_awaited_once_with("session-nonstream", "req-nonstream")
+
+
+@pytest.mark.asyncio
+async def test_tool_calls_and_results_route_through_safety_boundaries() -> None:
+    """Tool execution and tool result messages route through schema and output safety contracts."""
+    tool_msg_unvalidated = ToolMessage(
+        content=f"Secret payload {OUTPUT_CANARY}",
+        name="search_flights",
+        tool_call_id="call-tool-safety",
+        additional_kwargs={},  # Missing guardrail_validated=True
+    )
+
+    class ToolGraph:
+        async def astream_events(self, _state, *, config, version):
+            yield {"event": "on_chain_start", "name": "tools"}
+            yield {
+                "event": "on_chain_end",
+                "name": "tools",
+                "data": {"output": {"messages": [tool_msg_unvalidated]}},
+            }
+
+    client = MagicMock()
+    client.get_memory = AsyncMock(
+        return_value={"recentMessages": [], "summary": None, "totalMessageCount": 0}
+    )
+    client.create_message_batch = AsyncMock(return_value={"messages": []})
+    queue = MagicMock()
+    queue.acquire = AsyncMock(return_value="req-tool-safety")
+    queue.get_fence = MagicMock(return_value=13)
+    queue.validate_active_fence = AsyncMock(return_value=True)
+    queue.release = AsyncMock()
+
+    settings = SimpleNamespace(
+        NESTJS_API_URL="http://localhost:3001/api",
+        REQUIRE_GUARDRAIL_GATEWAY=False,
+        MEMORY_WINDOW_SIZE=20,
+        MEMORY_TOKEN_BUDGET=4000,
+        output_guardrail=SimpleNamespace(enabled=True),
+    )
+
+    runner = ChatTurnRunner(
+        settings=settings,
+        graph=ToolGraph(),
+        queue_manager=queue,
+        redis_client=MagicMock(),
+        client_factory=lambda **_kwargs: client,
+    )
+
+    events = [
+        event
+        async for event in runner.run(
+            ChatTurnCommand(
+                user_id="user-tool",
+                session_id="session-tool-safety",
+                message="Run search",
+                token="test-token",
+            )
+        )
+    ]
+
+    # Unvalidated tool results fail closed with GUARDRAIL_TOOL_SCHEMA
+    error_events = [e for e in events if isinstance(e, ErrorEvent)]
+    assert len(error_events) == 1
+    assert error_events[0].data.code == "GUARDRAIL_TOOL_SCHEMA"
+
+    # Queue was safely released
+    queue.release.assert_awaited_once_with("session-tool-safety", "req-tool-safety")
+
+
+@pytest.mark.asyncio
+async def test_model_dispatch_across_nodes_routes_into_unified_pipeline_contract() -> None:
+    """Model dispatch across streaming and unstreamed nodes routes through output pipeline."""
+    msg_stream = AIMessage(content="Safe initial answer. ")
+    msg_final = AIMessage(content="Safe final details.")
+
+    class MultiNodeGraph:
+        async def astream_events(self, _state, *, config, version):
+            # Node 1: Streaming
+            yield {"event": "on_chain_start", "name": "travel"}
+            yield {
+                "event": "on_chat_model_stream",
+                "run_id": "run-travel",
+                "data": {"chunk": MagicMock(content="Safe initial answer. ")},
+            }
+            yield {
+                "event": "on_chat_model_end",
+                "run_id": "run-travel",
+                "data": {"output": msg_stream},
+            }
+            yield {
+                "event": "on_chain_end",
+                "name": "travel",
+                "data": {"output": {"messages": [msg_stream]}},
+            }
+            # Node 2: Non-streamed completion
+            yield {"event": "on_chain_start", "name": "final_answer"}
+            yield {
+                "event": "on_chat_model_end",
+                "run_id": "run-final",
+                "data": {"output": msg_final},
+            }
+            yield {
+                "event": "on_chain_end",
+                "name": "final_answer",
+                "data": {"output": {"messages": [msg_final]}},
+            }
+
+    client = MagicMock()
+    client.get_memory = AsyncMock(
+        return_value={"recentMessages": [], "summary": None, "totalMessageCount": 0}
+    )
+    client.create_message_batch = AsyncMock(
+        return_value={"messages": [{"id": "msg-multi-node", "sender": "AGENT"}]}
+    )
+    queue = MagicMock()
+    queue.acquire = AsyncMock(return_value="req-multinode")
+    queue.get_fence = MagicMock(return_value=14)
+    queue.validate_active_fence = AsyncMock(return_value=True)
+    queue.release = AsyncMock()
+
+    settings = SimpleNamespace(
+        NESTJS_API_URL="http://localhost:3001/api",
+        REQUIRE_GUARDRAIL_GATEWAY=False,
+        MEMORY_WINDOW_SIZE=20,
+        MEMORY_TOKEN_BUDGET=4000,
+        output_guardrail=SimpleNamespace(enabled=True),
+    )
+
+    runner = ChatTurnRunner(
+        settings=settings,
+        graph=MultiNodeGraph(),
+        queue_manager=queue,
+        redis_client=MagicMock(),
+        client_factory=lambda **_kwargs: client,
+    )
+
+    events = [
+        event
+        async for event in runner.run(
+            ChatTurnCommand(
+                user_id="user-multinode",
+                session_id="session-multinode",
+                message="Complete itinerary",
+                token="test-token",
+            )
+        )
+    ]
+
+    tokens = [e for e in events if isinstance(e, TokenEvent)]
+    full_output = "".join(t.data.content for t in tokens)
+    assert "Safe initial answer." in full_output
+    assert "Safe final details." in full_output
+    assert not any(isinstance(e, ErrorEvent) for e in events)
+    queue.release.assert_awaited_once_with("session-multinode", "req-multinode")

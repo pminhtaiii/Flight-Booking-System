@@ -1,8 +1,24 @@
 # Architecture
 
-## Feature 026 — Agent Boundary Simplification (Phase 4 / Slice 1 Complete: US2 Test Characterization - Tasks T017, T018, T019, T022)
+## Feature 026 — Agent Boundary Simplification (Phase 4 / Slice 2 Complete: US2 Test Characterization - Tasks T020, T021, T023)
 
 Planning artifacts: [specification](../specs/026-agent-boundary-simplification/spec.md), [plan](../specs/026-agent-boundary-simplification/plan.md), and [tasks](../specs/026-agent-boundary-simplification/tasks.md).
+
+#### Output Stream Session, Delegate & PII Utility Characterization (US2 Phase 4 Slice 2)
+- **Persistent Stream Session & Runner Lifecycle (T020)**:
+  - `GuardrailGateway.stream_output(context, *, config, session_id)` async context manager session characterized.
+  - One stream session spans all three runner branches (final response text, tool call arguments, token streaming) per turn.
+  - Stream session semantics: `process_token(token)` maintains one shared buffer and cumulative `partial_response`; `flush()` is one-shot after model completion; `close()` is idempotent and non-flushing (never emits buffered undecided bytes); `__aexit__` guarantees `close()` without suppressing exceptions.
+  - `OutputGuardrailBlockedError` preserves original `partial_response`, `layer`, `rule`, and message without modification.
+  - Strict causal cleanup ordering verified: `approved_partial_persistence` -> `close` (non-flushing) -> `lease_release` across normal completion, blocked output, early return / stale fence, cancellation, and mid-turn exceptions.
+- **Delegate Output Pipeline & Stateless Helper Assertions (T021)**:
+  - Transitioned `OutputGuardrailBlockedError` imports across 8 delegate test files to `agent.guardrails.base`.
+  - Asserted target ownership: `output_pipeline.py` must import `deterministic_pii_match` and `_is_output_guardrail_disabled` directly from `agent.guardrails.pii` with zero duplicate definitions and zero circular imports.
+  - `payload_free_config` characterized as a stateless pure helper retaining exactly 6 configurable keys.
+  - Streaming-disabled passthrough behavior asserted across all 5 legacy disabled-config shapes in `OutputGuardrailPipeline`.
+- **Shared PII Utility Coverage & Lone Fallback Migration (T023)**:
+  - Comprehensive characterization for `agent.guardrails.pii`: `deterministic_pii_match` (Luhn credit cards, phones, emails, credentials, passports, safe content, cross-token buffering), `_is_output_guardrail_disabled` (all 5 shapes), and `approved_model_content` (filtering, non-string handling, prefix preservation).
+  - Migrated lone fallback in `test_tool_schemas.py` directly to registered tool `args_schema` and `TOOL_INPUT_SCHEMAS`, leaving zero consumers for `tool_schemas.py`.
 
 #### Guardrail Gateway Construction, Ingress Ordering & Authority Characterization (US2 Phase 4 Slice 1)
 - **Gateway Constructor & Ordered Composition (T017)**:
