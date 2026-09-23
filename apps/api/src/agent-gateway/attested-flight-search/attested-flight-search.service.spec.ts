@@ -7,7 +7,7 @@ import { AuditService } from '@/audit/audit.service';
 import { CacheService } from '@/cache/cache.service';
 import { FlightsService } from '@/flights/flights.service';
 import { SelectionAttestationService } from '../selection-attestation.service';
-import { ChatMessageCryptoService } from '@/chat/chat-message-crypto.service';
+import { ChatMessageCryptoService } from '@/common/chat-message-crypto.service';
 import { AgentToolAuditService } from '../audit/agent-tool-audit.service';
 import { HttpException, HttpStatus, ServiceUnavailableException } from '@nestjs/common';
 import { FlightSearchQueryDto } from '../dto/flight-search-query.dto';
