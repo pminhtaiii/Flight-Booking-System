@@ -61,11 +61,14 @@ def turn_capabilities() -> TurnCapabilities:
 
 @pytest.fixture
 def gateway() -> GuardrailGateway:
-    try:
-        return GuardrailGateway()
-    except (TypeError, Exception):
+    sig = inspect.signature(GuardrailGateway.__init__)
+    if (
+        "registry" in sig.parameters
+        and sig.parameters["registry"].default is inspect.Parameter.empty
+    ):
         registry = create_production_registry()
         return GuardrailGateway(registry)
+    return GuardrailGateway()
 
 
 # ============================================================================

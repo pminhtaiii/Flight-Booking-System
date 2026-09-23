@@ -2,6 +2,7 @@ import asyncio
 import inspect
 import json
 import time
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
@@ -511,7 +512,9 @@ async def test_ingress_degraded_gateway_pii_precedence_contract(monkeypatch):
             assert events[0]["data"]["code"] == "GUARDRAIL_BLOCKED"
 
 
-def test_ingress_order_strict_progression(mock_nestjs_client, monkeypatch):
+def test_ingress_order_strict_progression(
+    mock_nestjs_client: MagicMock, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """
     Assert ingress order in SSE:
     access check -> length guard -> gateway health -> validate_input -> Redis/quota.
@@ -577,14 +580,27 @@ def test_ingress_order_strict_progression(mock_nestjs_client, monkeypatch):
         assert gateway.validate_input.call_count == 0
         assert mock_redis.call_count == 0
 
-    # Stage 4: Input validation rejection (PII) stops before Redis/quota.
+    # Stage 4: Gateway validate_input runs before Redis/quota, and blocking decisions stop execution before Redis.
     gateway.is_healthy.return_value = True
-    gateway.validate_input.return_value = PipelineDecision(
-        status="BLOCK",
-        response_key="GUARDRAIL_INPUT_PII",
-        reason="PII detected",
-    )
-    mock_redis.reset_mock()
+    call_order: list[str] = []
+
+    async def mock_validate(context: Any, message: str) -> PipelineDecision:
+        call_order.append("validate_input")
+        return PipelineDecision(
+            status="BLOCK",
+            response_key="GUARDRAIL_INPUT_PII",
+            reason="PII detected",
+        )
+
+    gateway.validate_input = AsyncMock(side_effect=mock_validate)
+
+    def mock_redis_call() -> MagicMock:
+        call_order.append("redis")
+        return MagicMock()
+
+    mock_redis = MagicMock(side_effect=mock_redis_call)
+    has_t028_admission = "admission_decision" in inspect.signature(ChatController.stream).parameters
+
     with (
         patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client),
         patch("agent.streaming.sse.get_redis_client", mock_redis),
@@ -597,6 +613,26 @@ def test_ingress_order_strict_progression(mock_nestjs_client, monkeypatch):
         )
         assert res4.status_code == 200
         assert mock_redis.call_count == 0
+
+        if has_t028_admission:
+            # Target T028 contract: validate_input is awaited before Redis/quota
+            assert gateway.validate_input.await_count == 1
+            assert call_order == ["validate_input"]
+
+            # Also test non-PII payload that only the mocked gateway blocks
+            call_order.clear()
+            gateway.validate_input.reset_mock()
+            mock_redis.reset_mock()
+            res4_custom = client.post(
+                "/chat/stream",
+                json={"message": "Custom message blocked only by gateway"},
+                headers={"Authorization": f"Bearer {token}", "Origin": "http://localhost:3000"},
+            )
+            assert res4_custom.status_code == 200
+            assert gateway.validate_input.await_count == 1
+            assert mock_redis.call_count == 0
+            assert "redis" not in call_order
+            assert call_order == ["validate_input"]
 
 
 @pytest.mark.asyncio

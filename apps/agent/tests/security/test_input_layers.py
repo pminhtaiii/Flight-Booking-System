@@ -59,7 +59,10 @@ def _create_gateway(
     """Transitional compatibility helper constructing GuardrailGateway across phases.
     Supports current registry-backed GuardrailGateway and future zero-arg / injected constructor."""
     sig = inspect.signature(GuardrailGateway.__init__)
-    if "registry" in sig.parameters:
+    if (
+        "registry" in sig.parameters
+        and sig.parameters["registry"].default is inspect.Parameter.empty
+    ):
         registry = GuardrailRegistry()
         target_layers = (
             list(layers)
@@ -75,10 +78,7 @@ def _create_gateway(
             registry.register(layer)
         return GuardrailGateway(registry)
     if layers is not None:
-        try:
-            return GuardrailGateway(_input_layers=tuple(layers))  # type: ignore[call-arg]
-        except TypeError:
-            pass
+        return GuardrailGateway(_input_layers=tuple(layers))  # type: ignore[call-arg]
     return GuardrailGateway()  # type: ignore[call-arg]
 
 
@@ -762,12 +762,22 @@ async def test_gateway_validate_input_fail_closed_exceptions(
     finally:
         failing_layer.check = original_check  # type: ignore[method-assign]
 
-    # 3. No input layers configured
-    empty_gateway = _create_gateway([])
-    decision_empty = await empty_gateway.validate_input(admission_context, "Find flights")
-    assert decision_empty.status == "BLOCK"
-    assert decision_empty.response_key == GUARDRAIL_INPUT_INJECTION
-    assert decision_empty.validated_data is None
+    # 3. No input layers configured / empty layer composition
+    sig = inspect.signature(GuardrailGateway.__init__)
+    if (
+        "registry" in sig.parameters
+        and sig.parameters["registry"].default is inspect.Parameter.empty
+    ):
+        # Pre-T024 transitional: registry with 0 input layers exercises runtime fail-closed guard
+        empty_gateway = GuardrailGateway(GuardrailRegistry())
+        decision_empty = await empty_gateway.validate_input(admission_context, "Find flights")
+        assert decision_empty.status == "BLOCK"
+        assert decision_empty.response_key == GUARDRAIL_INPUT_INJECTION
+        assert decision_empty.validated_data is None
+    else:
+        # Post-T024 target: empty layer tuple is rejected directly at construction
+        with pytest.raises((ValueError, TypeError)):
+            GuardrailGateway(_input_layers=())
 
 
 def test_guardrail_input_response_keys_unchanged() -> None:

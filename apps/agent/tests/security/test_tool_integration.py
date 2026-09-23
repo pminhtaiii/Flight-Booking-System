@@ -48,10 +48,13 @@ pytestmark = pytest.mark.security
 
 @pytest.fixture
 def production_gateway() -> GuardrailGateway:
-    try:
-        return GuardrailGateway()
-    except (TypeError, Exception):
+    sig = inspect.signature(GuardrailGateway.__init__)
+    if (
+        "registry" in sig.parameters
+        and sig.parameters["registry"].default is inspect.Parameter.empty
+    ):
         return GuardrailGateway(create_production_registry())
+    return GuardrailGateway()
 
 
 @pytest.fixture
