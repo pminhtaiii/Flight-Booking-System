@@ -59,6 +59,11 @@ from agent.guardrails.output_pipeline import (
 )
 from agent.guardrails.registry import create_production_registry
 
+try:
+    from agent.guardrails.base import OutputGuardrailBlockedError
+except ImportError:
+    from agent.guardrails.output_pipeline import OutputGuardrailBlockedError
+
 pytestmark = pytest.mark.security
 
 CI_TOLERANCE = float(
@@ -953,3 +958,11 @@ async def test_memory_growth_and_concurrency_stress() -> None:
     assert memory_delta_mib < 15.0, (
         f"Peak memory delta for 50 streams exceeded 15 MB: {memory_delta_mib:.2f} MB"
     )
+
+
+@pytest.mark.asyncio
+async def test_blocked_stream_raises_output_guardrail_blocked_error() -> None:
+    pipeline = OutputGuardrailPipeline(config={"enabled": True})
+    with pytest.raises(OutputGuardrailBlockedError):
+        async for _ in pipeline.process_token("bearer secret-token-value"):
+            pass

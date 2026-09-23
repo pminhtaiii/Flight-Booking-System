@@ -11,6 +11,11 @@ import pytest
 
 from agent.guardrails.output_pipeline import OutputGuardrailPipeline
 
+try:
+    from agent.guardrails.base import OutputGuardrailBlockedError
+except ImportError:
+    from agent.guardrails.output_pipeline import OutputGuardrailBlockedError
+
 
 @pytest.mark.asyncio
 async def test_output_boundary_never_uses_a_secondary_model() -> None:
@@ -22,4 +27,17 @@ async def test_output_boundary_never_uses_a_secondary_model() -> None:
     emitted.extend([chunk async for chunk in pipeline.flush()])
 
     assert "".join(emitted) == "A safe public response. "
+    secondary.validate_output_chunk.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_output_boundary_blocks_without_secondary_model() -> None:
+    secondary = MagicMock()
+    secondary.validate_output_chunk = AsyncMock()
+    pipeline = OutputGuardrailPipeline(SimpleNamespace(enabled=True), secondary)
+
+    with pytest.raises(OutputGuardrailBlockedError):
+        async for _ in pipeline.process_token("secret=secret-api-key"):
+            pass
+
     secondary.validate_output_chunk.assert_not_awaited()

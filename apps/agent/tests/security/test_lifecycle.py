@@ -1,5 +1,7 @@
+import asyncio
+from types import SimpleNamespace
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -15,6 +17,7 @@ from agent.guardrails.base import (
     ValidatedInput,
 )
 from agent.guardrails.gateway import GuardrailGateway
+from agent.guardrails.output_pipeline import OutputGuardrailPipeline
 from agent.guardrails.registry import BaseGuardrailLayer, GuardrailRegistry
 from agent.queue.message_queue import MessageQueueManager
 
@@ -329,3 +332,161 @@ async def test_chat_controller_delegates_single_validation_pass() -> None:
 
     # Validate that input validation executed exactly once
     assert gateway.validate_input.call_count == 1
+
+
+# ============================================================================
+# Output Stream Lifecycle & Causal Cleanup Contract Tests (T020)
+# ============================================================================
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "scenario",
+    ["normal", "blocked", "stale_fence", "cancelled", "exception"],
+)
+async def test_lifecycle_output_stream_causal_cleanup_across_all_paths(scenario: str) -> None:
+    """Assert causal cleanup sequence for output stream:
+    approved partial persistence -> idempotent non-flushing close -> lease release
+    across normal completion, blocked output, early return, cancellation, and exceptions.
+    """
+    call_order: list[str] = []
+
+    class TrackingOutputPipeline(OutputGuardrailPipeline):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            super().__init__(*args, **kwargs)
+
+        async def aclose(self) -> None:
+            call_order.append("close")
+            await super().aclose()
+
+        def close(self) -> None:
+            call_order.append("close")
+            if hasattr(super(), "close"):
+                super().close()
+            else:
+                self.closed = True
+
+    mock_queue = MagicMock(spec=MessageQueueManager)
+    mock_queue.acquire = AsyncMock(return_value=f"req-lifecycle-{scenario}")
+    mock_queue.get_fence = MagicMock(return_value=50)
+    mock_queue.validate_active_fence = AsyncMock(return_value=True)
+
+    orig_release = AsyncMock()
+
+    async def tracked_release(*args: Any, **kwargs: Any) -> None:
+        call_order.append("release")
+        await orig_release(*args, **kwargs)
+
+    mock_queue.release = tracked_release
+
+    mock_client = MagicMock()
+    mock_client.create_session = AsyncMock(return_value={"id": f"sess-lifecycle-{scenario}"})
+    mock_client.get_memory = AsyncMock(return_value={"recentMessages": [], "summary": None})
+
+    orig_persist = AsyncMock(
+        return_value={"messages": [{"id": f"msg-{scenario}", "sender": "AGENT"}]}
+    )
+
+    async def tracked_persist(s_id: Any, messages: Any, *args: Any, **kwargs: Any) -> Any:
+        if any(m.get("sender") == "USER" for m in messages):
+            call_order.append("user_pre_persist")
+        else:
+            call_order.append("partial_persist")
+        return await orig_persist(s_id, messages, *args, **kwargs)
+
+    mock_client.create_message_batch = tracked_persist
+
+    if scenario == "stale_fence":
+        # Stale fence: active fence check returns False during stream processing
+        mock_queue.validate_active_fence = AsyncMock(side_effect=[True, False])
+
+    mock_graph = MagicMock()
+
+    async def mock_events(*args: Any, **kwargs: Any) -> Any:
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": MagicMock(content="Approved prefix text. ")},
+        }
+        if scenario == "blocked":
+            yield {
+                "event": "on_chat_model_stream",
+                "data": {"chunk": MagicMock(content="4111-1111-1111-1111")},
+            }
+        elif scenario == "cancelled":
+            raise asyncio.CancelledError()
+        elif scenario == "exception":
+            raise RuntimeError("Model generation crashed unexpectedly")
+
+    mock_graph.astream_events = mock_events
+
+    settings = SimpleNamespace(
+        NESTJS_API_URL="http://localhost:3001/api",
+        REQUIRE_GUARDRAIL_GATEWAY=False,
+        MEMORY_WINDOW_SIZE=20,
+        MEMORY_TOKEN_BUDGET=4000,
+        output_guardrail=SimpleNamespace(enabled=True),
+    )
+
+    with patch(
+        "agent.chat_turn.runner.OutputGuardrailPipeline", side_effect=TrackingOutputPipeline
+    ):
+        runner = ChatTurnRunner(
+            settings=settings,
+            graph=mock_graph,
+            queue_manager=mock_queue,
+            client_factory=lambda *args, **kwargs: mock_client,
+        )
+
+        cmd = ChatTurnCommand(
+            user_id="usr-lifecycle",
+            session_id=f"sess-lifecycle-{scenario}",
+            message="Execute turn",
+            token="token-lifecycle",
+        )
+
+        if scenario == "cancelled":
+            with pytest.raises(asyncio.CancelledError):
+                async for _ in runner.run(cmd):
+                    pass
+        else:
+            events = [e async for e in runner.run(cmd)]
+            if scenario == "blocked":
+                errors = [e for e in events if isinstance(e, ErrorEvent)]
+                assert len(errors) == 1
+                assert errors[0].data.code == "OUTPUT_GUARDRAIL_BLOCKED"
+            elif scenario == "exception":
+                errors = [e for e in events if isinstance(e, ErrorEvent)]
+                assert len(errors) == 1
+
+    # Assert causal cleanup ordering
+    assert "close" in call_order
+    assert "release" in call_order
+
+    close_idx = call_order.index("close")
+    release_idx = call_order.index("release")
+    assert close_idx < release_idx, f"close ({close_idx}) must precede release ({release_idx})"
+
+    if scenario in ("normal", "blocked", "cancelled", "exception"):
+        assert "partial_persist" in call_order
+        persist_idx = call_order.index("partial_persist")
+        assert persist_idx < close_idx, (
+            f"persistence ({persist_idx}) must precede close ({close_idx})"
+        )
+
+    # Verify lease release was called with expected session and request id
+    orig_release.assert_awaited_once_with(f"sess-lifecycle-{scenario}", f"req-lifecycle-{scenario}")
+
+
+@pytest.mark.asyncio
+async def test_lifecycle_output_stream_close_is_idempotent_during_cleanup() -> None:
+    """Multiple calls to pipeline close during cleanup are safe and do not raise."""
+    pipeline = OutputGuardrailPipeline(config=SimpleNamespace(enabled=True), session_id="sess-idem")
+    pipeline.buffer.add_token("bearer ")
+
+    # First close
+    await pipeline.aclose()
+    assert pipeline.closed is True
+
+    # Repeated close is idempotent and does not raise
+    await pipeline.aclose()
+    assert pipeline.closed is True

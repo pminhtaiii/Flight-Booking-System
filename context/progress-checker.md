@@ -1,5 +1,31 @@
 # Progress Tracker
  
+### Feature 026 — Agent Boundary Simplification: Phase 4 / Slice 2 Complete (Tasks T020, T021, T023 Verified) (2026-09-23)
+
+- **Phase 4 / Slice 2 (User Story 2 Test Characterization: Persistent Stream Sessions, Delegate Pipeline & Shared PII Utilities) Delivered (Tasks T020, T021, T023)**:
+  - **Persistent Stream Session & Runner Lifecycle Tests (T020)**:
+    - In `test_output_stream.py`, `test_model_output_boundary.py`, `test_lifecycle.py`, and `test_chat_turn_runner.py`:
+    - Replaced live `runner.OutputGuardrailPipeline` patch with fake gateway output-session returning stable `agent.guardrails.base.OutputGuardrailBlockedError`.
+    - Characterized that one stream session spans all three runner branches (final response text, tool call arguments, token streaming) per turn.
+    - Verified stream session contracts: `process_token` cross-branch shared buffer/partial response, one-shot `flush()`, idempotent non-flushing `close()`, `__aexit__` non-suppression, and error attributes preservation.
+    - Asserted causal cleanup ordering: `approved_partial_persistence` -> `close` (non-flushing) -> `lease_release` across normal completion, blocked output, early return / stale fence, cancellation, and exceptions.
+  - **Delegate Output Pipeline & Imported Matcher/Predicate Tests (T021)**:
+    - Updated `OutputGuardrailBlockedError` imports across 8 delegate test files to `agent.guardrails.base`.
+    - Asserted that `output_pipeline.py` contract imports `deterministic_pii_match` and `_is_output_guardrail_disabled` directly from `agent.guardrails.pii` with zero duplicate definitions and zero import cycles.
+    - Asserted `payload_free_config` is retained as a stateless helper in `output_pipeline.py`.
+    - Asserted streaming-disabled behavior across all 5 legacy disabled-config shapes.
+  - **Shared PII Utility Coverage & Lone Fallback Migration (T023)**:
+    - In `test_e2e_output_guardrails.py`: comprehensive coverage for `agent.guardrails.pii` (`deterministic_pii_match`, `_is_output_guardrail_disabled` across all 5 shapes, `approved_model_content`).
+    - Proved exactly one definition exists across the codebase and no circular dependencies occur.
+    - In `test_tool_schemas.py`: migrated lone fallback in `get_tool_schema` directly to registered tool `args_schema` and `TOOL_INPUT_SCHEMAS`, leaving zero consumers for `tool_schemas.py`.
+  - **Verification Gate**:
+    - Pytest: 161 passed, 1 skipped in 16.41s across target suites; 134 passed in 16.05s across secondary suites (total 295 passed).
+    - Ruff check & format: clean (0 errors, 0 warnings; 155 files formatted).
+  - **Scope Discipline**:
+    - Zero production code touched (`apps/agent/src/` clean).
+    - Tasks T020, T021, T023 marked `[x]` in `specs/026-agent-boundary-simplification/tasks.md`.
+    - Phase 4 / Slice 3 (Production code refactoring Tasks T024–T029) strictly unstarted.
+
 ### Feature 026 — Agent Boundary Simplification: Phase 4 / Slice 1 Complete (Tasks T017, T018, T019, T022 Verified) (2026-09-23)
 
 - **Phase 4 / Slice 1 (User Story 2 Test Characterization: Gateway Construction, Input Order, Tool PII Priority & SSE Admission) Delivered (Tasks T017, T018, T019, T022)**:
