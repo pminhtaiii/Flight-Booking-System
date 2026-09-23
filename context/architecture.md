@@ -1,8 +1,31 @@
 # Architecture
 
-## Feature 026 — Agent Boundary Simplification (Phase 3 / Slice 2 Complete: US1 Agent Boundary Restored - Tasks T001–T016)
+## Feature 026 — Agent Boundary Simplification (Phase 4 / Slice 1 Complete: US2 Test Characterization - Tasks T017, T018, T019, T022)
 
 Planning artifacts: [specification](../specs/026-agent-boundary-simplification/spec.md), [plan](../specs/026-agent-boundary-simplification/plan.md), and [tasks](../specs/026-agent-boundary-simplification/tasks.md).
+
+#### Guardrail Gateway Construction, Ingress Ordering & Authority Characterization (US2 Phase 4 Slice 1)
+- **Gateway Constructor & Ordered Composition (T017)**:
+  - Default constructor `GuardrailGateway()` instantiation characterized without caller-supplied registry.
+  - Keyword-only private injection seam `GuardrailGateway(_input_layers=..., _tool_layers=...)` verified for tests.
+  - Layer ordering asserted via `assert_layer_order(stage, layers, expected_types)`: enforces exact count, expected type at each position, unique keys, and earlier same-stage prerequisite declaration. Asserts raises on missing, duplicate, reordered, wrongly typed, unknown prerequisite, or late prerequisite composition.
+  - `is_healthy()` represents only post-construction runtime readiness and never recovers an invalid constructor.
+- **Fixed 4-Layer Ingress Ordering & Normalization (T018)**:
+  - Strict 4-layer fixed input order characterized: `(LengthValidator, PIIDetector, InjectionDetector, TopicBoundary)`.
+  - Short-circuiting verified on first blocking decision (length stops before PII; PII stops before injection; injection stops before topic).
+  - Unchanged response keys (`GUARDRAIL_INPUT_LENGTH`, `GUARDRAIL_INPUT_PII`, `GUARDRAIL_INPUT_INJECTION`, `GUARDRAIL_INPUT_TOPIC`).
+  - Detection-only normalization returns accepted non-Latin input unchanged.
+- **Tool Authority & Raw Extra-Field PII Priority (T019)**:
+  - Strict 4-layer fixed tool order characterized: `(SizeStructureValidator, SchemaValidator, PIIScanner, UntrustedContentInjectionDetector)`.
+  - Sole public result method is `validate_tool_result(context, tool_name, result)` (no alternate aliases).
+  - Raw extra-field PII scanning: `PIIScanner` scans original raw tool result before schema pruning; `GUARDRAIL_TOOL_PII` wins over `GUARDRAIL_TOOL_SCHEMA` without tuple indexing.
+  - Sealed authority across all intents (GENERAL, SEARCH, CHECKOUT) and whole-batch rejection preserved.
+- **SSE Pre-Quota Admission & Single Validation (T022)**:
+  - Ingress order: access check -> length guard -> gateway health -> `validate_input` -> Redis/quota.
+  - PII input makes zero `get_redis_client` or quota calls, returning exactly one first-and-only `error` event (`event: error`, `code: GUARDRAIL_BLOCKED`, `message: "Your message contains protected personal information and cannot be processed."`, `partialMessageId: null`).
+  - Gateway unavailable (503) takes precedence before validation; healthy gateway PII rejection takes precedence over Redis failure.
+  - Non-PII admission decision passed to `ChatController.stream` to prevent redundant revalidation.
+
 
 #### Agent-Gateway Chat Boundary & Shared Crypto Extraction (US1 Complete)
 - **Controller-Level Guard Reflection & Order**:

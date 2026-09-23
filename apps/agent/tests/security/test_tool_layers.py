@@ -14,6 +14,7 @@ Requirements:
   - Benign travel tool results pass.
 """
 
+import inspect
 from typing import Any
 
 import pytest
@@ -21,26 +22,20 @@ import pytest
 from agent.guardrails.base import (
     GUARDRAIL_TOOL_PII,
     GUARDRAIL_TOOL_SCHEMA,
+    BaseGuardrailLayer,
     TurnCapabilities,
     ValidatedToolResult,
 )
 from agent.guardrails.gateway import GuardrailGateway
+from agent.guardrails.layers.tool_output import (
+    PIIScanner,
+    SchemaValidator,
+    SizeStructureValidator,
+    ToolOutput,
+    ToolPIIScanner,
+    UntrustedContentInjectionDetector,
+)
 from agent.guardrails.registry import create_production_registry
-
-# Lazy / conditional imports for T024 layer classes
-try:
-    from agent.guardrails.layers.tool_output import (
-        PIIScanner,
-        SizeStructureValidator,
-        ToolPIIScanner,
-        UntrustedContentInjectionDetector,
-    )
-except ImportError:
-    SizeStructureValidator = None  # type: ignore[assignment, misc]
-    ToolPIIScanner = None  # type: ignore[assignment, misc]
-    PIIScanner = None  # type: ignore[assignment, misc]
-    UntrustedContentInjectionDetector = None  # type: ignore[assignment, misc]
-
 
 pytestmark = pytest.mark.security
 
@@ -66,8 +61,11 @@ def turn_capabilities() -> TurnCapabilities:
 
 @pytest.fixture
 def gateway() -> GuardrailGateway:
-    registry = create_production_registry()
-    return GuardrailGateway(registry)
+    try:
+        return GuardrailGateway()
+    except (TypeError, Exception):
+        registry = create_production_registry()
+        return GuardrailGateway(registry)
 
 
 # ============================================================================
@@ -613,12 +611,6 @@ async def test_schema_projection_leaves_modelled_injection_for_the_dedicated_det
     turn_capabilities: TurnCapabilities,
 ) -> None:
     """Schema projection is structural only; the ordered injection layer owns content policy."""
-    from agent.guardrails.layers.tool_output import (
-        SchemaValidator,
-        ToolOutput,
-        UntrustedContentInjectionDetector,
-    )
-
     schema = SchemaValidator()
     detector = UntrustedContentInjectionDetector()
     raw = ToolOutput(
@@ -640,8 +632,6 @@ async def test_checkout_signal_plain_text_error_passes_as_safe_error_result(
     turn_capabilities: TurnCapabilities,
 ) -> None:
     """Legitimate checkout validation errors are not JSON and must remain usable tool results."""
-    from agent.guardrails.layers.tool_output import SchemaValidator, ToolOutput
-
     decision = await SchemaValidator().check(
         turn_capabilities,
         ToolOutput(
@@ -655,3 +645,250 @@ async def test_checkout_signal_plain_text_error_passes_as_safe_error_result(
     assert decision.validated_data.data == {
         "error": "No search results available. Please perform a search first."
     }
+
+
+# ============================================================================
+# 3. Fixed Layer Order & Contract Authority Tests (T019)
+# ============================================================================
+
+
+def test_fixed_tool_layer_order_and_types(gateway: GuardrailGateway) -> None:
+    """Fixed tool layer order must be exactly (SizeStructureValidator, SchemaValidator, PIIScanner, UntrustedContentInjectionDetector)."""
+    expected_types = (
+        SizeStructureValidator,
+        SchemaValidator,
+        PIIScanner,
+        UntrustedContentInjectionDetector,
+    )
+    if hasattr(gateway, "_tool_layers"):
+        layers = gateway._tool_layers
+    elif hasattr(gateway, "tool_layers"):
+        layers = gateway.tool_layers
+    elif hasattr(gateway, "registry"):
+        layers = gateway.registry.ordered_layers("tool")
+    else:
+        pytest.fail("Cannot determine tool layers from GuardrailGateway")
+
+    assert tuple(type(layer) for layer in layers) == expected_types
+    assert len(layers) == 4
+
+    # Verify keys and stage
+    assert SizeStructureValidator.key == "tool.size_structure"
+    assert SchemaValidator.key == "tool.schema"
+    assert PIIScanner.key == "tool.pii"
+    assert UntrustedContentInjectionDetector.key == "tool.untrusted_content_injection"
+
+    assert all(getattr(layer, "stage", None) == "tool" for layer in layers)
+
+    # Verify prerequisites form strict forward-only dependency chain
+    assert SizeStructureValidator.prerequisites == ()
+    assert SchemaValidator.prerequisites == ("tool.size_structure",)
+    assert PIIScanner.prerequisites == ("tool.schema",)
+    assert UntrustedContentInjectionDetector.prerequisites == ("tool.pii",)
+
+
+def test_sole_public_tool_result_method(gateway: GuardrailGateway) -> None:
+    """GuardrailGateway must expose validate_tool_result(context, tool_name, result) as sole public result method."""
+    assert hasattr(gateway, "validate_tool_result"), "GuardrailGateway missing validate_tool_result"
+    sig = inspect.signature(gateway.validate_tool_result)
+    params = list(sig.parameters.keys())
+    assert params == ["context", "tool_name", "result"], (
+        f"validate_tool_result signature mismatch: expected ['context', 'tool_name', 'result'], got {params}"
+    )
+
+    # Prohibited aliases must NOT exist on GuardrailGateway
+    prohibited_aliases = (
+        "validate_tool_output",
+        "validate_tool",
+        "validate_result",
+        "check_tool_result",
+        "check_tool_output",
+        "validate_output_tool",
+        "validate_tool_response",
+    )
+    for alias in prohibited_aliases:
+        assert not hasattr(gateway, alias), (
+            f"Prohibited tool-result method alias '{alias}' found on GuardrailGateway"
+        )
+
+
+@pytest.mark.asyncio
+async def test_schema_failure_with_extra_fields_pii_wins_over_schema(
+    gateway: GuardrailGateway,
+    turn_capabilities: TurnCapabilities,
+) -> None:
+    """When schema validation fails and raw result contains extra fields with PII,
+
+    PIIScanner scans the original raw result and GUARDRAIL_TOOL_PII wins over GUARDRAIL_TOOL_SCHEMA.
+    No numeric index encodes this rule.
+    """
+    call = DummyToolCall("search_flights")
+
+    # Schema invalid (flights is not a list) AND extra field with synthetic credit card PII
+    tainted_schema_invalid_result = {
+        "flights": "INVALID_NOT_A_LIST",
+        "extra_debug_info": {
+            "unregistered_card_field": "4532015112830366",
+        },
+    }
+
+    # Test via validate_tool_result
+    decision = await gateway.validate_tool_result(
+        turn_capabilities,
+        "search_flights",
+        tainted_schema_invalid_result,
+    )
+    assert decision.status == "BLOCK"
+    assert decision.response_key == GUARDRAIL_TOOL_PII, (
+        f"Expected GUARDRAIL_TOOL_PII to win over schema failure, got {decision.response_key}"
+    )
+    assert decision.validated_data is None
+
+    # Test via execute_tool
+    async def invoke_tainted() -> dict[str, Any]:
+        return tainted_schema_invalid_result
+
+    decision_exec = await gateway.execute_tool(turn_capabilities, call, invoke_tainted)
+    assert decision_exec.status == "BLOCK"
+    assert decision_exec.response_key == GUARDRAIL_TOOL_PII
+    assert decision_exec.validated_data is None
+
+
+@pytest.mark.asyncio
+async def test_schema_valid_result_with_extra_fields_pii_scanned_from_raw_result(
+    gateway: GuardrailGateway,
+    turn_capabilities: TurnCapabilities,
+) -> None:
+    """When schema validation passes and projection strips extra fields,
+
+    PIIScanner scans the original raw result and blocks with GUARDRAIL_TOOL_PII.
+    """
+    call = DummyToolCall("search_flights")
+
+    tainted_valid_schema_result = {
+        "flights": [
+            {
+                "flight_id": "FL-100",
+                "airline": "SkyWings",
+                "price": 350.00,
+                "origin": "SFO",
+                "destination": "JFK",
+            }
+        ],
+        "unregistered_debug_card": "4532015112830366",
+    }
+
+    decision = await gateway.validate_tool_result(
+        turn_capabilities,
+        "search_flights",
+        tainted_valid_schema_result,
+    )
+    assert decision.status == "BLOCK"
+    assert decision.response_key == GUARDRAIL_TOOL_PII
+    assert decision.validated_data is None
+
+    async def invoke_tainted() -> dict[str, Any]:
+        return tainted_valid_schema_result
+
+    decision_exec = await gateway.execute_tool(turn_capabilities, call, invoke_tainted)
+    assert decision_exec.status == "BLOCK"
+    assert decision_exec.response_key == GUARDRAIL_TOOL_PII
+    assert decision_exec.validated_data is None
+
+
+@pytest.mark.asyncio
+async def test_schema_invalid_result_without_pii_blocks_with_schema_key(
+    gateway: GuardrailGateway,
+    turn_capabilities: TurnCapabilities,
+) -> None:
+    """When schema validation fails and no PII is present, GUARDRAIL_TOOL_SCHEMA is returned."""
+    invalid_result = {"flights": "INVALID_NOT_A_LIST"}
+
+    decision = await gateway.validate_tool_result(
+        turn_capabilities,
+        "search_flights",
+        invalid_result,
+    )
+    assert decision.status == "BLOCK"
+    assert decision.response_key == GUARDRAIL_TOOL_SCHEMA
+    assert decision.validated_data is None
+
+
+def test_pii_scanner_named_identity_resolution_not_numeric_index() -> None:
+    """Assert PIIScanner is identified by type/name/key contract, not numeric index."""
+    assert PIIScanner.key == "tool.pii"
+    assert issubclass(PIIScanner, BaseGuardrailLayer)
+
+    sample_layers = [
+        SizeStructureValidator(),
+        SchemaValidator(),
+        PIIScanner(),
+        UntrustedContentInjectionDetector(),
+    ]
+    named_pii = [
+        layer
+        for layer in sample_layers
+        if isinstance(layer, PIIScanner) or getattr(layer, "key", "") == "tool.pii"
+    ]
+    assert len(named_pii) == 1
+    assert named_pii[0].key == "tool.pii"
+
+
+@pytest.mark.asyncio
+async def test_validate_tool_result_sealed_authority_denial(
+    gateway: GuardrailGateway,
+    turn_capabilities: TurnCapabilities,
+) -> None:
+    """validate_tool_result rejects tools outside sealed authority immediately with GUARDRAIL_TOOL_SCHEMA."""
+    decision = await gateway.validate_tool_result(
+        turn_capabilities,
+        "signal_checkout_intent",
+        {"status": "ok"},
+    )
+    assert decision.status == "BLOCK"
+    assert decision.response_key == GUARDRAIL_TOOL_SCHEMA
+    assert decision.validated_data is None
+    assert (
+        "sealed authority" in (decision.reason or "").lower()
+        or "forbidden" in (decision.reason or "").lower()
+    )
+
+
+@pytest.mark.asyncio
+async def test_validate_tool_result_fail_closed_on_unhandled_exception(
+    gateway: GuardrailGateway,
+    turn_capabilities: TurnCapabilities,
+) -> None:
+    """validate_tool_result fails closed without leaking exception details when an internal error occurs."""
+
+    class _CrashingPayload:
+        def __str__(self) -> str:
+            raise RuntimeError("Database connection string leaked: secret_conn_canary_98765")
+
+        def __repr__(self) -> str:
+            raise RuntimeError("Database connection string leaked: secret_conn_canary_98765")
+
+    decision = await gateway.validate_tool_result(
+        turn_capabilities,
+        "search_flights",
+        _CrashingPayload(),
+    )
+    assert decision.status == "BLOCK"
+    assert decision.response_key == GUARDRAIL_TOOL_SCHEMA
+    assert decision.validated_data is None
+    assert "secret_conn_canary_98765" not in (decision.reason or "")
+
+
+@pytest.mark.asyncio
+async def test_validate_tool_result_invalid_context_fails_closed(
+    gateway: GuardrailGateway,
+) -> None:
+    """validate_tool_result fails closed when context is not TurnCapabilities."""
+    decision = await gateway.validate_tool_result(
+        None,  # type: ignore[arg-type]
+        "search_flights",
+        {"flights": []},
+    )
+    assert decision.status == "BLOCK"
+    assert decision.response_key == GUARDRAIL_TOOL_SCHEMA
+    assert decision.validated_data is None

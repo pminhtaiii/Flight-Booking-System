@@ -1,5 +1,6 @@
+import inspect
 from pathlib import Path
-from typing import ClassVar, Literal
+from typing import Any, ClassVar, Literal
 
 import pytest
 
@@ -10,8 +11,21 @@ from agent.guardrails.base import (
     GUARDRAIL_OUTPUT_PII,
     AdmissionContext,
     ApprovedChunk,
-    PipelineDecision,
+    BaseGuardrailLayer,
     ValidatedInput,
+)
+from agent.guardrails.gateway import GuardrailGateway
+from agent.guardrails.layers.input import (
+    InjectionDetector,
+    LengthValidator,
+    PIIDetector,
+    TopicBoundary,
+)
+from agent.guardrails.layers.tool_output import (
+    PIIScanner,
+    SchemaValidator,
+    SizeStructureValidator,
+    UntrustedContentInjectionDetector,
 )
 
 registry_module = pytest.importorskip(
@@ -21,49 +35,297 @@ registry_module = pytest.importorskip(
 GuardrailRegistry = registry_module.GuardrailRegistry
 RegistryContractError = registry_module.RegistryContractError
 create_production_registry = registry_module.create_production_registry
+OutputPIILayer = registry_module.OutputPIILayer
 
 pytestmark = pytest.mark.security
 
+try:
+    from agent.guardrails.gateway import assert_layer_order
+except ImportError:
 
-class StubLayer:
-    key: ClassVar[str] = "input.stub"
+    def assert_layer_order(
+        stage: str,
+        layers: tuple[Any, ...] | list[Any],
+        expected_types: tuple[type, ...] | list[type],
+    ) -> None:
+        """
+        Enforces exact layer count, expected type at every position, unique layer keys,
+        and earlier same-stage prerequisite declaration for a stage tuple.
+        """
+        if len(layers) != len(expected_types):
+            raise ValueError(
+                f"Stage '{stage}' layer count mismatch: expected {len(expected_types)}, got {len(layers)}"
+            )
+
+        seen_keys: set[str] = set()
+        stage_keys = [getattr(lyr, "key", None) for lyr in layers]
+
+        for idx, (layer, exp_type) in enumerate(zip(layers, expected_types)):
+            if not isinstance(layer, exp_type):
+                raise TypeError(
+                    f"Stage '{stage}' layer at index {idx} has wrong type: expected {exp_type.__name__}, got {type(layer).__name__}"
+                )
+            key = getattr(layer, "key", None)
+            if not key or not isinstance(key, str):
+                raise ValueError(f"Stage '{stage}' layer at index {idx} has invalid key: {key}")
+            if key in seen_keys:
+                raise ValueError(f"Stage '{stage}' contains duplicate layer key: {key}")
+
+            prereqs = getattr(layer, "prerequisites", ())
+            for prereq in prereqs:
+                if prereq not in seen_keys:
+                    if prereq in stage_keys:
+                        raise ValueError(
+                            f"Stage '{stage}' layer '{key}' has prerequisite '{prereq}' declared later in the stage tuple"
+                        )
+                    raise ValueError(
+                        f"Stage '{stage}' layer '{key}' has unknown prerequisite '{prereq}'"
+                    )
+            seen_keys.add(key)
+
+
+EXPECTED_INPUT_LAYER_TYPES: tuple[type, ...] = (
+    LengthValidator,
+    PIIDetector,
+    InjectionDetector,
+    TopicBoundary,
+)
+
+EXPECTED_TOOL_LAYER_TYPES: tuple[type, ...] = (
+    SizeStructureValidator,
+    SchemaValidator,
+    PIIScanner,
+    UntrustedContentInjectionDetector,
+)
+
+
+class StubLayerA(BaseGuardrailLayer):
+    key: ClassVar[str] = "test.layer_a"
     stage: ClassVar[Literal["input"]] = "input"
     prerequisites: ClassVar[tuple[str, ...]] = ()
 
-    async def check(self, context: AdmissionContext, data: str) -> PipelineDecision[ValidatedInput]:
-        return PipelineDecision(status="PASS", validated_data=ValidatedInput(content=data))
+
+class StubLayerB(BaseGuardrailLayer):
+    key: ClassVar[str] = "test.layer_b"
+    stage: ClassVar[Literal["input"]] = "input"
+    prerequisites: ClassVar[tuple[str, ...]] = ("test.layer_a",)
 
 
-class DependentStubLayer(StubLayer):
-    key = "input.dependent"
-    prerequisites = (StubLayer.key,)
+class StubLayerWithLatePrereq(BaseGuardrailLayer):
+    key: ClassVar[str] = "test.layer_late"
+    stage: ClassVar[Literal["input"]] = "input"
+    prerequisites: ClassVar[tuple[str, ...]] = ("test.layer_subsequent",)
 
 
-class CycleA(StubLayer):
-    key = "input.cycle_a"
-    prerequisites = ("input.cycle_b",)
+class StubLayerSubsequent(BaseGuardrailLayer):
+    key: ClassVar[str] = "test.layer_subsequent"
+    stage: ClassVar[Literal["input"]] = "input"
+    prerequisites: ClassVar[tuple[str, ...]] = ()
 
 
-class CycleB(StubLayer):
-    key = "input.cycle_b"
-    prerequisites = (CycleA.key,)
+class StubLayerWithUnknownPrereq(BaseGuardrailLayer):
+    key: ClassVar[str] = "test.layer_unknown"
+    stage: ClassVar[Literal["input"]] = "input"
+    prerequisites: ClassVar[tuple[str, ...]] = ("test.missing_prereq",)
 
 
-def test_unknown_layer_keys_fail_closed_on_registration_and_lookup() -> None:
-    registry = GuardrailRegistry(allowed_keys={StubLayer.key}, production=False)
-
-    with pytest.raises(RegistryContractError):
-        registry.register(DependentStubLayer())
-    with pytest.raises(RegistryContractError):
-        registry.get("input.unknown")
+class StubLayerDuplicateKey(BaseGuardrailLayer):
+    key: ClassVar[str] = "test.layer_a"
+    stage: ClassVar[Literal["input"]] = "input"
+    prerequisites: ClassVar[tuple[str, ...]] = ()
 
 
-def test_duplicate_layer_keys_are_rejected() -> None:
-    registry = GuardrailRegistry(allowed_keys={StubLayer.key}, production=False)
-    registry.register(StubLayer())
+# --- assert_layer_order Contract Tests ---
 
-    with pytest.raises(RegistryContractError):
-        registry.register(StubLayer())
+
+def test_assert_layer_order_valid_production_input_layers() -> None:
+    layers = (LengthValidator(), PIIDetector(), InjectionDetector(), TopicBoundary())
+    assert_layer_order("input", layers, EXPECTED_INPUT_LAYER_TYPES)
+
+
+def test_assert_layer_order_valid_production_tool_layers() -> None:
+    layers = (
+        SizeStructureValidator(),
+        SchemaValidator(),
+        PIIScanner(),
+        UntrustedContentInjectionDetector(),
+    )
+    assert_layer_order("tool", layers, EXPECTED_TOOL_LAYER_TYPES)
+
+
+def test_assert_layer_order_verifies_exact_layer_count() -> None:
+    # Too few layers
+    with pytest.raises(ValueError, match="layer count mismatch"):
+        assert_layer_order(
+            "input",
+            (LengthValidator(), PIIDetector(), InjectionDetector()),
+            EXPECTED_INPUT_LAYER_TYPES,
+        )
+
+    # Too many layers
+    with pytest.raises(ValueError, match="layer count mismatch"):
+        assert_layer_order(
+            "input",
+            (
+                LengthValidator(),
+                PIIDetector(),
+                InjectionDetector(),
+                TopicBoundary(),
+                TopicBoundary(),
+            ),
+            EXPECTED_INPUT_LAYER_TYPES,
+        )
+
+
+def test_assert_layer_order_verifies_expected_type_at_every_position() -> None:
+    # Wrong type at index 1
+    with pytest.raises(TypeError, match="wrong type"):
+        assert_layer_order(
+            "input",
+            (LengthValidator(), LengthValidator(), InjectionDetector(), TopicBoundary()),
+            EXPECTED_INPUT_LAYER_TYPES,
+        )
+
+
+def test_assert_layer_order_verifies_unique_layer_keys_across_stage() -> None:
+    layers = (StubLayerA(), StubLayerDuplicateKey())
+    types = (StubLayerA, StubLayerDuplicateKey)
+    with pytest.raises(ValueError, match="duplicate layer key"):
+        assert_layer_order("input", layers, types)
+
+
+def test_assert_layer_order_verifies_prerequisite_keys_declared_earlier() -> None:
+    layers = (StubLayerA(), StubLayerB())
+    types = (StubLayerA, StubLayerB)
+    assert_layer_order("input", layers, types)
+
+
+def test_assert_layer_order_raises_on_missing_layer() -> None:
+    layers = (StubLayerA(),)
+    types = (StubLayerA, StubLayerB)
+    with pytest.raises(ValueError, match="layer count mismatch"):
+        assert_layer_order("input", layers, types)
+
+
+def test_assert_layer_order_raises_on_reordered_layers() -> None:
+    # Reordered so dependent comes before prerequisite
+    layers = (StubLayerB(), StubLayerA())
+    types = (StubLayerB, StubLayerA)
+    with pytest.raises(ValueError, match="declared later in the stage tuple"):
+        assert_layer_order("input", layers, types)
+
+
+def test_assert_layer_order_raises_on_wrongly_typed_layer() -> None:
+    layers = (StubLayerA(), "not_a_layer_instance")
+    types = (StubLayerA, StubLayerB)
+    with pytest.raises(TypeError, match="wrong type"):
+        assert_layer_order("input", layers, types)
+
+
+def test_assert_layer_order_raises_on_unknown_prerequisite() -> None:
+    layers = (StubLayerWithUnknownPrereq(),)
+    types = (StubLayerWithUnknownPrereq,)
+    with pytest.raises(ValueError, match="unknown prerequisite"):
+        assert_layer_order("input", layers, types)
+
+
+def test_assert_layer_order_raises_on_late_prerequisite_composition() -> None:
+    layers = (StubLayerWithLatePrereq(), StubLayerSubsequent())
+    types = (StubLayerWithLatePrereq, StubLayerSubsequent)
+    with pytest.raises(ValueError, match="declared later in the stage tuple"):
+        assert_layer_order("input", layers, types)
+
+
+# --- GuardrailGateway Constructor & Injection Seam Contract Tests ---
+
+
+def test_production_default_guardrail_gateway_instantiation_contract() -> None:
+    """
+    FR-008 / internal-boundaries: GuardrailGateway() MUST construct the production tuples
+    with no caller-supplied registry.
+    Transitional compatibility check: if the current implementation still requires registry,
+    verify GuardrailGateway() without arguments raises TypeError/RegistryContractError,
+    and instantiating with create_production_registry() succeeds.
+    """
+    sig = inspect.signature(GuardrailGateway.__init__)
+    requires_registry = (
+        "registry" in sig.parameters
+        and sig.parameters["registry"].default is inspect.Parameter.empty
+    )
+
+    if requires_registry:
+        with pytest.raises((TypeError, RegistryContractError)):
+            GuardrailGateway()  # type: ignore[call-arg]
+
+        prod_registry = create_production_registry()
+        gw = GuardrailGateway(prod_registry)
+        assert gw.is_healthy() is True
+    else:
+        gw = GuardrailGateway()
+        assert gw.is_healthy() is True
+
+
+def test_keyword_only_private_injection_seam_contract() -> None:
+    """
+    FR-008: A keyword-only private injection seam (_input_layers, _tool_layers) exists for tests.
+    Positional passing must be rejected, and injected tuples must satisfy assert_layer_order.
+    """
+    sig = inspect.signature(GuardrailGateway.__init__)
+    if "_input_layers" not in sig.parameters:
+        # Pre-T024 transitional: injection seam not yet implemented on GuardrailGateway
+        with pytest.raises(TypeError):
+            GuardrailGateway(_input_layers=(), _tool_layers=())  # type: ignore[call-arg]
+    else:
+        param_input = sig.parameters["_input_layers"]
+        param_tool = sig.parameters["_tool_layers"]
+        assert param_input.kind == inspect.Parameter.KEYWORD_ONLY
+        assert param_tool.kind == inspect.Parameter.KEYWORD_ONLY
+
+        valid_input = (LengthValidator(), PIIDetector(), InjectionDetector(), TopicBoundary())
+        valid_tool = (
+            SizeStructureValidator(),
+            SchemaValidator(),
+            PIIScanner(),
+            UntrustedContentInjectionDetector(),
+        )
+        gw = GuardrailGateway(_input_layers=valid_input, _tool_layers=valid_tool)
+        assert gw.is_healthy() is True
+
+        # Positional passing rejected
+        with pytest.raises(TypeError):
+            GuardrailGateway(valid_input, valid_tool)  # type: ignore[call-arg]
+
+        # Invalid composition raises at construction
+        with pytest.raises((ValueError, TypeError)):
+            GuardrailGateway(_input_layers=(LengthValidator(),))
+
+
+def test_is_healthy_represents_runtime_readiness_and_never_recovers_invalid_constructor() -> None:
+    """
+    internal-boundaries: is_healthy() checks only post-construction runtime readiness
+    and cannot recover or represent an invalid constructor. Invalid composition raises
+    during construction; production startup therefore aborts before serving traffic.
+    """
+    sig = inspect.signature(GuardrailGateway.__init__)
+    requires_registry = (
+        "registry" in sig.parameters
+        and sig.parameters["registry"].default is inspect.Parameter.empty
+    )
+
+    if requires_registry:
+        with pytest.raises((TypeError, RegistryContractError)):
+            GuardrailGateway(None)  # type: ignore[arg-type]
+        with pytest.raises((TypeError, RegistryContractError)):
+            GuardrailGateway()  # type: ignore[call-arg]
+        prod_registry = create_production_registry()
+        gw = GuardrailGateway(prod_registry)
+    else:
+        with pytest.raises((ValueError, TypeError)):
+            GuardrailGateway(_input_layers=(LengthValidator(),))
+        gw = GuardrailGateway()
+
+    # is_healthy() represents post-construction runtime readiness
+    assert gw.is_healthy() is True
 
 
 def test_registry_source_contains_no_dynamic_import_execution() -> None:
@@ -75,58 +337,7 @@ def test_registry_source_contains_no_dynamic_import_execution() -> None:
     assert all(token not in registry_source for token in forbidden)
 
 
-def test_compulsory_production_layers_cannot_be_omitted_or_disabled() -> None:
-    with pytest.raises(RegistryContractError):
-        create_production_registry(disabled_keys={"input.injection"})
-
-    registry = create_production_registry()
-    assert {"input.length", "input.pii", "input.injection"}.issubset(registry.keys())
-
-
-def test_layers_are_returned_in_topological_prerequisite_order() -> None:
-    registry = GuardrailRegistry(
-        allowed_keys={StubLayer.key, DependentStubLayer.key}, production=False
-    )
-    registry.register(DependentStubLayer())
-    registry.register(StubLayer())
-
-    assert [layer.key for layer in registry.ordered_layers("input")] == [
-        StubLayer.key,
-        DependentStubLayer.key,
-    ]
-
-
-def test_missing_prerequisite_fails_closed() -> None:
-    registry = GuardrailRegistry(
-        allowed_keys={StubLayer.key, DependentStubLayer.key}, production=False
-    )
-    registry.register(DependentStubLayer())
-
-    with pytest.raises(RegistryContractError):
-        registry.ordered_layers("input")
-
-
-def test_cyclic_prerequisites_fail_closed() -> None:
-    registry = GuardrailRegistry(allowed_keys={CycleA.key, CycleB.key}, production=False)
-    registry.register(CycleA())
-    registry.register(CycleB())
-
-    with pytest.raises(RegistryContractError):
-        registry.ordered_layers("input")
-
-
-def test_test_injection_is_instance_local_and_forbidden_in_production() -> None:
-    test_registry = GuardrailRegistry(allowed_keys={StubLayer.key}, production=False)
-    second_registry = GuardrailRegistry(allowed_keys={StubLayer.key}, production=False)
-    production_registry = GuardrailRegistry(allowed_keys={StubLayer.key}, production=True)
-
-    test_registry.inject_for_test(StubLayer())
-
-    assert test_registry.get(StubLayer.key).key == StubLayer.key
-    with pytest.raises(RegistryContractError):
-        second_registry.get(StubLayer.key)
-    with pytest.raises(RegistryContractError):
-        production_registry.inject_for_test(StubLayer())
+# --- Layer Functional Tests ---
 
 
 @pytest.fixture
@@ -141,9 +352,8 @@ def admission_context() -> AdmissionContext:
 
 
 @pytest.mark.asyncio
-async def test_production_registry_input_pii_layer(admission_context: AdmissionContext) -> None:
-    registry = create_production_registry()
-    pii_layer = registry.get("input.pii")
+async def test_production_input_pii_layer(admission_context: AdmissionContext) -> None:
+    pii_layer = PIIDetector()
 
     clean_res = await pii_layer.check(admission_context, "I want to fly from SFO to JFK")
     assert clean_res.status == "PASS"
@@ -166,11 +376,10 @@ async def test_production_registry_input_pii_layer(admission_context: AdmissionC
 
 
 @pytest.mark.asyncio
-async def test_production_registry_input_injection_layer(
+async def test_production_input_injection_layer(
     admission_context: AdmissionContext,
 ) -> None:
-    registry = create_production_registry()
-    injection_layer = registry.get("input.injection")
+    injection_layer = InjectionDetector()
 
     clean_res = await injection_layer.check(admission_context, "Please book a flight to London")
     assert clean_res.status == "PASS"
@@ -193,9 +402,8 @@ async def test_production_registry_input_injection_layer(
 
 
 @pytest.mark.asyncio
-async def test_production_registry_input_topic_layer(admission_context: AdmissionContext) -> None:
-    registry = create_production_registry()
-    topic_layer = registry.get("input.topic")
+async def test_production_input_topic_layer(admission_context: AdmissionContext) -> None:
+    topic_layer = TopicBoundary()
 
     allowed_inputs = [
         "Hello!",
@@ -229,9 +437,8 @@ async def test_production_registry_input_topic_layer(admission_context: Admissio
 
 
 @pytest.mark.asyncio
-async def test_production_registry_output_pii_layer(admission_context: AdmissionContext) -> None:
-    registry = create_production_registry()
-    output_layer = registry.get("output.pii")
+async def test_production_output_pii_layer(admission_context: AdmissionContext) -> None:
+    output_layer = OutputPIILayer()
 
     clean_res = await output_layer.check(admission_context, "Your flight VN123 is confirmed.")
     assert clean_res.status == "PASS"

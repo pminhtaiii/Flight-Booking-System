@@ -1,6 +1,7 @@
 """Vertical security integration tests for the graph tool boundary."""
 
 import asyncio
+import inspect
 import json
 import logging
 from datetime import datetime, timedelta, timezone
@@ -21,8 +22,18 @@ from agent.chat_turn import (
 from agent.graph.graph import router_node
 from agent.graph.nodes import custom_tool_node, validate_handoff
 from agent.graph.state import AgentState
-from agent.guardrails.base import GUARDRAIL_TOOL_SCHEMA, TurnCapabilities
+from agent.guardrails.base import (
+    GUARDRAIL_TOOL_PII,
+    GUARDRAIL_TOOL_SCHEMA,
+    TurnCapabilities,
+)
 from agent.guardrails.gateway import GuardrailGateway
+from agent.guardrails.layers.tool_output import (
+    PIIScanner,
+    SchemaValidator,
+    SizeStructureValidator,
+    UntrustedContentInjectionDetector,
+)
 from agent.guardrails.registry import GuardrailRegistry, create_production_registry
 from agent.models.requests import RouteDecision
 from agent.observability.chat_observability import ALLOWED_OPERATIONS, ChatTelemetry
@@ -37,7 +48,10 @@ pytestmark = pytest.mark.security
 
 @pytest.fixture
 def production_gateway() -> GuardrailGateway:
-    return GuardrailGateway(create_production_registry())
+    try:
+        return GuardrailGateway()
+    except (TypeError, Exception):
+        return GuardrailGateway(create_production_registry())
 
 
 @pytest.fixture
@@ -1184,3 +1198,86 @@ async def test_unvalidated_tool_message_emits_static_error_and_releases_lease() 
     assert all(CANARY_INJECTION not in event.model_dump_json() for event in events)
     queue.release.assert_awaited_once_with("session-a", "lease-unvalidated")
     client.create_message_batch.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_schema_invalid_result_with_extra_pii_blocks_at_custom_tool_node_with_pii_key(
+    production_gateway: GuardrailGateway,
+    search_capabilities: TurnCapabilities,
+) -> None:
+    """When a tool returns a schema-invalid result with extra fields containing PII,
+
+    custom_tool_node blocks with GUARDRAIL_TOOL_PII (PII priority wins).
+    """
+    state: AgentState = {
+        "messages": [
+            AIMessage(
+                content="",
+                tool_calls=[{"name": "search_flights", "args": {}, "id": "call-search-pii-schema"}],
+            )
+        ],
+        "iteration_count": 0,
+        "turn_capabilities": search_capabilities,
+    }
+    fake_tool = MagicMock()
+    fake_tool.name = "search_flights"
+    fake_tool.args_schema = None
+    fake_tool.ainvoke = AsyncMock(
+        return_value={
+            "flights": "INVALID_NOT_A_LIST",  # schema validation failure
+            "extra_debug_card": CANARY_CARD,  # PII in extra field
+        }
+    )
+    config = {
+        "configurable": {
+            "guardrail_gateway": production_gateway,
+        }
+    }
+
+    with patch("agent.graph.nodes.get_tool_by_name", return_value=fake_tool):
+        update = await custom_tool_node(state, config)
+
+    assert update["tool_blocked"] is True
+    assert update["tool_block_response_key"] == GUARDRAIL_TOOL_PII
+    assert "messages" not in update
+    assert CANARY_CARD not in repr(update)
+
+
+def test_production_gateway_tool_layers_order_and_contract(
+    production_gateway: GuardrailGateway,
+) -> None:
+    """Production gateway has fixed 4-layer order and sole validate_tool_result method."""
+    expected_order = (
+        SizeStructureValidator,
+        SchemaValidator,
+        PIIScanner,
+        UntrustedContentInjectionDetector,
+    )
+    if hasattr(production_gateway, "_tool_layers"):
+        layers = production_gateway._tool_layers
+    elif hasattr(production_gateway, "tool_layers"):
+        layers = production_gateway.tool_layers
+    elif hasattr(production_gateway, "registry"):
+        layers = production_gateway.registry.ordered_layers("tool")
+    else:
+        pytest.fail("Cannot determine tool layers from production_gateway")
+
+    assert tuple(type(layer) for layer in layers) == expected_order
+
+    # Verify sole public result method
+    assert hasattr(production_gateway, "validate_tool_result")
+    sig = inspect.signature(production_gateway.validate_tool_result)
+    assert list(sig.parameters.keys()) == ["context", "tool_name", "result"]
+
+    for alias in (
+        "validate_tool_output",
+        "validate_tool",
+        "validate_result",
+        "check_tool_result",
+        "check_tool_output",
+        "validate_output_tool",
+        "validate_tool_response",
+    ):
+        assert not hasattr(production_gateway, alias), (
+            f"Prohibited tool-result method alias '{alias}' found on production_gateway"
+        )

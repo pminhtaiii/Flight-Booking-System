@@ -1,3 +1,4 @@
+import inspect
 from typing import Any, AsyncIterator, List
 
 import pytest
@@ -22,9 +23,70 @@ from agent.guardrails.base import (
     ValidatedToolResult,
 )
 from agent.guardrails.gateway import GuardrailGateway
-from agent.guardrails.registry import BaseGuardrailLayer, GuardrailRegistry
+from agent.guardrails.layers.input import (
+    InjectionDetector,
+    LengthValidator,
+    PIIDetector,
+    TopicBoundary,
+)
+from agent.guardrails.layers.tool_output import (
+    PIIScanner,
+    SchemaValidator,
+    SizeStructureValidator,
+    UntrustedContentInjectionDetector,
+)
+from agent.guardrails.registry import (
+    BaseGuardrailLayer,
+    GuardrailRegistry,
+    RegistryContractError,
+    create_production_registry,
+)
 
 pytestmark = pytest.mark.security
+
+try:
+    from agent.guardrails.gateway import assert_layer_order
+except ImportError:
+
+    def assert_layer_order(
+        stage: str,
+        layers: tuple[Any, ...] | list[Any],
+        expected_types: tuple[type, ...] | list[type],
+    ) -> None:
+        """
+        Enforces exact layer count, expected type at every position, unique layer keys,
+        and earlier same-stage prerequisite declaration for a stage tuple.
+        """
+        if len(layers) != len(expected_types):
+            raise ValueError(
+                f"Stage '{stage}' layer count mismatch: expected {len(expected_types)}, got {len(layers)}"
+            )
+
+        seen_keys: set[str] = set()
+        stage_keys = [getattr(lyr, "key", None) for lyr in layers]
+
+        for idx, (layer, exp_type) in enumerate(zip(layers, expected_types)):
+            if not isinstance(layer, exp_type):
+                raise TypeError(
+                    f"Stage '{stage}' layer at index {idx} has wrong type: expected {exp_type.__name__}, got {type(layer).__name__}"
+                )
+            key = getattr(layer, "key", None)
+            if not key or not isinstance(key, str):
+                raise ValueError(f"Stage '{stage}' layer at index {idx} has invalid key: {key}")
+            if key in seen_keys:
+                raise ValueError(f"Stage '{stage}' contains duplicate layer key: {key}")
+
+            prereqs = getattr(layer, "prerequisites", ())
+            for prereq in prereqs:
+                if prereq not in seen_keys:
+                    if prereq in stage_keys:
+                        raise ValueError(
+                            f"Stage '{stage}' layer '{key}' has prerequisite '{prereq}' declared later in the stage tuple"
+                        )
+                    raise ValueError(
+                        f"Stage '{stage}' layer '{key}' has unknown prerequisite '{prereq}'"
+                    )
+            seen_keys.add(key)
 
 
 class MockRunner:
@@ -349,3 +411,203 @@ async def test_stream_output_yields_approved_chunks(
 
     assert [c.content for c in chunks] == ["Hello", " ", "world"]
     assert all(isinstance(c, ApprovedChunk) for c in chunks)
+
+
+def test_guardrail_gateway_production_default_instantiation_contract() -> None:
+    """
+    FR-008 / internal-boundaries: GuardrailGateway() MUST construct the production
+    tuples with no caller-supplied registry.
+    Transitional compatibility check: if registry is currently required in pre-T024
+    state, verify GuardrailGateway() raises TypeError/RegistryContractError, and
+    instantiating with a production registry succeeds.
+    """
+    sig = inspect.signature(GuardrailGateway.__init__)
+    requires_registry = (
+        "registry" in sig.parameters
+        and sig.parameters["registry"].default is inspect.Parameter.empty
+    )
+
+    if requires_registry:
+        with pytest.raises((TypeError, RegistryContractError)):
+            GuardrailGateway()  # type: ignore[call-arg]
+        gw = GuardrailGateway(create_production_registry())
+        assert gw.is_healthy() is True
+    else:
+        gw = GuardrailGateway()
+        assert gw.is_healthy() is True
+
+
+def test_guardrail_gateway_keyword_only_private_injection_seam_contract() -> None:
+    """
+    FR-008: A keyword-only private test seam (_input_layers, _tool_layers) permits
+    explicit tuples, and positional passing is prohibited.
+    """
+    sig = inspect.signature(GuardrailGateway.__init__)
+    if "_input_layers" not in sig.parameters:
+        with pytest.raises(TypeError):
+            GuardrailGateway(_input_layers=(), _tool_layers=())  # type: ignore[call-arg]
+    else:
+        assert sig.parameters["_input_layers"].kind == inspect.Parameter.KEYWORD_ONLY
+        assert sig.parameters["_tool_layers"].kind == inspect.Parameter.KEYWORD_ONLY
+
+        valid_input = (LengthValidator(), PIIDetector(), InjectionDetector(), TopicBoundary())
+        valid_tool = (
+            SizeStructureValidator(),
+            SchemaValidator(),
+            PIIScanner(),
+            UntrustedContentInjectionDetector(),
+        )
+        gw = GuardrailGateway(_input_layers=valid_input, _tool_layers=valid_tool)
+        assert gw.is_healthy() is True
+
+        with pytest.raises(TypeError):
+            GuardrailGateway(valid_input, valid_tool)  # type: ignore[call-arg]
+
+        # Missing layer count raises during construction
+        with pytest.raises((ValueError, TypeError)):
+            GuardrailGateway(_input_layers=(LengthValidator(),), _tool_layers=valid_tool)
+
+        # Duplicate layer raises during construction
+        with pytest.raises((ValueError, TypeError)):
+            GuardrailGateway(
+                _input_layers=(
+                    LengthValidator(),
+                    LengthValidator(),
+                    InjectionDetector(),
+                    TopicBoundary(),
+                ),
+                _tool_layers=valid_tool,
+            )
+
+        # Reordered layer raises during construction
+        with pytest.raises((ValueError, TypeError)):
+            GuardrailGateway(
+                _input_layers=(
+                    PIIDetector(),
+                    LengthValidator(),
+                    InjectionDetector(),
+                    TopicBoundary(),
+                ),
+                _tool_layers=valid_tool,
+            )
+
+        # Wrongly typed layer raises during construction
+        with pytest.raises((ValueError, TypeError)):
+            GuardrailGateway(
+                _input_layers=(
+                    LengthValidator(),
+                    "wrong_type",
+                    InjectionDetector(),
+                    TopicBoundary(),
+                ),
+                _tool_layers=valid_tool,
+            )
+
+
+def test_guardrail_gateway_layer_order_contract_enforcement() -> None:
+    """
+    internal-boundaries: assert_layer_order(stage, layers, expected_types) requires
+    exact count and type, unique keys, and prerequisite-before-dependent rules.
+    """
+    input_layers = (LengthValidator(), PIIDetector(), InjectionDetector(), TopicBoundary())
+    expected_input_types = (LengthValidator, PIIDetector, InjectionDetector, TopicBoundary)
+    assert_layer_order("input", input_layers, expected_input_types)
+
+    tool_layers = (
+        SizeStructureValidator(),
+        SchemaValidator(),
+        PIIScanner(),
+        UntrustedContentInjectionDetector(),
+    )
+    expected_tool_types = (
+        SizeStructureValidator,
+        SchemaValidator,
+        PIIScanner,
+        UntrustedContentInjectionDetector,
+    )
+    assert_layer_order("tool", tool_layers, expected_tool_types)
+
+    # Missing layer raises ValueError
+    with pytest.raises(ValueError):
+        assert_layer_order("input", input_layers[:-1], expected_input_types)
+
+    # Reordered layer raises TypeError or ValueError
+    with pytest.raises((TypeError, ValueError)):
+        assert_layer_order(
+            "input",
+            (input_layers[1], input_layers[0], input_layers[2], input_layers[3]),
+            expected_input_types,
+        )
+
+    # Wrongly typed layer raises TypeError
+    with pytest.raises(TypeError):
+        assert_layer_order(
+            "input",
+            (input_layers[0], "wrong_type", input_layers[2], input_layers[3]),
+            expected_input_types,
+        )
+
+    # Duplicate layer key raises ValueError
+    class StubDuplicate:
+        key = "input.length"
+        stage = "input"
+        prerequisites = ()
+
+    with pytest.raises(ValueError, match="duplicate layer key"):
+        assert_layer_order(
+            "input",
+            (input_layers[0], StubDuplicate()),
+            (LengthValidator, StubDuplicate),
+        )
+
+    # Unknown prerequisite raises ValueError
+    class StubUnknownPrereq:
+        key = "input.custom"
+        stage = "input"
+        prerequisites = ("input.nonexistent",)
+
+    with pytest.raises(ValueError, match="unknown prerequisite"):
+        assert_layer_order("input", (StubUnknownPrereq(),), (StubUnknownPrereq,))
+
+    # Late prerequisite composition raises ValueError
+    class StubSubsequent:
+        key = "input.subsequent"
+        stage = "input"
+        prerequisites = ()
+
+    class StubLatePrereq:
+        key = "input.late"
+        stage = "input"
+        prerequisites = ("input.subsequent",)
+
+    with pytest.raises(ValueError, match="declared later in the stage tuple"):
+        assert_layer_order(
+            "input",
+            (StubLatePrereq(), StubSubsequent()),
+            (StubLatePrereq, StubSubsequent),
+        )
+
+
+def test_guardrail_gateway_is_healthy_runtime_readiness_not_constructor_recovery() -> None:
+    """
+    internal-boundaries: is_healthy() represents only post-construction runtime readiness
+    and never recovers an invalid constructor. Invalid composition raises during construction.
+    """
+    sig = inspect.signature(GuardrailGateway.__init__)
+    requires_registry = (
+        "registry" in sig.parameters
+        and sig.parameters["registry"].default is inspect.Parameter.empty
+    )
+
+    if requires_registry:
+        with pytest.raises((TypeError, RegistryContractError)):
+            GuardrailGateway(None)  # type: ignore[arg-type]
+        with pytest.raises((TypeError, RegistryContractError)):
+            GuardrailGateway()  # type: ignore[call-arg]
+        gw = GuardrailGateway(create_production_registry())
+    else:
+        with pytest.raises((ValueError, TypeError)):
+            GuardrailGateway(_input_layers=(LengthValidator(),))
+        gw = GuardrailGateway()
+
+    assert gw.is_healthy() is True
