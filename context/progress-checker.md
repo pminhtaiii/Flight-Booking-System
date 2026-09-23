@@ -1,5 +1,29 @@
 # Progress Tracker
  
+### Feature 026 — Agent Boundary Simplification: Phase 1 & 2 / Slice 1 Complete (Tasks T001–T005 Verified) (2026-09-23)
+
+- **Phase 1 (Setup) & Phase 2 (Foundational) Delivered (Tasks T001–T005)**:
+  - **Pre-Refactor NestJS API Baseline (T001)**:
+    - Executed targeted unit specs (5 suites, 66 tests passed).
+    - Executed targeted boundary E2E suites (10 suites, 117 tests passed).
+    - ESLint clean (0 errors, 0 warnings), `@shared/types` (23 suites, 110 tests passed), TypeScript `tsc --noEmit` clean, and production NestJS build clean.
+    - Evidence recorded in `specs/026-agent-boundary-simplification/verification/api-baseline.md`.
+  - **Pre-Refactor Python Agent Baseline (T002)**:
+    - Ruff check clean, Ruff format check clean (155 files formatted).
+    - Targeted security/guardrail/runner/SSE pytest suite passed (214 passed, 1 skipped).
+    - Full non-Redis pytest suite executed (1001 passed, 1 pre-existing failure in snapshot test documented).
+    - Evidence recorded in `specs/026-agent-boundary-simplification/verification/agent-baseline.md`.
+  - **Initial Import & Deletion Census Captured (T003)**:
+    - Recorded exact baseline match counts for pre-refactor symbols across 5 ripgrep queries in `specs/026-agent-boundary-simplification/verification/agent-baseline.md`.
+  - **Frozen Boundary Contracts Reconciled (T004)**:
+    - Reconciled characterization assertions against `specs/026-agent-boundary-simplification/contracts/internal-boundaries.md`: Agent-Chat HTTP boundary, `/access/check` claim token bypass, chat crypto AES-256-GCM parameters, fixed input/tool guardrail sequence, persistent stream session lifecycle, and ingress PII precedence. Characterization test suite assertions remain open and deferred to T010 and T017–T022 prior to production refactor.
+  - **Diff Guard Established & Evidence Recorded (T005)**:
+    - Verified clean git working tree diff on protected boundaries (`apps/api/prisma/`, `pnpm-lock.yaml`, `apps/api/package.json`, `apps/agent/pyproject.toml`).
+    - Recorded exact verification command, commit SHA anchor, timestamp, exit code 0, clean output, and SHA-256 hash manifest for all four protected paths in `specs/026-agent-boundary-simplification/verification/api-baseline.md` and `agent-baseline.md`.
+  - **Scope Discipline**:
+    - Zero production code touched. User Story 1 (Tasks T006–T016) remains unstarted.
+    - Tasks T001–T003 and T005 marked `[x]`, T004 remains `[ ]` (pending characterization tests) in `specs/026-agent-boundary-simplification/tasks.md`.
+
 ### Feature 025 — Booking Umbrella Deletion: Phase 6 Complete (Tasks T001–T039 100% Complete) (2026-09-22)
 
 - **Phase 6 (Polish & Cross-Cutting Verification) & Feature 025 100% Delivered (T001–T039)**:
