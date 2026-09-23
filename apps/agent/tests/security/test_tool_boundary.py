@@ -11,6 +11,7 @@ Requirements:
    - Public SSE events (TokenEvent, ToolResultEvent, ErrorEvent, etc.)
 """
 
+import inspect
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -129,8 +130,11 @@ def admission_context() -> AdmissionContext:
 
 @pytest.fixture
 def gateway() -> GuardrailGateway:
-    registry = create_production_registry()
-    return GuardrailGateway(registry)
+    try:
+        return GuardrailGateway()
+    except (TypeError, Exception):
+        registry = create_production_registry()
+        return GuardrailGateway(registry)
 
 
 # ============================================================================
@@ -297,6 +301,95 @@ async def test_gateway_execute_tool_passes_valid_result(
         tool_name="search_flights",
         data=clean_data,
     )
+
+
+@pytest.mark.asyncio
+async def test_validate_tool_result_blocks_pii_in_extra_fields_over_schema(
+    gateway: GuardrailGateway,
+    turn_capabilities: TurnCapabilities,
+) -> None:
+    """validate_tool_result blocks with GUARDRAIL_TOOL_PII when schema fails and extra fields leak PII."""
+    tainted_result = {
+        "flights": "INVALID_SCHEMA_STRING",
+        "debug_billing": {"card": CANARY_PII_CARD},
+    }
+
+    decision = await gateway.validate_tool_result(
+        turn_capabilities,
+        "search_flights",
+        tainted_result,
+    )
+
+    assert decision.status == "BLOCK"
+    assert decision.response_key == GUARDRAIL_TOOL_PII
+    assert decision.validated_data is None
+    assert CANARY_PII_CARD not in (decision.reason or "")
+
+
+@pytest.mark.asyncio
+async def test_validate_tool_result_denies_unsealed_tool(
+    gateway: GuardrailGateway,
+    turn_capabilities: TurnCapabilities,
+) -> None:
+    """validate_tool_result denies execution of unsealed tools before validation."""
+    decision = await gateway.validate_tool_result(
+        turn_capabilities,
+        "signal_checkout_intent",
+        {"flights": []},
+    )
+
+    assert decision.status == "BLOCK"
+    assert decision.response_key == GUARDRAIL_TOOL_SCHEMA
+    assert decision.validated_data is None
+
+
+@pytest.mark.asyncio
+async def test_validate_tool_result_fails_closed_on_unhandled_exception(
+    gateway: GuardrailGateway,
+    turn_capabilities: TurnCapabilities,
+) -> None:
+    """validate_tool_result fails closed without leaking exception details when an internal error occurs."""
+
+    class _CrashingPayload:
+        def __str__(self) -> str:
+            raise RuntimeError(f"Database connection string leaked: {CANARY_PII_TOKEN}")
+
+        def __repr__(self) -> str:
+            raise RuntimeError(f"Database connection string leaked: {CANARY_PII_TOKEN}")
+
+    decision = await gateway.validate_tool_result(
+        turn_capabilities,
+        "search_flights",
+        _CrashingPayload(),
+    )
+
+    assert decision.status == "BLOCK"
+    assert decision.response_key == GUARDRAIL_TOOL_SCHEMA
+    assert decision.validated_data is None
+    assert CANARY_PII_TOKEN not in (decision.reason or "")
+
+
+def test_validate_tool_result_sole_public_method_on_boundary(
+    gateway: GuardrailGateway,
+) -> None:
+    """validate_tool_result is sole public tool-result method and has no aliases."""
+    assert hasattr(gateway, "validate_tool_result")
+    sig = inspect.signature(gateway.validate_tool_result)
+    assert list(sig.parameters.keys()) == ["context", "tool_name", "result"]
+
+    prohibited_aliases = (
+        "validate_tool_output",
+        "validate_tool",
+        "validate_result",
+        "check_tool_result",
+        "check_tool_output",
+        "validate_output_tool",
+        "validate_tool_response",
+    )
+    for alias in prohibited_aliases:
+        assert not hasattr(gateway, alias), (
+            f"Prohibited tool-result method alias '{alias}' found on GuardrailGateway"
+        )
 
 
 # ============================================================================

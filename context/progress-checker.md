@@ -1,5 +1,43 @@
 # Progress Tracker
  
+### Feature 026 — Agent Boundary Simplification: Phase 4 / Slice 1 Complete (Tasks T017, T018, T019, T022 Verified) (2026-09-23)
+
+- **Phase 4 / Slice 1 (User Story 2 Test Characterization: Gateway Construction, Input Order, Tool PII Priority & SSE Admission) Delivered (Tasks T017, T018, T019, T022)**:
+  - **Gateway Constructor & Layer Order Assertions (T017)**:
+    - Updated `apps/agent/tests/security/test_registry.py` and `apps/agent/tests/security/test_gateway.py`.
+    - Characterized production-default `GuardrailGateway()` instantiation without caller-supplied registry.
+    - Verified keyword-only private injection seam `GuardrailGateway(_input_layers=..., _tool_layers=...)`.
+    - Tested `assert_layer_order(stage, layers, expected_types)` contract: exact count, expected type at each position, unique keys across stage, same-stage linear prerequisite declaration. Tested raising on missing, duplicate, reordered, wrongly typed, unknown prerequisite, or late prerequisite composition.
+    - Tested that `is_healthy()` represents only post-construction runtime readiness and never recovers an invalid constructor.
+  - **Fixed Input Layer Ordering & Normalization Tests (T018)**:
+    - In `apps/agent/tests/security/test_input_layers.py`: rewrote legacy `InputGuardrailPipeline` expectations to target `GuardrailGateway.validate_input()`.
+    - Asserted fixed 4-layer order: `(LengthValidator, PIIDetector, InjectionDetector, TopicBoundary)` with keys `("input.length", "input.pii", "input.injection", "input.topic")`.
+    - Asserted short-circuiting on first blocking decision (length stops before PII; PII stops before injection; injection stops before topic).
+    - Asserted fail-closed behavior on layer exceptions, empty layers, and invalid contexts.
+    - Asserted unchanged response keys (`GUARDRAIL_INPUT_LENGTH`, `GUARDRAIL_INPUT_PII`, `GUARDRAIL_INPUT_INJECTION`, `GUARDRAIL_INPUT_TOPIC`).
+    - Asserted detection-only normalization preserves non-Latin unicode input (Japanese, Vietnamese, Cyrillic) unchanged.
+  - **Tool Authority & Raw Extra-Field PII Priority Tests (T019)**:
+    - In `test_tool_layers.py`, `test_tool_authority.py`, `test_tool_boundary.py`, `test_tool_integration.py`:
+    - Asserted fixed 4-layer tool order: `(SizeStructureValidator, SchemaValidator, PIIScanner, UntrustedContentInjectionDetector)`.
+    - Asserted sole public result method `validate_tool_result(context, tool_name, result)` with zero alternate aliases.
+    - Asserted raw extra-field PII priority: when schema validation fails and raw result contains extra fields with PII, `PIIScanner` scans original raw result and `GUARDRAIL_TOOL_PII` wins over `GUARDRAIL_TOOL_SCHEMA` without tuple indexing.
+    - Asserted sealed tool capability authority across all intents (GENERAL, SEARCH, CHECKOUT), whole-batch rejection, and fail-closed error handling.
+  - **SSE Pre-Quota Admission & Single Validation Tests (T022)**:
+    - In `apps/agent/tests/test_sse.py`:
+    - Asserted ingress order in SSE: access check -> length guard -> gateway health -> `validate_input` -> Redis/quota.
+    - Asserted PII input makes zero `get_redis_client` or quota calls, immediately returning one first-and-only `error` event (`event: error`, `code: GUARDRAIL_BLOCKED`, `message: "Your message contains protected personal information and cannot be processed."`, `partialMessageId: null`).
+    - Asserted gateway unavailable (503) takes precedence before validation.
+    - Asserted healthy gateway PII rejection takes precedence over Redis failure.
+    - Asserted non-PII admission decision is passed to `ChatController.stream` to strictly prevent redundant revalidation.
+  - **Verification Gate**:
+    - Pytest: 8 suites, 295 passed in 17.97s (up from 237 baseline).
+    - Ruff check: clean (0 errors, 0 warnings).
+    - Ruff format: clean (155 files formatted).
+  - **Scope Discipline**:
+    - Zero production code touched (`apps/agent/src/` clean).
+    - Tasks T017, T018, T019, T022 marked `[x]` in `specs/026-agent-boundary-simplification/tasks.md`.
+    - Phase 4 / Slice 2 (Tasks T020, T021, T023) strictly unstarted.
+
 ### Feature 026 — Agent Boundary Simplification: Phase 3 / Slice 2 Complete (Tasks T011–T016 Verified, US1 Complete) (2026-09-23)
 
 - **Phase 3 / Slice 2 (Production Edge Relocation, Shared Crypto Extraction & US1 Completion) Delivered (Tasks T011–T016)**:

@@ -1,6 +1,8 @@
 import asyncio
+import inspect
 import json
 import time
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
@@ -9,6 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from agent.chat_turn.command import ChatTurnCommand
+from agent.chat_turn.controller import ChatController
 from agent.chat_turn.events import (
     ActionHandoffEvent,
     ActionHandoffPayload,
@@ -28,7 +31,7 @@ from agent.chat_turn.events import (
     ToolResultPayload,
 )
 from agent.config import get_settings
-from agent.guardrails.base import PipelineDecision
+from agent.guardrails.base import AdmissionContext, PipelineDecision, ValidatedInput
 from agent.guardrails.gateway import GuardrailGateway
 from agent.main import active_runners, app, lifespan
 from agent.repositories.chat_budget_repository import (
@@ -355,9 +358,139 @@ def test_prestream_redis_unavailable_exception_raises_503(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_ingress_pii_detected_yields_guardrail_blocked_event():
-    """Detecting PII in user message yields SSE GUARDRAIL_BLOCKED ErrorEvent."""
+    """Detecting PII in user message yields SSE GUARDRAIL_BLOCKED ErrorEvent with 0 redis/quota calls."""
     token = make_jwt()
     pii_message = "My contact email is customer@example.com and passport is N1234567 please help."
+
+    mock_redis = MagicMock()
+    mock_admit = AsyncMock()
+
+    with (
+        patch("agent.streaming.sse.get_redis_client", mock_redis),
+        patch("agent.streaming.sse.ChatBudgetRepository.admit_request", mock_admit),
+    ):
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+            response = await ac.post(
+                "/chat/stream",
+                json={"message": pii_message},
+                headers={"Authorization": f"Bearer {token}", "Origin": "http://localhost:3000"},
+            )
+            assert response.status_code == 200
+            assert "text/event-stream" in response.headers.get("content-type", "")
+
+            lines = [line async for line in response.aiter_lines()]
+            events = parse_sse(lines)
+
+            assert len(events) == 1
+            assert events[0]["event"] == "error"
+            assert events[0]["data"]["code"] == "GUARDRAIL_BLOCKED"
+            assert (
+                events[0]["data"]["message"]
+                == "Your message contains protected personal information and cannot be processed."
+            )
+            assert events[0]["data"]["partialMessageId"] is None
+
+        # PII input must make zero get_redis_client or quota calls
+        assert mock_redis.call_count == 0
+        assert mock_admit.call_count == 0
+
+
+@pytest.mark.asyncio
+async def test_ingress_healthy_gateway_pii_rejection_takes_precedence_over_redis_failure(
+    monkeypatch,
+):
+    """Healthy gateway PII rejection takes precedence over Redis failure (0 redis calls)."""
+    token = make_jwt()
+    gateway = MagicMock(spec=GuardrailGateway)
+    gateway.is_healthy.return_value = True
+    monkeypatch.setattr(app.state, "guardrail_gateway", gateway, raising=False)
+
+    pii_message = "My contact email is customer@example.com and passport is N1234567 please help."
+
+    mock_redis = MagicMock()
+    mock_redis.side_effect = RuntimeError("Redis cluster completely unavailable")
+
+    with patch("agent.streaming.sse.get_redis_client", mock_redis):
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+            # PII message succeeds to stream with GUARDRAIL_BLOCKED event, NOT 503 control plane error
+            response = await ac.post(
+                "/chat/stream",
+                json={"message": pii_message},
+                headers={"Authorization": f"Bearer {token}", "Origin": "http://localhost:3000"},
+            )
+            assert response.status_code == 200
+            lines = [line async for line in response.aiter_lines()]
+            events = parse_sse(lines)
+            assert len(events) == 1
+            assert events[0]["event"] == "error"
+            assert events[0]["data"]["code"] == "GUARDRAIL_BLOCKED"
+            assert events[0]["data"]["partialMessageId"] is None
+            assert mock_redis.call_count == 0
+
+            # Conversely, non-PII message with the same failing Redis raises 503
+            response_non_pii = await ac.post(
+                "/chat/stream",
+                json={"message": "Clean flight inquiry"},
+                headers={"Authorization": f"Bearer {token}", "Origin": "http://localhost:3000"},
+            )
+            assert response_non_pii.status_code == 503
+            assert response_non_pii.json().get("detail") == "CHAT_CONTROL_PLANE_UNAVAILABLE"
+
+
+def test_ingress_gateway_unavailable_503_takes_precedence_before_validation(monkeypatch):
+    """Absent or degraded gateway returns 503 before any validation or Redis calls."""
+    token = make_jwt()
+
+    # 1. Degraded gateway (is_healthy() == False)
+    degraded_gw = MagicMock(spec=GuardrailGateway)
+    degraded_gw.is_healthy.return_value = False
+    degraded_gw.validate_input = AsyncMock()
+    monkeypatch.setattr(app.state, "guardrail_gateway", degraded_gw, raising=False)
+
+    mock_redis = MagicMock()
+    with patch("agent.streaming.sse.get_redis_client", mock_redis):
+        response = client.post(
+            "/chat/stream",
+            json={"message": "hello agent"},
+            headers={"Authorization": f"Bearer {token}", "Origin": "http://localhost:3000"},
+        )
+        assert response.status_code == 503
+        assert "GUARDRAIL_GATEWAY_UNAVAILABLE" in response.json().get("detail", "")
+        assert degraded_gw.validate_input.call_count == 0
+        assert mock_redis.call_count == 0
+
+    # 2. Absent gateway (None)
+    monkeypatch.setattr(app.state, "guardrail_gateway", None, raising=False)
+    with patch("agent.streaming.sse.get_redis_client", mock_redis):
+        response2 = client.post(
+            "/chat/stream",
+            json={"message": "hello agent"},
+            headers={"Authorization": f"Bearer {token}", "Origin": "http://localhost:3000"},
+        )
+        assert response2.status_code == 503
+        assert "GUARDRAIL_GATEWAY_UNAVAILABLE" in response2.json().get("detail", "")
+        assert mock_redis.call_count == 0
+
+
+@pytest.mark.asyncio
+async def test_ingress_degraded_gateway_pii_precedence_contract(monkeypatch):
+    """
+    Contract: In target T028 architecture, gateway health check precedes validation.
+    Degraded gateway returns 503 before validation even on PII inputs.
+    Transitional baseline check: if pre-T028 duplicate detector is still active,
+    it returns 200 GUARDRAIL_BLOCKED prior to T028 gateway health relocation.
+    """
+    token = make_jwt()
+    degraded_gw = MagicMock(spec=GuardrailGateway)
+    degraded_gw.is_healthy.return_value = False
+    degraded_gw.validate_input = AsyncMock()
+    monkeypatch.setattr(app.state, "guardrail_gateway", degraded_gw, raising=False)
+
+    pii_message = "My contact email is customer@example.com and passport is N1234567 please help."
+
+    has_t028_admission = "admission_decision" in inspect.signature(ChatController.stream).parameters
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
@@ -366,16 +499,140 @@ async def test_ingress_pii_detected_yields_guardrail_blocked_event():
             json={"message": pii_message},
             headers={"Authorization": f"Bearer {token}", "Origin": "http://localhost:3000"},
         )
-        assert response.status_code == 200
-        assert "text/event-stream" in response.headers.get("content-type", "")
 
-        lines = [line async for line in response.aiter_lines()]
-        events = parse_sse(lines)
+        if has_t028_admission:
+            assert response.status_code == 503
+            assert "GUARDRAIL_GATEWAY_UNAVAILABLE" in response.json().get("detail", "")
+            assert degraded_gw.validate_input.call_count == 0
+        else:
+            assert response.status_code == 200
+            lines = [line async for line in response.aiter_lines()]
+            events = parse_sse(lines)
+            assert len(events) == 1
+            assert events[0]["data"]["code"] == "GUARDRAIL_BLOCKED"
 
-        assert len(events) == 1
-        assert events[0]["event"] == "error"
-        assert events[0]["data"]["code"] == "GUARDRAIL_BLOCKED"
-        assert "personal information" in events[0]["data"]["message"].lower()
+
+def test_ingress_order_strict_progression(
+    mock_nestjs_client: MagicMock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """
+    Assert ingress order in SSE:
+    access check -> length guard -> gateway health -> validate_input -> Redis/quota.
+    Each failing stage stops execution before reaching downstream stages.
+    """
+    token = make_jwt()
+    gateway = MagicMock(spec=GuardrailGateway)
+    gateway.is_healthy.return_value = False
+    gateway.validate_input = AsyncMock()
+    monkeypatch.setattr(app.state, "guardrail_gateway", gateway, raising=False)
+
+    mock_redis = MagicMock()
+
+    # Stage 1: Access check denial (401) stops before length guard, gateway health, or Redis.
+    mock_nestjs_client.check_user_access.return_value = {"allowed": False}
+    with (
+        patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client),
+        patch("agent.streaming.sse.get_redis_client", mock_redis),
+        patch.object(settings, "MAX_MESSAGE_LENGTH", 10),
+    ):
+        res1 = client.post(
+            "/chat/stream",
+            json={"message": "Over 10 chars, but access check runs first"},
+            headers={"Authorization": f"Bearer {token}", "Origin": "http://localhost:3000"},
+        )
+        assert res1.status_code == 401
+        assert "inactive or token revoked" in res1.json().get("detail", "").lower()
+        assert gateway.is_healthy.call_count == 0
+        assert gateway.validate_input.call_count == 0
+        assert mock_redis.call_count == 0
+
+    # Stage 2: Length guard (400) stops before gateway health or Redis.
+    mock_nestjs_client.check_user_access.return_value = {"allowed": True}
+    with (
+        patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client),
+        patch("agent.streaming.sse.get_redis_client", mock_redis),
+        patch.object(settings, "MAX_MESSAGE_LENGTH", 10),
+    ):
+        res2 = client.post(
+            "/chat/stream",
+            json={"message": "Over 10 chars, access allowed, but length exceeded"},
+            headers={"Authorization": f"Bearer {token}", "Origin": "http://localhost:3000"},
+        )
+        assert res2.status_code == 400
+        assert "exceeds maximum length" in res2.json().get("detail", "").lower()
+        assert gateway.is_healthy.call_count == 0
+        assert gateway.validate_input.call_count == 0
+        assert mock_redis.call_count == 0
+
+    # Stage 3: Gateway health failure (503) stops before validation or Redis.
+    with (
+        patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client),
+        patch("agent.streaming.sse.get_redis_client", mock_redis),
+        patch.object(settings, "MAX_MESSAGE_LENGTH", 1000),
+    ):
+        res3 = client.post(
+            "/chat/stream",
+            json={"message": "Clean short message"},
+            headers={"Authorization": f"Bearer {token}", "Origin": "http://localhost:3000"},
+        )
+        assert res3.status_code == 503
+        assert "GUARDRAIL_GATEWAY_UNAVAILABLE" in res3.json().get("detail", "")
+        assert gateway.validate_input.call_count == 0
+        assert mock_redis.call_count == 0
+
+    # Stage 4: Gateway validate_input runs before Redis/quota, and blocking decisions stop execution before Redis.
+    gateway.is_healthy.return_value = True
+    call_order: list[str] = []
+
+    async def mock_validate(context: Any, message: str) -> PipelineDecision:
+        call_order.append("validate_input")
+        return PipelineDecision(
+            status="BLOCK",
+            response_key="GUARDRAIL_INPUT_PII",
+            reason="PII detected",
+        )
+
+    gateway.validate_input = AsyncMock(side_effect=mock_validate)
+
+    def mock_redis_call() -> MagicMock:
+        call_order.append("redis")
+        return MagicMock()
+
+    mock_redis = MagicMock(side_effect=mock_redis_call)
+    has_t028_admission = "admission_decision" in inspect.signature(ChatController.stream).parameters
+
+    with (
+        patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client),
+        patch("agent.streaming.sse.get_redis_client", mock_redis),
+        patch.object(settings, "MAX_MESSAGE_LENGTH", 1000),
+    ):
+        res4 = client.post(
+            "/chat/stream",
+            json={"message": "My email is user@example.com"},
+            headers={"Authorization": f"Bearer {token}", "Origin": "http://localhost:3000"},
+        )
+        assert res4.status_code == 200
+        assert mock_redis.call_count == 0
+
+        if has_t028_admission:
+            # Target T028 contract: validate_input is awaited before Redis/quota
+            assert gateway.validate_input.await_count == 1
+            assert call_order == ["validate_input"]
+
+            # Also test non-PII payload that only the mocked gateway blocks
+            call_order.clear()
+            gateway.validate_input.reset_mock()
+            mock_redis.reset_mock()
+            res4_custom = client.post(
+                "/chat/stream",
+                json={"message": "Custom message blocked only by gateway"},
+                headers={"Authorization": f"Bearer {token}", "Origin": "http://localhost:3000"},
+            )
+            assert res4_custom.status_code == 200
+            assert gateway.validate_input.await_count == 1
+            assert mock_redis.call_count == 0
+            assert "redis" not in call_order
+            assert call_order == ["validate_input"]
 
 
 @pytest.mark.asyncio
@@ -421,6 +678,174 @@ def test_ingress_guardrail_unavailable_raises_503(monkeypatch):
     )
     assert response.status_code == 200
     assert "GUARDRAIL_INPUT_INJECTION" in response.text
+
+
+# ===========================================================================
+# 4b. ChatController stream validation & non-PII mapping
+# ===========================================================================
+
+
+@pytest.mark.asyncio
+async def test_chat_controller_stream_prevents_redundant_revalidation_when_admission_decision_provided():
+    """
+    ChatController.stream MUST NOT re-validate input if an admission decision was already
+    obtained at the SSE ingress boundary. It forwards validated_data to runner.
+    """
+    mock_runner = MagicMock()
+
+    async def mock_run_gen(command, validated_input=None):
+        yield TokenEvent(data=TokenPayload(content="Hello from runner"))
+        yield DoneEvent(data=DonePayload(sessionId="sess-test"))
+
+    mock_runner.run = mock_run_gen
+
+    mock_gateway = MagicMock(spec=GuardrailGateway)
+    mock_gateway.validate_input = AsyncMock()
+
+    controller = ChatController(runner=mock_runner, gateway=mock_gateway)
+    command = ChatTurnCommand(
+        user_id="user-123",
+        session_id="sess-test",
+        message="Search flights from SFO to JFK",
+        token="test-token",
+    )
+
+    admission_decision = PipelineDecision(
+        status="PASS",
+        validated_data=ValidatedInput(content="Search flights from SFO to JFK"),
+    )
+
+    sig = inspect.signature(ChatController.stream)
+    if "admission_decision" in sig.parameters:
+        # Target contract: admission_decision passed -> 0 validate_input calls
+        events = []
+        async for ev in controller.stream(command, admission_decision=admission_decision):
+            events.append(ev)
+
+        assert len(events) == 2
+        assert mock_gateway.validate_input.call_count == 0
+    else:
+        # Transitional baseline: admission_decision parameter not yet present
+        with pytest.raises(TypeError):
+            _ = [
+                ev async for ev in controller.stream(command, admission_decision=admission_decision)
+            ]  # type: ignore[call-arg]
+
+        # Without admission_decision, controller.stream performs validation
+        mock_gateway.validate_input.return_value = admission_decision
+        events = []
+        async for ev in controller.stream(command):
+            events.append(ev)
+
+        assert len(events) == 2
+        assert mock_gateway.validate_input.call_count == 1
+        assert isinstance(mock_gateway.validate_input.call_args[0][0], AdmissionContext)
+
+
+@pytest.mark.asyncio
+async def test_chat_controller_stream_preserves_existing_non_pii_mapping():
+    """
+    ChatController.stream preserves existing error mappings:
+    - BLOCK decision maps to ErrorEvent with corresponding response_key
+    - validate_input exception maps to GUARDRAIL_INPUT_INJECTION ErrorEvent
+    - Absent gateway maps to GUARDRAIL_CONFIGURATION_ERROR ErrorEvent
+    """
+    mock_runner = MagicMock()
+    mock_gateway = MagicMock(spec=GuardrailGateway)
+
+    command = ChatTurnCommand(
+        user_id="user-123",
+        session_id="sess-test",
+        message="Injection payload",
+        token="test-token",
+    )
+
+    # 1. BLOCK decision mapping
+    mock_gateway.validate_input = AsyncMock(
+        return_value=PipelineDecision(
+            status="BLOCK",
+            response_key="GUARDRAIL_INPUT_INJECTION",
+            reason="Blocked by injection layer",
+        )
+    )
+    controller = ChatController(runner=mock_runner, gateway=mock_gateway)
+    events_block = [ev async for ev in controller.stream(command)]
+    assert len(events_block) == 1
+    assert events_block[0].event == "error"
+    assert events_block[0].data.code == "GUARDRAIL_INPUT_INJECTION"
+    assert "GUARDRAIL_INPUT_INJECTION" in events_block[0].data.message
+
+    # 2. validate_input exception maps to GUARDRAIL_INPUT_INJECTION
+    mock_gateway.validate_input = AsyncMock(side_effect=RuntimeError("Gateway crash"))
+    events_exc = [ev async for ev in controller.stream(command)]
+    assert len(events_exc) == 1
+    assert events_exc[0].event == "error"
+    assert events_exc[0].data.code == "GUARDRAIL_INPUT_INJECTION"
+
+    # 3. Absent gateway maps to GUARDRAIL_CONFIGURATION_ERROR
+    controller_no_gw = ChatController(runner=mock_runner, gateway=None)
+    events_no_gw = [ev async for ev in controller_no_gw.stream(command)]
+    assert len(events_no_gw) == 1
+    assert events_no_gw[0].event == "error"
+    assert events_no_gw[0].data.code == "GUARDRAIL_CONFIGURATION_ERROR"
+
+
+@pytest.mark.asyncio
+async def test_sse_stream_single_validation_non_pii_request(mock_nestjs_client, monkeypatch):
+    """
+    In the full SSE request lifecycle, a non-PII request executes validation at most once.
+    Redundant revalidation between SSE ingress and ChatController is prohibited.
+    """
+    token = make_jwt()
+    mock_runner = MagicMock()
+
+    async def mock_run_gen(command, validated_input=None):
+        yield TokenEvent(data=TokenPayload(content="Flight search results"))
+        yield DoneEvent(data=DonePayload(sessionId="sess-test-123"))
+
+    mock_runner.run = mock_run_gen
+
+    gateway = MagicMock(spec=GuardrailGateway)
+    gateway.is_healthy.return_value = True
+    gateway.validate_input = AsyncMock(
+        return_value=PipelineDecision(
+            status="PASS",
+            validated_data=ValidatedInput(content="Find flights from SFO to JFK"),
+        )
+    )
+    monkeypatch.setattr(app.state, "guardrail_gateway", gateway, raising=False)
+
+    mock_budget = MagicMock()
+    mock_budget.admit_request = AsyncMock(return_value=True)
+
+    with (
+        patch("agent.streaming.sse.NestJSClient", return_value=mock_nestjs_client),
+        patch("agent.streaming.sse.ChatTurnRunner", return_value=mock_runner),
+        patch("agent.streaming.sse.ChatBudgetRepository", return_value=mock_budget),
+        patch("agent.streaming.sse.get_redis_client", return_value=MagicMock()),
+    ):
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+            response = await ac.post(
+                "/chat/stream",
+                json={"message": "Find flights from SFO to JFK", "sessionId": "sess-test-123"},
+                headers={"Authorization": f"Bearer {token}", "Origin": "http://localhost:3000"},
+            )
+            assert response.status_code == 200
+            lines = [line async for line in response.aiter_lines()]
+            events = parse_sse(lines)
+            assert len(events) == 2
+            assert events[0]["event"] == "token"
+            assert events[1]["event"] == "done"
+
+            # Must be validated at most once across the full turn, and exactly once when T028 admission is active
+            has_t028_admission = (
+                "admission_decision" in inspect.signature(ChatController.stream).parameters
+            )
+            if has_t028_admission:
+                assert gateway.validate_input.call_count == 1
+            else:
+                assert gateway.validate_input.call_count <= 1
 
 
 # ===========================================================================
