@@ -143,6 +143,9 @@ class OutputStreamSession:
         return False
 
 
+_DEFAULT_REGISTRY = object()
+
+
 class GuardrailGateway:
     """
     Mandatory security gateway enforcing deterministic admission, tool execution,
@@ -151,67 +154,34 @@ class GuardrailGateway:
 
     def __init__(
         self,
-        registry: Any = None,
+        registry: Any = _DEFAULT_REGISTRY,
         *,
         _input_layers: tuple[Any, ...] | list[Any] | None = None,
         _tool_layers: tuple[Any, ...] | list[Any] | None = None,
     ) -> None:
-        self.registry = registry
-
-        if registry is None and _input_layers is None and _tool_layers is None:
-            prod_input = (
-                LengthValidator(),
-                PIIDetector(),
-                InjectionDetector(),
-                TopicBoundary(),
-            )
-            prod_tool = (
-                SizeStructureValidator(),
-                SchemaValidator(),
-                PIIScanner(),
-                UntrustedContentInjectionDetector(),
-            )
-            assert_layer_order(
-                "input",
-                prod_input,
-                (LengthValidator, PIIDetector, InjectionDetector, TopicBoundary),
-            )
-            assert_layer_order(
-                "tool",
-                prod_tool,
-                (
-                    SizeStructureValidator,
-                    SchemaValidator,
-                    PIIScanner,
-                    UntrustedContentInjectionDetector,
-                ),
-            )
-            self._input_layers = prod_input
-            self._tool_layers = prod_tool
-        else:
-            if _input_layers is not None:
-                if (
-                    len(_input_layers) == 2
-                    and isinstance(_input_layers[0], LengthValidator)
-                    and isinstance(_input_layers[1], InjectionDetector)
-                ):
-                    self._input_layers = tuple(_input_layers)
-                else:
-                    assert_layer_order(
-                        "input",
-                        _input_layers,
-                        (LengthValidator, PIIDetector, InjectionDetector, TopicBoundary),
-                    )
-                    self._input_layers = tuple(_input_layers)
-            elif registry is not None and hasattr(registry, "ordered_layers"):
-                self._input_layers = tuple(registry.ordered_layers("input"))
-            else:
-                self._input_layers = ()
-
-            if _tool_layers is not None:
+        if registry is _DEFAULT_REGISTRY:
+            self.registry = None
+            if _input_layers is None and _tool_layers is None:
+                prod_input = (
+                    LengthValidator(),
+                    PIIDetector(),
+                    InjectionDetector(),
+                    TopicBoundary(),
+                )
+                prod_tool = (
+                    SizeStructureValidator(),
+                    SchemaValidator(),
+                    PIIScanner(),
+                    UntrustedContentInjectionDetector(),
+                )
+                assert_layer_order(
+                    "input",
+                    prod_input,
+                    (LengthValidator, PIIDetector, InjectionDetector, TopicBoundary),
+                )
                 assert_layer_order(
                     "tool",
-                    _tool_layers,
+                    prod_tool,
                     (
                         SizeStructureValidator,
                         SchemaValidator,
@@ -219,8 +189,63 @@ class GuardrailGateway:
                         UntrustedContentInjectionDetector,
                     ),
                 )
+                self._input_layers = prod_input
+                self._tool_layers = prod_tool
+            else:
+                if _input_layers is not None:
+                    if (
+                        len(_input_layers) == 2
+                        and isinstance(_input_layers[0], LengthValidator)
+                        and isinstance(_input_layers[1], InjectionDetector)
+                    ):
+                        assert_layer_order(
+                            "input",
+                            _input_layers,
+                            (LengthValidator, InjectionDetector),
+                        )
+                    else:
+                        assert_layer_order(
+                            "input",
+                            _input_layers,
+                            (LengthValidator, PIIDetector, InjectionDetector, TopicBoundary),
+                        )
+                    self._input_layers = tuple(_input_layers)
+                else:
+                    self._input_layers = ()
+
+                if _tool_layers is not None:
+                    assert_layer_order(
+                        "tool",
+                        _tool_layers,
+                        (
+                            SizeStructureValidator,
+                            SchemaValidator,
+                            PIIScanner,
+                            UntrustedContentInjectionDetector,
+                        ),
+                    )
+                    self._tool_layers = tuple(_tool_layers)
+                else:
+                    self._tool_layers = ()
+        else:
+            from agent.guardrails.registry import GuardrailRegistry, RegistryContractError
+
+            if registry is None or not isinstance(registry, GuardrailRegistry):
+                raise RegistryContractError(
+                    "GuardrailGateway requires a valid GuardrailRegistry instance when registry is provided."
+                )
+            self.registry = registry
+
+            if _input_layers is not None:
+                self._input_layers = tuple(_input_layers)
+            elif hasattr(registry, "ordered_layers"):
+                self._input_layers = tuple(registry.ordered_layers("input"))
+            else:
+                self._input_layers = ()
+
+            if _tool_layers is not None:
                 self._tool_layers = tuple(_tool_layers)
-            elif registry is not None and hasattr(registry, "ordered_layers"):
+            elif hasattr(registry, "ordered_layers"):
                 self._tool_layers = tuple(registry.ordered_layers("tool"))
             else:
                 self._tool_layers = ()

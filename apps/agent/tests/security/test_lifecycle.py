@@ -16,7 +16,7 @@ from agent.guardrails.base import (
     TurnCapabilities,
     ValidatedInput,
 )
-from agent.guardrails.gateway import GuardrailGateway
+from agent.guardrails.gateway import GuardrailGateway, OutputStreamSession
 from agent.guardrails.output_pipeline import OutputGuardrailPipeline
 from agent.guardrails.registry import BaseGuardrailLayer, GuardrailRegistry
 from agent.queue.message_queue import MessageQueueManager
@@ -351,20 +351,14 @@ async def test_lifecycle_output_stream_causal_cleanup_across_all_paths(scenario:
     """
     call_order: list[str] = []
 
-    class TrackingOutputPipeline(OutputGuardrailPipeline):
-        def __init__(self, *args: Any, **kwargs: Any) -> None:
-            super().__init__(*args, **kwargs)
-
+    class TrackingOutputStreamSession(OutputStreamSession):
         async def aclose(self) -> None:
             call_order.append("close")
             await super().aclose()
 
         def close(self) -> None:
             call_order.append("close")
-            if hasattr(super(), "close"):
-                super().close()
-            else:
-                self.closed = True
+            super().close()
 
     mock_queue = MagicMock(spec=MessageQueueManager)
     mock_queue.acquire = AsyncMock(return_value=f"req-lifecycle-{scenario}")
@@ -428,7 +422,7 @@ async def test_lifecycle_output_stream_causal_cleanup_across_all_paths(scenario:
     )
 
     with patch(
-        "agent.chat_turn.runner.OutputGuardrailPipeline", side_effect=TrackingOutputPipeline
+        "agent.chat_turn.runner.OutputStreamSession", side_effect=TrackingOutputStreamSession
     ):
         runner = ChatTurnRunner(
             settings=settings,
