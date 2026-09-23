@@ -162,20 +162,40 @@ async def chat_stream(
                     validated_data=ValidatedInput(content=body.message),
                 )
 
-        if decision.status == "BLOCK" and decision.response_key == GUARDRAIL_INPUT_PII:
-            guardrails_logger.warning("Ingress PII detected in user message: REDACTED")
+        if decision.status == "BLOCK":
+            if decision.response_key == GUARDRAIL_INPUT_PII:
+                guardrails_logger.warning("Ingress PII detected in user message: REDACTED")
 
-            async def pii_error_generator():
-                event = ErrorEvent(
-                    data=ErrorPayload(
-                        code="GUARDRAIL_BLOCKED",
-                        message="Your message contains protected personal information and cannot be processed.",
-                        partialMessageId=None,
+                async def pii_error_generator():
+                    event = ErrorEvent(
+                        data=ErrorPayload(
+                            code="GUARDRAIL_BLOCKED",
+                            message="Your message contains protected personal information and cannot be processed.",
+                            partialMessageId=None,
+                        )
                     )
-                )
-                yield {"event": event.event, "data": event.data.model_dump_json()}
+                    yield {"event": event.event, "data": event.data.model_dump_json()}
 
-            return EventSourceResponse(pii_error_generator())
+                return EventSourceResponse(pii_error_generator())
+            else:
+                code = decision.response_key or "GUARDRAIL_INPUT_BLOCKED"
+                guardrails_logger.warning(
+                    "Ingress input blocked by security guardrail: %s (reason: %s)",
+                    code,
+                    decision.reason,
+                )
+
+                async def blocked_error_generator():
+                    event = ErrorEvent(
+                        data=ErrorPayload(
+                            code=code,
+                            message=f"Input rejected by security guardrail: {code}",
+                            partialMessageId=None,
+                        )
+                    )
+                    yield {"event": event.event, "data": event.data.model_dump_json()}
+
+                return EventSourceResponse(blocked_error_generator())
 
     quota_started = time.perf_counter()
     try:

@@ -1,8 +1,35 @@
 # Architecture
 
-## Feature 026 — Agent Boundary Simplification (Phase 4 / Slice 2 Complete: US2 Test Characterization - Tasks T020, T021, T023)
+## Feature 026 — Agent Boundary Simplification (Phase 4 / Slice 3 Complete: Production US2 Implementation - Tasks T024–T029)
 
 Planning artifacts: [specification](../specs/026-agent-boundary-simplification/spec.md), [plan](../specs/026-agent-boundary-simplification/plan.md), and [tasks](../specs/026-agent-boundary-simplification/tasks.md).
+
+#### Production Gateway Refactoring, Stream Session, PII Extraction & Ingress Admission (US2 Phase 4 Slice 3)
+- **Direct Tuple Composition & Layer Ordering (`assert_layer_order`) (T024)**:
+  - `GuardrailGateway` constructs immutable default layer tuples for input validation `(LengthValidator, PIIDetector, InjectionDetector, TopicBoundary)` and tool results `(SizeStructureValidator, SchemaValidator, PIIScanner, UntrustedContentInjectionDetector)`.
+  - Layer composition is asserted at instantiation time via `assert_layer_order(stage, layers, expected_types)`: checks exact layer count, correct type per position, unique keys across stages, and linear declaration of same-stage prerequisites. Invalid composition raises fail-closed `ValueError` at constructor time.
+  - Keyword-only private parameters `_input_layers` and `_tool_layers` provide explicit seams for unit tests without mutable registries.
+  - Sole public tool verification method is `validate_tool_result(context, tool_name, result)`, ensuring raw tool payload evaluation and PII precedence over schema invalidity.
+- **`OutputStreamSession` Async Context Manager Facade & Causal Cleanup (T025, T026)**:
+  - `GuardrailGateway.stream_output(context, *, config, session_id)` provides an `OutputStreamSession` async context manager.
+  - Encapsulates a per-turn `OutputGuardrailPipeline` spanning all three runner branches (final response text, tool call arguments, token streaming).
+  - Exposes `process_token(token)` for chunk-buffered token analysis, one-shot `flush()`, and idempotent non-flushing `close()`.
+  - `OutputGuardrailBlockedError` is owned by `agent.guardrails.base` preserving `partial_response`, `layer`, `rule`, and message.
+  - Causal cleanup ordering is strictly enforced across all runner exits: `partial_persist` -> `close` (non-flushing) -> `release` (lease release).
+- **Standalone `agent.guardrails.pii` Ownership (T027)**:
+  - `agent.guardrails.pii` is the sole authoritative owner of `deterministic_pii_match`, `_is_output_guardrail_disabled` (covering all 5 legacy disabled shapes), and `approved_model_content`.
+  - All duplicate regexes and predicate functions eliminated; `output_pipeline.py` imports directly from `pii.py` while retaining stateless `payload_free_config`. Zero circular imports.
+- **SSE Pre-Quota Ingress Admission & Zero Redis on Block (T028)**:
+  - `apps/agent/src/agent/streaming/sse.py` validates inputs in strict ingress progression: `access check -> length guard -> gateway health -> validate_input -> Redis/quota`.
+  - If `decision.status == "BLOCK"`:
+    - If `decision.response_key == GUARDRAIL_INPUT_PII`: returns `ErrorEvent` with `code="GUARDRAIL_BLOCKED"` (`Your message contains protected personal information and cannot be processed.`).
+    - Else: returns `ErrorEvent` with `code = decision.response_key or "GUARDRAIL_INPUT_BLOCKED"` (`Input rejected by security guardrail: {code}`).
+    - Both paths terminate early as SSE streams before quota admission or Redis client initialization.
+    - Zero Redis calls and zero quota consumption on ANY blocked ingress decision.
+  - Admitted turns forward `admission_decision` to `ChatController.stream`, preventing redundant input revalidation.
+- **Canonical `get_guardrail_gateway` Singleton (T029)**:
+  - `apps/agent/src/agent/main.py` provides `get_guardrail_gateway()` with double-checked thread-safe caching.
+  - Shared across module-level execution and lifespan lifecycle; failure during production construction aborts startup fail-closed.
 
 #### Output Stream Session, Delegate & PII Utility Characterization (US2 Phase 4 Slice 2)
 - **Persistent Stream Session & Runner Lifecycle (T020)**:
