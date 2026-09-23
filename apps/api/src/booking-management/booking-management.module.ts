@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '@/prisma/prisma.module';
-import { BookingLifecycleModule } from '@/booking-lifecycle/booking-lifecycle.module';
+import { BookingStateModule } from '@/booking-lifecycle/booking-state.module';
 import { BookingManagementService } from './booking-management.service';
+import { BookingManagementController } from './booking-management.controller';
 
 @Module({
-  imports: [PrismaModule, BookingLifecycleModule],
+  imports: [PrismaModule, BookingStateModule],
+  controllers: [BookingManagementController],
   providers: [BookingManagementService],
   exports: [BookingManagementService],
 })

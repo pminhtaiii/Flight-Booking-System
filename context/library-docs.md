@@ -698,6 +698,23 @@ export class NotificationListener {
 - **Isolated Listener Exceptions**: Listeners must catch their own async exceptions without failing committed commands or triggering compensations.
 - **Passive DTO Envelopes**: Event classes must be behavior-free passive DTO envelopes containing typed primitive/readonly attributes.
 
+### Feature 024 Integration Rules
+
+- Keep `@nestjs/event-emitter` on the Nest 10 compatible `^2.1.1` line. The project registers `EventEmitterModule.forRoot({ wildcard: true, delimiter: '.', maxListeners: 20 })` exactly once in `AppModule`.
+- `BookingEventPublisherService` owns event-name resolution and calls `EventEmitter2.emitAsync` only after the owning Prisma transaction commits. A `TransactionEventContext` carries the transaction client plus a fresh event array; each retry attempt gets a new context.
+- Booking events are passive envelopes containing `bookingId`, `eventId`, `sourceVersion`, and `timestamp`. The projection listener subscribes to `booking.**` so dotted event names are delivered under the configured wildcard delimiter. It must not subscribe to `refund.settled`.
+- Listener and dispatch failures are caught, logged with safe context, and measured; they never fail the committed command or trigger financial compensation. Event delivery is in-process and non-durable, so reconciliation repairs missed dispatches.
+
+## @nestjs/schedule
+
+The API uses the installed `@nestjs/schedule` 6.x line with NestJS 10.
+
+**Rules:**
+
+- Register `ScheduleModule.forRoot()` once in `AppModule`; feature modules only provide scheduled services.
+- `BookingProjectionReconciliationService` uses `@Cron(CronExpression.EVERY_MINUTE, { name: 'BookingProjectionReconciliationService' })` so operators can inspect or pause/resume it through `SchedulerRegistry`.
+- The overlap guard and cursor are process-local. Multiple replicas may scan overlapping IDs; `BookingProjectionRepository.upsertGuarded` makes duplicate work safe through `sourceVersion` fencing and stable `agentReference` preservation. No distributed reconciliation lease is introduced.
+
 ---
 
 ## class-validator
@@ -1052,4 +1069,3 @@ All security scanners, linters, container images, and audit drivers are pinned i
 ### 5. pytest-cov (Coverage Enforcement)
 - **Pinned Version**: `pytest-cov>=5.0.0` (installed `7.1.0`).
 - **Thresholds**: Strictly enforced by `tests/security/coverage-policy.json`: `>=95.0%` statement coverage and `>=90.0%` branch coverage across changed security modules.
-

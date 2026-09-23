@@ -249,7 +249,7 @@ export async function getCancellationQuote(
   }
 
   const upstream = await fetchWithRetry(
-    `/api/bookings/${encodeURIComponent(bookingId.trim())}/cancellation-quote`,
+    `/api/bookings/${encodeURIComponent(bookingId.trim())}/cancellation/quote`,
     {
       method: 'POST',
       headers: {
@@ -329,7 +329,7 @@ export async function cancelBooking(
   }
 
   const upstream = await fetchWithRetry(
-    `/api/bookings/${encodeURIComponent(bookingId.trim())}/cancel`,
+    `/api/bookings/${encodeURIComponent(bookingId.trim())}/cancellation`,
     {
       method: 'POST',
       headers: {

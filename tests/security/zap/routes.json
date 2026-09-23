@@ -318,7 +318,7 @@
     {
       "id": "api-bookings-cancel",
       "method": "POST",
-      "path": "/bookings/:id/cancel",
+      "path": "/bookings/:id/cancellation",
       "service": "api",
       "targetPort": 3001,
       "targetService": "api:3001",

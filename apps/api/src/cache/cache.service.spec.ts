@@ -145,4 +145,293 @@ describe('CacheService', () => {
       expect(mockLrange).toHaveBeenCalledWith('latency_key', 0, -1);
     });
   });
+
+  describe('Distributed Lock operations', () => {
+    describe('in-memory fallback', () => {
+      it('acquires lock when key is free', async () => {
+        const acquired = await service.acquireLock('lock:res1', 'owner-1', 10);
+        expect(acquired).toBe(true);
+      });
+
+      it('rejects lock acquisition when key is already held by another owner', async () => {
+        const first = await service.acquireLock('lock:res2', 'owner-1', 10);
+        expect(first).toBe(true);
+
+        const second = await service.acquireLock('lock:res2', 'owner-2', 10);
+        expect(second).toBe(false);
+      });
+
+      it('allows lock acquisition after previous lease expires', async () => {
+        await service.acquireLock('lock:res3', 'owner-1', 0.001); // 1ms
+        await new Promise((r) => setTimeout(r, 10));
+
+        const second = await service.acquireLock('lock:res3', 'owner-2', 10);
+        expect(second).toBe(true);
+      });
+
+      it('releases lock only when owner matches and prevents foreign release', async () => {
+        await service.acquireLock('lock:res4', 'owner-1', 10);
+
+        // Attempt release with wrong owner
+        const wrongRelease = await service.releaseLock('lock:res4', 'owner-2');
+        expect(wrongRelease).toBe(false);
+
+        // Lock is still held: another cannot acquire
+        const secondAcquire = await service.acquireLock('lock:res4', 'owner-3', 10);
+        expect(secondAcquire).toBe(false);
+
+        // Correct owner release
+        const correctRelease = await service.releaseLock('lock:res4', 'owner-1');
+        expect(correctRelease).toBe(true);
+
+        // Now key is free
+        const thirdAcquire = await service.acquireLock('lock:res4', 'owner-3', 10);
+        expect(thirdAcquire).toBe(true);
+      });
+
+      it('renews lock lease when owner matches and rejects foreign renewal', async () => {
+        await service.acquireLock('lock:res5', 'owner-1', 10);
+
+        // Foreign renewal fails
+        const foreignRenew = await service.renewLock('lock:res5', 'owner-2', 30);
+        expect(foreignRenew).toBe(false);
+
+        // Owner renewal succeeds
+        const ownerRenew = await service.renewLock('lock:res5', 'owner-1', 30);
+        expect(ownerRenew).toBe(true);
+      });
+    });
+
+    describe('Redis client delegation', () => {
+      it('delegates acquireLock with NX and EX to redisClient', async () => {
+        const mockSet = jest.fn().mockResolvedValue('OK');
+        (service as unknown as { redisClient: unknown }).redisClient = {
+          set: mockSet,
+          quit: jest.fn().mockResolvedValue('OK'),
+        };
+
+        const result = await service.acquireLock('lock:redis1', 'owner-token', 30);
+        expect(result).toBe(true);
+        expect(mockSet).toHaveBeenCalledWith(
+          'lock:redis1',
+          'owner-token',
+          'EX',
+          30,
+          'NX',
+        );
+      });
+
+      it('returns false when redisClient SET NX fails (lock already held)', async () => {
+        const mockSet = jest.fn().mockResolvedValue(null);
+        (service as unknown as { redisClient: unknown }).redisClient = {
+          set: mockSet,
+          quit: jest.fn().mockResolvedValue('OK'),
+        };
+
+        const result = await service.acquireLock('lock:redis2', 'owner-token', 30);
+        expect(result).toBe(false);
+      });
+
+      it('delegates releaseLock with atomic Lua compare-and-delete', async () => {
+        const mockEval = jest.fn().mockResolvedValue(1);
+        (service as unknown as { redisClient: unknown }).redisClient = {
+          eval: mockEval,
+          quit: jest.fn().mockResolvedValue('OK'),
+        };
+
+        const result = await service.releaseLock('lock:redis3', 'owner-token');
+        expect(result).toBe(true);
+        expect(mockEval).toHaveBeenCalledWith(
+          expect.stringContaining("redis.call('del', KEYS[1])"),
+          1,
+          'lock:redis3',
+          'owner-token',
+        );
+      });
+
+      it('returns false from releaseLock when owner token does not match in Redis', async () => {
+        const mockEval = jest.fn().mockResolvedValue(0);
+        (service as unknown as { redisClient: unknown }).redisClient = {
+          eval: mockEval,
+          quit: jest.fn().mockResolvedValue('OK'),
+        };
+
+        const result = await service.releaseLock('lock:redis4', 'wrong-token');
+        expect(result).toBe(false);
+      });
+
+      it('delegates renewLock with atomic Lua check-and-expire', async () => {
+        const mockEval = jest.fn().mockResolvedValue(1);
+        (service as unknown as { redisClient: unknown }).redisClient = {
+          eval: mockEval,
+          quit: jest.fn().mockResolvedValue('OK'),
+        };
+
+        const result = await service.renewLock('lock:redis5', 'owner-token', 30);
+        expect(result).toBe(true);
+        expect(mockEval).toHaveBeenCalledWith(
+          expect.stringContaining("redis.call('expire', KEYS[1], ARGV[2])"),
+          1,
+          'lock:redis5',
+          'owner-token',
+          30,
+        );
+      });
+    });
+  });
+
+  describe('token-fenced atomic lock operations', () => {
+    it('acquireLock acquires lease when key free -> returns true', async () => {
+      const lockKey = 'lock:token-fenced:free';
+      const token = 'token-owner-1';
+
+      // 1. Redis delegation mode
+      const mockSet = jest.fn().mockResolvedValue('OK');
+      (service as unknown as { redisClient: unknown }).redisClient = {
+        set: mockSet,
+        quit: jest.fn().mockResolvedValue('OK'),
+      };
+      const acquiredRedis = await service.acquireLock(lockKey, token, 30);
+      expect(acquiredRedis).toBe(true);
+      expect(mockSet).toHaveBeenCalledWith(lockKey, token, 'EX', 30, 'NX');
+
+      // 2. In-memory fallback mode
+      (service as unknown as { redisClient: unknown }).redisClient = null;
+      const acquiredMem = await service.acquireLock('lock:mem-free', token, 30);
+      expect(acquiredMem).toBe(true);
+    });
+
+    it('acquireLock with different token fails while key held -> returns false', async () => {
+      const lockKey = 'lock:token-fenced:held';
+      const ownerToken = 'token-owner-1';
+      const competitorToken = 'token-owner-2';
+
+      // 1. Redis delegation mode (SET NX returns null when key held)
+      const mockSet = jest.fn().mockResolvedValue(null);
+      (service as unknown as { redisClient: unknown }).redisClient = {
+        set: mockSet,
+        quit: jest.fn().mockResolvedValue('OK'),
+      };
+      const acquiredRedis = await service.acquireLock(lockKey, competitorToken, 30);
+      expect(acquiredRedis).toBe(false);
+
+      // 2. In-memory fallback mode
+      (service as unknown as { redisClient: unknown }).redisClient = null;
+      const first = await service.acquireLock('lock:mem-held', ownerToken, 30);
+      expect(first).toBe(true);
+      const second = await service.acquireLock('lock:mem-held', competitorToken, 30);
+      expect(second).toBe(false);
+    });
+
+    it('releaseLock succeeds and removes key only when caller supplies matching token -> returns true', async () => {
+      const lockKey = 'lock:token-fenced:release-match';
+      const matchingToken = 'token-owner-match';
+
+      // 1. Redis delegation mode (Lua script returns 1 when token matches)
+      const mockEval = jest.fn().mockResolvedValue(1);
+      (service as unknown as { redisClient: unknown }).redisClient = {
+        eval: mockEval,
+        quit: jest.fn().mockResolvedValue('OK'),
+      };
+      const releasedRedis = await service.releaseLock(lockKey, matchingToken);
+      expect(releasedRedis).toBe(true);
+      expect(mockEval).toHaveBeenCalledWith(
+        expect.stringContaining("redis.call('del', KEYS[1])"),
+        1,
+        lockKey,
+        matchingToken,
+      );
+
+      // 2. In-memory fallback mode
+      (service as unknown as { redisClient: unknown }).redisClient = null;
+      await service.acquireLock('lock:mem-release-match', matchingToken, 30);
+      const releasedMem = await service.releaseLock('lock:mem-release-match', matchingToken);
+      expect(releasedMem).toBe(true);
+      // Key is removed, so new acquisition succeeds
+      const reacquired = await service.acquireLock('lock:mem-release-match', 'new-token', 30);
+      expect(reacquired).toBe(true);
+    });
+
+    it('releaseLock with wrong token fails -> returns false, preserves another owner\'s lock', async () => {
+      const lockKey = 'lock:token-fenced:wrong-token';
+      const ownerToken = 'correct-owner';
+      const wrongToken = 'wrong-owner';
+
+      // 1. Redis delegation mode (Lua returns 0 when token mismatch)
+      const mockEval = jest.fn().mockResolvedValue(0);
+      (service as unknown as { redisClient: unknown }).redisClient = {
+        eval: mockEval,
+        quit: jest.fn().mockResolvedValue('OK'),
+      };
+      const releasedRedis = await service.releaseLock(lockKey, wrongToken);
+      expect(releasedRedis).toBe(false);
+
+      // 2. In-memory fallback mode
+      (service as unknown as { redisClient: unknown }).redisClient = null;
+      await service.acquireLock('lock:mem-wrong-token', ownerToken, 30);
+      const releasedMem = await service.releaseLock('lock:mem-wrong-token', wrongToken);
+      expect(releasedMem).toBe(false);
+      // Original owner lock preserved, so competitor cannot acquire
+      const competitorAcquired = await service.acquireLock('lock:mem-wrong-token', 'competitor', 30);
+      expect(competitorAcquired).toBe(false);
+    });
+
+    it('releaseLock with expired lease / non-existent key fails -> returns false', async () => {
+      const missingKey = 'lock:non-existent';
+      const token = 'owner-token';
+
+      // 1. Redis delegation mode (Lua returns 0 when key missing or expired)
+      const mockEval = jest.fn().mockResolvedValue(0);
+      (service as unknown as { redisClient: unknown }).redisClient = {
+        eval: mockEval,
+        quit: jest.fn().mockResolvedValue('OK'),
+      };
+      const releasedRedis = await service.releaseLock(missingKey, token);
+      expect(releasedRedis).toBe(false);
+
+      // 2. In-memory mode with non-existent key
+      (service as unknown as { redisClient: unknown }).redisClient = null;
+      const releasedMemNonExistent = await service.releaseLock('lock:mem-missing', token);
+      expect(releasedMemNonExistent).toBe(false);
+
+      // 3. In-memory mode with expired lease
+      await service.acquireLock('lock:mem-expired', token, 0.001);
+      await new Promise((r) => setTimeout(r, 10));
+      await service.get('lock:mem-expired'); // Triggers lazy expiry cleanup
+      const releasedMemExpired = await service.releaseLock('lock:mem-expired', token);
+      expect(releasedMemExpired).toBe(false);
+    });
+
+    it('in-memory fallback behavior when Redis unavailable', async () => {
+      const lockKey = 'lock:fallback-unavailable';
+      const token = 'owner-fallback-token';
+
+      // Case A: redisClient is null
+      (service as unknown as { redisClient: unknown }).redisClient = null;
+      const acquiredNoRedis = await service.acquireLock(lockKey, token, 30);
+      expect(acquiredNoRedis).toBe(true);
+      const releasedNoRedis = await service.releaseLock(lockKey, token);
+      expect(releasedNoRedis).toBe(true);
+
+      // Case B: redisClient throws error on acquireLock -> fallback to in-memory
+      const brokenClient = {
+        set: jest.fn().mockRejectedValue(new Error('Redis connection failure')),
+        eval: jest.fn().mockRejectedValue(new Error('Redis connection failure')),
+        quit: jest.fn().mockResolvedValue('OK'),
+      };
+      (service as unknown as { redisClient: unknown }).redisClient = brokenClient;
+
+      const fallbackAcquire = await service.acquireLock('lock:fallback-err', token, 30);
+      expect(fallbackAcquire).toBe(true);
+
+      // Case C: redisClient throws error on releaseLock -> fallback to in-memory
+      const fallbackRelease = await service.releaseLock('lock:fallback-err', token);
+      expect(fallbackRelease).toBe(true);
+
+      // Attempting release again on now-empty key via fallback returns false
+      const fallbackReleaseAgain = await service.releaseLock('lock:fallback-err', token);
+      expect(fallbackReleaseAgain).toBe(false);
+    });
+  });
 });
+

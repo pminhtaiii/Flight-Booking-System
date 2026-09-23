@@ -3,6 +3,9 @@ import {
   BOOKING_PROJECTION_METRIC_NAMES,
   REDIS_LATEST_PASS_STATE_KEY,
   REDIS_CONSECUTIVE_ERRORS_KEY,
+  REDIS_LATEST_PASS_STATE_LOCK_KEY,
+  LATEST_PASS_STATE_LOCK_TTL_SECONDS,
+  LATEST_PASS_STATE_LOCK_HEARTBEAT_MS,
 } from './booking-projection.metrics';
 
 describe('BookingProjectionMetrics', () => {
@@ -388,6 +391,9 @@ describe('BookingProjectionMetrics', () => {
       set: jest.Mock;
       checkHealth: jest.Mock;
       del: jest.Mock;
+      acquireLock: jest.Mock;
+      releaseLock: jest.Mock;
+      renewLock: jest.Mock;
     };
     let mockPrisma: {
       $transaction: jest.Mock;
@@ -405,6 +411,9 @@ describe('BookingProjectionMetrics', () => {
         set: jest.fn().mockResolvedValue(undefined),
         checkHealth: jest.fn().mockResolvedValue('up'),
         del: jest.fn().mockResolvedValue(undefined),
+        acquireLock: jest.fn().mockResolvedValue(true),
+        releaseLock: jest.fn().mockResolvedValue(true),
+        renewLock: jest.fn().mockResolvedValue(true),
       };
       mockPrisma = {
         $transaction: jest.fn().mockImplementation(async (cb) => {
@@ -623,6 +632,110 @@ describe('BookingProjectionMetrics', () => {
       expect(mockCacheService.set).not.toHaveBeenCalled();
     });
 
+    it('keeps the newer pass state when concurrent stale and current writers overlap', async () => {
+      const initialState = JSON.stringify({
+        outcome: 'ERROR',
+        consecutiveErrors: 1,
+        timestamp: 0,
+      });
+      let storedState: string | null = initialState;
+      let stateReadCount = 0;
+      let resolveOlderRead: (() => void) | undefined;
+      let resolveOlderSetStarted: (() => void) | undefined;
+      let resolveNewerSet: (() => void) | undefined;
+      const olderRead = new Promise<void>((resolve) => {
+        resolveOlderRead = resolve;
+      });
+      const olderSetStarted = new Promise<void>((resolve) => {
+        resolveOlderSetStarted = resolve;
+      });
+      const newerSet = new Promise<void>((resolve) => {
+        resolveNewerSet = resolve;
+      });
+
+      let currentLockOwner: string | null = null;
+      mockCacheService.acquireLock.mockImplementation(
+        async (key: string, owner: string) => {
+          if (key.endsWith(':lock')) {
+            if (currentLockOwner !== null) {
+              return false;
+            }
+            currentLockOwner = owner;
+            return true;
+          }
+          return true;
+        },
+      );
+      mockCacheService.releaseLock.mockImplementation(
+        async (key: string, owner: string) => {
+          if (key.endsWith(':lock')) {
+            if (currentLockOwner === owner) {
+              currentLockOwner = null;
+              return true;
+            }
+            return false;
+          }
+          return true;
+        },
+      );
+      mockCacheService.incrby.mockImplementation(
+        async (key: string, amount: number) => {
+          if (key === REDIS_CONSECUTIVE_ERRORS_KEY) {
+            return amount;
+          }
+          return amount;
+        },
+      );
+      mockCacheService.get.mockImplementation(async (key: string) => {
+        if (key !== REDIS_LATEST_PASS_STATE_KEY) {
+          return null;
+        }
+        stateReadCount += 1;
+        if (stateReadCount === 1) {
+          resolveOlderRead?.();
+        }
+        return storedState;
+      });
+      mockCacheService.set.mockImplementation(
+        async (key: string, value: string) => {
+          if (key !== REDIS_LATEST_PASS_STATE_KEY) {
+            return;
+          }
+          const parsed = JSON.parse(value) as { timestamp: number };
+          if (parsed.timestamp === 1000) {
+            resolveOlderSetStarted?.();
+            if (!currentLockOwner) {
+              await newerSet;
+            }
+          } else if (parsed.timestamp === 2000) {
+            resolveNewerSet?.();
+          }
+          storedState = value;
+        },
+      );
+
+      const olderWrite = distributedMetrics.incrementReconciliationPassTotal(
+        'ERROR',
+        1,
+        1000,
+      );
+      await olderRead;
+      await olderSetStarted;
+
+      const newerWrite = distributedMetrics.incrementReconciliationPassTotal(
+        'SUCCESS',
+        1,
+        2000,
+      );
+      await Promise.all([olderWrite, newerWrite]);
+
+      expect(JSON.parse(storedState ?? '{}')).toEqual({
+        outcome: 'SUCCESS',
+        consecutiveErrors: 0,
+        timestamp: 2000,
+      });
+    });
+
     it('overwrites Redis pass state when incoming pass has newer timestamp', async () => {
       const t1Older = 1000;
       const t2Newer = 2000;
@@ -701,7 +814,144 @@ describe('BookingProjectionMetrics', () => {
       expect(mockCacheService.del).toHaveBeenCalledWith(REDIS_CONSECUTIVE_ERRORS_KEY);
       expect(redisErrors).toBe(0);
     });
+
+    describe('Issue 1: Redis distributed lock owner verification and heartbeat lease renewal', () => {
+      it('acquires lock with a unique owner token and releases it with the exact matching token', async () => {
+        let capturedAcquireToken = '';
+        let capturedReleaseToken = '';
+
+        mockCacheService.acquireLock.mockImplementation(
+          async (_key: string, ownerToken: string, ttl: number) => {
+            capturedAcquireToken = ownerToken;
+            expect(ttl).toBe(LATEST_PASS_STATE_LOCK_TTL_SECONDS);
+            return true;
+          },
+        );
+        mockCacheService.releaseLock.mockImplementation(
+          async (_key: string, ownerToken: string) => {
+            capturedReleaseToken = ownerToken;
+            return true;
+          },
+        );
+
+        await distributedMetrics.incrementReconciliationPassTotal('SUCCESS', 1, 1000);
+
+        expect(capturedAcquireToken).toMatch(
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+        );
+        expect(capturedReleaseToken).toBe(capturedAcquireToken);
+        expect(mockCacheService.acquireLock).toHaveBeenCalledWith(
+          REDIS_LATEST_PASS_STATE_LOCK_KEY,
+          capturedAcquireToken,
+          LATEST_PASS_STATE_LOCK_TTL_SECONDS,
+        );
+        expect(mockCacheService.releaseLock).toHaveBeenCalledWith(
+          REDIS_LATEST_PASS_STATE_LOCK_KEY,
+          capturedAcquireToken,
+        );
+      });
+
+      it('generates distinct owner tokens for consecutive lock acquisitions', async () => {
+        const tokens: string[] = [];
+        mockCacheService.acquireLock.mockImplementation(
+          async (_key: string, ownerToken: string) => {
+            tokens.push(ownerToken);
+            return true;
+          },
+        );
+
+        await distributedMetrics.incrementReconciliationPassTotal('SUCCESS', 1, 1000);
+        await distributedMetrics.incrementReconciliationPassTotal('ERROR', 1, 2000);
+
+        expect(tokens.length).toBe(2);
+        expect(tokens[0]).not.toBe(tokens[1]);
+      });
+
+      it('renews lock lease periodically during execution and clears timer on release', async () => {
+        jest.useFakeTimers();
+        try {
+          let resolveCriticalSection: (() => void) | undefined;
+          const criticalSectionBlocked = new Promise<void>((resolve) => {
+            resolveCriticalSection = resolve;
+          });
+
+          let capturedOwnerToken = '';
+          mockCacheService.acquireLock.mockImplementation(
+            async (_key: string, ownerToken: string) => {
+              capturedOwnerToken = ownerToken;
+              return true;
+            },
+          );
+
+          // Stall during cache.get to simulate critical section work
+          mockCacheService.get.mockImplementation(async () => {
+            await criticalSectionBlocked;
+            return null;
+          });
+
+          const updatePromise = distributedMetrics.incrementReconciliationPassTotal(
+            'SUCCESS',
+            1,
+            5000,
+          );
+
+          // Allow the acquireLock promise to resolve and enter while loop
+          await jest.advanceTimersByTimeAsync(1);
+          expect(mockCacheService.acquireLock).toHaveBeenCalled();
+
+          // Advance by 1 heartbeat interval (10s)
+          await jest.advanceTimersByTimeAsync(LATEST_PASS_STATE_LOCK_HEARTBEAT_MS);
+          expect(mockCacheService.renewLock).toHaveBeenCalledWith(
+            REDIS_LATEST_PASS_STATE_LOCK_KEY,
+            capturedOwnerToken,
+            LATEST_PASS_STATE_LOCK_TTL_SECONDS,
+          );
+          expect(mockCacheService.renewLock).toHaveBeenCalledTimes(1);
+
+          // Advance by another heartbeat interval (another 10s)
+          await jest.advanceTimersByTimeAsync(LATEST_PASS_STATE_LOCK_HEARTBEAT_MS);
+          expect(mockCacheService.renewLock).toHaveBeenCalledTimes(2);
+
+          // Unblock critical section and complete
+          resolveCriticalSection?.();
+          await updatePromise;
+
+          // Lock is released
+          expect(mockCacheService.releaseLock).toHaveBeenCalledWith(
+            REDIS_LATEST_PASS_STATE_LOCK_KEY,
+            capturedOwnerToken,
+          );
+
+          // Advance time further after release; verify NO more renewLock calls occur
+          await jest.advanceTimersByTimeAsync(LATEST_PASS_STATE_LOCK_HEARTBEAT_MS * 2);
+          expect(mockCacheService.renewLock).toHaveBeenCalledTimes(2);
+        } finally {
+          jest.useRealTimers();
+        }
+      });
+
+      it('handles releaseLock returning false (lock stolen or lost) without crashing', async () => {
+        mockCacheService.releaseLock.mockResolvedValueOnce(false);
+
+        await expect(
+          distributedMetrics.incrementReconciliationPassTotal('SUCCESS', 1, 6000),
+        ).resolves.not.toThrow();
+
+        expect(distributedMetrics.getLastPassOutcome()).toBe('SUCCESS');
+      });
+
+      it('handles acquireLock timeout gracefully and retains local pass metrics', async () => {
+        // Lock acquisition always fails
+        mockCacheService.acquireLock.mockResolvedValue(false);
+
+        await expect(
+          distributedMetrics.incrementReconciliationPassTotal('ERROR', 1, 7000),
+        ).resolves.not.toThrow();
+
+        expect(distributedMetrics.getLastPassOutcome()).toBe('ERROR');
+        expect(distributedMetrics.getConsecutivePassErrors()).toBe(1);
+      });
+    });
   });
 });
-
 

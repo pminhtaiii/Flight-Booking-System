@@ -6,9 +6,11 @@ import {
   clamp,
   compareObjectiveTiers,
   determineSignal,
+  formatHour,
   getCabinAdjacency,
   getMatchLevel,
   getPriceSensitivityMultiplier,
+  type HourWindow,
   hourDistanceToWindow,
   isHourInWindow,
   round6,
@@ -18,9 +20,8 @@ import {
 } from './flight-match.policy';
 import type {
   ActiveWeights,
+  ConstraintViolation,
   DimensionScore,
-  EligibilityResult,
-  FlightMatchDimension,
   FlightMatchInput,
   MatchLevel,
   ScoredOffer,
@@ -29,35 +30,13 @@ import type {
 
 const AIRLINE_CODE_PATTERN = /^[A-Z0-9]{2,3}$/;
 const NORMALIZED_AIRLINE_CODES = new WeakMap<readonly unknown[], readonly string[]>();
-
-type PersonalizedDimension =
-  | 'AIRLINE'
-  | 'ARRIVAL_SCHEDULE'
-  | 'CABIN'
-  | 'DEPARTURE_SCHEDULE'
-  | 'BAGGAGE';
-
-type BaselineDimension = 'PRICE' | 'STOPS' | 'DURATION';
-
-const PERSONALIZED_DIMENSION_KEYS: readonly PersonalizedDimension[] = [
-  'AIRLINE',
-  'ARRIVAL_SCHEDULE',
-  'CABIN',
-  'DEPARTURE_SCHEDULE',
-  'BAGGAGE',
-];
-
-const BASELINE_DIMENSION_KEYS: readonly BaselineDimension[] = [
-  'PRICE',
-  'STOPS',
-  'DURATION',
-];
-
-const BASELINE_REMAINDER_KEYS: readonly BaselineDimension[] = [
-  'PRICE',
-  'STOPS',
-  'DURATION',
-];
+const EMPTY_SET: ReadonlySet<string> = new Set<string>();
+const EMPTY_BREAKDOWN: readonly [] = [];
+const EMPTY_OBJECT: Readonly<Record<string, unknown>> = Object.freeze({});
+const ELIGIBLE_RESULT = Object.freeze({
+  eligible: true as const,
+  violations: [] as const,
+});
 
 type MedianComparison = 'below' | 'at' | 'above';
 type PriceMedianExplanationKey =
@@ -112,21 +91,44 @@ export class FlightMatchScorerService {
     offer: FlightMatchInput,
     preferences: ScoringPreferences,
     precomputedBlacklist?: ReadonlySet<string>,
-  ): EligibilityResult {
+  ):
+    | { readonly eligible: true; readonly violations: readonly [] }
+    | { readonly eligible: false; readonly violations: readonly ConstraintViolation[] } {
     const blacklistedAirlines =
-      precomputedBlacklist ?? new Set(normalizeAirlineCodes(preferences.blacklistedAirlines));
-    const violations = normalizeAirlineCodes(offer.carrierCodes)
-      .filter((airline) => blacklistedAirlines.has(airline))
-      .map((airline) => ({
-        constraint: 'BLACKLISTED_AIRLINE' as const,
-        explanation: {
-          key: 'constraint.airline.blacklisted' as const,
-          params: { airline },
-        },
-      }));
+      precomputedBlacklist ??
+      (preferences.blacklistedAirlines && preferences.blacklistedAirlines.length > 0
+        ? new Set(normalizeAirlineCodes(preferences.blacklistedAirlines))
+        : EMPTY_SET);
 
-    if (violations.length === 0) {
-      return { eligible: true, violations: [] };
+    if (blacklistedAirlines.size === 0) {
+      return ELIGIBLE_RESULT;
+    }
+
+    const carriers = normalizeAirlineCodes(offer.carrierCodes);
+    let violations: Array<{
+      constraint: 'BLACKLISTED_AIRLINE';
+      explanation: {
+        key: 'constraint.airline.blacklisted';
+        params: { airline: string };
+      };
+    }> | undefined;
+
+    for (let i = 0; i < carriers.length; i++) {
+      const airline = carriers[i];
+      if (blacklistedAirlines.has(airline)) {
+        if (!violations) violations = [];
+        violations.push({
+          constraint: 'BLACKLISTED_AIRLINE' as const,
+          explanation: {
+            key: 'constraint.airline.blacklisted' as const,
+            params: { airline },
+          },
+        });
+      }
+    }
+
+    if (!violations || violations.length === 0) {
+      return ELIGIBLE_RESULT;
     }
 
     return { eligible: false, violations };
@@ -137,86 +139,112 @@ export class FlightMatchScorerService {
     preferences: ScoringPreferences,
     preFilteredEligibleOffers?: readonly FlightMatchInput[],
     precomputedPreferredSet?: ReadonlySet<string>,
+    precomputedMetrics?: {
+      medianPrice: number;
+      medianDuration: number;
+      minStops: number;
+    },
   ): ActiveWeights {
-    const eligibleOffers =
-      preFilteredEligibleOffers ??
-      offers.filter((offer) => this.checkEligibility(offer, preferences).eligible);
+    let eligibleOffers: readonly FlightMatchInput[];
+    if (preFilteredEligibleOffers) {
+      eligibleOffers = preFilteredEligibleOffers;
+    } else {
+      const filtered: FlightMatchInput[] = [];
+      const blSet =
+        preferences.blacklistedAirlines && preferences.blacklistedAirlines.length > 0
+          ? new Set(normalizeAirlineCodes(preferences.blacklistedAirlines))
+          : EMPTY_SET;
+      for (let i = 0; i < offers.length; i++) {
+        if (this.checkEligibility(offers[i], preferences, blSet).eligible) {
+          filtered.push(offers[i]);
+        }
+      }
+      eligibleOffers = filtered;
+    }
 
-    if (eligibleOffers.length === 0) {
+    const nEligible = eligibleOffers.length;
+    if (nEligible === 0) {
       return { ...BASE_WEIGHTS };
     }
 
     const preferredSet =
       precomputedPreferredSet ??
-      new Set(normalizeAirlineCodes(preferences.preferredAirlines ?? []));
+      (preferences.preferredAirlines && preferences.preferredAirlines.length > 0
+        ? new Set(normalizeAirlineCodes(preferences.preferredAirlines))
+        : EMPTY_SET);
 
-    const isMissingPersonalized: Record<PersonalizedDimension, boolean> = {
-      AIRLINE: preferredSet.size === 0,
-      ARRIVAL_SCHEDULE: preferences.preferredArrivalWindow == null,
-      CABIN: preferences.classPreference == null || preferences.classPreference.trim() === '',
-      DEPARTURE_SCHEDULE: preferences.preferredDepartureWindow == null,
-      BAGGAGE: preferences.requiresCheckedBaggage == null,
-    };
+    const applyZeroVariance = nEligible >= 2;
 
-    const applyZeroVariance = eligibleOffers.length >= 2;
-
-    let isBaselineActive: Record<BaselineDimension, boolean>;
+    let priceActive = true;
+    let stopsActive = true;
+    let durationActive = true;
 
     if (applyZeroVariance) {
-      const medianPrice = calculateMedian(eligibleOffers.map((o) => o.price));
-      const medianDuration = calculateMedian(eligibleOffers.map((o) => o.duration));
-      const minStops = Math.min(...eligibleOffers.map((o) => o.stops));
+      let medianPrice = precomputedMetrics?.medianPrice;
+      let medianDuration = precomputedMetrics?.medianDuration;
+      let minStops = precomputedMetrics?.minStops;
+
+      if (medianPrice === undefined || medianDuration === undefined || minStops === undefined) {
+        const prices: number[] = new Array(nEligible);
+        const durations: number[] = new Array(nEligible);
+        let minS = Infinity;
+        for (let i = 0; i < nEligible; i++) {
+          const o = eligibleOffers[i];
+          prices[i] = o.price;
+          durations[i] = o.duration;
+          if (o.stops < minS) minS = o.stops;
+        }
+        if (medianPrice === undefined) medianPrice = calculateMedian(prices);
+        if (medianDuration === undefined) medianDuration = calculateMedian(durations);
+        if (minStops === undefined) minStops = minS === Infinity ? 0 : minS;
+      }
 
       const priceMultiplier = getPriceSensitivityMultiplier(preferences.priceSensitivity);
-      const getPriceScore = (o: FlightMatchInput) =>
-        round6(
-          clamp(
-            0.5 +
-              0.5 *
-                priceMultiplier *
-                ((medianPrice - o.price) / Math.max(medianPrice, 0.01)),
-            0,
-            1,
-          ),
-        );
+      const priceDenom = Math.max(medianPrice, 0.01);
+      const priceFactor = 0.5 * priceMultiplier;
 
-      const firstPrice = getPriceScore(eligibleOffers[0]);
+      const firstPriceScore = round6(
+        clamp(0.5 + priceFactor * ((medianPrice - eligibleOffers[0].price) / priceDenom), 0, 1),
+      );
       let priceZeroVariance = true;
-      for (let i = 1; i < eligibleOffers.length; i++) {
-        if (getPriceScore(eligibleOffers[i]) !== firstPrice) {
+      for (let i = 1; i < nEligible; i++) {
+        const score = round6(
+          clamp(0.5 + priceFactor * ((medianPrice - eligibleOffers[i].price) / priceDenom), 0, 1),
+        );
+        if (score !== firstPriceScore) {
           priceZeroVariance = false;
           break;
         }
       }
 
       const maxStopsPref = preferences.maxStops;
-      const getStopsScore = (o: FlightMatchInput) =>
-        maxStopsPref !== null && maxStopsPref !== undefined
-          ? round6(o.stops <= maxStopsPref ? 1.0 : clamp(1 - 0.5 * (o.stops - maxStopsPref), 0, 1))
-          : round6(clamp(1 - 0.5 * (o.stops - minStops), 0, 1));
-
-      const firstStops = getStopsScore(eligibleOffers[0]);
+      const hasMaxStops = maxStopsPref !== null && maxStopsPref !== undefined;
+      const firstStops = eligibleOffers[0].stops;
+      const firstStopsScore = hasMaxStops
+        ? round6(firstStops <= (maxStopsPref as number) ? 1.0 : clamp(1 - 0.5 * (firstStops - (maxStopsPref as number)), 0, 1))
+        : round6(clamp(1 - 0.5 * (firstStops - minStops), 0, 1));
       let stopsZeroVariance = true;
-      for (let i = 1; i < eligibleOffers.length; i++) {
-        if (getStopsScore(eligibleOffers[i]) !== firstStops) {
+      for (let i = 1; i < nEligible; i++) {
+        const stops = eligibleOffers[i].stops;
+        const score = hasMaxStops
+          ? round6(stops <= (maxStopsPref as number) ? 1.0 : clamp(1 - 0.5 * (stops - (maxStopsPref as number)), 0, 1))
+          : round6(clamp(1 - 0.5 * (stops - minStops), 0, 1));
+        if (score !== firstStopsScore) {
           stopsZeroVariance = false;
           break;
         }
       }
 
-      const getDurationScore = (o: FlightMatchInput) =>
-        round6(
-          clamp(
-            0.5 + 0.5 * ((medianDuration - o.duration) / Math.max(medianDuration, 1)),
-            0,
-            1,
-          ),
-        );
-
-      const firstDuration = getDurationScore(eligibleOffers[0]);
+      const durDenom = Math.max(medianDuration, 1);
+      const firstDurScore = round6(
+        clamp(0.5 + 0.5 * ((medianDuration - eligibleOffers[0].duration) / durDenom), 0, 1),
+      );
       let durationZeroVariance = true;
-      for (let i = 1; i < eligibleOffers.length; i++) {
-        if (getDurationScore(eligibleOffers[i]) !== firstDuration) {
+      for (let i = 1; i < nEligible; i++) {
+        const score = round6(
+          clamp(0.5 + 0.5 * ((medianDuration - eligibleOffers[i].duration) / durDenom), 0, 1),
+        );
+        if (score !== firstDurScore) {
           durationZeroVariance = false;
           break;
         }
@@ -225,197 +253,164 @@ export class FlightMatchScorerService {
       const allBaselineZeroVariance =
         priceZeroVariance && stopsZeroVariance && durationZeroVariance;
 
-      isBaselineActive = {
-        PRICE: allBaselineZeroVariance || !priceZeroVariance,
-        STOPS: allBaselineZeroVariance || !stopsZeroVariance,
-        DURATION: allBaselineZeroVariance || !durationZeroVariance,
-      };
-    } else {
-      isBaselineActive = {
-        PRICE: true,
-        STOPS: true,
-        DURATION: true,
-      };
+      priceActive = allBaselineZeroVariance || !priceZeroVariance;
+      stopsActive = allBaselineZeroVariance || !stopsZeroVariance;
+      durationActive = allBaselineZeroVariance || !durationZeroVariance;
     }
 
-    const isPersonalizedActive: Record<PersonalizedDimension, boolean> = {
-      AIRLINE: false,
-      ARRIVAL_SCHEDULE: false,
-      CABIN: false,
-      DEPARTURE_SCHEDULE: false,
-      BAGGAGE: false,
-    };
+    // Personalized dimensions
+    let airlineActive = false;
+    let arrivalActive = false;
+    let cabinActive = false;
+    let departureActive = false;
+    let baggageActive = false;
 
-    for (const dim of PERSONALIZED_DIMENSION_KEYS) {
-      if (isMissingPersonalized[dim]) {
-        isPersonalizedActive[dim] = false;
-        continue;
-      }
-
+    // AIRLINE
+    if (preferredSet.size > 0) {
       if (!applyZeroVariance) {
-        isPersonalizedActive[dim] = true;
-        continue;
-      }
-
-      let isZeroVariance = true;
-      switch (dim) {
-        case 'AIRLINE': {
-          const getScore = (o: FlightMatchInput) =>
-            preferredSet.size > 0 &&
-            normalizeAirlineCodes(o.carrierCodes ?? []).some((c) => preferredSet.has(c))
-              ? 1.0
-              : 0.5;
-          const first = getScore(eligibleOffers[0]);
-          for (let i = 1; i < eligibleOffers.length; i++) {
-            if (getScore(eligibleOffers[i]) !== first) {
-              isZeroVariance = false;
-              break;
-            }
-          }
-          break;
-        }
-        case 'ARRIVAL_SCHEDULE': {
-          const window = preferences.preferredArrivalWindow;
-          if (!window) {
-            isZeroVariance = true;
-            break;
-          }
-          const getScore = (o: FlightMatchInput) => {
-            const h = o.outboundArrivalHour;
-            if (isHourInWindow(h, window)) return 1.0;
-            const dist = hourDistanceToWindow(h, window);
-            return round6(clamp(1 - dist / SCHEDULE_SHOULDER_HOURS, 0, 1));
-          };
-          const first = getScore(eligibleOffers[0]);
-          for (let i = 1; i < eligibleOffers.length; i++) {
-            if (getScore(eligibleOffers[i]) !== first) {
-              isZeroVariance = false;
-              break;
-            }
-          }
-          break;
-        }
-        case 'CABIN': {
-          const reqClass = preferences.classPreference ?? '';
-          const getScore = (o: FlightMatchInput) =>
-            CABIN_ADJACENCY_MAPPINGS[getCabinAdjacency(reqClass, o.cabinClass)].subScore;
-          const first = getScore(eligibleOffers[0]);
-          for (let i = 1; i < eligibleOffers.length; i++) {
-            if (getScore(eligibleOffers[i]) !== first) {
-              isZeroVariance = false;
-              break;
-            }
-          }
-          break;
-        }
-        case 'DEPARTURE_SCHEDULE': {
-          const window = preferences.preferredDepartureWindow;
-          if (!window) {
-            isZeroVariance = true;
-            break;
-          }
-          const getScore = (o: FlightMatchInput) => {
-            const h = o.outboundDepartureHour;
-            if (isHourInWindow(h, window)) return 1.0;
-            const dist = hourDistanceToWindow(h, window);
-            return round6(clamp(1 - dist / SCHEDULE_SHOULDER_HOURS, 0, 1));
-          };
-          const first = getScore(eligibleOffers[0]);
-          for (let i = 1; i < eligibleOffers.length; i++) {
-            if (getScore(eligibleOffers[i]) !== first) {
-              isZeroVariance = false;
-              break;
-            }
-          }
-          break;
-        }
-        case 'BAGGAGE': {
-          const req = preferences.requiresCheckedBaggage;
-          const getScore = (o: FlightMatchInput) => {
-            if (req === true) return o.hasCheckedBaggage === true ? 1.0 : 0.0;
-            if (req === false) return 1.0;
-            return 0.5;
-          };
-          const first = getScore(eligibleOffers[0]);
-          for (let i = 1; i < eligibleOffers.length; i++) {
-            if (getScore(eligibleOffers[i]) !== first) {
-              isZeroVariance = false;
-              break;
-            }
-          }
-          break;
-        }
-      }
-
-      isPersonalizedActive[dim] = !isZeroVariance;
-    }
-
-    const mutableWeights: Record<FlightMatchDimension, number> = {
-      PRICE: 0,
-      AIRLINE: 0,
-      ARRIVAL_SCHEDULE: 0,
-      STOPS: 0,
-      CABIN: 0,
-      DEPARTURE_SCHEDULE: 0,
-      BAGGAGE: 0,
-      DURATION: 0,
-    };
-
-    let sumPersonalizedWeights = 0;
-    for (const dim of PERSONALIZED_DIMENSION_KEYS) {
-      if (isPersonalizedActive[dim]) {
-        mutableWeights[dim] = BASE_WEIGHTS[dim];
-        sumPersonalizedWeights += BASE_WEIGHTS[dim];
+        airlineActive = true;
       } else {
-        mutableWeights[dim] = 0;
+        const firstScore = hasPreferredAirline(eligibleOffers[0].carrierCodes, preferredSet) ? 1.0 : 0.5;
+        let zeroVar = true;
+        for (let i = 1; i < nEligible; i++) {
+          if ((hasPreferredAirline(eligibleOffers[i].carrierCodes, preferredSet) ? 1.0 : 0.5) !== firstScore) {
+            zeroVar = false;
+            break;
+          }
+        }
+        airlineActive = !zeroVar;
       }
     }
+
+    // ARRIVAL_SCHEDULE
+    const arrWindow = preferences.preferredArrivalWindow;
+    if (arrWindow != null) {
+      if (!applyZeroVariance) {
+        arrivalActive = true;
+      } else {
+        const firstScore = calcScheduleScore(eligibleOffers[0].outboundArrivalHour, arrWindow);
+        let zeroVar = true;
+        for (let i = 1; i < nEligible; i++) {
+          if (calcScheduleScore(eligibleOffers[i].outboundArrivalHour, arrWindow) !== firstScore) {
+            zeroVar = false;
+            break;
+          }
+        }
+        arrivalActive = !zeroVar;
+      }
+    }
+
+    // CABIN
+    const classPref = preferences.classPreference;
+    if (classPref != null && classPref.trim() !== '') {
+      if (!applyZeroVariance) {
+        cabinActive = true;
+      } else {
+        const firstScore = CABIN_ADJACENCY_MAPPINGS[getCabinAdjacency(classPref, eligibleOffers[0].cabinClass)].subScore;
+        let zeroVar = true;
+        for (let i = 1; i < nEligible; i++) {
+          if (CABIN_ADJACENCY_MAPPINGS[getCabinAdjacency(classPref, eligibleOffers[i].cabinClass)].subScore !== firstScore) {
+            zeroVar = false;
+            break;
+          }
+        }
+        cabinActive = !zeroVar;
+      }
+    }
+
+    // DEPARTURE_SCHEDULE
+    const depWindow = preferences.preferredDepartureWindow;
+    if (depWindow != null) {
+      if (!applyZeroVariance) {
+        departureActive = true;
+      } else {
+        const firstScore = calcScheduleScore(eligibleOffers[0].outboundDepartureHour, depWindow);
+        let zeroVar = true;
+        for (let i = 1; i < nEligible; i++) {
+          if (calcScheduleScore(eligibleOffers[i].outboundDepartureHour, depWindow) !== firstScore) {
+            zeroVar = false;
+            break;
+          }
+        }
+        departureActive = !zeroVar;
+      }
+    }
+
+    // BAGGAGE
+    const bagReq = preferences.requiresCheckedBaggage;
+    if (bagReq != null) {
+      if (!applyZeroVariance) {
+        baggageActive = true;
+      } else {
+        const firstScore = calcBaggageScore(eligibleOffers[0].hasCheckedBaggage, bagReq);
+        let zeroVar = true;
+        for (let i = 1; i < nEligible; i++) {
+          if (calcBaggageScore(eligibleOffers[i].hasCheckedBaggage, bagReq) !== firstScore) {
+            zeroVar = false;
+            break;
+          }
+        }
+        baggageActive = !zeroVar;
+      }
+    }
+
+    const airlineWeight = airlineActive ? BASE_WEIGHTS.AIRLINE : 0;
+    const arrivalWeight = arrivalActive ? BASE_WEIGHTS.ARRIVAL_SCHEDULE : 0;
+    const cabinWeight = cabinActive ? BASE_WEIGHTS.CABIN : 0;
+    const departureWeight = departureActive ? BASE_WEIGHTS.DEPARTURE_SCHEDULE : 0;
+    const baggageWeight = baggageActive ? BASE_WEIGHTS.BAGGAGE : 0;
+
+    const sumPersonalizedWeights =
+      airlineWeight + arrivalWeight + cabinWeight + departureWeight + baggageWeight;
 
     const baselineTargetPool = round6(1.0 - sumPersonalizedWeights);
 
-    const activeBaselineDimensions = BASELINE_DIMENSION_KEYS.filter(
-      (dim) => isBaselineActive[dim],
-    );
-    const sumActiveBaselineBaseWeights = activeBaselineDimensions.reduce(
-      (sum, dim) => sum + BASE_WEIGHTS[dim],
-      0,
-    );
+    let sumActiveBaselineBaseWeights = 0;
+    if (priceActive) sumActiveBaselineBaseWeights += BASE_WEIGHTS.PRICE;
+    if (stopsActive) sumActiveBaselineBaseWeights += BASE_WEIGHTS.STOPS;
+    if (durationActive) sumActiveBaselineBaseWeights += BASE_WEIGHTS.DURATION;
 
-    for (const dim of BASELINE_DIMENSION_KEYS) {
-      if (isBaselineActive[dim]) {
-        mutableWeights[dim] = round6(
-          (BASE_WEIGHTS[dim] / sumActiveBaselineBaseWeights) * baselineTargetPool,
-        );
-      } else {
-        mutableWeights[dim] = 0;
-      }
-    }
+    let priceWeight = priceActive
+      ? round6((BASE_WEIGHTS.PRICE / sumActiveBaselineBaseWeights) * baselineTargetPool)
+      : 0;
+    let stopsWeight = stopsActive
+      ? round6((BASE_WEIGHTS.STOPS / sumActiveBaselineBaseWeights) * baselineTargetPool)
+      : 0;
+    let durationWeight = durationActive
+      ? round6((BASE_WEIGHTS.DURATION / sumActiveBaselineBaseWeights) * baselineTargetPool)
+      : 0;
 
     const currentSum = round6(
-      Object.values(mutableWeights).reduce((sum, w) => sum + w, 0),
+      priceWeight +
+      airlineWeight +
+      arrivalWeight +
+      stopsWeight +
+      cabinWeight +
+      departureWeight +
+      baggageWeight +
+      durationWeight,
     );
     const remainder = round6(1.0 - currentSum);
 
     if (remainder !== 0) {
-      const highestPriorityBaseline = BASELINE_REMAINDER_KEYS.find(
-        (dim) => isBaselineActive[dim],
-      );
-      if (highestPriorityBaseline) {
-        mutableWeights[highestPriorityBaseline] = round6(
-          mutableWeights[highestPriorityBaseline] + remainder,
-        );
+      if (priceActive) {
+        priceWeight = round6(priceWeight + remainder);
+      } else if (stopsActive) {
+        stopsWeight = round6(stopsWeight + remainder);
+      } else if (durationActive) {
+        durationWeight = round6(durationWeight + remainder);
       }
     }
 
     return {
-      PRICE: mutableWeights.PRICE,
-      AIRLINE: mutableWeights.AIRLINE,
-      ARRIVAL_SCHEDULE: mutableWeights.ARRIVAL_SCHEDULE,
-      STOPS: mutableWeights.STOPS,
-      CABIN: mutableWeights.CABIN,
-      DEPARTURE_SCHEDULE: mutableWeights.DEPARTURE_SCHEDULE,
-      BAGGAGE: mutableWeights.BAGGAGE,
-      DURATION: mutableWeights.DURATION,
+      PRICE: priceWeight,
+      AIRLINE: airlineWeight,
+      ARRIVAL_SCHEDULE: arrivalWeight,
+      STOPS: stopsWeight,
+      CABIN: cabinWeight,
+      DEPARTURE_SCHEDULE: departureWeight,
+      BAGGAGE: baggageWeight,
+      DURATION: durationWeight,
     };
   }
 
@@ -423,31 +418,45 @@ export class FlightMatchScorerService {
     offers: readonly FlightMatchInput[],
     preferences: ScoringPreferences,
   ): readonly ScoredOffer[] {
-    const evaluatedOffers = offers.map((offer) => ({
-      offer,
-      eligibility: this.checkEligibility(offer, preferences),
-    }));
-    const eligibleOffers = evaluatedOffers
-      .filter(({ eligibility }) => eligibility.eligible)
-      .map(({ offer }) => offer);
-    const medianPrice = calculateMedian(eligibleOffers.map(({ price }) => price));
-    const medianDuration = calculateMedian(eligibleOffers.map(({ duration }) => duration));
+    const numOffers = offers.length;
+    type EvaluatedEligibility = ReturnType<FlightMatchScorerService['checkEligibility']>;
+    const eligibilities: EvaluatedEligibility[] = new Array(numOffers);
+    const eligiblePrices: number[] = [];
+    const eligibleDurations: number[] = [];
 
-    return evaluatedOffers.map(({ offer, eligibility }): ScoredOffer => {
+    for (let i = 0; i < numOffers; i++) {
+      const offer = offers[i];
+      const eligibility = this.checkEligibility(offer, preferences);
+      eligibilities[i] = eligibility;
+      if (eligibility.eligible) {
+        eligiblePrices.push(offer.price);
+        eligibleDurations.push(offer.duration);
+      }
+    }
+
+    const medianPrice = calculateMedian(eligiblePrices);
+    const medianDuration = calculateMedian(eligibleDurations);
+    const metadata = {
+      scoringVersion: SCORING_POLICY_VERSION,
+      activeWeights: BASE_WEIGHTS,
+    };
+
+    const scoredOffers: ScoredOffer[] = new Array(numOffers);
+    for (let i = 0; i < numOffers; i++) {
+      const offer = offers[i];
+      const eligibility = eligibilities[i];
       if (!eligibility.eligible) {
-        return {
+        scoredOffers[i] = {
           offer,
           matchResult: {
-            eligibility: { eligible: false, violations: eligibility.violations },
+            eligibility,
             score: null,
             matchLevel: null,
-            breakdown: [],
-            metadata: {
-              scoringVersion: SCORING_POLICY_VERSION,
-              activeWeights: BASE_WEIGHTS,
-            },
+            breakdown: EMPTY_BREAKDOWN,
+            metadata,
           },
         };
+        continue;
       }
 
       const breakdown = [
@@ -456,92 +465,142 @@ export class FlightMatchScorerService {
       ];
       const { score, matchLevel } = this.computeScoreResult(breakdown);
 
-      return {
+      scoredOffers[i] = {
         offer,
         matchResult: {
-          eligibility: { eligible: true, violations: [] },
+          eligibility: ELIGIBLE_RESULT,
           score,
           matchLevel,
           breakdown,
-          metadata: {
-            scoringVersion: SCORING_POLICY_VERSION,
-            activeWeights: BASE_WEIGHTS,
-          },
+          metadata,
         },
       };
-    });
+    }
+
+    return scoredOffers;
   }
 
   scoreAll(
     offers: readonly FlightMatchInput[],
     preferences: ScoringPreferences,
   ): readonly ScoredOffer[] {
-    const blacklistedSet = new Set(normalizeAirlineCodes(preferences.blacklistedAirlines));
-    const evaluatedOffers = offers.map((offer) => ({
-      offer,
-      eligibility: this.checkEligibility(offer, preferences, blacklistedSet),
-    }));
+    const numOffers = offers.length;
+    const blacklistedSet =
+      preferences.blacklistedAirlines && preferences.blacklistedAirlines.length > 0
+        ? new Set(normalizeAirlineCodes(preferences.blacklistedAirlines))
+        : EMPTY_SET;
 
-    const eligibleOffers = evaluatedOffers
-      .filter(({ eligibility }) => eligibility.eligible)
-      .map(({ offer }) => offer);
+    type EvaluatedEligibility = ReturnType<FlightMatchScorerService['checkEligibility']>;
+    const eligibilities: EvaluatedEligibility[] = new Array(numOffers);
+    const eligibleOffers: FlightMatchInput[] = [];
+    const prices: number[] = [];
+    const durations: number[] = [];
+    let minStops = Infinity;
 
-    const preferredSet = new Set(normalizeAirlineCodes(preferences.preferredAirlines ?? []));
-    const activeWeights = this.resolveWeights(offers, preferences, eligibleOffers, preferredSet);
+    for (let i = 0; i < numOffers; i++) {
+      const offer = offers[i];
+      const eligibility = this.checkEligibility(offer, preferences, blacklistedSet);
+      eligibilities[i] = eligibility;
+      if (eligibility.eligible) {
+        eligibleOffers.push(offer);
+        prices.push(offer.price);
+        durations.push(offer.duration);
+        if (offer.stops < minStops) {
+          minStops = offer.stops;
+        }
+      }
+    }
+    if (minStops === Infinity) {
+      minStops = 0;
+    }
 
-    const medianPrice = calculateMedian(eligibleOffers.map(({ price }) => price));
-    const medianDuration = calculateMedian(eligibleOffers.map(({ duration }) => duration));
-    const minStops =
-      eligibleOffers.length > 0
-        ? Math.min(...eligibleOffers.map(({ stops }) => stops))
-        : 0;
+    const preferredSet =
+      preferences.preferredAirlines && preferences.preferredAirlines.length > 0
+        ? new Set(normalizeAirlineCodes(preferences.preferredAirlines))
+        : EMPTY_SET;
 
-    const scoredOffers: ScoredOffer[] = evaluatedOffers.map(({ offer, eligibility }) => {
+    const medianPrice = calculateMedian(prices);
+    const medianDuration = calculateMedian(durations);
+    const metrics = { medianPrice, medianDuration, minStops };
+
+    const activeWeights = this.resolveWeights(
+      offers,
+      preferences,
+      eligibleOffers,
+      preferredSet,
+      metrics,
+    );
+
+    const metadata = {
+      scoringVersion: SCORING_POLICY_VERSION,
+      activeWeights,
+    };
+
+    const priceMultiplier = getPriceSensitivityMultiplier(preferences.priceSensitivity);
+    const scoredOffers: ScoredOffer[] = new Array(numOffers);
+
+    for (let i = 0; i < numOffers; i++) {
+      const offer = offers[i];
+      const eligibility = eligibilities[i];
       if (!eligibility.eligible) {
-        return {
+        scoredOffers[i] = {
           offer,
           matchResult: {
-            eligibility: { eligible: false, violations: eligibility.violations },
+            eligibility,
             score: null,
             matchLevel: null,
-            breakdown: [],
-            metadata: {
-              scoringVersion: SCORING_POLICY_VERSION,
-              activeWeights,
-            },
+            breakdown: EMPTY_BREAKDOWN,
+            metadata,
           },
         };
+        continue;
       }
 
+      const scorePrice = this.scorePrice(offer, medianPrice, preferences, activeWeights.PRICE, priceMultiplier);
+      const scoreAirline = this.scoreAirline(offer, preferences, activeWeights.AIRLINE, preferredSet);
+      const scoreArrivalSchedule = this.scoreArrivalSchedule(offer, preferences, activeWeights.ARRIVAL_SCHEDULE);
+      const scoreStops = this.scoreStops(offer, preferences, minStops, activeWeights.STOPS);
+      const scoreCabin = this.scoreCabin(offer, preferences, activeWeights.CABIN);
+      const scoreDepartureSchedule = this.scoreDepartureSchedule(offer, preferences, activeWeights.DEPARTURE_SCHEDULE);
+      const scoreBaggage = this.scoreBaggage(offer, preferences, activeWeights.BAGGAGE);
+      const scoreDuration = this.scoreDuration(offer, medianDuration, activeWeights.DURATION);
+
       const breakdown: readonly DimensionScore[] = [
-        this.scorePrice(offer, medianPrice, preferences, activeWeights.PRICE),
-        this.scoreAirline(offer, preferences, activeWeights.AIRLINE, preferredSet),
-        this.scoreArrivalSchedule(offer, preferences, activeWeights.ARRIVAL_SCHEDULE),
-        this.scoreStops(offer, preferences, minStops, activeWeights.STOPS),
-        this.scoreCabin(offer, preferences, activeWeights.CABIN),
-        this.scoreDepartureSchedule(offer, preferences, activeWeights.DEPARTURE_SCHEDULE),
-        this.scoreBaggage(offer, preferences, activeWeights.BAGGAGE),
-        this.scoreDuration(offer, medianDuration, activeWeights.DURATION),
+        scorePrice,
+        scoreAirline,
+        scoreArrivalSchedule,
+        scoreStops,
+        scoreCabin,
+        scoreDepartureSchedule,
+        scoreBaggage,
+        scoreDuration,
       ];
 
-      const { score, matchLevel } = this.computeScoreResult(breakdown);
+      const sum =
+        scorePrice.contribution +
+        scoreAirline.contribution +
+        scoreArrivalSchedule.contribution +
+        scoreStops.contribution +
+        scoreCabin.contribution +
+        scoreDepartureSchedule.contribution +
+        scoreBaggage.contribution +
+        scoreDuration.contribution;
+      const score = clamp(roundHalfAwayFromZero(round6(sum * 100)), 0, 100);
+      const matchLevel = getMatchLevel(score);
 
-      return {
+      scoredOffers[i] = {
         offer,
         matchResult: {
-          eligibility: { eligible: true, violations: [] },
+          eligibility: ELIGIBLE_RESULT,
           score,
           matchLevel,
           breakdown,
-          metadata: {
-            scoringVersion: SCORING_POLICY_VERSION,
-            activeWeights,
-          },
+          metadata,
         },
       };
-    });
+    }
 
-    return [...scoredOffers].sort((a, b) => {
+    scoredOffers.sort((a, b) => {
       const aEligible = a.matchResult.eligibility.eligible;
       const bEligible = b.matchResult.eligibility.eligible;
 
@@ -561,6 +620,8 @@ export class FlightMatchScorerService {
 
       return compareObjectiveTiers(a.offer, b.offer);
     });
+
+    return scoredOffers;
   }
 
   computeContribution(subScore: number, effectiveWeight: number): number {
@@ -568,7 +629,10 @@ export class FlightMatchScorerService {
   }
 
   computeFinalScore(breakdown: readonly DimensionScore[]): number {
-    const sum = breakdown.reduce((acc, item) => acc + item.contribution, 0);
+    let sum = 0;
+    for (let i = 0; i < breakdown.length; i++) {
+      sum += breakdown[i].contribution;
+    }
     return clamp(roundHalfAwayFromZero(round6(sum * 100)), 0, 100);
   }
 
@@ -592,13 +656,14 @@ export class FlightMatchScorerService {
     medianPrice: number,
     preferences: ScoringPreferences,
     effectiveWeight: number = BASE_WEIGHTS.PRICE,
+    precomputedMultiplier?: number,
   ): DimensionScore {
+    const mult = precomputedMultiplier ?? getPriceSensitivityMultiplier(preferences.priceSensitivity);
+    const denom = Math.max(medianPrice, 0.01);
+    const diffRatio = (medianPrice - offer.price) / denom;
     const score = round6(
       clamp(
-        0.5 +
-          0.5 *
-            getPriceSensitivityMultiplier(preferences.priceSensitivity) *
-            ((medianPrice - offer.price) / Math.max(medianPrice, 0.01)),
+        0.5 + 0.5 * mult * diffRatio,
         0,
         1,
       ),
@@ -613,8 +678,7 @@ export class FlightMatchScorerService {
       explanation: {
         key: getComparisonExplanationKey('PRICE', offer.price, medianPrice),
         params: {
-          percentDiff:
-            round6(((medianPrice - offer.price) / Math.max(medianPrice, 0.01)) * 100) || 0,
+          percentDiff: round6(diffRatio * 100) || 0,
         },
       },
     };
@@ -678,37 +742,40 @@ export class FlightMatchScorerService {
   ): DimensionScore {
     const preferredSet =
       precomputedPreferredSet ??
-      new Set(normalizeAirlineCodes(preferences.preferredAirlines ?? []));
+      (preferences.preferredAirlines && preferences.preferredAirlines.length > 0
+        ? new Set(normalizeAirlineCodes(preferences.preferredAirlines))
+        : EMPTY_SET);
     if (preferredSet.size > 0) {
       const offerCarriers = normalizeAirlineCodes(offer.carrierCodes ?? []);
-      const matchedCarrier = offerCarriers.find((carrier) => preferredSet.has(carrier));
-
-      if (matchedCarrier) {
-        const score = round6(1.0);
-        return {
-          dimension: 'AIRLINE',
-          score,
-          weight: effectiveWeight,
-          contribution: this.computeContribution(score, effectiveWeight),
-          signal: determineSignal(score),
-          explanation: {
-            key: 'match.airline.preferred',
-            params: { airline: matchedCarrier },
-          },
-        };
+      for (let i = 0; i < offerCarriers.length; i++) {
+        const carrier = offerCarriers[i];
+        if (preferredSet.has(carrier)) {
+          const score = 1.0;
+          return {
+            dimension: 'AIRLINE',
+            score,
+            weight: effectiveWeight,
+            contribution: this.computeContribution(score, effectiveWeight),
+            signal: 'POSITIVE',
+            explanation: {
+              key: 'match.airline.preferred',
+              params: { airline: carrier },
+            },
+          };
+        }
       }
     }
 
-    const score = round6(0.5);
+    const score = 0.5;
     return {
       dimension: 'AIRLINE',
       score,
       weight: effectiveWeight,
       contribution: this.computeContribution(score, effectiveWeight),
-      signal: determineSignal(score),
+      signal: 'NEUTRAL',
       explanation: {
         key: 'match.airline.neutral',
-        params: {},
+        params: EMPTY_OBJECT,
       },
     };
   }
@@ -720,14 +787,14 @@ export class FlightMatchScorerService {
   ): DimensionScore {
     const adjacency = getCabinAdjacency(preferences.classPreference ?? '', offer.cabinClass);
     const { subScore, key: explanationKey } = CABIN_ADJACENCY_MAPPINGS[adjacency];
-    const score = round6(subScore);
+    const score = subScore;
 
     return {
       dimension: 'CABIN',
       score,
       weight: effectiveWeight,
       contribution: this.computeContribution(score, effectiveWeight),
-      signal: determineSignal(score),
+      signal: score === 1.0 ? 'POSITIVE' : score === 0.5 ? 'NEUTRAL' : 'NEGATIVE',
       explanation: {
         key: explanationKey,
         params: {
@@ -789,13 +856,13 @@ export class FlightMatchScorerService {
       params = { checkedBags: offer.hasCheckedBaggage ? 1 : 0, required: false };
     }
 
-    const score = round6(subScore);
+    const score = subScore;
     return {
       dimension: 'BAGGAGE',
       score,
       weight: effectiveWeight,
       contribution: this.computeContribution(score, effectiveWeight),
-      signal: determineSignal(score),
+      signal: score === 1.0 ? 'POSITIVE' : score === 0.5 ? 'NEUTRAL' : 'NEGATIVE',
       explanation: {
         key: explanationKey,
         params,
@@ -810,16 +877,16 @@ export class FlightMatchScorerService {
     effectiveWeight: number = SCHEDULE_CONFIG[dimension].weight,
   ): DimensionScore {
     const config = SCHEDULE_CONFIG[dimension];
-    const formattedTime = `${String(hour).padStart(2, '0')}:00`;
+    const formattedTime = formatHour(hour);
 
     if (!window) {
-      const score = round6(0.5);
+      const score = 0.5;
       return {
         dimension,
         score,
         weight: effectiveWeight,
         contribution: this.computeContribution(score, effectiveWeight),
-        signal: determineSignal(score),
+        signal: 'NEUTRAL',
         explanation: {
           key: config.nearWindowKey,
           params: { time: formattedTime },
@@ -882,7 +949,7 @@ export class FlightMatchScorerService {
       signal: determineSignal(score),
       explanation: {
         key: getComparisonExplanationKey('DURATION', offer.duration, medianDuration),
-        params: {},
+        params: EMPTY_OBJECT,
       },
     };
   }
@@ -898,29 +965,58 @@ function normalizeAirlineCodes(codes: readonly unknown[]): readonly string[] {
     return cached;
   }
 
-  if (codes.length === 1 && typeof codes[0] === 'string') {
+  const len = codes.length;
+  if (len === 1 && typeof codes[0] === 'string') {
     const normalizedCode = codes[0].trim().toUpperCase();
     const normalizedCodes = AIRLINE_CODE_PATTERN.test(normalizedCode) ? [normalizedCode] : [];
     NORMALIZED_AIRLINE_CODES.set(codes, normalizedCodes);
     return normalizedCodes;
   }
 
-  const normalizedCodes = new Set<string>();
-
-  for (const code of codes) {
+  const result: string[] = [];
+  for (let i = 0; i < len; i++) {
+    const code = codes[i];
     if (typeof code !== 'string') {
       continue;
     }
 
     const normalizedCode = code.trim().toUpperCase();
     if (AIRLINE_CODE_PATTERN.test(normalizedCode)) {
-      normalizedCodes.add(normalizedCode);
+      if (!result.includes(normalizedCode)) {
+        result.push(normalizedCode);
+      }
     }
   }
 
-  const result = [...normalizedCodes];
   NORMALIZED_AIRLINE_CODES.set(codes, result);
   return result;
+}
+
+function hasPreferredAirline(
+  carrierCodes: readonly unknown[] | undefined,
+  preferredSet: ReadonlySet<string>,
+): boolean {
+  if (!carrierCodes || carrierCodes.length === 0 || preferredSet.size === 0) return false;
+  const normalized = normalizeAirlineCodes(carrierCodes);
+  for (let i = 0; i < normalized.length; i++) {
+    if (preferredSet.has(normalized[i])) return true;
+  }
+  return false;
+}
+
+function calcScheduleScore(hour: number, window: HourWindow): number {
+  if (isHourInWindow(hour, window)) return 1.0;
+  const dist = hourDistanceToWindow(hour, window);
+  return round6(clamp(1 - dist / SCHEDULE_SHOULDER_HOURS, 0, 1));
+}
+
+function calcBaggageScore(
+  hasCheckedBaggage: boolean | null | undefined,
+  req: boolean | null | undefined,
+): number {
+  if (req === true) return hasCheckedBaggage === true ? 1.0 : 0.0;
+  if (req === false) return 1.0;
+  return 0.5;
 }
 
 function getComparisonExplanationKey(

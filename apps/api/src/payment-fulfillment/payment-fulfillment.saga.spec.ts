@@ -1048,10 +1048,14 @@ describe('PaymentFulfillmentSaga', () => {
       expect(result.status).toBe('SUCCEEDED');
       expect(result.success).toBe(true);
       expect(mockBookingLifecycle.updateToFailed).not.toHaveBeenCalled();
-      expect(mockIdempotency.completeSagaKeyAtomic).not.toHaveBeenCalledWith(
-        expect.anything(),
-        HttpStatus.BAD_GATEWAY,
-        expect.anything(),
+      expect(mockIdempotency.completeSagaKeyAtomic).toHaveBeenCalledWith(
+        expect.objectContaining({ key: idempotencyKey }),
+        HttpStatus.OK,
+        expect.objectContaining({
+          success: true,
+          paymentId,
+          status: 'SUCCEEDED',
+        }),
       );
     });
 
@@ -1503,7 +1507,7 @@ describe('PaymentFulfillmentSaga', () => {
       expect(mockBookingLifecycle.updateToFailed).not.toHaveBeenCalled();
     });
 
-    it('aborts compensation cleanly without updating booking to FAILED or completing key with BAD_GATEWAY if payment is already SUCCEEDED in handleBackgroundError', async () => {
+    it('terminalizes the owned key without updating booking to FAILED if payment is already SUCCEEDED in handleBackgroundError', async () => {
       mockPrisma.payment.findUnique.mockResolvedValueOnce({
         ...basePayment,
         status: 'AUTHORIZED',
@@ -1523,10 +1527,14 @@ describe('PaymentFulfillmentSaga', () => {
       await saga.handleBackgroundError(paymentId, idempotencyKey, userId, ownership, new Error('background crash'));
 
       expect(mockBookingLifecycle.updateToFailed).not.toHaveBeenCalled();
-      expect(mockIdempotency.completeSagaKeyAtomic).not.toHaveBeenCalledWith(
+      expect(mockIdempotency.completeSagaKeyAtomic).toHaveBeenCalledWith(
         ownership,
-        HttpStatus.BAD_GATEWAY,
-        expect.anything(),
+        HttpStatus.OK,
+        expect.objectContaining({
+          success: true,
+          paymentId,
+          status: 'SUCCEEDED',
+        }),
       );
     });
 

@@ -846,7 +846,7 @@
         "x-route-id": "api-flights-detail"
       }
     },
-    "/bookings/{id}/cancel": {
+    "/bookings/{id}/cancellation": {
       "post": {
         "operationId": "api-bookings-cancel",
         "summary": "Request booking cancellation quote and submit cancellation",

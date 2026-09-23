@@ -513,7 +513,14 @@ describe('booking-management server domain module', () => {
 
   describe('getCancellationStatus', () => {
     it('maps cancellation status stripping duffel quote and retry count internals', async () => {
-      globalThis.fetch = async (): Promise<Response> => {
+      let requestedUrl = '';
+      let requestedInit: RequestInit | undefined;
+      globalThis.fetch = async (
+        input: RequestInfo | URL,
+        init?: RequestInit,
+      ): Promise<Response> => {
+        requestedUrl = String(input);
+        requestedInit = init;
         return new Response(
           JSON.stringify({
             bookingId: 'booking-uuid-001',
@@ -542,18 +549,56 @@ describe('booking-management server domain module', () => {
         assert.strictEqual(outcome.data.airlineRefundAmount, '450.00');
       }
 
+      assert.strictEqual(
+        new URL(requestedUrl).pathname,
+        '/api/bookings/booking-uuid-001/cancellation',
+      );
+      assert.strictEqual(requestedInit?.method, 'GET');
+      const headers = (requestedInit?.headers ?? {}) as Record<string, string>;
+      assert.strictEqual(headers.Authorization, 'Bearer session-token-abc');
+
       const serialized = JSON.stringify(outcome);
       assert.strictEqual(serialized.includes('cquo_provider_secret'), false);
       assert.strictEqual(serialized.includes('SUPPLIER_RATE_LIMITED'), false);
       assert.strictEqual(serialized.includes('retryCount'), false);
+    });
+
+    it('handles upstream error status mapping (401, 403, 404, 500)', async () => {
+      const errorCases = [
+        { status: 401, expectedReason: 'UNAUTHENTICATED', retryable: false },
+        { status: 403, expectedReason: 'FORBIDDEN', retryable: false },
+        { status: 404, expectedReason: 'NOT_FOUND', retryable: false },
+        { status: 500, expectedReason: 'UPSTREAM_UNAVAILABLE', retryable: true },
+      ] as const;
+
+      for (const { status, expectedReason, retryable } of errorCases) {
+        globalThis.fetch = async (): Promise<Response> => {
+          return new Response(JSON.stringify({ message: `Error ${status}` }), { status });
+        };
+
+        const outcome = await getCancellationStatus('booking-uuid-001');
+
+        assert.strictEqual(outcome.ok, false);
+        if (!outcome.ok) {
+          assert.strictEqual(outcome.reason, expectedReason);
+          assert.strictEqual(outcome.retryable, retryable);
+        }
+      }
     });
   });
 
   describe('getCancellationQuote', () => {
     it('requests cancellation quote and strips provider duffelOrderId with fast-fail mutation', async () => {
       let attempts = 0;
-      globalThis.fetch = async (): Promise<Response> => {
+      let requestedUrl = '';
+      let requestedInit: RequestInit | undefined;
+      globalThis.fetch = async (
+        input: RequestInfo | URL,
+        init?: RequestInit,
+      ): Promise<Response> => {
         attempts += 1;
+        requestedUrl = String(input);
+        requestedInit = init;
         return new Response(
           JSON.stringify({
             bookingId: 'booking-uuid-001',
@@ -581,6 +626,14 @@ describe('booking-management server domain module', () => {
         assert.strictEqual(outcome.data.refundable, true);
       }
       assert.strictEqual(attempts, 1);
+      assert.strictEqual(
+        new URL(requestedUrl).pathname,
+        '/api/bookings/booking-uuid-001/cancellation/quote',
+      );
+      assert.strictEqual(requestedInit?.method, 'POST');
+      const headers = (requestedInit?.headers ?? {}) as Record<string, string>;
+      assert.strictEqual(headers.Authorization, 'Bearer session-token-abc');
+      assert.strictEqual(headers['Content-Type'], 'application/json');
 
       const serialized = JSON.stringify(outcome);
       assert.strictEqual(serialized.includes('ord_secret_123'), false);
@@ -602,18 +655,43 @@ describe('booking-management server domain module', () => {
       }
       assert.strictEqual(attempts, 1);
     });
+
+    it('handles upstream error status mapping for quote request', async () => {
+      const errorCases = [
+        { status: 401, expectedReason: 'UNAUTHENTICATED', retryable: false },
+        { status: 403, expectedReason: 'FORBIDDEN', retryable: false },
+        { status: 404, expectedReason: 'NOT_FOUND', retryable: false },
+        { status: 400, expectedReason: 'INVALID_COMMAND', retryable: false },
+      ] as const;
+
+      for (const { status, expectedReason, retryable } of errorCases) {
+        globalThis.fetch = async (): Promise<Response> => {
+          return new Response(JSON.stringify({ message: `Error ${status}` }), { status });
+        };
+
+        const outcome = await getCancellationQuote('booking-uuid-001');
+
+        assert.strictEqual(outcome.ok, false);
+        if (!outcome.ok) {
+          assert.strictEqual(outcome.reason, expectedReason);
+          assert.strictEqual(outcome.retryable, retryable);
+        }
+      }
+    });
   });
 
   describe('cancelBooking', () => {
     it('executes cancellation mutation fast-fail and maps result', async () => {
       let attempts = 0;
-      let requestedBody = '';
+      let requestedUrl = '';
+      let requestedInit: RequestInit | undefined;
       globalThis.fetch = async (
         input: RequestInfo | URL,
         init?: RequestInit,
       ): Promise<Response> => {
         attempts += 1;
-        requestedBody = String(init?.body);
+        requestedUrl = String(input);
+        requestedInit = init;
         return new Response(
           JSON.stringify({
             bookingId: 'booking-uuid-001',
@@ -636,10 +714,58 @@ describe('booking-management server domain module', () => {
         assert.strictEqual(outcome.data.refundAmount, '450.00');
       }
       assert.strictEqual(attempts, 1);
-      assert.deepEqual(JSON.parse(requestedBody), { quoteId: 'quote-local-123' });
+      assert.strictEqual(
+        new URL(requestedUrl).pathname,
+        '/api/bookings/booking-uuid-001/cancellation',
+      );
+      assert.strictEqual(requestedInit?.method, 'POST');
+      const headers = (requestedInit?.headers ?? {}) as Record<string, string>;
+      assert.strictEqual(headers.Authorization, 'Bearer session-token-abc');
+      assert.strictEqual(headers['Content-Type'], 'application/json');
+      assert.strictEqual(requestedInit?.body, JSON.stringify({ quoteId: 'quote-local-123' }));
 
       const serialized = JSON.stringify(outcome);
       assert.strictEqual(serialized.includes('cquo_secret_123'), false);
+    });
+
+    it('fails fast on 500 error for booking cancellation (1 attempt)', async () => {
+      let attempts = 0;
+      globalThis.fetch = async (): Promise<Response> => {
+        attempts += 1;
+        return new Response('Internal Server Error', { status: 500 });
+      };
+
+      const outcome = await cancelBooking('booking-uuid-001', 'quote-local-123');
+
+      assert.strictEqual(outcome.ok, false);
+      if (!outcome.ok) {
+        assert.strictEqual(outcome.reason, 'UPSTREAM_UNAVAILABLE');
+      }
+      assert.strictEqual(attempts, 1);
+    });
+
+    it('handles upstream error status mapping for cancelBooking (409, 400, 401, 403, 404)', async () => {
+      const errorCases = [
+        { status: 409, expectedReason: 'STALE_REVISION', retryable: false },
+        { status: 400, expectedReason: 'INVALID_COMMAND', retryable: false },
+        { status: 401, expectedReason: 'UNAUTHENTICATED', retryable: false },
+        { status: 403, expectedReason: 'FORBIDDEN', retryable: false },
+        { status: 404, expectedReason: 'NOT_FOUND', retryable: false },
+      ] as const;
+
+      for (const { status, expectedReason, retryable } of errorCases) {
+        globalThis.fetch = async (): Promise<Response> => {
+          return new Response(JSON.stringify({ message: `Error ${status}` }), { status });
+        };
+
+        const outcome = await cancelBooking('booking-uuid-001', 'quote-local-123');
+
+        assert.strictEqual(outcome.ok, false);
+        if (!outcome.ok) {
+          assert.strictEqual(outcome.reason, expectedReason);
+          assert.strictEqual(outcome.retryable, retryable);
+        }
+      }
     });
 
     it('returns INVALID_COMMAND if quoteId is missing', async () => {

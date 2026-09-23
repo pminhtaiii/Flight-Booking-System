@@ -62,13 +62,23 @@ To maintain strict boundaries and prevent circular dependencies across domains:
   - Module import graphs MUST remain strictly acyclic (DAG). Circular module dependencies (`A -> B -> A`) are strictly forbidden.
   - Using `forwardRef()` in production code to patch circular dependencies is prohibited. Cycles must be eliminated by architectural extraction or inversion of control.
   - Strict one-way dependency boundaries:
-    - `BookingModule` (umbrella) imports `BookingLifecycleModule`, `BookingManagementModule`, `CancellationModule`.
-    - `CancellationModule` imports `PaymentModule` (to trigger refunds via `PaymentRefundService`).
-    - `PaymentModule` imports `BookingLifecycleModule` (for lifecycle confirmation/failure transitions), `RefundModule`, `RefundSettlementModule`.
-    - `BookingLifecycleModule` and `BookingManagementModule` NEVER import `PaymentModule`.
-    - `PaymentModule` NEVER imports `BookingModule` or `CancellationModule`.
+    - `AppModule` directly imports domain modules `BookingManagementModule` and `CancellationModule` (umbrella `BookingModule` deleted).
+    - `CancellationModule` may import `PaymentModule` to trigger refunds through `PaymentRefundService`, while `PaymentModule` does not import `CancellationModule`.
+    - `PaymentModule` owns payment CRUD/webhooks/refunds and imports `PaymentFulfillmentModule`, `BookingStateModule`, `RefundModule`, and `RefundSettlementModule`; it does not import `BookingLifecycleModule`.
+    - `PaymentFulfillmentModule` may import `BookingLifecycleModule` for provider-blind lifecycle transitions, but NEVER imports `PaymentModule`.
+    - `BookingLifecycleModule` owns recovery dependencies and re-exports `BookingStateModule`; `BookingStateModule` alone registers/exports `BookingLifecycleService` and depends only on Prisma plus `DomainEventsModule`.
+    - `DisruptionModule` and `RefundSettlementModule` import `BookingStateModule` and `DomainEventsModule`, never `BookingLifecycleModule` or the projection writer.
+    - `BookingProjectionModule` imports only Prisma, Cache, and `DomainEventsModule`; core mutation modules do not import it or call projection services directly.
     - `ChatModule` NEVER imports `AgentGatewayModule`.
   - Zero cyclic dependencies between Payment and Booking domains are enforced statically in CI.
+
+- **Event-Driven Booking Projection Rules**:
+  - `Booking.version` increments atomically only for committed business-state or itinerary changes. Bookkeeping, rejected transitions, and no-op replays do not increment it or collect events.
+  - Caller-owned transaction contexts carry a fresh event collector per transaction attempt. The outer owner publishes only after commit; rollback and discarded retry contexts publish nothing.
+  - Domain events are passive booking/refund facts. `BookingProjectionListener` consumes `booking.**`; `refund.settled` remains a financial fact and does not update the booking projection.
+  - Projection hydration reads a coherent booking/revision/segment snapshot. Authoritative malformed revisions fail closed without stale `flightSnapshot` fallback.
+  - Projection writes use guarded `sourceVersion` upserts and preserve the existing opaque `agentReference`. Reconciliation is database-only, runs once per minute in batches of 100 with at most 5 workers, advances past poison pills, and may overlap across replicas safely.
+  - Projection metric labels use bounded values and never include booking IDs, user IDs, passenger data, provider payloads, or payment data. Structured reconciliation logs may include booking IDs for operator triage; they must not include passenger, payment, provider payload, or secret values.
 
 ### NestJS Controller Pattern
 
@@ -317,6 +327,9 @@ Conventions for Stripe payment processing:
 - Payment flow: create intent → frontend confirms → webhook updates booking status
 - All payment state changes written to `audit_logs` table
 - Use Stripe test mode for all development — never use live keys locally
+- Feature 024 confirmation orchestration lives in `PaymentFulfillmentSaga` behind provider-blind ports. `PaymentService` retains payment creation/status behavior; recovery retains direct Stripe/Duffel wrappers.
+- `StripePaymentAdapter` and `DuffelFulfillmentAdapter` use per-process bounded admission (Stripe 20 active / 100 queued, Duffel 10 active / 100 queued, 5-second wait deadline by default). Every permit is released in `finally`; admission failure starts no provider call.
+- Saga ownership is asserted immediately before each provider operation and by the adapter after admission. Never hold a database transaction while invoking Stripe or Duffel.
 
 ---
 

@@ -1,41 +1,107 @@
+import { randomUUID } from 'crypto';
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { BookingFailureReason, BookingStatus, Prisma, RefundStatus, RefundTriggerType } from '@prisma/client';
+import { OnEvent } from '@nestjs/event-emitter';
+import {
+  BookingFailureReason,
+  BookingStatus,
+  PaymentEventSource,
+  PaymentStatus,
+  Prisma,
+  RefundStatus,
+  RefundTriggerType,
+} from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { StripeService } from '@/common/stripe.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { RefundTransactionService } from '@/refund/refund-transaction.service';
 import { RefundSettlementService } from '@/refund-settlement/refund-settlement.service';
+import { CacheService } from '@/cache/cache.service';
 import { BookingLifecycleService } from './booking-lifecycle.service';
 import { BookingWithRelations } from './booking-lifecycle.types';
 import { BookingEventPublisherService, TransactionEventContext } from '@/domain-events';
 
-function enrichRedactedDuffelOrder(duffelOrder: any, dbPassengers: any[], userEmail: string): any {
+const STALE_THRESHOLD_MS = 15 * 60 * 1000;
+
+const BOOKING_RECOVERY_INCLUDE = {
+  payment: {
+    include: {
+      ancillarySelection: {
+        include: {
+          seatSelections: true,
+          baggageSelections: true,
+        },
+      },
+    },
+  },
+  bookingIntent: {
+    include: {
+      passengers: true,
+    },
+  },
+  activeDisruptionRevision: {
+    include: {
+      segments: { orderBy: { globalOrder: 'asc' } },
+      notificationOutbox: true,
+    },
+  },
+  itineraryRevisions: {
+    orderBy: { version: 'desc' },
+    take: 1,
+    include: { segments: { orderBy: { globalOrder: 'asc' } } },
+  },
+} as const;
+
+type BookingIntentPassengerDetails = {
+  readonly duffelPassengerId: string | null;
+  readonly givenName: string;
+  readonly familyName: string;
+  readonly dateOfBirth: Date;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isUnknownArray(value: unknown): value is unknown[] {
+  return Array.isArray(value);
+}
+
+function enrichRedactedDuffelOrder(
+  duffelOrder: unknown,
+  dbPassengers: readonly BookingIntentPassengerDetails[],
+  userEmail: string,
+): unknown {
   if (!duffelOrder) return duffelOrder;
-  const copy = JSON.parse(JSON.stringify(duffelOrder));
-  if (Array.isArray(copy.passengers)) {
-    copy.passengers.forEach((p: any, i: number) => {
-      const dbPass =
-        dbPassengers.find((dbp: any) => dbp.duffelPassengerId === p.id) || dbPassengers[i];
-      if (dbPass) {
-        if (!p.given_name || p.given_name === 'REDACTED') {
-          p.given_name = dbPass.givenName;
-        }
-        if (!p.family_name || p.family_name === 'REDACTED') {
-          p.family_name = dbPass.familyName;
-        }
-        if (dbPass.dateOfBirth && (!p.born_on || p.born_on === 'REDACTED')) {
-          const d = new Date(dbPass.dateOfBirth);
-          if (!isNaN(d.getTime())) {
-            p.born_on = d.toISOString().split('T')[0];
-          }
-        }
-      }
-      if (!p.email || p.email === 'REDACTED') {
-        p.email = userEmail;
-      }
-    });
+  const copy: unknown = JSON.parse(JSON.stringify(duffelOrder));
+  if (!isRecord(copy) || !isUnknownArray(copy.passengers)) {
+    return copy;
   }
+
+  copy.passengers.forEach((passenger: unknown, index: number) => {
+    if (!isRecord(passenger)) return;
+
+    const dbPass =
+      dbPassengers.find((candidate) => candidate.duffelPassengerId === passenger.id) ??
+      dbPassengers[index];
+    if (dbPass) {
+      if (!passenger.given_name || passenger.given_name === 'REDACTED') {
+        passenger.given_name = dbPass.givenName;
+      }
+      if (!passenger.family_name || passenger.family_name === 'REDACTED') {
+        passenger.family_name = dbPass.familyName;
+      }
+      if (dbPass.dateOfBirth && (!passenger.born_on || passenger.born_on === 'REDACTED')) {
+        const dateOfBirth = new Date(dbPass.dateOfBirth);
+        if (!isNaN(dateOfBirth.getTime())) {
+          passenger.born_on = dateOfBirth.toISOString().split('T')[0];
+        }
+      }
+    }
+    if (!passenger.email || passenger.email === 'REDACTED') {
+      passenger.email = userEmail;
+    }
+  });
   return copy;
 }
 
@@ -50,54 +116,76 @@ export class BookingRecoveryService {
     private readonly refundTransactionService: RefundTransactionService,
     private readonly refundSettlementService: RefundSettlementService,
     private readonly bookingLifecycleService: BookingLifecycleService,
+    private readonly cacheService: CacheService,
     @Optional() private readonly publisher?: BookingEventPublisherService,
   ) {}
+
+  @OnEvent('booking.reconciliation.requested', { async: true })
+  async handleReconciliationRequested(event: { bookingId: string }): Promise<void> {
+    if (!event?.bookingId) return;
+    await this.reconcileBookingWithLock(event.bookingId);
+  }
 
   @Cron(CronExpression.EVERY_10_MINUTES)
   async sweepStaleBookings(): Promise<void> {
     this.logger.log('Running stale PROCESSING bookings sweeper');
-    const staleThreshold = new Date(Date.now() - 15 * 60 * 1000);
+    const staleThreshold = new Date(Date.now() - STALE_THRESHOLD_MS);
     const staleBookings = await this.prisma.booking.findMany({
       where: {
         status: BookingStatus.PROCESSING,
         createdAt: { lte: staleThreshold },
       },
-      include: {
-        payment: {
-          include: {
-            ancillarySelection: {
-              include: {
-                seatSelections: true,
-                baggageSelections: true,
-              },
-            },
-          },
-        },
-        bookingIntent: {
-          include: {
-            passengers: true,
-          },
-        },
-        activeDisruptionRevision: {
-          include: {
-            segments: { orderBy: { globalOrder: 'asc' } },
-            notificationOutbox: true,
-          },
-        },
-        itineraryRevisions: {
-          orderBy: { version: 'desc' },
-          take: 1,
-          include: { segments: { orderBy: { globalOrder: 'asc' } } },
-        },
-      },
     });
 
     for (const booking of staleBookings) {
-      try {
-        await this.reconcileBookingIfStale(booking as unknown as BookingWithRelations);
-      } catch (e: any) {
-        this.logger.error(`Failed to reconcile stale booking ${booking.id}: ${e.message}`, e.stack);
+      await this.reconcileBookingWithLock(booking.id);
+    }
+  }
+
+  private async reconcileBookingWithLock(bookingId: string): Promise<void> {
+    try {
+      const token = randomUUID();
+      const lockKey = 'booking:recon:lock:' + bookingId;
+      const acquired = await this.cacheService.acquireLock(lockKey, token, 300);
+      if (!acquired) {
+        this.logger.log(
+          `Reconciliation lock collision for booking ${bookingId}; skipping attempt.`,
+        );
+        return;
       }
+
+      try {
+        const booking = await this.prisma.booking.findUnique({
+          where: { id: bookingId },
+          include: BOOKING_RECOVERY_INCLUDE,
+        });
+
+        if (!booking) {
+          this.logger.warn(`Booking ${bookingId} not found during locked reconciliation; skipping.`);
+          return;
+        }
+
+        const staleThreshold = new Date(Date.now() - STALE_THRESHOLD_MS);
+        if (booking.status !== BookingStatus.PROCESSING || booking.createdAt > staleThreshold) {
+          this.logger.log(
+            `Booking ${bookingId} is not eligible for stale processing recovery (status: ${booking.status}); skipping.`,
+          );
+          return;
+        }
+
+        await this.reconcileBookingIfStale(booking as unknown as BookingWithRelations, {
+          lockKey,
+          token,
+        });
+      } finally {
+        await this.cacheService.releaseLock(lockKey, token);
+      }
+    } catch (e: unknown) {
+      const error = e instanceof Error ? e : new Error(String(e));
+      this.logger.error(
+        `[reconcileBookingWithLock] Error during locked reconciliation for booking ${bookingId}: ${error.message}`,
+        error.stack,
+      );
     }
   }
 
@@ -144,18 +232,36 @@ export class BookingRecoveryService {
         await this.bookingLifecycleService.checkAndCompleteBooking(
           booking as unknown as BookingWithRelations,
         );
-      } catch (e: any) {
-        this.logger.error(`Failed to complete booking ${booking.id}: ${e.message}`, e.stack);
+      } catch (e: unknown) {
+        const error = e instanceof Error ? e : new Error(String(e));
+        this.logger.error(`Failed to complete booking ${booking.id}: ${error.message}`, error.stack);
       }
     }
   }
 
-  async reconcileBookingIfStale(booking: BookingWithRelations): Promise<BookingWithRelations> {
+  async reconcileBookingIfStale(
+    booking: BookingWithRelations,
+    lockContext?: { lockKey: string; token: string },
+  ): Promise<BookingWithRelations> {
     if (booking.status !== BookingStatus.PROCESSING) return booking;
 
-    const staleThreshold = new Date(Date.now() - 15 * 60 * 1000);
+    const staleThreshold = new Date(Date.now() - STALE_THRESHOLD_MS);
     if (booking.createdAt > staleThreshold) {
       return booking;
+    }
+
+    if (lockContext) {
+      const stillOwned = await this.cacheService.renewLock(
+        lockContext.lockKey,
+        lockContext.token,
+        300,
+      );
+      if (!stillOwned) {
+        this.logger.warn(
+          `Reconciliation lock lease lost or expired for booking ${booking.id} (${lockContext.lockKey}); aborting stale reconciliation.`,
+        );
+        return booking;
+      }
     }
 
     try {
@@ -204,20 +310,63 @@ export class BookingRecoveryService {
         this.stripeService.retrievePaymentIntent(payment.stripePaymentIntentId),
       );
       if (intent.status !== 'succeeded') {
+        const isPaymentAlreadyCancelledOrRefunded =
+          payment.status === 'CANCELLED' || payment.status === 'REFUNDED';
+
         try {
-          const duffelEvent = await this.prisma.paymentEvent.findFirst({
-            where: { paymentId: payment.id, eventType: 'duffel_order_created' },
-            orderBy: { createdAt: 'desc' },
+          const duffelCancelledEvent = await this.prisma.paymentEvent.findFirst({
+            where: { paymentId: payment.id, eventType: 'duffel_order_cancelled' },
           });
-          const duffelOrder = duffelEvent?.metadata as Record<string, unknown> | null;
-          if (duffelOrder && typeof duffelOrder.id === 'string') {
-            await this.duffelService.cancelOrder(duffelOrder.id);
-            this.logger.log(
-              `Successfully cancelled orphaned Duffel order ${duffelOrder.id} during stale booking sweep.`,
-            );
+          if (!duffelCancelledEvent) {
+            const duffelEvent = await this.prisma.paymentEvent.findFirst({
+              where: { paymentId: payment.id, eventType: 'duffel_order_created' },
+              orderBy: { createdAt: 'desc' },
+            });
+            const duffelOrder = duffelEvent?.metadata as Record<string, unknown> | null;
+            if (duffelOrder && typeof duffelOrder.id === 'string') {
+              let wasCancelledOrAlreadyCancelled = false;
+              try {
+                await this.duffelService.cancelOrder(duffelOrder.id);
+                this.logger.log(
+                  `Successfully cancelled orphaned Duffel order ${duffelOrder.id} during stale booking sweep.`,
+                );
+                wasCancelledOrAlreadyCancelled = true;
+              } catch (cancelError: unknown) {
+                const err =
+                  cancelError instanceof Error ? cancelError : new Error(String(cancelError));
+                if (/already_cancelled|already cancelled|cannot be cancelled/i.test(err.message)) {
+                  this.logger.log(
+                    `Orphaned Duffel order ${duffelOrder.id} already cancelled: ${err.message}. Treating as idempotent success.`,
+                  );
+                  wasCancelledOrAlreadyCancelled = true;
+                } else {
+                  this.logger.error(
+                    `Duffel order cancellation failed during stale booking sweep: ${err.message}`,
+                    err.stack,
+                  );
+                }
+              }
+
+              if (wasCancelledOrAlreadyCancelled) {
+                await this.prisma.paymentEvent.create({
+                  data: {
+                    paymentId: payment.id,
+                    eventType: 'duffel_order_cancelled',
+                    previousStatus: payment.status ?? PaymentStatus.AUTHORIZED,
+                    newStatus: payment.status ?? PaymentStatus.AUTHORIZED,
+                    source: PaymentEventSource.SYSTEM,
+                    createdBy: 'system',
+                    metadata: { duffelOrderId: duffelOrder.id },
+                  },
+                });
+              }
+            }
           }
-        } catch (cancelError: unknown) {
-          const err = cancelError instanceof Error ? cancelError : new Error(String(cancelError));
+        } catch (duffelLookupError: unknown) {
+          const err =
+            duffelLookupError instanceof Error
+              ? duffelLookupError
+              : new Error(String(duffelLookupError));
           this.logger.error(
             `Duffel order cancellation failed during stale booking sweep: ${err.message}`,
             err.stack,
@@ -225,20 +374,22 @@ export class BookingRecoveryService {
         }
 
         // Release the Stripe authorization hold (cancel intent)
-        try {
-          await this.stripeService.cancelPaymentIntent(payment.stripePaymentIntentId);
-          this.logger.log(
-            `Successfully cancelled Stripe PaymentIntent ${payment.stripePaymentIntentId} during stale booking sweep.`,
-          );
-        } catch (stripeCancelError: unknown) {
-          const err =
-            stripeCancelError instanceof Error
-              ? stripeCancelError
-              : new Error(String(stripeCancelError));
-          this.logger.error(
-            `Stripe cancelPaymentIntent failed during stale booking sweep: ${err.message}`,
-            err.stack,
-          );
+        if (!isPaymentAlreadyCancelledOrRefunded && intent.status !== 'canceled') {
+          try {
+            await this.stripeService.cancelPaymentIntent(payment.stripePaymentIntentId);
+            this.logger.log(
+              `Successfully cancelled Stripe PaymentIntent ${payment.stripePaymentIntentId} during stale booking sweep.`,
+            );
+          } catch (stripeCancelError: unknown) {
+            const err =
+              stripeCancelError instanceof Error
+                ? stripeCancelError
+                : new Error(String(stripeCancelError));
+            this.logger.error(
+              `Stripe cancelPaymentIntent failed during stale booking sweep: ${err.message}`,
+              err.stack,
+            );
+          }
         }
 
         let eventContext: TransactionEventContext | undefined;
@@ -279,8 +430,8 @@ export class BookingRecoveryService {
         orderBy: { createdAt: 'desc' },
       });
 
-      const rawOrder = duffelEvent?.metadata as any;
-      if (rawOrder && rawOrder.id) {
+      const rawOrder: unknown = duffelEvent?.metadata;
+      if (isRecord(rawOrder) && typeof rawOrder.id === 'string') {
         const bookingIntent = await this.prisma.bookingIntent.findUnique({
           where: { id: booking.bookingIntentId },
           include: { passengers: true, user: true },
@@ -296,6 +447,12 @@ export class BookingRecoveryService {
 
         const { flightSnapshot, passengerSnapshot } =
           this.duffelService.mapDuffelOrderToSnapshots(order);
+        const orderRecord = isRecord(order) ? order : rawOrder;
+        const bookingReference =
+          typeof orderRecord.booking_reference === 'string' ? orderRecord.booking_reference : null;
+        const duffelOrderId = typeof orderRecord.id === 'string' ? orderRecord.id : rawOrder.id;
+        // The lifecycle method persists a nullable PNR but retains a legacy string parameter type.
+        const lifecycleBookingReference = bookingReference as unknown as string;
         const departureAt = flightSnapshot.segments?.[0]?.departureAt
           ? new Date(flightSnapshot.segments[0].departureAt)
           : null;
@@ -306,8 +463,8 @@ export class BookingRecoveryService {
           eventContext = this.publisher ? this.publisher.createContext(tx) : { tx, events: [] };
           await this.bookingLifecycleService.confirmBooking(
             booking.id,
-            order.booking_reference || null,
-            order.id,
+            lifecycleBookingReference,
+            duffelOrderId,
             flightSnapshot,
             passengerSnapshot,
             tx,
@@ -327,8 +484,8 @@ export class BookingRecoveryService {
 
         if (didTransition) {
           booking.status = BookingStatus.CONFIRMED;
-          booking.pnrReference = order.booking_reference || null;
-          booking.duffelOrderId = order.id;
+          booking.pnrReference = bookingReference;
+          booking.duffelOrderId = duffelOrderId;
           booking.flightSnapshot = flightSnapshot as unknown as Prisma.JsonValue;
           booking.passengerSnapshot = passengerSnapshot as unknown as Prisma.JsonValue;
           booking.departureAt = departureAt;

@@ -1,5 +1,7 @@
 import 'reflect-metadata';
 import { MODULE_METADATA } from '@nestjs/common/constants';
+import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ScheduleModule } from '@nestjs/schedule';
 import { Test } from '@nestjs/testing';
 import { AppModule, envSchema } from './app.module';
 import { DashboardModule } from './dashboard/dashboard.module';
@@ -8,6 +10,17 @@ import { DashboardService } from './dashboard/dashboard.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { PrismaService } from './prisma/prisma.service';
 import { BookingManagementModule } from './booking-management/booking-management.module';
+import { BookingStateModule } from './booking-lifecycle/booking-state.module';
+import { BookingLifecycleModule } from './booking-lifecycle/booking-lifecycle.module';
+import { BookingRecoveryService } from './booking-lifecycle/booking-recovery.service';
+import { BookingManagementService } from './booking-management/booking-management.service';
+import { DuffelService } from './duffel/duffel.service';
+import { StripeService } from './common/stripe.service';
+import { CacheService } from './cache/cache.service';
+import { RefundTransactionService } from './refund/refund-transaction.service';
+import { RefundSettlementService } from './refund-settlement/refund-settlement.service';
+import { BookingEventPublisherService } from './domain-events';
+import { CancellationModule } from './cancellation/cancellation.module';
 import { ProfileModule } from './profile/profile.module';
 import { PaymentModule } from './payment/payment.module';
 import { CacheModule } from './cache/cache.module';
@@ -200,3 +213,66 @@ describe('AppModule Dependency Graph & DashboardModule Registration (T017 / T018
     expect(service).toBeInstanceOf(DashboardService);
   });
 });
+
+describe('AppModule Booking Domain Wiring (T007 / T024)', () => {
+  it('registers BookingManagementModule and CancellationModule directly and excludes BookingModule', () => {
+    const imports = Reflect.getMetadata(MODULE_METADATA.IMPORTS, AppModule) as unknown[];
+    expect(imports).toBeDefined();
+    expect(imports).toContain(BookingManagementModule);
+    expect(imports).toContain(CancellationModule);
+
+    const importNames = (imports as Array<{ name?: string } | undefined>).map(
+      (m) => m?.name || (m as { constructor?: { name?: string } })?.constructor?.name,
+    );
+    expect(importNames).not.toContain('BookingModule');
+  });
+
+  it('compiles BookingManagementModule and BookingLifecycleModule cleanly without circular dependencies', async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [
+        ScheduleModule.forRoot(),
+        EventEmitterModule.forRoot(),
+        BookingManagementModule,
+        BookingLifecycleModule,
+      ],
+    })
+      .overrideProvider(PrismaService)
+      .useValue({})
+      .overrideProvider(DuffelService)
+      .useValue({})
+      .overrideProvider(StripeService)
+      .useValue({})
+      .overrideProvider(CacheService)
+      .useValue({})
+      .overrideProvider(RefundTransactionService)
+      .useValue({})
+      .overrideProvider(RefundSettlementService)
+      .useValue({})
+      .overrideProvider(BookingEventPublisherService)
+      .useValue({})
+      .compile();
+
+    expect(moduleRef).toBeDefined();
+    expect(moduleRef.get(BookingManagementService)).toBeDefined();
+    expect(moduleRef.get(BookingRecoveryService)).toBeDefined();
+  });
+
+  it('verifies BookingManagementModule imports BookingStateModule and excludes BookingLifecycleModule (T024)', () => {
+    const imports = (Reflect.getMetadata(MODULE_METADATA.IMPORTS, BookingManagementModule) ?? []) as unknown[];
+    expect(imports).toContain(BookingStateModule);
+    expect(imports).not.toContain(BookingLifecycleModule);
+  });
+
+  it('verifies BookingLifecycleModule provides BookingRecoveryService for stale booking recovery (T024)', () => {
+    const providers = (Reflect.getMetadata(MODULE_METADATA.PROVIDERS, BookingLifecycleModule) ?? []) as unknown[];
+    expect(providers).toContain(BookingRecoveryService);
+  });
+
+  it('verifies BookingLifecycleModule imports BookingStateModule and exports it (T024)', () => {
+    const imports = (Reflect.getMetadata(MODULE_METADATA.IMPORTS, BookingLifecycleModule) ?? []) as unknown[];
+    const exports = (Reflect.getMetadata(MODULE_METADATA.EXPORTS, BookingLifecycleModule) ?? []) as unknown[];
+    expect(imports).toContain(BookingStateModule);
+    expect(exports).toContain(BookingStateModule);
+  });
+});
+

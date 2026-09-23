@@ -103,6 +103,35 @@ export function resolveEventName(event: unknown): string | null {
   }
 }
 
+const MAX_UNRECOGNIZED_EVENT_METADATA_LENGTH = 128;
+
+function getUnrecognizedEventMetadata(event: unknown): string {
+  const valueType = event === null ? 'null' : Array.isArray(event) ? 'array' : typeof event;
+  let constructorName = 'unknown';
+
+  if (typeof event === 'object' && event !== null) {
+    try {
+      const constructorCandidate = (event as { constructor?: unknown }).constructor;
+      if (
+        typeof constructorCandidate === 'function' &&
+        typeof constructorCandidate.name === 'string'
+      ) {
+        constructorName = constructorCandidate.name;
+      }
+    } catch {
+      constructorName = 'unknown';
+    }
+  }
+
+  const boundedConstructorName = constructorName
+    .replace(/[^a-zA-Z0-9_.:$-]/g, '_')
+    .slice(0, 64);
+  return `type=${valueType}; constructor=${boundedConstructorName || 'unknown'}`.slice(
+    0,
+    MAX_UNRECOGNIZED_EVENT_METADATA_LENGTH,
+  );
+}
+
 /**
  * BookingEventPublisherService
  *
@@ -160,7 +189,9 @@ export class BookingEventPublisherService {
       try {
         const eventName = this.resolveEventName(event);
         if (!eventName) {
-          this.logger.warn(`Could not resolve event name for domain event: ${JSON.stringify(event)}`);
+          this.logger.warn(
+            `Could not resolve event name for domain event (${getUnrecognizedEventMetadata(event)})`,
+          );
           continue;
         }
 

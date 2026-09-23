@@ -1,32 +1,115 @@
 # Architecture
 
-## Feature 024 — Event-Driven Module Deepening (In Progress)
+## Feature 025 — Booking Umbrella Deletion (Complete - Tasks T001–T039)
+
+Planning artifacts: [specification](../specs/025-booking-umbrella-deletion/spec.md), [plan](../specs/025-booking-umbrella-deletion/plan.md), and [tasks](../specs/025-booking-umbrella-deletion/tasks.md).
+
+#### Domain-Owned Booking Controllers (US1 Complete)
+- **Elimination of `BookingModule` Facade**:
+  - The umbrella forwarding module `BookingModule` (`apps/api/src/booking/`) and its facade DTO directory have been deleted.
+  - `AppModule` now directly imports and mounts `BookingManagementModule` and `CancellationModule`.
+- **`BookingManagementController` (`apps/api/src/booking-management/`)**:
+  - Directly handles authenticated traveler booking reads: `GET /bookings` (list with pagination & tab filtering) and `GET /bookings/:bookingId` (detail view).
+  - Protected with `@UseGuards(JwtAuthGuard)` and parameter UUID validation via `ParseUUIDPipe({ version: '4' })`.
+- **`CancellationController` (`apps/api/src/cancellation/`)**:
+  - Normalized to canonical REST sub-resource hierarchy under `@Controller('bookings/:bookingId/cancellation')`: `GET /bookings/:bookingId/cancellation` (status), `POST /bookings/:bookingId/cancellation/quote` (quote), and `POST /bookings/:bookingId/cancellation` (cancellation execution with `CancelBookingDto`). Legacy sibling paths (`:bookingId/cancellation-quote` and `:bookingId/cancel`) are rejected with `404 Not Found`.
+  - Protected with `@UseGuards(JwtAuthGuard)` and parameter UUID validation via `ParseUUIDPipe({ version: '4' })`.
+  - Service boundaries, ownership checks, and DTO validation remain strictly preserved.
+
+#### Normalized Frontend Cancellation Proxy, Client UI & Security Catalog (US3 Phase 5 Complete)
+- **Next.js App Router Route Handlers (`apps/web/app/api/booking-management/bookings/[bookingId]/cancellation/`)**:
+  - Normalized proxy handlers matching the backend REST sub-resource hierarchy:
+    - `cancellation/route.ts`: `GET` (cancellation status) and `POST` (cancel execution forwarding `quoteId`).
+    - `cancellation/quote/route.ts`: `POST` (cancellation quote request).
+  - All route handlers enforce `export const dynamic = 'force-dynamic'`, standard Next.js route params extraction (`{ params }: { params: { bookingId: string } }`), and `Cache-Control: private, no-store` header on all responses (success and mapped failure).
+  - Outcome-to-HTTP mapping preserves `BookingManagementOutcome` contract: `UNAUTHENTICATED` (401), `FORBIDDEN` (403), `NOT_FOUND` (404), `STALE_REVISION` (409), `INVALID_COMMAND` (400), `UPSTREAM_UNAVAILABLE` (503).
+  - Obsolete sibling proxy routes deleted: `cancel/`, `cancellation-quote/`, and `cancellation-status/`.
+- **Server Client Loader Updates (`apps/web/lib/server/booking-management.ts`)**:
+  - `getCancellationQuote()` targets `/api/bookings/${encodeURIComponent(bookingId.trim())}/cancellation/quote` (POST, fast-fail mutation).
+  - `cancelBooking()` targets `/api/bookings/${encodeURIComponent(bookingId.trim())}/cancellation` (POST, fast-fail mutation).
+  - `getCancellationStatus()` retains `/api/bookings/${encodeURIComponent(bookingId.trim())}/cancellation` (GET, bounded retry).
+- **Client UI Migration (`apps/web/components/bookings/BookingDetail.tsx`)**:
+  - Status polling targets `/api/booking-management/bookings/${booking.id}/cancellation` (GET).
+  - Cancellation quote requests target `/api/booking-management/bookings/${booking.id}/cancellation/quote` (POST).
+  - Cancellation executions target `/api/booking-management/bookings/${booking.id}/cancellation` (POST).
+- **Security Catalog & OpenAPI Parity (`tests/security/zap/`)**:
+  - Migrated `POST /bookings/:id/cancel` to `POST /bookings/:id/cancellation` in `routes.json` and `routes-config.test.mjs`.
+  - Migrated OpenAPI operation from `/bookings/{id}/cancel` to `/bookings/{id}/cancellation` in `openapi.json`, maintaining parity with live route catalog.
+
+#### Non-Blocking Stale Read Path & Projection Guard (US2 Phase 4 Slice 1 Complete)
+- **Non-Blocking Stale Read Path (`BookingManagementService`)**:
+  - `BookingManagementService` read path is decoupled from synchronous provider recovery (`BookingRecoveryService` dependency and `reconcileBookingIfStale()` calls removed).
+  - When traveler queries bookings (`GET /bookings` or `GET /bookings/:bookingId`), any booking in `PROCESSING` status older than 15 minutes (`createdAt <= now - 15m`) triggers an asynchronous fire-and-forget event emission: `booking.reconciliation.requested` with payload `{ bookingId }`.
+  - The read completes immediately without awaiting provider repair or blocking the traveler on Duffel/Stripe API calls.
+  - Inline local terminal completion (`checkAndCompleteBooking()`) remains immediate and synchronously evaluated on read.
+- **Early-Return Guard in `BookingProjectionListener` (`apps/api/src/booking-projection/`)**:
+  - `BookingProjectionListener` guards its event handler (`handleBookingEvent`) against coordination requests and non-domain events.
+  - Events that do not match catalogued `BOOKING_EVENTS` (such as `booking.reconciliation.requested`), or payloads lacking valid `eventId` or `sourceVersion`, are rejected via an early return before entering the `try/finally` block.
+  - This early exit ensures coordination requests bypass the hydrator, repository upsert, and all metric recordings/duration timers with zero operational overhead.
+- **`BookingManagementModule` Decoupling**:
+  - `BookingManagementModule` has been decoupled to import `BookingStateModule` directly instead of `BookingLifecycleModule`.
+  - Isolates traveler-facing read services from background reconciliation loops and recovery cron jobs, while `BookingLifecycleModule` retains ownership of `BookingRecoveryService` and its scheduled sweep.
+
+#### Locked Background Recovery Handler & Provider Hardening (US2 Phase 4 Slice 2 Complete)
+- **Asynchronous Reconciliation Handler & Distributed Lock (`BookingRecoveryService`)**:
+  - Subscribes to `booking.reconciliation.requested` via `@OnEvent('booking.reconciliation.requested', { async: true })`.
+  - Unified routing: Both incoming read-triggered events and scheduled cron sweeps (`sweepStaleBookings`) delegate to private helper `reconcileBookingWithLock(bookingId)`.
+  - Distributed Locking: Acquires an atomic 300s TTL lock via `CacheService.acquireLock('booking:recon:lock:' + bookingId, token, 300)` using a fresh `randomUUID()` token. If lock acquisition fails (collision or active recovery in-flight), execution silently returns.
+  - Guarantees token-verified release inside `finally` via `this.cacheService.releaseLock(lockKey, token)` even if recovery throws, preventing deadlock or premature release by stale workers.
+  - Catches and logs all errors, guaranteeing zero unhandled promise rejections or emitter crashes.
+- **Latest-State Reload & Pre-Flight Recheck**:
+  - Reloads latest full relations directly from database under the lock before initiating any recovery work.
+  - Enforces pre-flight eligibility recheck: Verifies `status === BookingStatus.PROCESSING` and `createdAt <= now - 15m`. If booking has already been confirmed, cancelled, or failed concurrently, recovery aborts with zero side effects.
+- **Duplicate Provider Side-Effect Hardening**:
+  - Reconcile logic guards against repeated remote actions across race conditions and lease expirations:
+    - Skips Duffel and Stripe cancellations if `payment.status` is already `'CANCELLED'` or `'REFUNDED'`.
+    - Skips Stripe cancellation if Stripe `intent.status === 'canceled'`.
+    - Skips Duffel cancellation if `duffel_order_cancelled` `PaymentEvent` already exists.
+    - Records `duffel_order_cancelled` `PaymentEvent` (with `source: SYSTEM`, `createdBy: 'system'`) upon successful Duffel cancellation.
+    - Handles concurrent state transitions: If `failBooking` or `confirmBooking` returns 0 affected rows, payment updates and event publications are completely skipped, preventing state regression.
+- **Module Graph Boundary Assertions (`apps/api/src/app.module.spec.ts`)**:
+  - Validates `BookingManagementModule` imports `BookingStateModule` directly and strictly excludes `BookingLifecycleModule`.
+  - Validates `BookingLifecycleModule` provides `BookingRecoveryService` and re-exports `BookingStateModule`.
+
+#### Cross-Cutting Verification & Ripgrep Census (Phase 6 Complete - Tasks T037–T039)
+- **Static Census Verification (T039)**:
+  - 0 references to `BookingModule` in production code or module registrations (only permitted in negative assertions in test files).
+  - 0 synchronous `reconcileBookingIfStale` calls in `BookingManagementService`.
+  - 0 references to legacy paths (`/cancellation-quote`, `/cancellation-status`, `/cancel`) in production code, web client, or ZAP catalogs (only permitted in explicit negative 404 test assertions in E2E suites).
+- **Comprehensive Quality Gates (T038)**:
+  - API and Web lint gates pass with 0 errors and 0 warnings (`eslint`, `next lint`).
+  - API and Web TypeScript compiles pass with 0 diagnostic errors (`tsc --noEmit`).
+  - Full suite of focused unit, server-loader, route-handler, and ZAP configuration tests pass with 100% success.
+
+## Feature 024 — Event-Driven Module Deepening (Phase 6 closure in progress; T001–T040 implemented)
 
 Planning artifacts: [specification](../specs/024-event-driven-module-deepening/spec.md), [plan](../specs/024-event-driven-module-deepening/plan.md), and [tasks](../specs/024-event-driven-module-deepening/tasks.md).
 
-#### Implemented Architecture (Phase 5 Slice 2: US3 Completed — Reconciliation E2E Suite, Observability Telemetry & Operational Runbook)
+#### Implemented Architecture (Phase 5 / US3 complete; Phase 6 closure in progress)
 
 - **Comprehensive Reconciliation E2E Suite (`apps/api/test/booking-projection-reconciliation.e2e-spec.ts`) (T038)**:
   - Real PostgreSQL E2E suite validating self-healing reconciliation under CI network guard.
-  - Proves 6 critical invariants:
+  - The recorded T038 evidence proves 6 critical invariants:
     1. *Suppressed Events / Lost Messages*: Repaired missing projections and stale `sourceVersion < version` records to authoritative state.
     2. *Large Backlog Keyset Pagination*: Fair keyset pagination across >100 records (105 seeded) in batches of 100 with `reachedEnd` reset.
     3. *Poison Pill Isolation*: Corrupted rows (0 segments, missing flight details) marked failed/skipped and bypassed without crashing the process.
     4. *5-Worker Concurrency Bound*: Active worker parallelism strictly bounded to at most 5 concurrent tasks.
     5. *Live Concurrent Mutations*: Monotonic version fencing in `upsertGuarded` protects against out-of-order writes from older snapshots.
     6. *Zero Provider Calls*: Verified zero external HTTP/HTTPS calls to Stripe, Duffel, or external providers during background repair.
+  - The current fixture also boots `ScheduleModule`, stops registered cron jobs during setup, and checks the named `BookingProjectionReconciliationService` cron entry through `SchedulerRegistry`.
   - Completed legacy-writer compatibility fixture in `apps/api/test/booking-projection-version-migration.e2e-spec.ts`:
     - Verified freshness reset (`sourceVersion = 0`) repairs cleanly with stable `agentReference`.
     - Proved financial tables (`payments`, `refunds`, `ledger_entries`) remain completely unmodified.
 - **Observability Telemetry & Bounded Metrics (`apps/api/src/booking-projection/booking-projection.metrics.ts`) (T039)**:
-  - Implemented structured Prometheus metrics:
+  - Implemented bounded projection and reconciliation metrics using the existing telemetry names:
     - Counters: `booking_projection_reconciliation_pass_total` (outcome: `SUCCESS` | `ERROR`), `stale_found_total`, `repaired_total`, `failed_total`, `skipped_total`, `current_total`.
     - Latency timer: `booking_projection_reconciliation_duration_ms` with percentiles (p50, p90, p95, p99).
     - Failure tracking: `booking_projection_failure_total` (labels: `error_type` in `HYDRATION_FAILED`, `EXTRACTION_FAILED`, `UNEXPECTED_ERROR`, `INVALID_EVENT`, `DATABASE_ERROR`, `UNKNOWN`).
-  - Strict bounded cardinality and zero raw identifiers (no booking IDs, user IDs, or PII) in Prometheus metric labels.
-  - Injected into `BookingProjectionReconciliationService` and `BookingProjectionListener`.
+  - Strict bounded cardinality and zero raw identifiers (no booking IDs, user IDs, or PII) in metric labels.
+  - `BookingProjectionMetrics` keeps bounded local counters and latency samples, mirrors counters and samples to Redis when available, tracks the latest pass outcome and consecutive errors across replicas, rejects stale timestamped pass-state writes, and reports database/Redis dependency health.
+  - Injected into `BookingProjectionReconciliationService` and `BookingProjectionListener`; `GET /health/booking-projection` exposes the health snapshot.
 - **Operational Runbook & Quickstart Integration (`docs/runbooks/booking-projection-reconciliation.md`) (T040)**:
-  - Authoritative operational guide covering self-healing architecture, keyset traversal mechanics, poison pill triage, multi-replica pod safety, emergency single-booking repair, and rollback/reactivation without financial disruption.
+  - Authoritative operational guide covering self-healing architecture, keyset traversal mechanics, poison pill triage, multi-replica pod safety, named-cron pause/resume, emergency single-booking repair, and rollback/reactivation without financial disruption.
   - Linked in `specs/024-event-driven-module-deepening/quickstart.md`.
 
 #### Implemented Architecture (Phase 5 Slice 1: US3 Keyset Scan, Background Reconciliation Engine & Backfill Script Unification)
@@ -36,9 +119,10 @@ Planning artifacts: [specification](../specs/024-event-driven-module-deepening/s
   - Executes raw SQL keyset scan with LEFT JOIN `"booking_agent_projections"` on `p."bookingId" = b."id"`, selecting candidates where `(p."bookingId" IS NULL OR p."source_version" < b."version")` and `b."id" > cursor`.
   - Monotonic keyset progression with `reachedEnd` detection and `nextCursor` tracking.
 - **BookingProjectionReconciliationService (`apps/api/src/booking-projection/booking-projection-reconciliation.service.ts`) (T036)**:
-  - Background self-healing repair service scheduled once per minute (`@Cron(CronExpression.EVERY_MINUTE)`).
+  - Background self-healing repair service scheduled once per minute (`@Cron(CronExpression.EVERY_MINUTE)`) under the runtime-manageable name `BookingProjectionReconciliationService`.
   - Enforces local non-overlapping execution lock (`isReconciling: boolean`) ensuring overlapping cron ticks are safely skipped.
   - Bounded 100-batch / 5-worker concurrency pool processing candidates concurrently without external dependencies.
+  - Cursor and overlap lock are process-local; multiple replicas may overlap safely because guarded persistence fences stale writes. No distributed reconciliation lease is used.
   - Safely classifies candidate outcomes into `repaired`, `current`, `skipped`, and `failed`.
   - Poison-pill progression advances keyset cursor over malformed or unprocessable records to prevent scan deadlocks; resets cursor to `undefined` when `reachedEnd === true` without scanning an extra empty page.
   - Exported and registered in `BookingProjectionModule` and `booking-projection/index.ts`.
@@ -110,7 +194,7 @@ Planning artifacts: [specification](../specs/024-event-driven-module-deepening/s
   - Verifies provider uniqueness: `PaymentMethodService` is registered strictly once in `PaymentMethodsModule` across all modules in `AppModule`, resolving identical singleton references across all consumer modules.
   - Enforces acyclic architecture: `PaymentModule` imports `PaymentFulfillmentModule`, while `PaymentFulfillmentModule` contains zero direct or transitive imports of `PaymentModule` in both static metadata and runtime NestContainer dependency graph.
   - Verifies direct SDK wrapper retention: `BookingRecoveryService` directly injects `StripeService` and `DuffelService` without routing through saga ports.
-  - Root AppModule Wiring & DI Architecture (T032): `AppModule` imports `EventEmitterModule.forRoot({ wildcard: true, delimiter: '.' })` and `BookingProjectionModule`; verifies DI registration and resolution of `EventEmitter2`, `BookingProjectionListener`, `BookingProjectionRepository`, `BookingProjectionService`, and `BookingEventHydratorService`.
+  - Root AppModule Wiring & DI Architecture (T032): `AppModule` imports `EventEmitterModule.forRoot({ wildcard: true, delimiter: '.', maxListeners: 20 })` and `BookingProjectionModule`; verifies DI registration and resolution of `EventEmitter2`, `BookingProjectionListener`, `BookingProjectionRepository`, `BookingProjectionService`, and `BookingEventHydratorService`.
 
 #### Implemented Architecture (Phase 4 Slice 2: US2 Event Publisher & Acyclic State Module)
 
@@ -133,7 +217,7 @@ Planning artifacts: [specification](../specs/024-event-driven-module-deepening/s
   - **BookingEventHydratorService (T021)**: Reads cohesive booking snapshot from Prisma (booking row, latest active revision ordered by version desc with segments ordered by `globalOrder: asc`, and passenger snapshot). Deduplicates concurrent calls via a cycle-scoped in-flight promise cache (`Map<string, Promise<CoherentBookingSnapshot | null>>`), sharing a single database fetch and releasing via `.finally()`.
   - **BookingProjectionService (T022)**: Extracts safe flight fields for agent consumption with PII sanitization. Enforces the strict invariant **No Stale Fallback**: if an authoritative revision exists but has empty/malformed segments, throws `MalformedRevisionError` rather than falling back to stale initial `flightSnapshot`. Fallback is permitted only when no revision exists.
   - **BookingProjectionRepository (T023)**: Implements atomic guarded upsert via PostgreSQL `INSERT ... ON CONFLICT ("bookingId") DO UPDATE ... WHERE booking_agent_projections.source_version < EXCLUDED.source_version`. Monotonically persists `Booking.version` as `source_version`, silently ignoring out-of-order/stale deliveries (`outcome: 'STALE_IGNORED'`), and guaranteeing immutable `agentReference` on conflict.
-   - **BookingProjectionListener & Metrics (T023, T033)**: Thin asynchronous event listener subscribing strictly to booking domain events (strictly no `refund.settled`). Implements `OnApplicationBootstrap` to bind `booking.**` directly on the event bus, ensuring multi-segment domain events (`booking.recovery.resolved`, `booking.disruption.synced`, etc.) are caught reliably under EventEmitter2 delimiter semantics. Enforces complete error isolation: all hydrator and projection failures are logged with structured event context (`bookingId`, `eventId`, `sourceVersion`) and measured without throwing unhandled rejections to Node.js. Exposes bounded telemetry counters (`booking_projection_events_total` with `SUCCESS | ERROR | STALE_IGNORED`) and latency tracking (`booking_projection_duration_ms`).
+   - **BookingProjectionListener & Metrics (T023, T033)**: Thin asynchronous event listener subscribing strictly to booking domain events (strictly no `refund.settled`) through `@OnEvent('booking.**')`, ensuring multi-segment domain events (`booking.recovery.resolved`, `booking.disruption.synced`, etc.) are caught reliably under EventEmitter2 delimiter semantics. Enforces complete error isolation: all hydrator and projection failures are logged with structured event context (`bookingId`, `eventId`, `sourceVersion`) and measured without throwing unhandled rejections to Node.js. Exposes bounded telemetry counters (`booking_projection_events_total` with `SUCCESS | ERROR | STALE_IGNORED`) and latency tracking (`booking_projection_duration_ms`).
 - **PostgreSQL Event & Projection E2E Integration Suite (`apps/api/test/booking-events.e2e-spec.ts`) (T033)**:
   - Comprehensive real-database integration test suite across all 8 domain event categories against PostgreSQL:
     - (a) Creation, Confirmation, Failure, Completion: Verifies hydrated processing projection at version 1, confirmation to version 2, failure transitions, and completion transitions.
@@ -159,7 +243,7 @@ Planning artifacts: [specification](../specs/024-event-driven-module-deepening/s
   - Decoupled consumer modules: dropped obsolete `AgentGatewayModule` imports from `BookingLifecycleModule` and `CancellationModule`.
   - Removed projection-related `forwardRef(() => AgentGatewayModule)` from `DisruptionModule` while preserving safe query cycles.
 - **Root AppModule Wiring & DI Architecture (`apps/api/src/app.module.ts`, `apps/api/test/module-deepening.e2e-spec.ts`) (T032)**:
-  - Registered `EventEmitterModule.forRoot({ wildcard: true, delimiter: '.' })` once at the application root.
+  - Registered `EventEmitterModule.forRoot({ wildcard: true, delimiter: '.', maxListeners: 20 })` once at the application root.
   - Registered `BookingProjectionModule` in `AppModule` imports.
   - Verified `EventEmitter2`, `BookingProjectionListener`, `BookingProjectionRepository`, `BookingProjectionService`, and `BookingEventHydratorService` tokens resolve cleanly via DI with zero circular dependencies.
 - **Eventual Consistency Test Adaptation (`apps/api/test/`) (T034)**:
@@ -167,10 +251,10 @@ Planning artifacts: [specification](../specs/024-event-driven-module-deepening/s
   - `characterization/booking-characterization.e2e-spec.ts`: Added `waitForCondition` helper and bounded polling for projection assertions following `updateToConfirmed`.
   - Verified `chat-persistence-migration.e2e-spec.ts` and `safe-booking-read.service.spec.ts` pass cleanly.
 
-### Remaining Architecture (Phases 5–6)
+### Closure Status
 
-- Phase 5 (US3): Repair and operate projections with background reconciliation scanner (`BookingProjectionReconciliationService`), minute-scheduled repair loop (100 candidates, 5 concurrent workers), and backfill script integration (`T035`–`T040`).
-- Phase 6: Final gates, runbooks, documentation synchronization, and plan convergence (`T041`–`T044`).
+- Phase 5 (US3) is implemented through T040: keyset scanning, minute-scheduled 100/5 repair, guarded backfill, reconciliation E2E coverage, bounded telemetry, and the operational runbook.
+- Phase 6 closure is in progress. T041 mutation/import inventory and T042 full gate and smoke execution remain pending; per-task reviews were waived, but the final T044 dual-axis review and signoff remain pending. T043 is the current context synchronization work. This file records no final gate or implementation signoff.
 
 ## Stack
 
@@ -218,14 +302,16 @@ Planning artifacts: [specification](../specs/024-event-driven-module-deepening/s
 │   │   │   │   ├── auth/                  → AgentAuthModule (API key & claim token guards)
 │   │   │   │   └── audit/                 → AgentToolAuditModule (privacy-safe telemetry)
 │   │   │   ├── ancillaries/           → Ancillary services (seats, baggage) importing IdempotencyModule directly
-│   │   │   ├── booking/               → Pure umbrella BookingModule aggregating submodules
-│   │   │   ├── booking-lifecycle/     → Provider-blind lifecycle transitions & recovery
-│   │   │   ├── booking-management/    → Owner read models, disruption & revision queries
-│   │   │   ├── cancellation/          → Cancellation quotes, locks & obligation generation
+│   │   │   ├── booking-lifecycle/     → Provider-blind lifecycle transitions & recovery (BookingStateModule, BookingRecoveryService)
+│   │   │   ├── booking-projection/    → Version-fenced safe projection listener, writer, metrics & reconciliation
+│   │   │   ├── booking-management/    → Owner read models, disruption & revision queries (BookingManagementController)
+│   │   │   ├── cancellation/          → Cancellation quotes, locks & obligation generation (CancellationController)
 │   │   │   ├── chat/                  → Chat persistence & AgentChatController (JTI checks)
 │   │   │   ├── dashboard/             → Direct Prisma booking summary read model & stats
 │   │   │   ├── idempotency/           → IdempotencyModule providing PaymentIdempotencyService
 │   │   │   ├── payment/               → Payment processing & trigger coordinators (imports IdempotencyModule)
+│   │   │   ├── payment-fulfillment/   → Provider-blind payment confirmation saga, ports & bounded adapters
+│   │   │   ├── domain-events/         → Passive booking/refund events, transaction context & post-commit publisher
 │   │   │   ├── refund/                → RefundTransactionService & capacity reservation
 │   │   │   └── refund-settlement/     → Provider-blind atomic ledger & projection settlement
 │   │   └── test/                      → API E2E & characterization spec tests

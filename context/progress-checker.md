@@ -1,4 +1,113 @@
 # Progress Tracker
+ 
+### Feature 025 — Booking Umbrella Deletion: Phase 6 Complete (Tasks T001–T039 100% Complete) (2026-09-22)
+
+- **Phase 6 (Polish & Cross-Cutting Verification) & Feature 025 100% Delivered (T001–T039)**:
+  - **Static Ripgrep Census (T039)**:
+    - Zero (0) references to `BookingModule` in production code or module registrations across `apps/api/src`, `apps/api/test`, `apps/web/app/api`, `apps/web/lib/server`, `apps/web/components/bookings`, and `tests/security/zap/` (only permitted in negative assertions in test files: `app.module.spec.ts` and `booking-characterization.e2e-spec.ts`).
+    - Zero (0) synchronous `reconcileBookingIfStale` calls in `BookingManagementService`. Read paths emit fire-and-forget `booking.reconciliation.requested` with payload `{ bookingId }` for stale `PROCESSING` bookings (>15m) without blocking travelers.
+    - Zero (0) references to legacy sibling paths (`/cancellation-quote`, `/cancellation-status`, `/cancel`) in production code, web client, or ZAP catalogs (only permitted in explicit negative HTTP 404 test assertions in `cancellation.e2e-spec.ts`).
+  - **Documentation Synchronization (T037)**:
+    - Updated `context/architecture.md` heading to `## Feature 025 — Booking Umbrella Deletion (Complete - Tasks T001–T039)`.
+    - Verified and documented domain-owned controllers: `BookingManagementController` (`GET /bookings`, `GET /bookings/:bookingId`) in `BookingManagementModule` and `CancellationController` (`GET /bookings/:bookingId/cancellation`, `POST /bookings/:bookingId/cancellation/quote`, `POST /bookings/:bookingId/cancellation`) in `CancellationModule`.
+    - Verified and documented non-blocking read architecture, background lock coordination under Redis lock `booking:recon:lock:{bookingId}` with unique UUID token and 300s TTL, and normalized frontend proxy architecture under `apps/web/app/api/booking-management/bookings/[bookingId]/cancellation/`.
+    - Updated `specs/025-booking-umbrella-deletion/tasks.md` marking T001–T039 100% complete.
+  - **Comprehensive Verification Evidence (T038)**:
+    - API ESLint: Clean (`pnpm exec eslint "apps/api/**/*.ts" --max-warnings 0`), exit code 0.
+    - API Typecheck: Clean (`pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`), exit code 0.
+    - Web Lint: Clean (`pnpm --filter @web/frontend lint`), exit code 0.
+    - Web Typecheck: Clean (`pnpm --filter @web/frontend typecheck`), exit code 0.
+    - Server-Loader Unit Suite (`apps/web/lib/server/booking-management.spec.ts`): 27/27 tests passed, exit code 0.
+    - Route Handlers Direct Unit Suite (`apps/web/app/api/.../cancellation/route.spec.ts` & `quote/route.spec.ts`): 10/10 tests passed, exit code 0.
+    - Security / ZAP Route Catalog Suite (`tests/security/zap/routes-config.test.mjs`): 9/9 tests passed, exit code 0.
+    - API Cancellation Unit Suite (`apps/api/src/cancellation/cancellation.controller.spec.ts`): 13/13 tests passed, exit code 0.
+    - API Cancellation E2E Suite (`apps/api/test/cancellation.e2e-spec.ts`): 11/11 tests passed, exit code 0.
+  - **Feature Completion Status**: Feature 025 (Booking Umbrella Deletion) is 100% complete, fully verified, and ready for integration.
+
+### Feature 025 — Booking Umbrella Deletion: Phase 5 Complete (User Story 3: Tasks T026–T036 Implemented & Verified) (2026-09-22)
+
+- **Phase 5 User Story 3 (Normalized Cancellation Sub-Resource & UI Migration) 100% Delivered (T026–T036)**:
+  - **Normalized App Router Route Handlers (T031)**: Created `cancellation/route.ts` (GET status, POST execute) and `cancellation/quote/route.ts` (POST quote) with `force-dynamic`, params extraction, and `'Cache-Control': 'private, no-store'`.
+  - **Legacy Proxy Cleanup (T032)**: Deleted obsolete directories `cancel/`, `cancellation-quote/`, and `cancellation-status/`.
+  - **Server Client Loader (T033)**: Updated `getCancellationQuote()`, `cancelBooking()`, and `getCancellationStatus()` upstream URLs.
+  - **Client UI Migration (T034)**: Updated `apps/web/components/bookings/BookingDetail.tsx` polling, quote, and execute requests to use `/api/booking-management/bookings/${booking.id}/cancellation` and `/cancellation/quote`. Replaced `err: any` with typed `err: unknown`.
+  - **Browser Journey Characterization (T029)**: Updated `apps/web/tests/characterization/booking-seam.characterization.spec.ts` route intercepts to normalized proxy paths `/cancellation/quote` and `/cancellation`.
+  - **ZAP Security Catalog & OpenAPI Migration (T036)**: Migrated `POST /bookings/:id/cancel` to `POST /bookings/:id/cancellation` across `tests/security/zap/routes.json`, `tests/security/zap/routes-config.test.mjs`, and `tests/security/zap/openapi.json`.
+  - **Unit & Security Tests (T027, T028, T036)**:
+    - Server-loader unit suite: 27/27 passed.
+    - Route handlers direct unit suite: 10/10 passed (7 cancellation, 3 quote).
+    - ZAP routes config test suite: 9/9 passed.
+  - **Verification Gate**:
+    - ESLint: 0 warnings, 0 errors.
+    - TypeScript (`tsc --noEmit`): 0 errors.
+  - **Status**: User Story 3 is 100% complete and verified. Ready for Phase 6 (Polish & Cross-Cutting Verification, T037).
+
+ ### Feature 025 — Booking Umbrella Deletion: Phase 5 Slice 1 Complete (Tasks T026, T030, T035 Implemented & Verified) (2026-09-22)
+
+- **Phase 5 User Story 3 (Normalized Cancellation Sub-Resource Backend & E2E) Delivered (T026, T030, T035)**:
+  - **Backend Route Normalization (T030)**: Normalized `CancellationController` (`apps/api/src/cancellation/cancellation.controller.ts`) to `@Controller('bookings/:bookingId/cancellation')` with `@Get()` (cancellation status), `@Post('quote')` (cancellation quote), and `@Post()` (execute cancellation with `CancelBookingDto`). Preserved `JwtAuthGuard`, `ParseUUIDPipe` on `:bookingId`, and service delegation without modifying business logic.
+  - **Controller Spec & E2E Route Updates with Negative Assertions (T026)**:
+    - Updated `cancellation.controller.spec.ts` with route path metadata, parameter metadata, guard checks, DTO validation, and service delegation assertions (13/13 passed).
+    - Updated `cancellation.e2e-spec.ts` HTTP requests to target `/api/bookings/:bookingId/cancellation` and `/api/bookings/:bookingId/cancellation/quote`.
+    - Added explicit negative assertions proving legacy sibling routes (`POST /api/bookings/:bookingId/cancellation-quote` and `POST /api/bookings/:bookingId/cancel`) return HTTP 404 Not Found (11/11 passed).
+  - **Stale Fixture Removal (T035)**: Confirmed `jest-e2e.json` targets `.e2e-spec.ts$` via `ts-jest` and deleted tracked compiled fixture `apps/api/test/cancellation.e2e-spec.js`. Documented rationale in `specs/025-booking-umbrella-deletion/quickstart.md`.
+  - **Verification Gate**: Executed verification matrix with exit code 0: ESLint (0 errors, 0 warnings), TypeScript (`tsc --noEmit`, 0 errors), network-guarded unit test (13/13 passed), and cancellation E2E test (`test:e2e`, 11/11 passed).
+  - **Status**: Phase 5 / Slice 1 is 100% complete and verified. Ready for Phase 5 / Slice 2 (Frontend Proxy & Next Route Handlers, T027–T029, T031–T034, T036).
+
+### Feature 025 — Booking Umbrella Deletion: Phase 4 Slice 2 Complete (Tasks T015, T018, T020, T021, T024, T025 Implemented & Verified) (2026-09-22)
+
+- **Phase 4 User Story 2 (Non-Blocking Stale Booking Reconciliation) Fully Delivered (T014–T025 100% Complete)**:
+  - **Asynchronous Reconciliation Event Handler & Distributed Lock (T015, T018, T020)**: Implemented `@OnEvent('booking.reconciliation.requested', { async: true })` in `BookingRecoveryService`. Unified event-triggered and cron-triggered (`sweepStaleBookings`) flows under private helper `reconcileBookingWithLock(bookingId)` with an atomic 300s TTL Redis lock lease (`booking:recon:lock:${bookingId}`), unique UUID token, and token-checked release in `finally`.
+  - **State Reload & Eligibility Recheck (T018, T020)**: Reloads booking with all relations from DB inside the lock; rechecks that status is still `PROCESSING` and age is >= 15m before executing provider recovery, preventing race conditions against concurrent completions.
+  - **Duplicate Side-Effect Hardening (T021)**: Hardened provider operations against repeated execution: skips Duffel and Stripe cancellations if `payment.status` is already `'CANCELLED'` or `'REFUNDED'`; skips Stripe cancellation if `intent.status === 'canceled'`; skips Duffel cancellation if `duffel_order_cancelled` `PaymentEvent` exists, and records `duffel_order_cancelled` on successful Duffel cancel. Guarded concurrent transitions with 0 count to prevent state regression.
+  - **Module Graph Assertions (T024)**: Added assertions in `apps/api/src/app.module.spec.ts` confirming `BookingManagementModule` imports `BookingStateModule` directly and excludes `BookingLifecycleModule`, while `BookingLifecycleModule` provides `BookingRecoveryService` for the background cron sweep.
+  - **Verification Gate (T025)**: Executed full verification gate with exit code 0: ESLint (0 errors, 0 warnings), TypeScript (`tsc --noEmit`, 0 errors), 5 focused unit test suites under network guard (120/120 passed), and API Booking E2E suite (`booking.e2e-spec.ts`, 7/7 passed).
+- **Status**: Phase 4 / User Story 2 is 100% complete and verified. Ready for Phase 5 (User Story 3: Normalized Cancellation Sub-Resource, T026–T036).
+
+### Feature 025 — Booking Umbrella Deletion: Phase 4 Slice 1 Complete (Tasks T014, T016, T017, T019, T022, T023 Implemented & Verified) (2026-09-21)
+
+- **Phase 4 User Story 2 (Non-Blocking Stale Read Path & Projection Guard) Delivered (T014, T016, T017, T019, T022, T023)**:
+  - **Non-Blocking Stale Read Emission (T014, T019)**: Decoupled `BookingManagementService` from synchronous recovery by removing `BookingRecoveryService` dependency and `reconcileBookingIfStale()` calls. Reads emit fire-and-forget `booking.reconciliation.requested` with payload `{ bookingId }` only for stale `PROCESSING` bookings (>15m) without awaiting provider repair. Preserved immediate inline local `checkAndCompleteBooking()`.
+  - **Cache Lock Verification (T016)**: Added unit test suite in `apps/api/src/cache/cache.service.spec.ts` testing atomic lock acquisition with TTL, unique-token ownership, and owner-matched release via Lua scripts under high concurrency and failure cases.
+  - **Projection Listener Guard (T017, T022)**: Hardened `BookingProjectionListener` in `apps/api/src/booking-projection/booking-projection.listener.ts` with an early-return guard rejecting non-catalogued events, coordination payloads (e.g. `booking.reconciliation.requested`), missing/empty `eventId`, or undefined `sourceVersion` before `try/finally` latency tracking, ensuring strictly zero hydrations, upserts, or metric emissions.
+  - **Module Decoupling (T023)**: Refactored `BookingManagementModule` to import `BookingStateModule` directly rather than `BookingLifecycleModule`, isolating the read path from background reconciliation and recovery cron jobs.
+- **Verification & Review Remediations**:
+  - Replaced all `any` usages in `booking-projection.listener.spec.ts` with `as unknown as DomainEventBase` and strongly typed helpers (`ListenerPrivateMembers`), achieving zero `any` across the test suite.
+  - All unit test suites passed (`booking-management.service.spec.ts`, `cache.service.spec.ts`, `booking-projection.listener.spec.ts`).
+  - Strict boundary respected: Task T020 retained for Slice 2 scope.
+
+### Feature 025 — Booking Umbrella Deletion: Phase 1 Setup & Phase 3 US1 MVP Complete (Tasks T001–T013 Implemented) (2026-09-21)
+
+- **Phase 1 (Setup) & Phase 2 (Foundational) Verified (T001–T004)**:
+  - Verified Feature 024's `BookingStateModule`, `EventEmitterModule.forRoot`, and `CacheService.acquireLock` / `releaseLock` (Lua owner validation).
+  - Reconciled contracts in `specs/025-booking-umbrella-deletion/contracts/` with plan and ADR.
+  - Baseline tests confirmed passing; confirmed no Prisma schema changes or migrations needed.
+- **Phase 3 User Story 1 (Domain-Owned Booking Controllers) Delivered (T005–T013)**:
+  - Created `BookingManagementController` in `apps/api/src/booking-management/` (`GET /bookings`, `GET /bookings/:bookingId`) with `JwtAuthGuard` and `ParseUUIDPipe`.
+  - Created `CancellationController` in `apps/api/src/cancellation/` (`GET /bookings/:bookingId/cancellation`, `POST /bookings/:bookingId/cancellation-quote`, `POST /bookings/:bookingId/cancel`).
+  - Registered controllers in `BookingManagementModule` and `CancellationModule`.
+  - Directly registered both domain modules in `AppModule` and removed `BookingModule`.
+  - Deleted obsolete umbrella files in `apps/api/src/booking/` (`booking.module.ts`, `booking.controller.ts`, `booking.controller.spec.ts`, `booking/dto/*`).
+  - Updated characterization E2E suite (`booking-characterization.e2e-spec.ts`) and `app.module.spec.ts` asserting domain controller registration and zero references to `BookingModule`.
+- **Dual-Axis Review Remediated**:
+  - Replaced `interface AuthenticatedRequest` with `type AuthenticatedRequest` per `code-standards.md`.
+  - Added unit test metadata checks for guards and pipes.
+  - Verified clean compilation, typecheck, lint (0 errors, 0 warnings), and test passes.
+
+### Feature 024 — Event-Driven Module Deepening: Complete & Verified (Tasks T001–T047 100% Implemented) (2026-09-19)
+
+- Complete delivery across all 6 phases and convergence: US1 (Payment Fulfillment extraction), US2 (Event-Driven Safe Booking Projection), US3 (Projection Keyset Keconciliation & Repair), Phase 6 (Closure & Gate Validation), Phase 7 (Convergence Remediation).
+- T041 mutation/import census and module boot verification passed 27/27 tests.
+- T042 Gate Validation Matrix passed with exit code 0:
+  - Static CI contract: 23/23 passed.
+  - Lint & typecheck: 0 warnings, 0 errors.
+  - Shared types tests: 110/110 passed.
+  - Network-guarded API unit Jest (`--runInBand`): 112/112 suites, 1,806/1,806 passed; `FlightMatchScorerService` optimized to p95 0.34ms (<1ms).
+  - Database E2E Matrix: 6/6 suites, 88/88 passed (payment-fulfillment, module-deepening, booking-events, reconciliation, version-migration, backfill).
+  - Controlled-Provider Smoke (`test:smoke:all`): 20/20 passed (smoke 8/8, sanity 12/12).
+- T043 synchronized `context/architecture.md`, `context/code-standards.md`, `context/library-docs.md`, and this tracker.
+- T044 Dual-Axis Review completed; all HIGH/CRITICAL and MEDIUM findings remediated and verified (T045 atomic Redis pass updates, T046 bounded unknown-event logging, T047 removal of `any`).
+- All tasks T001–T047 marked complete `[x]`. Feature is fully verified and ready for merge into `development`.
 
 ### Feature 024 — Event-Driven Module Deepening: Phase 5 Slice 2 (Tasks T038, T039, T040 - US3 Completed) (2026-09-18)
 
@@ -29,7 +138,7 @@
 - **T040 [US3] Operational Runbook & Quickstart Integration**:
   - Authored authoritative operational runbook in `docs/runbooks/booking-projection-reconciliation.md` covering architecture, keyset mechanics, poison pill triage, multi-replica safety, diagnostic SQL/PowerShell commands, and safe rollback/reactivation without financial data modification.
   - Linked runbook in `specs/024-event-driven-module-deepening/quickstart.md`.
-  - Phase 5 (User Story 3: Repair and operate projections) is now fully complete. Phase 6 remains unstarted.
+  - Phase 5 (User Story 3: Repair and operate projections) is now fully complete. Phase 6 closure is in progress; T041 and T042 remain pending, final T044 review remains pending, and T043 synchronizes project context.
 - **Verification**:
   - `pnpm exec eslint "apps/api/src/booking-projection/**/*.ts" --max-warnings 0` passed (0 errors, 0 warnings).
   - `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` passed (0 errors).
@@ -188,7 +297,7 @@
   - `pnpm exec eslint "apps/api/**/*.ts" --max-warnings 0` passed (0 errors, 0 warnings).
   - `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` passed (0 errors).
   - `pnpm --filter @api/backend test -- apps/api/src/disruption/ apps/api/src/refund-settlement/ apps/api/src/payment/ apps/api/src/booking-lifecycle/` passed (36 suites, 339/339 tests passed, exit code 0).
-  - Slice 6 (Tasks T031–T034) remains unstarted.
+  - Slice 6 (Tasks T031–T034) is complete; see the dedicated Phase 4 entry above.
 
 ### Feature 024 — Event-Driven Module Deepening: Phase 4 Slice 4 (Tasks T024, T025, T026) Completed (2026-09-17)
 
@@ -537,7 +646,7 @@
 
 ### Feature 024 — Event-Driven Module Deepening: Planning (2026-09-16)
 
-- Specification, implementation plan, research, data model, two internal contracts, validation guide and 44 unstarted tasks created in `specs/024-event-driven-module-deepening/`.
+- Specification, implementation plan, research, data model, two internal contracts, validation guide and 44 planned tasks were created in `specs/024-event-driven-module-deepening/`; implementation evidence through T040 is recorded above.
 - Scope: payment saga/idempotency extraction and event-driven booking projections based on the two recorded grilling sessions.
 - Luna exploration and two Luna MAX convergence reviews completed. After revisions, both targeted rechecks reported zero unresolved CRITICAL/HIGH/MEDIUM/LOW findings; evidence is in `specs/024-event-driven-module-deepening/reviews/convergence.md`.
 

@@ -131,7 +131,7 @@ test('T037.1: routes.json covers all required Section 2 inventory routes', () =>
     { path: '/flights/:id', method: 'GET' },
     { path: '/bookings', method: 'GET' },
     { path: '/bookings/:id', method: 'GET' },
-    { path: '/bookings/:id/cancel', method: 'POST' },
+    { path: '/bookings/:id/cancellation', method: 'POST' },
     { path: '/bookings/handoffs/resolve', method: 'POST' },
     { path: '/bookings/intent', method: 'POST' },
     { path: '/bookings/intent/:id', method: 'GET' },
