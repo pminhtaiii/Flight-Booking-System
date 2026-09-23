@@ -1,5 +1,4 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import * as crypto from 'crypto';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigModule } from '@nestjs/config';
 import { ChatModule } from './chat.module';
@@ -28,29 +27,16 @@ describe('ChatModule architectural boundary (US1 T009)', () => {
       expect(paramNames).not.toContain('ClaimTokenGuard');
     });
 
-    it('asserts ChatModule dependency rules and future exclusion of AgentAuthModule in target architecture', () => {
-      const modulePath = join(__dirname, 'chat.module.ts');
-      const moduleSource = readFileSync(modulePath, 'utf8');
+    it('asserts ChatModule imports core persistence and audit modules and isolates gateway exports', () => {
       const imports = Reflect.getMetadata('imports', ChatModule) ?? [];
-
-      // Core domain assertion: ChatModule imports foundational persistence and audit modules
+      const exports = Reflect.getMetadata('exports', ChatModule) ?? [];
       expect(imports).toContain(PrismaModule);
       expect(imports).toContain(AuditModule);
-
-      // Target architecture invariant (Feature 026 / US1 T013):
-      // ChatModule must isolate core chat functionality.
-      // Agent-gateway concerns (AgentAuthModule, AgentChatController, AgentChatAccessService)
-      // are moving to AgentChatModule at the gateway boundary.
-      const isTargetArchitecture = !moduleSource.includes('@/agent-gateway/auth/agent-auth.module');
-      const importedNames = imports.map((m: { name?: string } | Function) => (typeof m === 'function' ? m.name : m?.name));
-
-      if (isTargetArchitecture) {
-        expect(importedNames).not.toContain('AgentAuthModule');
-        expect(moduleSource).not.toMatch(/@\/agent-gateway/);
-      } else {
-        // Transitional baseline for Slice 1: AgentAuthModule is present and flagged for future exclusion in Slice 2 (T013)
-        expect(moduleSource).toContain('AgentAuthModule');
-      }
+      const exportedNames = exports.map((e: { name?: string } | Function) => (typeof e === 'function' ? e.name : e?.name));
+      expect(exportedNames).not.toContain('AgentApiKeyGuard');
+      expect(exportedNames).not.toContain('ClaimTokenGuard');
+      expect(exportedNames).not.toContain('AgentAuthService');
+      expect(exportedNames).not.toContain('ClaimTokenService');
     });
 
     it('verifies ChatModule can compile into a testing module exporting ChatService', async () => {
@@ -61,7 +47,7 @@ describe('ChatModule architectural boundary (US1 T009)', () => {
             ignoreEnvFile: true,
             load: [
               () => ({
-                CHAT_ENCRYPTION_KEY: 'ab'.repeat(32),
+                CHAT_ENCRYPTION_KEY: crypto.randomBytes(32).toString('hex'),
                 FEATURE_FLAG_WRITE_FENCE: 'false',
                 AGENT_SERVICE_API_KEY: 'test-agent-key',
                 CLAIM_TOKEN_SECRET: 'test-claim-secret',

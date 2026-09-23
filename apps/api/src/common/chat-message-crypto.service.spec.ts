@@ -10,6 +10,10 @@ import {
 describe('ChatMessageCryptoService (common)', () => {
   let service: ChatMessageCryptoService;
   const TEST_KEY_HEX = crypto.randomBytes(32).toString('hex');
+  const randomHex = (bytes: number): string => crypto.randomBytes(bytes).toString('hex');
+  const mockNonce = (): string => randomHex(12);
+  const mockAuthTag = (): string => randomHex(16);
+  const mockCiphertext = (): string => randomHex(16);
 
   const createServiceWithKey = async (
     key: string | null = TEST_KEY_HEX,
@@ -122,7 +126,9 @@ describe('ChatMessageCryptoService (common)', () => {
       const aad = 'ChatMessage:msg-4:session-100:USER:STANDARD:v1';
 
       const encrypted = await service.encrypt(plaintext, aad);
-      const tamperedCiphertext = 'bad' + encrypted.ciphertext.slice(3);
+      const tamperedCiphertext =
+        encrypted.ciphertext.slice(0, -2) +
+        (encrypted.ciphertext.endsWith('00') ? 'ff' : '00');
 
       await expect(
         service.decrypt(
@@ -249,9 +255,9 @@ describe('ChatMessageCryptoService (common)', () => {
           sessionId: 'session-unsupported',
           sender: 'USER',
           type: 'STANDARD',
-          contentCiphertext: 'abcd',
-          contentNonce: '0102030405060708090a0b0c',
-          contentAuthTag: '0102030405060708090a0b0c0d0e0f10',
+          contentCiphertext: mockCiphertext(),
+          contentNonce: mockNonce(),
+          contentAuthTag: mockAuthTag(),
           contentKeyVersion: 2,
         }),
       ).rejects.toThrow(UnsupportedKeyVersionError);
@@ -261,9 +267,9 @@ describe('ChatMessageCryptoService (common)', () => {
       await expect(
         service.decryptSessionTitle({
           id: 'session-unsupported',
-          titleCiphertext: 'abcd',
-          titleNonce: '0102030405060708090a0b0c',
-          titleAuthTag: '0102030405060708090a0b0c0d0e0f10',
+          titleCiphertext: mockCiphertext(),
+          titleNonce: mockNonce(),
+          titleAuthTag: mockAuthTag(),
           titleKeyVersion: 3,
         }),
       ).rejects.toThrow(UnsupportedKeyVersionError);
@@ -281,9 +287,9 @@ describe('ChatMessageCryptoService (common)', () => {
 
       await expect(
         unconfigured.decrypt(
-          '12',
-          '0102030405060708090a0b0c',
-          '0102030405060708090a0b0c0d0e0f10',
+          randomHex(1),
+          mockNonce(),
+          mockAuthTag(),
           'aad',
           1,
         ),
@@ -295,9 +301,9 @@ describe('ChatMessageCryptoService (common)', () => {
           sessionId: 'session-1',
           sender: 'USER',
           type: 'STANDARD',
-          contentCiphertext: 'abcd',
-          contentNonce: '0102030405060708090a0b0c',
-          contentAuthTag: '0102030405060708090a0b0c0d0e0f10',
+          contentCiphertext: mockCiphertext(),
+          contentNonce: mockNonce(),
+          contentAuthTag: mockAuthTag(),
           contentKeyVersion: 1,
         }),
       ).rejects.toThrow(CryptoKeyUnavailableError);
@@ -305,16 +311,16 @@ describe('ChatMessageCryptoService (common)', () => {
       await expect(
         unconfigured.decryptSessionTitle({
           id: 'session-1',
-          titleCiphertext: 'abcd',
-          titleNonce: '0102030405060708090a0b0c',
-          titleAuthTag: '0102030405060708090a0b0c0d0e0f10',
+          titleCiphertext: mockCiphertext(),
+          titleNonce: mockNonce(),
+          titleAuthTag: mockAuthTag(),
           titleKeyVersion: 1,
         }),
       ).rejects.toThrow(CryptoKeyUnavailableError);
     });
 
     it('throws CryptoKeyUnavailableError when key length is invalid', async () => {
-      const shortKey = await createServiceWithKey('abcdef1234');
+      const shortKey = await createServiceWithKey(randomHex(5));
       await expect(shortKey.encrypt('hello', 'aad')).rejects.toThrow(
         CryptoKeyUnavailableError,
       );
@@ -383,9 +389,9 @@ describe('ChatMessageCryptoService (common)', () => {
         sessionId: 'session-err',
         sender: 'USER',
         type: 'STANDARD',
-        contentCiphertext: 'badciphertext1234',
-        contentNonce: '0102030405060708090a0b0c',
-        contentAuthTag: '0102030405060708090a0b0c0d0e0f10',
+        contentCiphertext: mockCiphertext(),
+        contentNonce: mockNonce(),
+        contentAuthTag: mockAuthTag(),
         contentKeyVersion: 1,
       };
 
@@ -429,9 +435,9 @@ describe('ChatMessageCryptoService (common)', () => {
       await expect(
         service.decryptSessionTitle({
           id: 'session-corrupt',
-          titleCiphertext: 'badtitle1234',
-          titleNonce: '0102030405060708090a0b0c',
-          titleAuthTag: '0102030405060708090a0b0c0d0e0f10',
+          titleCiphertext: mockCiphertext(),
+          titleNonce: mockNonce(),
+          titleAuthTag: mockAuthTag(),
           titleKeyVersion: 1,
         }),
       ).rejects.toThrow(/Failed to decrypt ChatSession title/);
@@ -441,9 +447,9 @@ describe('ChatMessageCryptoService (common)', () => {
       await expect(
         service.decryptSessionTitle({
           id: 'session-incomplete',
-          titleCiphertext: 'abcd',
+          titleCiphertext: mockCiphertext(),
           titleNonce: null,
-          titleAuthTag: '0102030405060708090a0b0c0d0e0f10',
+          titleAuthTag: mockAuthTag(),
           titleKeyVersion: 1,
         }),
       ).rejects.toThrow(

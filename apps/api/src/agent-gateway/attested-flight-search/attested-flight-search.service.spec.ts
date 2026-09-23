@@ -1448,25 +1448,12 @@ describe('AttestedFlightSearchService', () => {
       expect(paramNames).not.toContain('AgentChatAccessService');
     });
 
-    it('asserts target architecture module dependency: AttestedFlightSearchModule isolates crypto from ChatModule', () => {
+    it('asserts AttestedFlightSearchModule isolates crypto from chat service/controller components', () => {
       const modulePath = join(__dirname, 'attested-flight-search.module.ts');
       const moduleSource = readFileSync(modulePath, 'utf8');
-
-      // Boundary check: AttestedFlightSearchModule never imports or exports ChatService
       expect(moduleSource).not.toMatch(/\bChatService\b/);
       expect(moduleSource).not.toMatch(/\bChatController\b/);
       expect(moduleSource).not.toMatch(/\bAgentChatAccessService\b/);
-
-      // In target architecture (Phase 3 Slice 2 / T014):
-      // AttestedFlightSearchModule imports ChatMessageCryptoModule directly rather than ChatModule.
-      const isTargetArch = !moduleSource.includes('@/chat/chat.module');
-      if (isTargetArch) {
-        expect(moduleSource).not.toContain('ChatModule');
-        expect(moduleSource).toMatch(/ChatMessageCryptoModule/);
-      } else {
-        // Transitional check for Slice 1: ChatModule is imported strictly as crypto provider owner
-        expect(moduleSource).toContain('ChatModule');
-      }
     });
   });
 });

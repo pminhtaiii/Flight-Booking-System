@@ -1,3 +1,4 @@
+import * as crypto from 'crypto';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { ServiceUnavailableException } from '@nestjs/common';
@@ -43,6 +44,7 @@ describe('Attested flight search persistence boundary', () => {
   let transaction: jest.Mock;
   let duffelSearch: jest.Mock<Promise<SupplierResult>>;
   let savedEncryptionKey: string | undefined;
+  let savedChatEncryptionKey: string | undefined;
 
   const request = {
     chatSessionId: 'session-1',
@@ -52,7 +54,10 @@ describe('Attested flight search persistence boundary', () => {
 
   beforeEach(async () => {
     savedEncryptionKey = process.env.ENCRYPTION_KEY;
-    process.env.ENCRYPTION_KEY = 'ab'.repeat(32);
+    savedChatEncryptionKey = process.env.CHAT_ENCRYPTION_KEY;
+    const testKey = crypto.randomBytes(32).toString('hex');
+    process.env.ENCRYPTION_KEY = testKey;
+    process.env.CHAT_ENCRYPTION_KEY = testKey;
     commit = deferred();
     transactionStarted = deferred();
     const committed = new Map<string, Prisma.FlightOfferCreateManyInput>();
@@ -142,7 +147,7 @@ describe('Attested flight search persistence boundary', () => {
             ATTESTATION_SECRET: 'attestation-test-secret',
             CHAT_HANDOFF_SECRET: 'handoff-test-secret',
             FEATURE_FLAG_CHAT_HANDOFF_ISSUE: 'true',
-            CHAT_ENCRYPTION_KEY: 'ab'.repeat(32),
+            CHAT_ENCRYPTION_KEY: testKey,
           }),
         },
         { provide: CacheService, useValue: {} },
@@ -185,6 +190,8 @@ describe('Attested flight search persistence boundary', () => {
     await module.close();
     if (savedEncryptionKey === undefined) delete process.env.ENCRYPTION_KEY;
     else process.env.ENCRYPTION_KEY = savedEncryptionKey;
+    if (savedChatEncryptionKey === undefined) delete process.env.CHAT_ENCRYPTION_KEY;
+    else process.env.CHAT_ENCRYPTION_KEY = savedChatEncryptionKey;
   });
 
   it.each([false, true])(
