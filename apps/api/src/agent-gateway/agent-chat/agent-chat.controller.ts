@@ -17,7 +17,7 @@ import { AgentApiKeyGuard } from '@/agent-gateway/auth/agent-api-key.guard';
 import { ClaimTokenGuard } from '@/agent-gateway/auth/claim-token.guard';
 import { ChatService } from '@/chat/chat.service';
 import { AgentChatAccessService, CheckUserAccessDto } from './agent-chat-access.service';
-import { MemoryQueryDto } from './dto/memory-query.dto';
+import { MemoryQueryDto } from '@/chat/dto/memory-query.dto';
 import { MessageSender, MessageType } from '@prisma/client';
 
 export interface AuthenticatedRequest extends Request {

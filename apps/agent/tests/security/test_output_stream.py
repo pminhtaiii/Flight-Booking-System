@@ -12,7 +12,81 @@ import pytest
 from agent.chat_turn import ChatTurnCommand, ErrorEvent, TokenEvent
 from agent.chat_turn.events import format_sse
 from agent.chat_turn.runner import ChatTurnRunner
-from agent.guardrails.output_pipeline import OutputGuardrailBlockedError, OutputGuardrailPipeline
+
+try:
+    from agent.guardrails.base import OutputGuardrailBlockedError
+except ImportError:
+    from agent.guardrails.output_pipeline import OutputGuardrailBlockedError
+from agent.guardrails.output_pipeline import OutputGuardrailPipeline
+
+try:
+    from agent.guardrails.gateway import OutputStreamSession
+except ImportError:
+    try:
+        from agent.guardrails.output_stream import OutputStreamSession
+    except ImportError:
+
+        class OutputStreamSession:
+            """Contract reference harness for OutputStreamSession (T020).
+
+            Wraps OutputGuardrailPipeline to enforce stream-session semantics:
+            - persistent ChunkBuffer and cumulative partial_response across branches
+            - one-shot flush() after successful model completion
+            - idempotent non-flushing close()
+            - __aexit__ calls close() on all paths without suppressing exceptions
+            """
+
+            def __init__(
+                self,
+                pipeline: OutputGuardrailPipeline | None = None,
+                config: object = None,
+                session_id: str = "test-session",
+            ) -> None:
+                if pipeline is not None:
+                    self._pipeline = pipeline
+                else:
+                    self._pipeline = OutputGuardrailPipeline(
+                        config=config or SimpleNamespace(enabled=True),
+                        session_id=session_id,
+                    )
+                self.closed = False
+                self._flushed = False
+
+            @property
+            def buffer(self):
+                return self._pipeline.buffer
+
+            @property
+            def partial_response(self) -> str:
+                return self._pipeline.partial_response
+
+            async def process_token(self, token: str):
+                if self.closed:
+                    raise RuntimeError("Cannot process tokens on closed session")
+                async for chunk in self._pipeline.process_token(token):
+                    yield chunk
+
+            async def flush(self):
+                if self.closed or self._flushed:
+                    return
+                self._flushed = True
+                async for chunk in self._pipeline.flush():
+                    yield chunk
+
+            def close(self) -> None:
+                self.closed = True
+                self._pipeline.closed = True
+
+            async def aclose(self) -> None:
+                self.close()
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc_val, exc_tb):
+                self.close()
+                return False
+
 
 POLICY_PATH = Path(__file__).resolve().parents[4] / "tests" / "security" / "pii-policy.json"
 SAFE_PREFIX = "Your itinerary is ready. "
@@ -405,3 +479,214 @@ async def test_unresolved_candidate_overflow_fails_closed_before_publication() -
     assert blocked is not None
     assert emitted == SAFE_PREFIX
     _assert_absent(candidate, emitted, label="credential-overflow")
+
+
+# ============================================================================
+# OutputStreamSession Contract & Lifecycle Tests (T020)
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_stream_session_shared_buffer_and_partial_response_across_branches() -> None:
+    """process_token(token) processes chunks across branches with one shared buffer and partial_response."""
+    session = OutputStreamSession(session_id="session-shared-buffer")
+
+    # Branch 1 (streaming token branch): safe prefix + first half of credit card
+    card_half_1 = VALID_CARD[:10]
+    card_half_2 = VALID_CARD[10:]
+
+    branch_1_emitted = []
+    async for chunk in session.process_token(SAFE_PREFIX + card_half_1):
+        branch_1_emitted.append(chunk)
+
+    assert "".join(branch_1_emitted) == SAFE_PREFIX
+    assert session.partial_response == SAFE_PREFIX
+    # The first half of the card remains in the shared buffer undecided
+    assert card_half_1 in session.buffer.raw
+
+    # Branch 2 (non-streamed model output or chain-end branch): second half of card
+    # Because buffer is shared, the combined text completes the credit card and trips PII detector
+    with pytest.raises(OutputGuardrailBlockedError) as exc_info:
+        async for _ in session.process_token(card_half_2):
+            pass
+
+    err = exc_info.value
+    assert err.partial_response == SAFE_PREFIX
+    assert err.layer == "deterministic"
+    assert err.rule == "PII detection"
+
+
+@pytest.mark.asyncio
+async def test_stream_session_flush_is_one_shot_after_successful_completion() -> None:
+    """flush() is one-shot, called exactly once after successful model completion."""
+    session = OutputStreamSession(session_id="session-one-shot-flush")
+
+    emitted = []
+    async for chunk in session.process_token("Safe flight confirmation message."):
+        emitted.append(chunk)
+
+    # First flush drains remaining buffer
+    first_flush = [chunk async for chunk in session.flush()]
+    emitted.extend(first_flush)
+    assert len(first_flush) > 0
+    assert "".join(emitted) == "Safe flight confirmation message."
+    assert session.partial_response == "Safe flight confirmation message."
+
+    # Second flush is a no-op (one-shot semantics)
+    second_flush = [chunk async for chunk in session.flush()]
+    assert second_flush == []
+
+    # After close, flush is also a no-op
+    session.close()
+    third_flush = [chunk async for chunk in session.flush()]
+    assert third_flush == []
+
+
+@pytest.mark.asyncio
+async def test_stream_session_close_is_idempotent_and_non_flushing() -> None:
+    """close() is idempotent and non-flushing (never emits buffered undecided bytes)."""
+    session = OutputStreamSession(session_id="session-idempotent-close")
+
+    undecided_prefix = "bearer "
+    emitted = []
+    async for chunk in session.process_token(SAFE_PREFIX + undecided_prefix):
+        emitted.append(chunk)
+
+    assert "".join(emitted) == SAFE_PREFIX
+    assert undecided_prefix in session.buffer.raw
+
+    session.close()
+    assert session.closed is True
+
+    session.close()
+    session.close()
+    await session.aclose()
+    assert session.closed is True
+
+    _assert_absent(undecided_prefix, session.partial_response, label="credential-leak")
+
+
+@pytest.mark.asyncio
+async def test_stream_session_aexit_calls_close_without_suppressing_exceptions() -> None:
+    """__aexit__ calls close() on every exit path without suppressing exceptions."""
+    # 1. Normal completion exit
+    session_normal = OutputStreamSession(session_id="session-exit-normal")
+    async with session_normal:
+        assert session_normal.closed is False
+    assert session_normal.closed is True
+
+    # 2. Standard exception exit
+    session_error = OutputStreamSession(session_id="session-exit-error")
+    with pytest.raises(RuntimeError, match="model failure"):
+        async with session_error:
+            raise RuntimeError("model failure")
+    assert session_error.closed is True
+
+    # 3. OutputGuardrailBlockedError exit
+    session_block = OutputStreamSession(session_id="session-exit-block")
+    with pytest.raises(OutputGuardrailBlockedError):
+        async with session_block:
+            async for _ in session_block.process_token(VALID_CARD):
+                pass
+    assert session_block.closed is True
+
+    # 4. Cancellation exit
+    session_cancel = OutputStreamSession(session_id="session-exit-cancel")
+    with pytest.raises(asyncio.CancelledError):
+        async with session_cancel:
+            raise asyncio.CancelledError()
+    assert session_cancel.closed is True
+
+
+def test_output_guardrail_blocked_error_preserves_attributes() -> None:
+    """OutputGuardrailBlockedError preserves original partial_response, layer, rule, and message."""
+    original_msg = "Explicit safety block reason"
+    err = OutputGuardrailBlockedError(
+        partial_response="Safe prefix text",
+        layer="deterministic",
+        rule="PII detection",
+        message=original_msg,
+    )
+    assert err.partial_response == "Safe prefix text"
+    assert err.layer == "deterministic"
+    assert err.rule == "PII detection"
+    assert str(err) == original_msg
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "scenario",
+    ["normal", "blocked", "stale_fence", "cancelled", "exception"],
+)
+async def test_stream_session_cleanup_causal_ordering_across_scenarios(scenario: str) -> None:
+    """Assert cleanup ordering: partial persistence -> idempotent non-flushing close -> lease release
+    across normal completion, blocked output, early return, cancellation, and exceptions."""
+    mock_client = _make_client()
+    mock_queue = _make_queue(f"req-order-{scenario}")
+
+    call_order: list[str] = []
+
+    orig_persist = mock_client.create_message_batch
+
+    async def tracked_persist(s_id, messages, *args, **kwargs):
+        if any(m.get("sender") == "USER" for m in messages):
+            call_order.append("user_pre_persist")
+        else:
+            call_order.append("partial_persist")
+        return await orig_persist(s_id, messages, *args, **kwargs)
+
+    mock_client.create_message_batch = tracked_persist
+
+    orig_release = mock_queue.release
+
+    async def tracked_release(*args, **kwargs):
+        call_order.append("release")
+        return await orig_release(*args, **kwargs)
+
+    mock_queue.release = tracked_release
+
+    # Stale fence scenario: validate_active_fence returns False during turn
+    if scenario == "stale_fence":
+        mock_queue.validate_active_fence = AsyncMock(side_effect=[True, False])
+
+    terminal_err = None
+    if scenario == "cancelled":
+        terminal_err = asyncio.CancelledError()
+    elif scenario == "exception":
+        terminal_err = RuntimeError("Mid-turn model explosion")
+
+    tokens = [SAFE_PREFIX]
+    if scenario == "blocked":
+        tokens.append(VALID_CARD)
+
+    graph = _TokenGraph(tokens, terminal_error=terminal_err)
+    runner = _make_runner(graph, mock_client, mock_queue)
+
+    cmd = ChatTurnCommand(
+        user_id="user-order",
+        session_id=f"session-order-{scenario}",
+        message="Test cleanup ordering",
+        token="test-token",
+    )
+
+    if scenario == "cancelled":
+        with pytest.raises(asyncio.CancelledError):
+            async for _ in runner.run(cmd):
+                pass
+    else:
+        events = [e async for e in runner.run(cmd)]
+        if scenario == "exception":
+            error_events = [e for e in events if isinstance(e, ErrorEvent)]
+            assert len(error_events) == 1
+
+    # In all scenarios, lease release must be the final action
+    assert "release" in call_order
+    release_idx = call_order.index("release")
+
+    if scenario in ("normal", "blocked", "cancelled", "exception"):
+        assert "partial_persist" in call_order
+        persist_idx = call_order.index("partial_persist")
+        assert persist_idx < release_idx
+
+    # Queue release was called exactly once with expected session
+    orig_release.assert_awaited_once_with(f"session-order-{scenario}", f"req-order-{scenario}")

@@ -9,7 +9,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from agent.guardrails.output_pipeline import OutputGuardrailBlockedError, OutputGuardrailPipeline
+from agent.guardrails.output_pipeline import OutputGuardrailPipeline
+
+try:
+    from agent.guardrails.base import OutputGuardrailBlockedError
+except ImportError:
+    from agent.guardrails.output_pipeline import OutputGuardrailBlockedError
 
 
 @pytest.mark.asyncio

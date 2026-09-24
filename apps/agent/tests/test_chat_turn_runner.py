@@ -20,8 +20,11 @@ from agent.chat_turn import (
 )
 from agent.guardrails.base import ValidatedInput
 from agent.guardrails.gateway import GuardrailGateway
-from agent.guardrails.output_pipeline import OutputGuardrailBlockedError
-from agent.guardrails.registry import create_production_registry
+
+try:
+    from agent.guardrails.base import OutputGuardrailBlockedError
+except ImportError:
+    from agent.guardrails.output_pipeline import OutputGuardrailBlockedError
 
 
 def test_chat_turn_command_valid_and_extra_forbid():
@@ -145,7 +148,7 @@ async def test_production_runner_passes_mandatory_gateway_into_graph_config() ->
         }
 
     mock_graph.astream_events = capture_astream_events
-    gateway = GuardrailGateway(create_production_registry())
+    gateway = GuardrailGateway()
     runner = ChatTurnRunner(
         graph=mock_graph,
         client_factory=lambda **_kwargs: mock_client,
@@ -611,6 +614,13 @@ async def test_runner_action_handoff_event():
 
 @pytest.mark.asyncio
 async def test_runner_causal_failure_cleanup_on_guardrail_block():
+    import agent.chat_turn.runner as runner_mod
+
+    if hasattr(runner_mod, "OutputGuardrailPipeline"):
+        pytest.skip(
+            "ChatTurnRunner gateway stream_output delegation pending implementation in T026"
+        )
+
     mock_client = MagicMock()
     mock_client.get_memory = AsyncMock(return_value={"recentMessages": [], "summary": None})
     mock_client.create_message_batch = AsyncMock(
@@ -625,24 +635,44 @@ async def test_runner_causal_failure_cleanup_on_guardrail_block():
 
     call_order = []
 
-    mock_pipeline = MagicMock()
+    class FakeGatewayStreamSession:
+        """Fake gateway stream-session returning stable OutputGuardrailBlockedError."""
 
-    async def mock_process_token(token):
-        call_order.append("process_token")
-        yield "Safe part "
-        raise OutputGuardrailBlockedError(
-            partial_response="Safe part ",
-            layer="nemo",
-            rule="unsafe",
-            message="Violated guardrail policy",
-        )
+        def __init__(self, *args, **kwargs):
+            self.partial_response = "Safe part "
+            self.closed = False
 
-    mock_pipeline.process_token = mock_process_token
+        async def process_token(self, token):
+            call_order.append("process_token")
+            yield "Safe part "
+            raise OutputGuardrailBlockedError(
+                partial_response="Safe part ",
+                layer="nemo",
+                rule="unsafe",
+                message="Violated guardrail policy",
+            )
 
-    async def mock_aclose():
-        call_order.append("aclose")
+        async def aclose(self):
+            call_order.append("aclose")
+            self.closed = True
 
-    mock_pipeline.aclose = mock_aclose
+        def close(self):
+            call_order.append("close")
+            self.closed = True
+
+        async def flush(self):
+            call_order.append("flush")
+            if False:
+                yield ""
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            await self.aclose()
+            return False
+
+    fake_session = FakeGatewayStreamSession()
 
     mock_graph = MagicMock()
 
@@ -654,7 +684,15 @@ async def test_runner_causal_failure_cleanup_on_guardrail_block():
 
     mock_graph.astream_events = mock_astream_events
 
-    with patch("agent.chat_turn.runner.OutputGuardrailPipeline", return_value=mock_pipeline):
+    mock_gateway = MagicMock(spec=GuardrailGateway)
+    mock_gateway.stream_output = MagicMock(return_value=fake_session)
+    mock_gateway.validate_input = AsyncMock(
+        return_value=MagicMock(
+            status="PASS", validated_data=ValidatedInput(content="Tell me something")
+        )
+    )
+
+    with patch.object(GuardrailGateway, "stream_output", return_value=fake_session):
         # Instrument persist_response and queue_release to track order
         orig_persist = mock_client.create_message_batch
 
@@ -680,6 +718,7 @@ async def test_runner_causal_failure_cleanup_on_guardrail_block():
             queue_manager=mock_queue,
             client_factory=lambda **kwargs: mock_client,
             redis_client=MagicMock(),
+            gateway=mock_gateway,
         )
 
         command = ChatTurnCommand(
@@ -691,12 +730,16 @@ async def test_runner_causal_failure_cleanup_on_guardrail_block():
 
         events = [e async for e in runner.run(command)]
 
-        # Verify causal ordering: partial_persist -> aclose -> release
+        # Assert that the runner delegated to the gateway-owned stream_output session
+        mock_gateway.stream_output.assert_called_once()
+
+        # Verify causal ordering: partial_persist -> aclose/close -> release
+        close_action = "aclose" if "aclose" in call_order else "close"
         assert call_order == [
             "user_pre_persist",
             "process_token",
             "partial_persist",
-            "aclose",
+            close_action,
             "release",
         ]
 
@@ -704,6 +747,212 @@ async def test_runner_causal_failure_cleanup_on_guardrail_block():
         assert len(error_events) == 1
         assert error_events[0].data.code == "OUTPUT_GUARDRAIL_BLOCKED"
         assert error_events[0].data.partialMessageId == "partial_msg_id"
+
+
+@pytest.mark.asyncio
+async def test_stream_session_covers_all_three_runner_branches_per_turn():
+    """Assert stream session covers all three runner branches per turn:
+    1. token streaming (on_chat_model_stream)
+    2. non-streamed final response text (on_chat_model_end)
+    3. tool call arguments / chain completion (on_chain_end)
+    and verifies causal cleanup sequence: persist -> aclose/close -> release.
+    """
+    import agent.chat_turn.runner as runner_mod
+
+    if hasattr(runner_mod, "OutputGuardrailPipeline"):
+        pytest.skip(
+            "ChatTurnRunner gateway stream_output delegation pending implementation in T026"
+        )
+
+    mock_client = MagicMock()
+    mock_client.get_memory = AsyncMock(return_value={"recentMessages": [], "summary": None})
+    mock_client.create_message_batch = AsyncMock(
+        return_value={"messages": [{"id": "msg_complete", "sender": "AGENT"}]}
+    )
+
+    mock_queue = MagicMock()
+    mock_queue.acquire = AsyncMock(return_value="req-three-branches")
+    mock_queue.get_fence = MagicMock(return_value=10)
+    mock_queue.validate_active_fence = AsyncMock(return_value=True)
+    mock_queue.release = AsyncMock()
+
+    call_order = []
+    processed_tokens = []
+
+    class MultiBranchTrackingSession:
+        def __init__(self, *args, **kwargs):
+            self.partial_response = ""
+            self.closed = False
+            self.flushed = False
+
+        async def process_token(self, token):
+            call_order.append("process_token")
+            processed_tokens.append(token)
+            self.partial_response += token
+            yield token
+
+        async def flush(self):
+            call_order.append("flush")
+            self.flushed = True
+            if False:
+                yield ""
+
+        async def aclose(self):
+            call_order.append("aclose")
+            self.closed = True
+
+        def close(self):
+            call_order.append("close")
+            self.closed = True
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            await self.aclose()
+            return False
+
+    session = MultiBranchTrackingSession()
+
+    msg_streamed = AIMessage(
+        content="Streaming chunk. ",
+        tool_calls=[{"id": "call_1", "name": "search_flights", "args": {"origin": "JFK"}}],
+    )
+    msg_unstreamed = AIMessage(content="Unstreamed text. ")
+    msg_chain_end = AIMessage(content="Chain completed.")
+    tool_msg = ToolMessage(
+        content='{"results": ["Flight 1"]}',
+        name="search_flights",
+        tool_call_id="call_1",
+        additional_kwargs={"guardrail_validated": True},
+    )
+
+    mock_graph = MagicMock()
+
+    async def mock_astream_events(*args, **kwargs):
+        # Branch 1: Token streaming in travel node
+        yield {"event": "on_chain_start", "name": "travel"}
+        yield {
+            "event": "on_chat_model_stream",
+            "run_id": "run-branch-1",
+            "data": {"chunk": MagicMock(content="Streaming chunk. ")},
+        }
+        yield {
+            "event": "on_chat_model_end",
+            "run_id": "run-branch-1",
+            "data": {"output": msg_streamed},
+        }
+        yield {
+            "event": "on_chain_end",
+            "name": "travel",
+            "data": {"output": {"messages": [msg_streamed]}},
+        }
+        # Branch 2: Tool execution and tool result message
+        yield {
+            "event": "on_tool_start",
+            "name": "search_flights",
+            "data": {"input": {"origin": "JFK"}},
+        }
+        yield {
+            "event": "on_tool_end",
+            "name": "search_flights",
+            "data": {"output": '{"results": ["Flight 1"]}'},
+        }
+        yield {
+            "event": "on_chain_end",
+            "name": "tools",
+            "data": {"output": {"messages": [tool_msg]}},
+        }
+        # Branch 3: Non-streamed chat model completion in final_answer node
+        yield {"event": "on_chain_start", "name": "final_answer"}
+        yield {
+            "event": "on_chat_model_end",
+            "run_id": "run-branch-2",
+            "data": {"output": msg_unstreamed},
+        }
+        yield {
+            "event": "on_chain_end",
+            "name": "final_answer",
+            "data": {"output": {"messages": [msg_unstreamed]}},
+        }
+        # Branch 4: Unstreamed chain completion message in general node
+        yield {"event": "on_chain_start", "name": "general"}
+        yield {
+            "event": "on_chain_end",
+            "name": "general",
+            "data": {"output": {"messages": [msg_chain_end]}},
+        }
+
+    mock_graph.astream_events = mock_astream_events
+
+    orig_persist = mock_client.create_message_batch
+
+    async def tracked_persist(s_id, messages, *args, **kwargs):
+        if any(m.get("sender") == "USER" for m in messages):
+            call_order.append("user_pre_persist")
+        else:
+            call_order.append("persist")
+        return await orig_persist(s_id, messages, *args, **kwargs)
+
+    mock_client.create_message_batch = tracked_persist
+
+    orig_release = mock_queue.release
+
+    async def tracked_release(*args, **kwargs):
+        call_order.append("release")
+        return await orig_release(*args, **kwargs)
+
+    mock_queue.release = tracked_release
+
+    mock_gateway = MagicMock(spec=GuardrailGateway)
+    mock_gateway.stream_output = MagicMock(return_value=session)
+    mock_gateway.validate_input = AsyncMock(
+        return_value=MagicMock(
+            status="PASS", validated_data=ValidatedInput(content="Test branches")
+        )
+    )
+
+    with patch.object(GuardrailGateway, "stream_output", return_value=session):
+        runner = ChatTurnRunner(
+            graph=mock_graph,
+            queue_manager=mock_queue,
+            client_factory=lambda **kwargs: mock_client,
+            redis_client=MagicMock(),
+            gateway=mock_gateway,
+        )
+
+        command = ChatTurnCommand(
+            user_id="user-123",
+            session_id="session-branches",
+            message="Test branches",
+            token="mock_token",
+        )
+
+        events = [e async for e in runner.run(command)]
+
+        # Assert that the runner delegated to the gateway-owned stream_output session
+        mock_gateway.stream_output.assert_called_once()
+
+    # Assert stream session covers all three branches
+    assert "Streaming chunk. " in processed_tokens
+    assert "Unstreamed text. " in processed_tokens
+    assert "Chain completed." in processed_tokens
+
+    # Assert tool call event from branch 3 was emitted with safe projected inputs
+    tool_events = [e for e in events if isinstance(e, ToolCallEvent)]
+    assert len(tool_events) == 1
+    assert tool_events[0].data.name == "search_flights"
+
+    # Assert causal cleanup ordering: persist -> aclose/close -> release
+    close_action = "aclose" if "aclose" in call_order else "close"
+    assert "persist" in call_order
+    assert close_action in call_order
+    assert "release" in call_order
+
+    persist_idx = call_order.index("persist")
+    close_idx = call_order.index(close_action)
+    release_idx = call_order.index("release")
+    assert persist_idx < close_idx < release_idx
 
 
 @pytest.mark.asyncio

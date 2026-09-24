@@ -45,22 +45,15 @@ FORBIDDEN_SIGNAL_FIXTURES: List[Dict[str, Any]] = [
 
 
 def get_tool_schema(tool_name: str) -> Type[BaseModel]:
-    """Retrieve strict schema for a registered tool.
-
-    Prefers agent.guardrails.tool_schemas if available (T025),
-    falling back to registered tool args_schema.
-    """
-    try:
-        from agent.guardrails import tool_schemas  # type: ignore[import-not-found]
-
-        if hasattr(tool_schemas, "TOOL_SCHEMAS") and tool_name in tool_schemas.TOOL_SCHEMAS:
-            return tool_schemas.TOOL_SCHEMAS[tool_name]
-    except ImportError:
-        pass
-
+    """Retrieve strict schema for a registered tool."""
     tool = get_tool_by_name(tool_name)
     assert tool is not None, f"Tool '{tool_name}' must be registered"
     assert tool.args_schema is not None, f"Tool '{tool_name}' must have args_schema"
+    if "state" in getattr(tool.args_schema, "model_fields", {}):
+        from agent.guardrails.schemas.tools import TOOL_INPUT_SCHEMAS
+
+        if tool_name in TOOL_INPUT_SCHEMAS:
+            return TOOL_INPUT_SCHEMAS[tool_name]
     return tool.args_schema
 
 

@@ -1,11 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { AttestedFlightSearchService } from './attested-flight-search.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
 import { CacheService } from '@/cache/cache.service';
 import { FlightsService } from '@/flights/flights.service';
 import { SelectionAttestationService } from '../selection-attestation.service';
-import { ChatMessageCryptoService } from '@/chat/chat-message-crypto.service';
+import { ChatMessageCryptoService } from '@/common/chat-message-crypto.service';
 import { AgentToolAuditService } from '../audit/agent-tool-audit.service';
 import { HttpException, HttpStatus, ServiceUnavailableException } from '@nestjs/common';
 import { FlightSearchQueryDto } from '../dto/flight-search-query.dto';
@@ -1287,6 +1289,171 @@ describe('AttestedFlightSearchService', () => {
           }
         });
       });
+    });
+  });
+
+  describe('ChatMessageCryptoService contract & provider verification', () => {
+    it('verifies ChatMessageCryptoService contract methods are provided and callable', () => {
+      expect(chatMessageCryptoService).toBeDefined();
+      expect(typeof chatMessageCryptoService.decryptMessageContent).toBe('function');
+      expect(typeof chatMessageCryptoService.isConfigured).toBe('function');
+    });
+
+    it('verifies searchFlightsV2 calls ChatMessageCryptoService.decryptMessageContent when user message exists', async () => {
+      prismaService.chatSession.findFirst.mockResolvedValueOnce({
+        id: 'sess_crypto_contract',
+        userId: 'user-crypto-1',
+        deletedAt: null,
+      });
+      prismaService.chatMessage.findFirst.mockResolvedValueOnce({
+        id: 'msg-crypto-1',
+        sessionId: 'sess_crypto_contract',
+        sender: 'USER',
+        contentCiphertext: 'enc_hex_payload',
+      });
+      chatMessageCryptoService.decryptMessageContent.mockResolvedValueOnce('find cheap flights');
+
+      flightsService.search.mockResolvedValueOnce({
+        mode: 'RANKED',
+        results: [],
+        meta: { totalResults: 0, cached: false, searchHash: 'h' },
+      });
+
+      await service.searchFlightsV2('user-crypto-1', {
+        chatSessionId: 'sess_crypto_contract',
+        search: {
+          origin: 'SGN',
+          destination: 'HAN',
+          date: '2026-09-01',
+          adults: 1,
+        },
+      });
+
+      expect(chatMessageCryptoService.decryptMessageContent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'msg-crypto-1',
+          sessionId: 'sess_crypto_contract',
+          sender: 'USER',
+        }),
+      );
+    });
+
+    it('verifies searchFlightsV2 triggers honest degradation when ChatMessageCryptoService reveals keyword', async () => {
+      prismaService.chatSession.findFirst.mockResolvedValueOnce({
+        id: 'sess_crypto_keyword',
+        userId: 'user-crypto-2',
+        deletedAt: null,
+      });
+      prismaService.chatMessage.findFirst.mockResolvedValueOnce({
+        id: 'msg-crypto-2',
+        sessionId: 'sess_crypto_keyword',
+        sender: 'USER',
+        contentCiphertext: 'enc_hex_payload',
+      });
+      chatMessageCryptoService.decryptMessageContent.mockResolvedValueOnce('I want business class');
+
+      await expect(
+        service.searchFlightsV2('user-crypto-2', {
+          chatSessionId: 'sess_crypto_keyword',
+          search: {
+            origin: 'SGN',
+            destination: 'HAN',
+            date: '2026-09-01',
+            adults: 1,
+          },
+        }),
+      ).rejects.toThrow(HttpException);
+
+      expect(auditService.createLog).toHaveBeenCalledWith(
+        null,
+        expect.objectContaining({
+          userId: 'user-crypto-2',
+          action: 'AGENT_KEYWORD_TRIGGER',
+        }),
+      );
+    });
+
+    it('verifies searchFlightsV2 maps unconfigured crypto provider to 503 ServiceUnavailableException', async () => {
+      prismaService.chatSession.findFirst.mockResolvedValueOnce({
+        id: 'sess_crypto_unconf',
+        userId: 'user-crypto-3',
+        deletedAt: null,
+      });
+      prismaService.chatMessage.findFirst.mockResolvedValueOnce({
+        id: 'msg-crypto-3',
+        sessionId: 'sess_crypto_unconf',
+        sender: 'USER',
+        contentCiphertext: 'enc_hex_payload',
+      });
+      chatMessageCryptoService.isConfigured.mockReturnValueOnce(false);
+      chatMessageCryptoService.decryptMessageContent.mockRejectedValueOnce(
+        new Error('CHAT_ENCRYPTION_KEY is missing'),
+      );
+
+      await expect(
+        service.searchFlightsV2('user-crypto-3', {
+          chatSessionId: 'sess_crypto_unconf',
+          search: {
+            origin: 'SGN',
+            destination: 'HAN',
+            date: '2026-09-01',
+            adults: 1,
+          },
+        }),
+      ).rejects.toThrow(ServiceUnavailableException);
+    });
+
+    it('verifies searchFlightsV2 maps crypto decryption failure to 400 BAD_REQUEST', async () => {
+      prismaService.chatSession.findFirst.mockResolvedValueOnce({
+        id: 'sess_crypto_corrupt',
+        userId: 'user-crypto-4',
+        deletedAt: null,
+      });
+      prismaService.chatMessage.findFirst.mockResolvedValueOnce({
+        id: 'msg-crypto-4',
+        sessionId: 'sess_crypto_corrupt',
+        sender: 'USER',
+        contentCiphertext: 'corrupt_cipher',
+      });
+      chatMessageCryptoService.isConfigured.mockReturnValueOnce(true);
+      chatMessageCryptoService.decryptMessageContent.mockRejectedValueOnce(
+        new Error('Failed to decrypt ChatMessage content'),
+      );
+
+      await expect(
+        service.searchFlightsV2('user-crypto-4', {
+          chatSessionId: 'sess_crypto_corrupt',
+          search: {
+            origin: 'SGN',
+            destination: 'HAN',
+            date: '2026-09-01',
+            adults: 1,
+          },
+        }),
+      ).rejects.toThrow(
+        new HttpException('Unable to decrypt chat message envelope', HttpStatus.BAD_REQUEST),
+      );
+    });
+  });
+
+  describe('Static architecture & module dependency assertions (US1 T009)', () => {
+    it('asserts AttestedFlightSearchService depends on ChatMessageCryptoService contract without depending on ChatService', () => {
+      const paramTypes = Reflect.getMetadata('design:paramtypes', AttestedFlightSearchService) || [];
+      const paramNames = paramTypes.map((t: any) => t?.name);
+
+      expect(paramNames).toContain('ChatMessageCryptoService');
+      expect(paramNames).not.toContain('ChatService');
+      expect(paramNames).not.toContain('ChatController');
+      expect(paramNames).not.toContain('AgentChatController');
+      expect(paramNames).not.toContain('AgentChatAccessService');
+    });
+
+    it('asserts AttestedFlightSearchModule isolates crypto from chat service/controller components', () => {
+      const modulePath = join(__dirname, 'attested-flight-search.module.ts');
+      const moduleSource = readFileSync(modulePath, 'utf8');
+      expect(moduleSource).not.toMatch(/\bChatService\b/);
+      expect(moduleSource).not.toMatch(/\bChatController\b/);
+      expect(moduleSource).not.toMatch(/\bAgentChatAccessService\b/);
     });
   });
 });

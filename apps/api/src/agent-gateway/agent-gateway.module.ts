@@ -6,6 +6,7 @@ import { AttestedFlightSearchModule } from './attested-flight-search/attested-fl
 import { AgentBookingReadinessModule } from './booking-readiness/agent-booking-readiness.module';
 import { SafeBookingReadModule } from './safe-booking-read/safe-booking-read.module';
 import { TravelerPreferencesModule } from './traveler-preferences/traveler-preferences.module';
+import { AgentChatModule } from './agent-chat/agent-chat.module';
 import { PrismaModule } from '@/prisma/prisma.module';
 
 @Module({
@@ -17,6 +18,7 @@ import { PrismaModule } from '@/prisma/prisma.module';
     AgentBookingReadinessModule,
     SafeBookingReadModule,
     TravelerPreferencesModule,
+    AgentChatModule,
   ],
   providers: [SelectionAttestationService],
   exports: [
@@ -27,6 +29,7 @@ import { PrismaModule } from '@/prisma/prisma.module';
     AgentBookingReadinessModule,
     SafeBookingReadModule,
     TravelerPreferencesModule,
+    AgentChatModule,
   ],
 })
 export class AgentGatewayModule {}

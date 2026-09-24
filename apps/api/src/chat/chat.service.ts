@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { CacheService } from '@/cache/cache.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
-import { ChatMessageCryptoService } from './chat-message-crypto.service';
+import { ChatMessageCryptoService } from '@/common/chat-message-crypto.service';
 import { ListSessionsQueryDto } from './dto/list-sessions-query.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { BatchMessagesDto } from './dto/batch-messages.dto';

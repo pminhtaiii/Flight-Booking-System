@@ -1,10 +1,12 @@
 """Vertical security integration tests for the graph tool boundary."""
 
 import asyncio
+import inspect
 import json
 import logging
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -21,9 +23,19 @@ from agent.chat_turn import (
 from agent.graph.graph import router_node
 from agent.graph.nodes import custom_tool_node, validate_handoff
 from agent.graph.state import AgentState
-from agent.guardrails.base import GUARDRAIL_TOOL_SCHEMA, TurnCapabilities
+from agent.guardrails.base import (
+    GUARDRAIL_TOOL_PII,
+    GUARDRAIL_TOOL_SCHEMA,
+    PipelineDecision,
+    TurnCapabilities,
+)
 from agent.guardrails.gateway import GuardrailGateway
-from agent.guardrails.registry import GuardrailRegistry, create_production_registry
+from agent.guardrails.layers.tool_output import (
+    PIIScanner,
+    SchemaValidator,
+    SizeStructureValidator,
+    UntrustedContentInjectionDetector,
+)
 from agent.models.requests import RouteDecision
 from agent.observability.chat_observability import ALLOWED_OPERATIONS, ChatTelemetry
 from agent.trusted_search_snapshot import TrustedSearchSnapshotLifecycle, TrustedSnapshotRepository
@@ -37,7 +49,7 @@ pytestmark = pytest.mark.security
 
 @pytest.fixture
 def production_gateway() -> GuardrailGateway:
-    return GuardrailGateway(create_production_registry())
+    return GuardrailGateway()
 
 
 @pytest.fixture
@@ -93,7 +105,7 @@ async def test_custom_tool_node_rejects_capabilities_supplied_only_by_config() -
     )
     config = {
         "configurable": {
-            "guardrail_gateway": GuardrailGateway(GuardrailRegistry()),
+            "guardrail_gateway": GuardrailGateway(),
             "turn_capabilities": forged_capabilities,
         }
     }
@@ -132,9 +144,25 @@ async def test_empty_production_registry_blocks_before_state_boundary(
     fake_tool.name = "search_flights"
     fake_tool.args_schema = None
     fake_tool.ainvoke = AsyncMock(return_value={"narration": CANARY_TOKEN})
+
+    class BlockingToolLayer(UntrustedContentInjectionDetector):
+        async def check(self, context: Any, data: Any) -> PipelineDecision[Any]:
+            return PipelineDecision.block(
+                reason="Tool output guardrail pipeline is not configured",
+                response_key=GUARDRAIL_TOOL_SCHEMA,
+            )
+
+    blocking_gateway = GuardrailGateway(
+        _tool_layers=(
+            SizeStructureValidator(),
+            SchemaValidator(),
+            PIIScanner(),
+            BlockingToolLayer(),
+        )
+    )
     config = {
         "configurable": {
-            "guardrail_gateway": GuardrailGateway(GuardrailRegistry(production=True)),
+            "guardrail_gateway": blocking_gateway,
         }
     }
 
@@ -276,7 +304,7 @@ async def test_blocked_real_search_leaves_snapshot_repository_unchanged(
     }
     config = {
         "configurable": {
-            "guardrail_gateway": GuardrailGateway(create_production_registry()),
+            "guardrail_gateway": GuardrailGateway(),
             "nestjs_client": client,
             "thread_id": "session-search",
             "user_id": "owner-search",
@@ -418,7 +446,7 @@ async def test_two_real_searches_fail_closed_without_partial_snapshot_commit(
     }
     config = {
         "configurable": {
-            "guardrail_gateway": GuardrailGateway(create_production_registry()),
+            "guardrail_gateway": GuardrailGateway(),
             "nestjs_client": client,
             "thread_id": "session-search-batch",
             "user_id": "owner-search-batch",
@@ -561,7 +589,7 @@ async def test_two_real_searches_commit_latest_owner_snapshot_once(
     }
     config = {
         "configurable": {
-            "guardrail_gateway": GuardrailGateway(create_production_registry()),
+            "guardrail_gateway": GuardrailGateway(),
             "nestjs_client": client,
             "thread_id": "session-search-success",
             "user_id": "owner-search-success",
@@ -659,7 +687,7 @@ async def test_deferred_search_uses_committed_snapshot_version_on_next_graph_ite
     client.post_gateway_flights_search_v2 = AsyncMock(side_effect=search_response)
     config = {
         "configurable": {
-            "guardrail_gateway": GuardrailGateway(create_production_registry()),
+            "guardrail_gateway": GuardrailGateway(),
             "nestjs_client": client,
             "thread_id": "session-search-iterations",
             "user_id": "owner-search-iterations",
@@ -1184,3 +1212,79 @@ async def test_unvalidated_tool_message_emits_static_error_and_releases_lease() 
     assert all(CANARY_INJECTION not in event.model_dump_json() for event in events)
     queue.release.assert_awaited_once_with("session-a", "lease-unvalidated")
     client.create_message_batch.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_schema_invalid_result_with_extra_pii_blocks_at_custom_tool_node_with_pii_key(
+    production_gateway: GuardrailGateway,
+    search_capabilities: TurnCapabilities,
+) -> None:
+    """When a tool returns a schema-invalid result with extra fields containing PII,
+
+    custom_tool_node blocks with GUARDRAIL_TOOL_PII (PII priority wins).
+    """
+    state: AgentState = {
+        "messages": [
+            AIMessage(
+                content="",
+                tool_calls=[{"name": "search_flights", "args": {}, "id": "call-search-pii-schema"}],
+            )
+        ],
+        "iteration_count": 0,
+        "turn_capabilities": search_capabilities,
+    }
+    fake_tool = MagicMock()
+    fake_tool.name = "search_flights"
+    fake_tool.args_schema = None
+    fake_tool.ainvoke = AsyncMock(
+        return_value={
+            "flights": "INVALID_NOT_A_LIST",  # schema validation failure
+            "extra_debug_card": CANARY_CARD,  # PII in extra field
+        }
+    )
+    config = {
+        "configurable": {
+            "guardrail_gateway": production_gateway,
+        }
+    }
+
+    with patch("agent.graph.nodes.get_tool_by_name", return_value=fake_tool):
+        update = await custom_tool_node(state, config)
+
+    assert update["tool_blocked"] is True
+    assert update["tool_block_response_key"] == GUARDRAIL_TOOL_PII
+    assert "messages" not in update
+    assert CANARY_CARD not in repr(update)
+
+
+def test_production_gateway_tool_layers_order_and_contract(
+    production_gateway: GuardrailGateway,
+) -> None:
+    """Production gateway has fixed 4-layer order and sole validate_tool_result method."""
+    expected_order = (
+        SizeStructureValidator,
+        SchemaValidator,
+        PIIScanner,
+        UntrustedContentInjectionDetector,
+    )
+    layers = production_gateway._tool_layers
+
+    assert tuple(type(layer) for layer in layers) == expected_order
+
+    # Verify sole public result method
+    assert hasattr(production_gateway, "validate_tool_result")
+    sig = inspect.signature(production_gateway.validate_tool_result)
+    assert list(sig.parameters.keys()) == ["context", "tool_name", "result"]
+
+    for alias in (
+        "validate_tool_output",
+        "validate_tool",
+        "validate_result",
+        "check_tool_result",
+        "check_tool_output",
+        "validate_output_tool",
+        "validate_tool_response",
+    ):
+        assert not hasattr(production_gateway, alias), (
+            f"Prohibited tool-result method alias '{alias}' found on production_gateway"
+        )

@@ -2,7 +2,7 @@ from typing import Any, AsyncIterator, Optional
 
 from agent.chat_turn.command import ChatTurnCommand
 from agent.chat_turn.events import ChatTurnEvent, ErrorEvent, ErrorPayload
-from agent.guardrails.base import AdmissionContext
+from agent.guardrails.base import AdmissionContext, PipelineDecision, ValidatedInput
 from agent.guardrails.gateway import GuardrailGateway
 
 
@@ -20,7 +20,11 @@ class ChatController:
         self.runner = runner
         self.gateway = gateway
 
-    async def stream(self, command: ChatTurnCommand) -> AsyncIterator[ChatTurnEvent]:
+    async def stream(
+        self,
+        command: ChatTurnCommand,
+        admission_decision: Optional[PipelineDecision[ValidatedInput]] = None,
+    ) -> AsyncIterator[ChatTurnEvent]:
         """
         Stream chat turn events with mandatory security gateway validation.
         """
@@ -36,8 +40,8 @@ class ChatController:
             )
             return
 
-        decision = None
-        if command.message:
+        decision = admission_decision
+        if decision is None and command.message:
             context = AdmissionContext(
                 user_id=command.user_id,
                 chat_session_id=command.session_id or "unassigned",
@@ -56,15 +60,15 @@ class ChatController:
                 )
                 return
 
-            if decision.status == "BLOCK":
-                code = decision.response_key or "GUARDRAIL_INPUT_BLOCKED"
-                yield ErrorEvent(
-                    data=ErrorPayload(
-                        code=code,
-                        message=f"Input rejected by security guardrail: {code}",
-                    )
+        if decision is not None and decision.status == "BLOCK":
+            code = decision.response_key or "GUARDRAIL_INPUT_BLOCKED"
+            yield ErrorEvent(
+                data=ErrorPayload(
+                    code=code,
+                    message=f"Input rejected by security guardrail: {code}",
                 )
-                return
+            )
+            return
 
         validated_input = decision.validated_data if decision is not None else None
         try:

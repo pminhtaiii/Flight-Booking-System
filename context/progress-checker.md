@@ -1,5 +1,253 @@
 # Progress Tracker
  
+### Feature 026 — Agent Boundary Simplification: Phase 5 Complete / Feature 100% Complete (Tasks T033–T037 Verified) (2026-09-24)
+
+- **Phase 5 (Polish & Cross-Cutting Verification) & Feature 026 100% Delivered (Tasks T033–T037)**:
+  - **Static Ripgrep Censuses (T033)**:
+    - Executed 5 authoritative queries from `specs/026-agent-boundary-simplification/quickstart.md`.
+    - Zero (0) references to `agent-gateway` under `apps/api/src/chat/` (exit code 1, 0 matches).
+    - Zero (0) references to `@/chat/chat-message-crypto.service`, `GuardrailRegistry`, `create_production_registry`, `OutputPIILayer`, `InputGuardrailPipeline`, or `ToolOutputGuardrailPipeline` across `apps/api` and `apps/agent` (exit code 1, 0 matches).
+    - Production `OutputGuardrailPipeline` construction strictly isolated inside `apps/agent/src/agent/guardrails/gateway.py:98` (exit code 0, 1 match).
+    - Zero (0) external imports of `OutputGuardrailPipeline` or `OutputGuardrailBlockedError` from `output_pipeline.py`. Callers import `OutputGuardrailBlockedError` strictly from `agent.guardrails.base` and external callers only import permitted stateless `payload_free_config` and `approved_model_content`.
+    - Exactly one definition each of `deterministic_pii_match`, `_is_output_guardrail_disabled`, and `approved_model_content` strictly in `apps/agent/src/agent/guardrails/pii.py` (exit code 0, 3 matches).
+  - **Scope & Diff Guard Confirmation (T034)**:
+    - Zero (0) Prisma schema changes or migrations in `apps/api/prisma/` (`git diff origin/development...HEAD -- apps/api/prisma` clean).
+    - Zero (0) dependency changes in `apps/api/package.json`, `pnpm-lock.yaml`, or `apps/agent/pyproject.toml` (`git diff` clean).
+    - Zero (0) new endpoints or feature flag additions in `apps/api/src/app.module.ts` or `apps/agent/src/agent/main.py`.
+    - SHA256 hashes of protected baseline files verified identical.
+  - **Documentation Synchronization (T035 & T036)**:
+    - Updated `context/architecture.md` to `Feature 026 — Agent Boundary Simplification (Complete - Tasks T001–T037)` detailing NestJS boundary separation (`AgentChatModule`, `ChatMessageCryptoModule`, isolated `ChatModule`) and Python guardrail gateway architecture (fixed 4-tuples, `OutputStreamSession`, standalone PII ownership).
+    - Updated `context/progress-checker.md` recording full completion status of Feature 026 (Tasks T001–T037 complete).
+    - Updated `specs/026-agent-boundary-simplification/tasks.md` marking T001–T037 100% complete.
+  - **Complete Verification Gate Execution (T037)**:
+    - NestJS API Gate (`specs/026-agent-boundary-simplification/verification/api-final.md`):
+      - Unit Tests: 5 suites, 98 passed, exit code 0.
+      - E2E Tests: 10 suites, 123 passed, exit code 0.
+      - ESLint: 0 errors, 0 warnings, exit code 0 (`pnpm exec eslint "apps/api/**/*.ts" "packages/shared/**/*.ts" --max-warnings 0`).
+      - Shared Types: 23 suites, 110 passed, exit code 0 (`pnpm --filter @shared/types test`).
+      - TypeScript: 0 errors, exit code 0 (`pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`).
+      - Production Build: Clean, exit code 0 (`pnpm --filter @api/backend build`).
+    - Python Agent Gate (`specs/026-agent-boundary-simplification/verification/agent-final.md`):
+      - Ruff Lint: Clean, exit code 0 (`uv run --package agent ruff check apps/agent`).
+      - Ruff Format: Clean, exit code 0 (`uv run --package agent ruff format --check apps/agent`, 153 files formatted).
+      - Targeted Security Pytest: 7 suites, 265 passed, 1 skipped in 56.11s, exit code 0 (`test_gateway.py`, `test_input_layers.py`, `test_tool_layers.py`, `test_output_stream.py`, `test_output_pipeline.py`, `test_chat_turn_runner.py`, `test_sse.py`).
+      - Full Non-Redis Pytest: 1141 passed, 4 skipped, 12 deselected, 0 failed in 98.19s, exit code 0.
+  - **Confirmed Rollback Boundaries**:
+    - US1 NestJS slice independently revertible via `git revert` of US1 commits without impacting Python service.
+    - US2 Python slice independently revertible via `git revert` of US2 commits without impacting NestJS API.
+  - **Feature Completion Status**:
+    - Feature 026 (Agent Boundary Simplification) is 100% complete across both User Stories (US1 & US2), fully verified, and ready for dual-axis code review.
+
+### Feature 026 — Agent Boundary Simplification: Phase 4 Complete / US2 100% Complete (Tasks T030–T032 Verified) (2026-09-24)
+
+- **Phase 4 / Slice 4 (User Story 2 Completion: Fixture Cluster Migration, Dead Registry/Pipeline Elimination & Verification Gate) Delivered (Tasks T030–T032)**:
+  - **Fixture Cluster Migration (T030)**:
+    - Migrated registry-constructor fixture clusters across 22 test files (`apps/agent/tests/security/test_enforcement.py`, `test_gateway.py`, `test_input_layers.py`, `test_lifecycle.py`, `test_memory_boundary.py`, `test_model_output_boundary.py`, `test_registry.py`, `test_rollout.py`, `test_security_performance.py`, `test_tool_authority.py`, `test_tool_boundary.py`, `test_tool_integration.py`, `test_tool_layers.py`, `test_chaos_simulation.py`, `test_chat_turn_runner.py`, `test_graph.py`, `test_guardrails.py`, `test_negative_privacy_audit.py`, `test_rollback_matrix.py`, `test_stream_auth_budget.py`, `test_stream_session_control.py`, `test_tools.py`) to direct `GuardrailGateway()` or keyword-only tuple injection (`_input_layers`, `_tool_layers`).
+    - Asserted no test treats `is_healthy()` as constructor recovery.
+  - **Dead Registry & Pipeline File Deletion (T031)**:
+    - Deleted obsolete files: `apps/agent/src/agent/guardrails/registry.py` (including `OutputPIILayer`), `apps/agent/src/agent/guardrails/input_pipeline.py`, `apps/agent/src/agent/guardrails/tool_output_pipeline.py`, and `apps/agent/src/agent/guardrails/tool_schemas.py`.
+    - Symbol census verified zero lingering imports or references to `GuardrailRegistry`, `create_production_registry`, `InputGuardrailPipeline`, `ToolOutputGuardrailPipeline`, or `OutputPIILayer`.
+  - **US2 Verification Gate Execution (T032)**:
+    - Executed focused suites and full non-Redis agent pytest suite: 1141 passed, 4 skipped, 12 deselected (all tests pass).
+    - Ruff check & format: clean (0 errors, 0 warnings).
+    - User Story 2 is 100% complete (Tasks T017–T032 all complete).
+  - **Phase 5 Status**:
+    - Phase 5 (Tasks T033–T037: Polish & Cross-Cutting Verification) remains strictly unstarted.
+
+### Feature 026 — Agent Boundary Simplification: Phase 4 / Slice 3 Complete (Tasks T024–T029 Verified) (2026-09-24)
+
+- **Phase 4 / Slice 3 (User Story 2 Implementation: Fixed Gateway Refactoring, Stream Session, PII Extraction, SSE Pre-Quota Admission & Canonical Singleton) Delivered (Tasks T024–T029)**:
+  - **Fixed Gateway Refactoring & Tuple Composition (T024)**:
+    - In `apps/agent/src/agent/guardrails/gateway.py`: `GuardrailGateway()` builds immutable production layer tuples without caller-supplied registry.
+    - Added `assert_layer_order(stage, layers, expected_types)` asserting exact layer count, positions, unique keys, and linear prerequisites; raises on invalid composition during construction.
+    - Keyword-only private tuple injection `_input_layers` and `_tool_layers` enabled for testing.
+    - Sealed `validate_tool_result(context, tool_name, result)` as the sole public tool method with raw extra-field PII priority.
+    - `is_healthy()` covers runtime readiness only and never recovers an invalid constructor.
+  - **OutputStreamSession & Causal Cleanup (T025, T026)**:
+    - Implemented `GuardrailGateway.stream_output` returning `OutputStreamSession` async context manager facade.
+    - Per-turn session exposes `process_token`, one-shot `flush`, and idempotent non-flushing `close`.
+    - Preserved `OutputGuardrailBlockedError` in `agent.guardrails.base` with original partial response, layer, rule, and message.
+    - Updated `ChatTurnRunner` to use one stream session spanning all execution branches (final text, tool arguments, token stream).
+    - Preserved strict causal cleanup ordering across all exit paths: `partial_persist` -> `close` (non-flushing) -> `release` (lease release).
+  - **Standalone PII Utility Ownership (T027)**:
+    - Created `apps/agent/src/agent/guardrails/pii.py` as sole owner of `deterministic_pii_match`, `_is_output_guardrail_disabled` (covering all 5 shapes), and `approved_model_content`.
+    - Removed duplicate definitions across modules; updated `output_pipeline.py` to import directly from `pii.py` while retaining `payload_free_config`. Zero circular dependencies.
+  - **SSE Pre-Quota Ingress Admission & Block Handling (T028)**:
+    - In `apps/agent/src/agent/streaming/sse.py`: ingress order strictly enforces `access check -> length guard -> gateway health -> validate_input -> quota/Redis`.
+    - Pre-quota ingress admission returns immediately on ANY blocked decision before touching Redis or admitting budget.
+    - PII blocks yield `GUARDRAIL_BLOCKED` (`Your message contains protected personal information and cannot be processed.`).
+    - Non-PII blocks yield `code = decision.response_key or "GUARDRAIL_INPUT_BLOCKED"` (`Input rejected by security guardrail: {code}`).
+    - Guaranteed zero Redis calls or quota consumption for ANY blocked input.
+    - Forwarded admission decision to `ChatController.stream` to prevent redundant revalidation on admitted turns.
+  - **Canonical Gateway Singleton (T029)**:
+    - In `apps/agent/src/agent/main.py`: added `get_guardrail_gateway()` canonical singleton factory with fast double-checked locking.
+    - Lifespan and module-level lookups reuse single instance; construction failures abort startup fail-closed.
+  - **Verification Gate**:
+    - Pytest: 49/49 passed across `test_sse.py`, `test_chat_controller.py`, and `security/test_gateway.py`.
+    - Ruff check & format: clean (0 errors, 0 warnings).
+  - **Scope Discipline**:
+    - Zero deletions of `registry.py` or touches to tasks T030–T032.
+    - Tasks T024–T029 marked complete.
+
+### Feature 026 — Agent Boundary Simplification: Phase 4 / Slice 2 Complete (Tasks T020, T021, T023 Verified) (2026-09-23)
+
+- **Phase 4 / Slice 2 (User Story 2 Test Characterization: Persistent Stream Sessions, Delegate Pipeline & Shared PII Utilities) Delivered (Tasks T020, T021, T023)**:
+  - **Persistent Stream Session & Runner Lifecycle Tests (T020)**:
+    - In `test_output_stream.py`, `test_model_output_boundary.py`, `test_lifecycle.py`, and `test_chat_turn_runner.py`:
+    - Replaced live `runner.OutputGuardrailPipeline` patch with fake gateway output-session returning stable `agent.guardrails.base.OutputGuardrailBlockedError`.
+    - Characterized that one stream session spans all three runner branches (final response text, tool call arguments, token streaming) per turn.
+    - Verified stream session contracts: `process_token` cross-branch shared buffer/partial response, one-shot `flush()`, idempotent non-flushing `close()`, `__aexit__` non-suppression, and error attributes preservation.
+    - Asserted causal cleanup ordering: `approved_partial_persistence` -> `close` (non-flushing) -> `lease_release` across normal completion, blocked output, early return / stale fence, cancellation, and exceptions.
+  - **Delegate Output Pipeline & Imported Matcher/Predicate Tests (T021)**:
+    - Updated `OutputGuardrailBlockedError` imports across 8 delegate test files to `agent.guardrails.base`.
+    - Asserted that `output_pipeline.py` contract imports `deterministic_pii_match` and `_is_output_guardrail_disabled` directly from `agent.guardrails.pii` with zero duplicate definitions and zero import cycles.
+    - Asserted `payload_free_config` is retained as a stateless helper in `output_pipeline.py`.
+    - Asserted streaming-disabled behavior across all 5 legacy disabled-config shapes.
+  - **Shared PII Utility Coverage & Lone Fallback Migration (T023)**:
+    - In `test_e2e_output_guardrails.py`: comprehensive coverage for `agent.guardrails.pii` (`deterministic_pii_match`, `_is_output_guardrail_disabled` across all 5 shapes, `approved_model_content`).
+    - Proved exactly one definition exists across the codebase and no circular dependencies occur.
+    - In `test_tool_schemas.py`: migrated lone fallback in `get_tool_schema` directly to registered tool `args_schema` and `TOOL_INPUT_SCHEMAS`, leaving zero consumers for `tool_schemas.py`.
+  - **Verification Gate**:
+    - Pytest: 161 passed, 1 skipped in 16.41s across target suites; 134 passed in 16.05s across secondary suites (total 295 passed).
+    - Ruff check & format: clean (0 errors, 0 warnings; 155 files formatted).
+  - **Scope Discipline**:
+    - Zero production code touched (`apps/agent/src/` clean).
+    - Tasks T020, T021, T023 marked `[x]` in `specs/026-agent-boundary-simplification/tasks.md`.
+    - Phase 4 / Slice 3 (Production code refactoring Tasks T024–T029) strictly unstarted.
+
+### Feature 026 — Agent Boundary Simplification: Phase 4 / Slice 1 Complete (Tasks T017, T018, T019, T022 Verified) (2026-09-23)
+
+- **Phase 4 / Slice 1 (User Story 2 Test Characterization: Gateway Construction, Input Order, Tool PII Priority & SSE Admission) Delivered (Tasks T017, T018, T019, T022)**:
+  - **Gateway Constructor & Layer Order Assertions (T017)**:
+    - Updated `apps/agent/tests/security/test_registry.py` and `apps/agent/tests/security/test_gateway.py`.
+    - Characterized production-default `GuardrailGateway()` instantiation without caller-supplied registry.
+    - Verified keyword-only private injection seam `GuardrailGateway(_input_layers=..., _tool_layers=...)`.
+    - Tested `assert_layer_order(stage, layers, expected_types)` contract: exact count, expected type at each position, unique keys across stage, same-stage linear prerequisite declaration. Tested raising on missing, duplicate, reordered, wrongly typed, unknown prerequisite, or late prerequisite composition.
+    - Tested that `is_healthy()` represents only post-construction runtime readiness and never recovers an invalid constructor.
+  - **Fixed Input Layer Ordering & Normalization Tests (T018)**:
+    - In `apps/agent/tests/security/test_input_layers.py`: rewrote legacy `InputGuardrailPipeline` expectations to target `GuardrailGateway.validate_input()`.
+    - Asserted fixed 4-layer order: `(LengthValidator, PIIDetector, InjectionDetector, TopicBoundary)` with keys `("input.length", "input.pii", "input.injection", "input.topic")`.
+    - Asserted short-circuiting on first blocking decision (length stops before PII; PII stops before injection; injection stops before topic).
+    - Asserted fail-closed behavior on layer exceptions, empty layers, and invalid contexts.
+    - Asserted unchanged response keys (`GUARDRAIL_INPUT_LENGTH`, `GUARDRAIL_INPUT_PII`, `GUARDRAIL_INPUT_INJECTION`, `GUARDRAIL_INPUT_TOPIC`).
+    - Asserted detection-only normalization preserves non-Latin unicode input (Japanese, Vietnamese, Cyrillic) unchanged.
+  - **Tool Authority & Raw Extra-Field PII Priority Tests (T019)**:
+    - In `test_tool_layers.py`, `test_tool_authority.py`, `test_tool_boundary.py`, `test_tool_integration.py`:
+    - Asserted fixed 4-layer tool order: `(SizeStructureValidator, SchemaValidator, PIIScanner, UntrustedContentInjectionDetector)`.
+    - Asserted sole public result method `validate_tool_result(context, tool_name, result)` with zero alternate aliases.
+    - Asserted raw extra-field PII priority: when schema validation fails and raw result contains extra fields with PII, `PIIScanner` scans original raw result and `GUARDRAIL_TOOL_PII` wins over `GUARDRAIL_TOOL_SCHEMA` without tuple indexing.
+    - Asserted sealed tool capability authority across all intents (GENERAL, SEARCH, CHECKOUT), whole-batch rejection, and fail-closed error handling.
+  - **SSE Pre-Quota Admission & Single Validation Tests (T022)**:
+    - In `apps/agent/tests/test_sse.py`:
+    - Asserted ingress order in SSE: access check -> length guard -> gateway health -> `validate_input` -> Redis/quota.
+    - Asserted PII input makes zero `get_redis_client` or quota calls, immediately returning one first-and-only `error` event (`event: error`, `code: GUARDRAIL_BLOCKED`, `message: "Your message contains protected personal information and cannot be processed."`, `partialMessageId: null`).
+    - Asserted gateway unavailable (503) takes precedence before validation.
+    - Asserted healthy gateway PII rejection takes precedence over Redis failure.
+    - Asserted non-PII admission decision is passed to `ChatController.stream` to strictly prevent redundant revalidation.
+  - **Verification Gate**:
+    - Pytest: 8 suites, 295 passed in 17.97s (up from 237 baseline).
+    - Ruff check: clean (0 errors, 0 warnings).
+    - Ruff format: clean (155 files formatted).
+  - **Scope Discipline**:
+    - Zero production code touched (`apps/agent/src/` clean).
+    - Tasks T017, T018, T019, T022 marked `[x]` in `specs/026-agent-boundary-simplification/tasks.md`.
+    - Phase 4 / Slice 2 (Tasks T020, T021, T023) strictly unstarted.
+
+### Feature 026 — Agent Boundary Simplification: Phase 3 / Slice 2 Complete (Tasks T011–T016 Verified, US1 Complete) (2026-09-23)
+
+- **Phase 3 / Slice 2 (Production Edge Relocation, Shared Crypto Extraction & US1 Completion) Delivered (Tasks T011–T016)**:
+  - **Shared Crypto Extraction (T011)**:
+    - Relocated `ChatMessageCryptoService` to `apps/api/src/common/chat-message-crypto.service.ts` preserving all cryptographic logic, error classes, AES-256-GCM algorithms, and AAD parameters verbatim.
+    - Created `apps/api/src/common/chat-message-crypto.module.ts` as the sole provider and export owner.
+    - Updated `apps/api/src/chat/chat.service.ts` and `apps/api/src/common/chat-message-crypto.service.spec.ts` imports.
+  - **Edge Controller & Access Service Relocation (T012)**:
+    - Relocated `AgentChatController` and `AgentChatAccessService` to `apps/api/src/agent-gateway/agent-chat/`.
+    - Preserved class-level `@Controller('agent-gateway/chat')` and `@UseGuards(AgentApiKeyGuard, ClaimTokenGuard)`.
+    - Preserved `/access/check` claim token guard bypass, all 7 routes, DTOs, casing-insensitive fencing headers (`x-fencing-token` / `X-Fencing-Token`), and `CHAT_SESSION_NOT_FOUND` error mapping.
+  - **AgentChatModule Creation & ChatModule Isolation (T013)**:
+    - Created `apps/api/src/agent-gateway/agent-chat/agent-chat.module.ts` importing `ChatModule`, `AgentAuthModule`, `PrismaModule`, and `CacheModule`. Composed cleanly in `AgentGatewayModule`.
+    - Isolated `ChatModule`: removed `AgentAuthModule` import, removed edge controller/access service, imported `ChatMessageCryptoModule`, and exported strictly only `ChatService`.
+    - Deleted old files from `apps/api/src/chat/`.
+  - **Attested Flight Search Decoupling (T014)**:
+    - Replaced `ChatModule` import in `AttestedFlightSearchModule` with `ChatMessageCryptoModule`.
+    - Updated `ChatMessageCryptoService` imports in `attested-flight-search.service.ts` and its specs to `@/common/chat-message-crypto.service`. Kept `EncryptionService` completely separate.
+  - **E2E Consumer Migration (T015)**:
+    - Updated 9 E2E test suites (`agent-gateway`, `chat`, `chat-plaintext-cleanup`, `chat-privacy-corpus`, `negative-privacy-audit`, `phase11d-cryptographic-audit`, `phase11e-continuous-reliability`, `privacy-and-telemetry-audit`, `rollback-matrix`) to consume `@/common/chat-message-crypto.service`.
+    - Updated `agent-chat-gateway.e2e-spec.ts` to consume edge controller. All 10 suites passed (123/123 tests).
+  - **Verification Gate & Static Import Census (T016)**:
+    - Static census: 0 matches for `agent-gateway` in `apps/api/src/chat`, 0 matches for `@/chat/chat-message-crypto.service` in `apps/api`.
+    - Unit tests: 5 suites, 98 tests passed.
+    - E2E tests: 10 suites, 123 tests passed.
+    - ESLint: 0 errors, 0 warnings.
+    - Shared types: 110/110 tests passed.
+    - TypeScript: `tsc --noEmit` clean (code 0).
+    - API Build: `nest build` clean (code 0).
+    - Tasks T011–T016 marked `[x]` in `specs/026-agent-boundary-simplification/tasks.md`. User Story 1 100% complete.
+    - Phase 4 (Tasks T017–T032) untouched.
+
+### Feature 026 — Agent Boundary Simplification: Phase 3 / Slice 1 Complete (Tasks T006–T010 Verified) (2026-09-23)
+
+- **Phase 3 / Slice 1 (User Story 1 Characterization & Boundary Specs) Delivered (Tasks T006–T010)**:
+  - **Controller Characterization Spec (T006)**:
+    - Relocated spec to `apps/api/src/agent-gateway/agent-chat/agent-chat.controller.spec.ts`; deleted obsolete file in `src/chat/`.
+    - Added controller-level guard reflection test asserting `@UseGuards(AgentApiKeyGuard, ClaimTokenGuard)` declaration and exact order.
+    - Verified all 7 routes (`POST /access/check`, `POST /sessions`, `GET /sessions/:sessionId/memory`, `POST /sessions/:sessionId/messages`, `POST /sessions/:sessionId/turns`, `POST /sessions/:sessionId/summaries`, `DELETE /sessions/:sessionId`).
+    - Verified bodies, response shapes, HTTP status codes, and `CHAT_SESSION_NOT_FOUND` (404) error mapping.
+    - Verified support for both lowercase `x-fencing-token` and canonical `X-Fencing-Token` header spellings.
+    - Verified `/access/check` bypasses claim-token extraction and delegates `{ sub }` validation directly to `AgentChatAccessService`.
+  - **Access Service Characterization Spec (T007)**:
+    - Relocated spec to `apps/api/src/agent-gateway/agent-chat/agent-chat-access.service.spec.ts`; deleted obsolete file in `src/chat/`.
+    - Verified `checkUserAccess`: active user status check, redis revocation check via JTI (`blacklist:jti:${jti}`), expiration check, caching, and fail-closed behavior on inactive/missing user or revoked token.
+    - Verified fencing token decoupling and session state semantics.
+  - **Shared Crypto Compatibility Spec (T008)**:
+    - Relocated spec to `apps/api/src/common/chat-message-crypto.service.spec.ts`; deleted obsolete file in `src/chat/`.
+    - Verified AES-256-GCM encryption with 12-byte nonce, 16-byte authTag, `keyVersion: 1`, hex envelope format, and record-bound AAD.
+    - Verified edge cases: empty/corrupt envelopes, unsupported key versions, wrong decryption keys, and authentication tag mismatch.
+    - Verified helper methods (`encryptMessageContent`, `decryptMessageContent`, `encryptSessionTitle`, `decryptSessionTitle`).
+  - **Attested Search Crypto & Module Boundary Assertions (T009)**:
+    - In `attested-flight-search.service.spec.ts` and `persistence.spec.ts`: updated crypto provider assertions to verify `ChatMessageCryptoService` contract and static architectural separation from `ChatModule`.
+    - Created `apps/api/src/chat/chat.module.spec.ts`: asserted `ChatModule` exports `ChatService`, confirmed domain service has zero dependency on `AgentAuthService` or gateway guards, and validated target architectural boundary.
+  - **Gateway HTTP E2E Characterization (T010)**:
+    - In `apps/api/test/agent-chat-gateway.e2e-spec.ts`: covered all 7 `/api/agent-gateway/chat/*` routes with full HTTP requests via Supertest.
+    - Asserted controller-level guard order: `AgentApiKeyGuard` followed by `ClaimTokenGuard`.
+    - Asserted deliberate `/access/check` bypass: `POST /api/agent-gateway/chat/access/check` succeeds with API key and `{ sub }` body without `X-User-Claim`.
+    - Asserted 6 session routes strictly reject missing `X-User-Claim` with 401 `INVALID_CLAIM_TOKEN`.
+    - Asserted both `x-fencing-token` and `X-Fencing-Token` headers across all write routes.
+    - Asserted `CHAT_SESSION_NOT_FOUND` (404) error mapping on nonexistent or cross-user sessions.
+  - **Verification Gate**:
+    - Unit tests: 6 suites, 102 tests passed.
+    - E2E tests: 1 suite, 18 tests passed.
+    - ESLint: 0 errors, 0 warnings (`pnpm exec eslint "apps/api/**/*.ts" --max-warnings 0`).
+    - TypeScript: 0 diagnostic errors (`pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`).
+  - **Scope Discipline**:
+    - Zero production code touched; only test specifications and task tracker updated.
+    - Tasks T006–T010 marked `[x]` in `specs/026-agent-boundary-simplification/tasks.md`.
+    - Phase 3 / Slice 2 (Production code relocation T011–T016) strictly unstarted.
+
+### Feature 026 — Agent Boundary Simplification: Phase 1 & 2 / Slice 1 Complete (Tasks T001–T005 Verified) (2026-09-23)
+
+- **Phase 1 (Setup) & Phase 2 (Foundational) Delivered (Tasks T001–T005)**:
+  - **Pre-Refactor NestJS API Baseline (T001)**:
+    - Executed targeted unit specs (5 suites, 66 tests passed).
+    - Executed targeted boundary E2E suites (10 suites, 117 tests passed).
+    - ESLint clean (0 errors, 0 warnings), `@shared/types` (23 suites, 110 tests passed), TypeScript `tsc --noEmit` clean, and production NestJS build clean.
+    - Evidence recorded in `specs/026-agent-boundary-simplification/verification/api-baseline.md`.
+  - **Pre-Refactor Python Agent Baseline (T002)**:
+    - Ruff check clean, Ruff format check clean (155 files formatted).
+    - Targeted security/guardrail/runner/SSE pytest suite passed (214 passed, 1 skipped).
+    - Full non-Redis pytest suite executed (1001 passed, 1 pre-existing failure in snapshot test documented).
+    - Evidence recorded in `specs/026-agent-boundary-simplification/verification/agent-baseline.md`.
+  - **Initial Import & Deletion Census Captured (T003)**:
+    - Recorded exact baseline match counts for pre-refactor symbols across 5 ripgrep queries in `specs/026-agent-boundary-simplification/verification/agent-baseline.md`.
+  - **Frozen Boundary Contracts Reconciled (T004)**:
+    - Reconciled characterization assertions against `specs/026-agent-boundary-simplification/contracts/internal-boundaries.md`: Agent-Chat HTTP boundary, `/access/check` claim token bypass, chat crypto AES-256-GCM parameters, fixed input/tool guardrail sequence, persistent stream session lifecycle, and ingress PII precedence. Characterization test suite assertions remain open and deferred to T010 and T017–T022 prior to production refactor.
+  - **Diff Guard Established & Evidence Recorded (T005)**:
+    - Verified clean git working tree diff on protected boundaries (`apps/api/prisma/`, `pnpm-lock.yaml`, `apps/api/package.json`, `apps/agent/pyproject.toml`).
+    - Recorded exact verification command, commit SHA anchor, timestamp, exit code 0, clean output, and SHA-256 hash manifest for all four protected paths in `specs/026-agent-boundary-simplification/verification/api-baseline.md` and `agent-baseline.md`.
+  - **Scope Discipline**:
+    - Zero production code touched. User Story 1 (Tasks T006–T016) remains unstarted.
+    - Tasks T001–T003 and T005 marked `[x]`, T004 remains `[ ]` (pending characterization tests) in `specs/026-agent-boundary-simplification/tasks.md`.
+
 ### Feature 025 — Booking Umbrella Deletion: Phase 6 Complete (Tasks T001–T039 100% Complete) (2026-09-22)
 
 - **Phase 6 (Polish & Cross-Cutting Verification) & Feature 025 100% Delivered (T001–T039)**:

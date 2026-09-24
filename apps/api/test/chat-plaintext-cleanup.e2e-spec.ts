@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaClient, User } from '@prisma/client';
 import { AppModule } from '../src/app.module';
 import { ChatService } from '../src/chat/chat.service';
-import { ChatMessageCryptoService } from '../src/chat/chat-message-crypto.service';
+import { ChatMessageCryptoService } from '@/common/chat-message-crypto.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 const prisma = new PrismaClient();

@@ -6,6 +6,7 @@ Validates:
 3. TurnCapabilities immutability, non-expansion during transitions, and model node intersection binding.
 """
 
+import inspect
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Dict, List
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -20,9 +21,18 @@ from agent.agents.travel_assistant import travel_assistant_node
 from agent.graph.graph import route_after_tools, router_node
 from agent.graph.nodes import custom_tool_node, final_answer_node
 from agent.graph.state import AgentState
-from agent.guardrails.base import GUARDRAIL_TOOL_SCHEMA, TurnCapabilities
+from agent.guardrails.base import (
+    GUARDRAIL_TOOL_PII,
+    GUARDRAIL_TOOL_SCHEMA,
+    TurnCapabilities,
+)
 from agent.guardrails.gateway import GuardrailGateway
-from agent.guardrails.registry import GuardrailRegistry, create_production_registry
+from agent.guardrails.layers.input import (
+    InjectionDetector,
+    LengthValidator,
+    PIIDetector,
+    TopicBoundary,
+)
 from agent.models.requests import RouteDecision
 from agent.tools.registry import (
     get_tools,
@@ -33,6 +43,19 @@ from agent.trusted_search_snapshot import (
 )
 
 pytestmark = pytest.mark.security
+
+
+def _make_gateway() -> GuardrailGateway:
+    """Instantiate GuardrailGateway with keyword seam for tool authority tests."""
+    return GuardrailGateway(
+        _input_layers=(
+            LengthValidator(),
+            PIIDetector(),
+            InjectionDetector(),
+            TopicBoundary(),
+        )
+    )
+
 
 TRAVEL_TOOL_NAMES: tuple[str, ...] = (
     "search_flights",
@@ -445,7 +468,7 @@ class TestCapabilitySealingTruthTable:
             provenance="trusted_router",
             sealed_tools=(),
         )
-        gateway = GuardrailGateway(GuardrailRegistry())
+        gateway = _make_gateway()
         invoked = False
 
         async def dummy_invoke() -> Dict[str, Any]:
@@ -462,6 +485,23 @@ class TestCapabilitySealingTruthTable:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("tool_name", ALL_REGISTERED_TOOL_NAMES)
+    async def test_exhaustive_general_authority_validate_tool_result_blocks_every_tool(
+        self, tool_name: str
+    ) -> None:
+        """validate_tool_result under GENERAL authority blocks every registered tool."""
+        caps = TurnCapabilities(
+            intent="GENERAL",
+            provenance="trusted_router",
+            sealed_tools=(),
+        )
+        gateway = _make_gateway()
+        decision = await gateway.validate_tool_result(caps, tool_name, {"status": "ok"})
+        assert decision.status == "BLOCK"
+        assert decision.response_key == GUARDRAIL_TOOL_SCHEMA
+        assert decision.validated_data is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("tool_name", ALL_REGISTERED_TOOL_NAMES)
     async def test_exhaustive_search_authority_permits_only_travel_tools(
         self, tool_name: str
     ) -> None:
@@ -471,7 +511,7 @@ class TestCapabilitySealingTruthTable:
             provenance="trusted_router",
             sealed_tools=TRAVEL_TOOL_NAMES,
         )
-        gateway = GuardrailGateway(GuardrailRegistry())
+        gateway = _make_gateway()
         invoked = False
 
         async def dummy_invoke() -> Dict[str, Any]:
@@ -491,6 +531,24 @@ class TestCapabilitySealingTruthTable:
             assert invoked is False, f"Tool '{tool_name}' must be blocked under SEARCH authority"
 
     @pytest.mark.asyncio
+    async def test_validate_tool_result_blocks_unsealed_checkout_in_search_authority(
+        self,
+    ) -> None:
+        """validate_tool_result under SEARCH authority blocks signal_checkout_intent."""
+        caps = TurnCapabilities(
+            intent="SEARCH",
+            provenance="trusted_router",
+            sealed_tools=TRAVEL_TOOL_NAMES,
+        )
+        gateway = _make_gateway()
+        decision = await gateway.validate_tool_result(
+            caps, "signal_checkout_intent", {"signal": "ok"}
+        )
+        assert decision.status == "BLOCK"
+        assert decision.response_key == GUARDRAIL_TOOL_SCHEMA
+        assert decision.validated_data is None
+
+    @pytest.mark.asyncio
     @pytest.mark.parametrize("tool_name", ALL_REGISTERED_TOOL_NAMES)
     async def test_exhaustive_checkout_authority_permits_only_signal_tool(
         self, tool_name: str
@@ -501,7 +559,7 @@ class TestCapabilitySealingTruthTable:
             provenance="trusted_router",
             sealed_tools=CHECKOUT_TOOL_NAMES,
         )
-        gateway = GuardrailGateway(GuardrailRegistry())
+        gateway = _make_gateway()
         invoked = False
 
         async def dummy_invoke() -> Dict[str, Any]:
@@ -519,6 +577,23 @@ class TestCapabilitySealingTruthTable:
             assert decision.status == "BLOCK"
             assert decision.response_key == GUARDRAIL_TOOL_SCHEMA
             assert invoked is False, f"Tool '{tool_name}' must be blocked under CHECKOUT authority"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("travel_tool", TRAVEL_TOOL_NAMES)
+    async def test_validate_tool_result_blocks_unsealed_travel_in_checkout_authority(
+        self, travel_tool: str
+    ) -> None:
+        """validate_tool_result under CHECKOUT authority blocks travel tools."""
+        caps = TurnCapabilities(
+            intent="CHECKOUT",
+            provenance="trusted_router",
+            sealed_tools=CHECKOUT_TOOL_NAMES,
+        )
+        gateway = _make_gateway()
+        decision = await gateway.validate_tool_result(caps, travel_tool, {"status": "ok"})
+        assert decision.status == "BLOCK"
+        assert decision.response_key == GUARDRAIL_TOOL_SCHEMA
+        assert decision.validated_data is None
 
 
 # ===========================================================================
@@ -568,7 +643,7 @@ class TestWholeBatchDenialRule:
 
         config = {
             "configurable": {
-                "guardrail_gateway": GuardrailGateway(GuardrailRegistry()),
+                "guardrail_gateway": _make_gateway(),
                 "turn_capabilities": caps,
                 "thread_id": "session-batch-test",
                 "user_id": "user-batch-test",
@@ -621,7 +696,7 @@ class TestWholeBatchDenialRule:
         }
         config = {
             "configurable": {
-                "guardrail_gateway": GuardrailGateway(GuardrailRegistry()),
+                "guardrail_gateway": _make_gateway(),
                 "turn_capabilities": caps,
                 "thread_id": "session-batch-test",
                 "user_id": "user-batch-test",
@@ -641,7 +716,7 @@ class TestWholeBatchDenialRule:
     @pytest.mark.asyncio
     async def test_gateway_execute_tool_batch_denies_mixed_batches(self) -> None:
         """GuardrailGateway.execute_tool_batch must fail closed (BLOCK) if any call is unauthorized."""
-        gateway = GuardrailGateway(GuardrailRegistry())
+        gateway = _make_gateway()
         caps = TurnCapabilities(
             intent="SEARCH",
             provenance="trusted_router",
@@ -711,7 +786,7 @@ class TestWholeBatchDenialRule:
         }
         config = {
             "configurable": {
-                "guardrail_gateway": GuardrailGateway(GuardrailRegistry()),
+                "guardrail_gateway": _make_gateway(),
                 "turn_capabilities": caps,
                 "thread_id": "session-batch-test",
                 "user_id": "user-batch-test",
@@ -757,7 +832,7 @@ class TestWholeBatchDenialRule:
         config = {
             "callbacks": [MagicMock()],
             "configurable": {
-                "guardrail_gateway": GuardrailGateway(create_production_registry()),
+                "guardrail_gateway": _make_gateway(),
                 "thread_id": "session-checkout-state-injection",
                 "user_id": "user-checkout-state-injection",
             },
@@ -772,6 +847,101 @@ class TestWholeBatchDenialRule:
         }
         assert result["messages"][0].content == "Checkout intent registered successfully."
         assert result["messages"][0].additional_kwargs["guardrail_validated"] is True
+
+    @pytest.mark.asyncio
+    async def test_gateway_execute_tool_batch_mismatched_lengths_fails_closed(self) -> None:
+        """execute_tool_batch fails closed when calls and invokes lengths differ."""
+        gateway = _make_gateway()
+        caps = TurnCapabilities(
+            intent="SEARCH",
+            provenance="trusted_router",
+            sealed_tools=TRAVEL_TOOL_NAMES,
+        )
+        calls = [{"name": "search_flights", "args": {}}]
+        invokes: list[Callable[..., Any]] = []
+
+        decision = await gateway.execute_tool_batch(caps, calls, invokes)
+        assert decision.status == "BLOCK"
+        assert decision.response_key == GUARDRAIL_TOOL_SCHEMA
+        assert decision.validated_data is None
+
+    @pytest.mark.asyncio
+    async def test_gateway_execute_tool_batch_invalid_context_fails_closed(self) -> None:
+        """execute_tool_batch fails closed when context is not TurnCapabilities."""
+        gateway = _make_gateway()
+        decision = await gateway.execute_tool_batch(
+            None,  # type: ignore[arg-type]
+            [{"name": "search_flights", "args": {}}],
+            [AsyncMock()],
+        )
+        assert decision.status == "BLOCK"
+        assert decision.response_key == GUARDRAIL_TOOL_SCHEMA
+        assert decision.validated_data is None
+
+    @pytest.mark.asyncio
+    async def test_gateway_execute_tool_batch_fails_closed_when_tool_raises_exception(
+        self,
+    ) -> None:
+        """execute_tool_batch fails closed without leaking exception details when an invoke crashes."""
+        gateway = _make_gateway()
+        caps = TurnCapabilities(
+            intent="SEARCH",
+            provenance="trusted_router",
+            sealed_tools=TRAVEL_TOOL_NAMES,
+        )
+        calls = [{"name": "search_flights", "args": {}}]
+
+        async def crashing_invoke() -> None:
+            raise RuntimeError("Database connection string leaked: secret_batch_crash_canary")
+
+        decision = await gateway.execute_tool_batch(caps, calls, [crashing_invoke])
+        assert decision.status == "BLOCK"
+        assert decision.response_key == GUARDRAIL_TOOL_SCHEMA
+        assert decision.validated_data is None
+        assert "secret_batch_crash_canary" not in (decision.reason or "")
+
+    @pytest.mark.asyncio
+    async def test_gateway_execute_tool_batch_pii_priority_in_batch(self) -> None:
+        """execute_tool_batch blocks with GUARDRAIL_TOOL_PII when a tool result contains PII in extra fields."""
+        gateway = GuardrailGateway()
+        caps = TurnCapabilities(
+            intent="SEARCH",
+            provenance="trusted_router",
+            sealed_tools=TRAVEL_TOOL_NAMES,
+        )
+        calls = [{"name": "search_flights", "args": {}}]
+
+        async def invoke_with_pii_extra_fields() -> dict[str, Any]:
+            return {
+                "flights": "INVALID_SCHEMA_NOT_LIST",
+                "extra_leak": "4532015112830366",
+            }
+
+        decision = await gateway.execute_tool_batch(caps, calls, [invoke_with_pii_extra_fields])
+        assert decision.status == "BLOCK"
+        assert decision.response_key == GUARDRAIL_TOOL_PII
+        assert decision.validated_data is None
+
+    def test_gateway_tool_authority_sole_public_method(self) -> None:
+        """GuardrailGateway sole public result method is validate_tool_result without aliases."""
+        gateway = _make_gateway()
+        assert hasattr(gateway, "validate_tool_result")
+        sig = inspect.signature(gateway.validate_tool_result)
+        assert list(sig.parameters.keys()) == ["context", "tool_name", "result"]
+
+        prohibited_aliases = (
+            "validate_tool_output",
+            "validate_tool",
+            "validate_result",
+            "check_tool_result",
+            "check_tool_output",
+            "validate_output_tool",
+            "validate_tool_response",
+        )
+        for alias in prohibited_aliases:
+            assert not hasattr(gateway, alias), (
+                f"Prohibited tool-result method alias '{alias}' found on GuardrailGateway"
+            )
 
 
 # ===========================================================================

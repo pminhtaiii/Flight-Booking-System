@@ -13,7 +13,7 @@ import { ConfigService } from '@nestjs/config';
 import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
 import { ChatService } from '@/chat/chat.service';
-import { ChatMessageCryptoService } from '@/chat/chat-message-crypto.service';
+import { ChatMessageCryptoService } from '@/common/chat-message-crypto.service';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { Prisma } from '@prisma/client';
 
