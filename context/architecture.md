@@ -9,7 +9,7 @@ Planning artifacts: [specification](../specs/026-agent-boundary-simplification/s
   - Zero (0) references to `agent-gateway` under `apps/api/src/chat/`.
   - Zero (0) references to `@/chat/chat-message-crypto.service`, `GuardrailRegistry`, `create_production_registry`, `OutputPIILayer`, `InputGuardrailPipeline`, or `ToolOutputGuardrailPipeline` across `apps/api` and `apps/agent`.
   - Production `OutputGuardrailPipeline` construction strictly localized inside `apps/agent/src/agent/guardrails/gateway.py`.
-  - Zero (0) external imports of `OutputGuardrailPipeline` or `OutputGuardrailBlockedError` from `output_pipeline.py`. Callers import `OutputGuardrailBlockedError` strictly from `agent.guardrails.base` and only use stateless `payload_free_config` from `output_pipeline.py`.
+  - Zero (0) external imports of `OutputGuardrailPipeline` or `OutputGuardrailBlockedError` from `output_pipeline.py`. Callers import `OutputGuardrailBlockedError` strictly from `agent.guardrails.base`; external callers are strictly limited to stateless `payload_free_config` and re-exported `approved_model_content` from `output_pipeline.py`.
   - Exactly one definition each of `deterministic_pii_match`, `_is_output_guardrail_disabled`, and `approved_model_content` strictly in `apps/agent/src/agent/guardrails/pii.py`.
 - **Scope & Diff Guard Confirmation (T034)**:
   - Zero (0) Prisma schema changes or migrations in `apps/api/prisma/`.
