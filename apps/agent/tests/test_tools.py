@@ -6,7 +6,6 @@ from langchain_core.runnables import RunnableConfig
 
 from agent.guardrails.base import TurnCapabilities
 from agent.guardrails.gateway import GuardrailGateway
-from agent.guardrails.registry import create_production_registry
 from agent.tools.base import get_nestjs_client
 from agent.tools.booking_detail import get_booking_detail
 from agent.tools.booking_summaries import list_user_booking_summaries
@@ -627,7 +626,7 @@ async def test_readiness_tool_projects_ordinary_success_to_depth_safe_public_sha
         },
         config=run_config_with_readiness,
     )
-    gateway = GuardrailGateway(create_production_registry())
+    gateway = GuardrailGateway()
     capabilities = TurnCapabilities(
         intent="SEARCH",
         provenance="trusted_router",

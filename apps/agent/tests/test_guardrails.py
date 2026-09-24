@@ -11,13 +11,12 @@ from fastapi.testclient import TestClient
 
 from agent.guardrails.base import AdmissionContext
 from agent.guardrails.gateway import GuardrailGateway
-from agent.guardrails.registry import create_production_registry
 from agent.main import app
 
 
 @pytest.mark.asyncio
 async def test_gateway_deterministically_blocks_injection_without_model_calls() -> None:
-    gateway = GuardrailGateway(create_production_registry())
+    gateway = GuardrailGateway()
     context = AdmissionContext(
         user_id="user",
         chat_session_id="session",

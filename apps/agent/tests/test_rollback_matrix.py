@@ -12,7 +12,6 @@ from agent.graph.graph import graph, router_node
 from agent.graph.nodes import create_handoff_token
 from agent.graph.state import AgentState
 from agent.guardrails.gateway import GuardrailGateway
-from agent.guardrails.registry import create_production_registry
 from agent.main import app
 from agent.models.requests import RouteDecision
 from agent.tools.nestjs_client import NestJSClient
@@ -406,7 +405,7 @@ async def test_step2_rollback_single_agent_flight_search_succeeds(mock_nestjs_cl
             "nestjs_client": mock_nestjs_client,
             "thread_id": "test_thread_single_agent_search",
             "user_id": "user_single_agent_1",
-            "guardrail_gateway": GuardrailGateway(create_production_registry()),
+            "guardrail_gateway": GuardrailGateway(),
         }
     )
 
@@ -482,7 +481,7 @@ async def test_step2_rollback_single_agent_preference_query_succeeds(mock_nestjs
             "nestjs_client": mock_nestjs_client,
             "thread_id": "test_thread_single_agent_prefs",
             "user_id": "user_single_agent_2",
-            "guardrail_gateway": GuardrailGateway(create_production_registry()),
+            "guardrail_gateway": GuardrailGateway(),
         }
     )
 
@@ -535,7 +534,7 @@ async def test_step2_rollback_out_of_bounds_query_no_unhandled_exception(
             "nestjs_client": mock_nestjs_client,
             "thread_id": "test_thread_single_agent_oob",
             "user_id": "user_single_agent_3",
-            "guardrail_gateway": GuardrailGateway(create_production_registry()),
+            "guardrail_gateway": GuardrailGateway(),
         }
     )
 

@@ -1,6 +1,5 @@
 import inspect
-from pathlib import Path
-from typing import Any, ClassVar, Literal
+from typing import ClassVar, Literal
 
 import pytest
 
@@ -8,13 +7,11 @@ from agent.guardrails.base import (
     GUARDRAIL_INPUT_INJECTION,
     GUARDRAIL_INPUT_PII,
     GUARDRAIL_INPUT_TOPIC,
-    GUARDRAIL_OUTPUT_PII,
     AdmissionContext,
-    ApprovedChunk,
     BaseGuardrailLayer,
     ValidatedInput,
 )
-from agent.guardrails.gateway import GuardrailGateway
+from agent.guardrails.gateway import GuardrailGateway, assert_layer_order
 from agent.guardrails.layers.input import (
     InjectionDetector,
     LengthValidator,
@@ -28,60 +25,7 @@ from agent.guardrails.layers.tool_output import (
     UntrustedContentInjectionDetector,
 )
 
-registry_module = pytest.importorskip(
-    "agent.guardrails.registry",
-    reason="T013 supplies the closed registry implementation",
-)
-GuardrailRegistry = registry_module.GuardrailRegistry
-RegistryContractError = registry_module.RegistryContractError
-create_production_registry = registry_module.create_production_registry
-OutputPIILayer = registry_module.OutputPIILayer
-
 pytestmark = pytest.mark.security
-
-try:
-    from agent.guardrails.gateway import assert_layer_order
-except ImportError:
-
-    def assert_layer_order(
-        stage: str,
-        layers: tuple[Any, ...] | list[Any],
-        expected_types: tuple[type, ...] | list[type],
-    ) -> None:
-        """
-        Enforces exact layer count, expected type at every position, unique layer keys,
-        and earlier same-stage prerequisite declaration for a stage tuple.
-        """
-        if len(layers) != len(expected_types):
-            raise ValueError(
-                f"Stage '{stage}' layer count mismatch: expected {len(expected_types)}, got {len(layers)}"
-            )
-
-        seen_keys: set[str] = set()
-        stage_keys = [getattr(lyr, "key", None) for lyr in layers]
-
-        for idx, (layer, exp_type) in enumerate(zip(layers, expected_types)):
-            if not isinstance(layer, exp_type):
-                raise TypeError(
-                    f"Stage '{stage}' layer at index {idx} has wrong type: expected {exp_type.__name__}, got {type(layer).__name__}"
-                )
-            key = getattr(layer, "key", None)
-            if not key or not isinstance(key, str):
-                raise ValueError(f"Stage '{stage}' layer at index {idx} has invalid key: {key}")
-            if key in seen_keys:
-                raise ValueError(f"Stage '{stage}' contains duplicate layer key: {key}")
-
-            prereqs = getattr(layer, "prerequisites", ())
-            for prereq in prereqs:
-                if prereq not in seen_keys:
-                    if prereq in stage_keys:
-                        raise ValueError(
-                            f"Stage '{stage}' layer '{key}' has prerequisite '{prereq}' declared later in the stage tuple"
-                        )
-                    raise ValueError(
-                        f"Stage '{stage}' layer '{key}' has unknown prerequisite '{prereq}'"
-                    )
-            seen_keys.add(key)
 
 
 EXPECTED_INPUT_LAYER_TYPES: tuple[type, ...] = (
@@ -243,26 +187,19 @@ def test_production_default_guardrail_gateway_instantiation_contract() -> None:
     """
     FR-008 / internal-boundaries: GuardrailGateway() MUST construct the production tuples
     with no caller-supplied registry.
-    Transitional compatibility check: if the current implementation still requires registry,
-    verify GuardrailGateway() without arguments raises TypeError/RegistryContractError,
-    and instantiating with create_production_registry() succeeds.
     """
-    sig = inspect.signature(GuardrailGateway.__init__)
-    requires_registry = (
-        "registry" in sig.parameters
-        and sig.parameters["registry"].default is inspect.Parameter.empty
-    )
-
-    if requires_registry:
-        with pytest.raises((TypeError, RegistryContractError)):
-            GuardrailGateway()  # type: ignore[call-arg]
-
-        prod_registry = create_production_registry()
-        gw = GuardrailGateway(prod_registry)
-        assert gw.is_healthy() is True
-    else:
-        gw = GuardrailGateway()
-        assert gw.is_healthy() is True
+    gw = GuardrailGateway()
+    assert gw.is_healthy() is True
+    assert len(gw._input_layers) == 4
+    assert isinstance(gw._input_layers[0], LengthValidator)
+    assert isinstance(gw._input_layers[1], PIIDetector)
+    assert isinstance(gw._input_layers[2], InjectionDetector)
+    assert isinstance(gw._input_layers[3], TopicBoundary)
+    assert len(gw._tool_layers) == 4
+    assert isinstance(gw._tool_layers[0], SizeStructureValidator)
+    assert isinstance(gw._tool_layers[1], SchemaValidator)
+    assert isinstance(gw._tool_layers[2], PIIScanner)
+    assert isinstance(gw._tool_layers[3], UntrustedContentInjectionDetector)
 
 
 def test_keyword_only_private_injection_seam_contract() -> None:
@@ -271,33 +208,30 @@ def test_keyword_only_private_injection_seam_contract() -> None:
     Positional passing must be rejected, and injected tuples must satisfy assert_layer_order.
     """
     sig = inspect.signature(GuardrailGateway.__init__)
-    if "_input_layers" not in sig.parameters:
-        # Pre-T024 transitional: injection seam not yet implemented on GuardrailGateway
-        with pytest.raises(TypeError):
-            GuardrailGateway(_input_layers=(), _tool_layers=())  # type: ignore[call-arg]
-    else:
-        param_input = sig.parameters["_input_layers"]
-        param_tool = sig.parameters["_tool_layers"]
-        assert param_input.kind == inspect.Parameter.KEYWORD_ONLY
-        assert param_tool.kind == inspect.Parameter.KEYWORD_ONLY
+    assert "_input_layers" in sig.parameters
+    assert "_tool_layers" in sig.parameters
+    param_input = sig.parameters["_input_layers"]
+    param_tool = sig.parameters["_tool_layers"]
+    assert param_input.kind == inspect.Parameter.KEYWORD_ONLY
+    assert param_tool.kind == inspect.Parameter.KEYWORD_ONLY
 
-        valid_input = (LengthValidator(), PIIDetector(), InjectionDetector(), TopicBoundary())
-        valid_tool = (
-            SizeStructureValidator(),
-            SchemaValidator(),
-            PIIScanner(),
-            UntrustedContentInjectionDetector(),
-        )
-        gw = GuardrailGateway(_input_layers=valid_input, _tool_layers=valid_tool)
-        assert gw.is_healthy() is True
+    valid_input = (LengthValidator(), PIIDetector(), InjectionDetector(), TopicBoundary())
+    valid_tool = (
+        SizeStructureValidator(),
+        SchemaValidator(),
+        PIIScanner(),
+        UntrustedContentInjectionDetector(),
+    )
+    gw = GuardrailGateway(_input_layers=valid_input, _tool_layers=valid_tool)
+    assert gw.is_healthy() is True
 
-        # Positional passing rejected
-        with pytest.raises(TypeError):
-            GuardrailGateway(valid_input, valid_tool)  # type: ignore[call-arg]
+    # Positional passing rejected
+    with pytest.raises(TypeError):
+        GuardrailGateway(valid_input, valid_tool)  # type: ignore[call-arg]
 
-        # Invalid composition raises at construction
-        with pytest.raises((ValueError, TypeError)):
-            GuardrailGateway(_input_layers=(LengthValidator(),))
+    # Invalid composition raises at construction
+    with pytest.raises((ValueError, TypeError)):
+        GuardrailGateway(_input_layers=(LengthValidator(),))
 
 
 def test_is_healthy_represents_runtime_readiness_and_never_recovers_invalid_constructor() -> None:
@@ -306,35 +240,12 @@ def test_is_healthy_represents_runtime_readiness_and_never_recovers_invalid_cons
     and cannot recover or represent an invalid constructor. Invalid composition raises
     during construction; production startup therefore aborts before serving traffic.
     """
-    sig = inspect.signature(GuardrailGateway.__init__)
-    requires_registry = (
-        "registry" in sig.parameters
-        and sig.parameters["registry"].default is inspect.Parameter.empty
-    )
-
-    if requires_registry:
-        with pytest.raises((TypeError, RegistryContractError)):
-            GuardrailGateway(None)  # type: ignore[arg-type]
-        with pytest.raises((TypeError, RegistryContractError)):
-            GuardrailGateway()  # type: ignore[call-arg]
-        prod_registry = create_production_registry()
-        gw = GuardrailGateway(prod_registry)
-    else:
-        with pytest.raises((ValueError, TypeError)):
-            GuardrailGateway(_input_layers=(LengthValidator(),))
-        gw = GuardrailGateway()
+    with pytest.raises((ValueError, TypeError)):
+        GuardrailGateway(_input_layers=(LengthValidator(),))
+    gw = GuardrailGateway()
 
     # is_healthy() represents post-construction runtime readiness
     assert gw.is_healthy() is True
-
-
-def test_registry_source_contains_no_dynamic_import_execution() -> None:
-    registry_source = (
-        Path(__file__).parents[2] / "src" / "agent" / "guardrails" / "registry.py"
-    ).read_text(encoding="utf-8")
-
-    forbidden = ("__import__(", "importlib.import_module", "eval(", "exec(")
-    assert all(token not in registry_source for token in forbidden)
 
 
 # --- Layer Functional Tests ---
@@ -433,24 +344,4 @@ async def test_production_input_topic_layer(admission_context: AdmissionContext)
         decision = await topic_layer.check(admission_context, blocked)
         assert decision.status == "BLOCK", f"Expected '{blocked}' to be blocked by topic layer"
         assert decision.response_key == GUARDRAIL_INPUT_TOPIC
-        assert decision.validated_data is None
-
-
-@pytest.mark.asyncio
-async def test_production_output_pii_layer(admission_context: AdmissionContext) -> None:
-    output_layer = OutputPIILayer()
-
-    clean_res = await output_layer.check(admission_context, "Your flight VN123 is confirmed.")
-    assert clean_res.status == "PASS"
-    assert clean_res.validated_data == ApprovedChunk(content="Your flight VN123 is confirmed.")
-
-    pii_outputs = [
-        "Customer email is secret@company.com",
-        "Phone number is +1 555-987-6543",
-        "Passport number is B987654321",
-    ]
-    for pii_out in pii_outputs:
-        decision = await output_layer.check(admission_context, pii_out)
-        assert decision.status == "BLOCK", f"Expected '{pii_out}' to be blocked"
-        assert decision.response_key == GUARDRAIL_OUTPUT_PII
         assert decision.validated_data is None

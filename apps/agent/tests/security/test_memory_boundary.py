@@ -22,10 +22,11 @@ from agent.guardrails.base import (
     ValidatedInput,
 )
 from agent.guardrails.gateway import GuardrailGateway
-from agent.guardrails.registry import (
-    BaseGuardrailLayer,
-    GuardrailRegistry,
-    create_production_registry,
+from agent.guardrails.layers.input import (
+    InjectionDetector,
+    LengthValidator,
+    PIIDetector,
+    TopicBoundary,
 )
 from agent.memory.manager import MemoryManager
 from agent.middleware.body_limit import BodyLimitMiddleware
@@ -252,8 +253,7 @@ async def test_memory_manager_summarization_prompt_uses_lower_trust_envelope() -
     """MemoryManager._generate_and_persist_summary presents instructions in a fixed
     trusted SystemMessage and existing summary / new messages in a lower-trust HumanMessage envelope,
     never interpolating untrusted data into SystemMessage."""
-    registry = create_production_registry()
-    gateway = GuardrailGateway(registry)
+    gateway = GuardrailGateway()
     manager = MemoryManager(window_size=2, token_budget=100, gateway=gateway)
 
     mock_client = MagicMock()
@@ -301,7 +301,7 @@ async def test_memory_manager_summarization_prompt_uses_lower_trust_envelope() -
 # ============================================================================
 
 
-class StubInjectionGuardrail(BaseGuardrailLayer):
+class StubInjectionGuardrail(InjectionDetector):
     key = "input.injection"
     stage = "input"
 
@@ -320,7 +320,7 @@ class StubInjectionGuardrail(BaseGuardrailLayer):
         return PipelineDecision(status="PASS", validated_data=ValidatedInput(content=text))
 
 
-class StubPIIGuardrail(BaseGuardrailLayer):
+class StubPIIGuardrail(PIIDetector):
     key = "input.pii"
     stage = "input"
 
@@ -343,9 +343,14 @@ class StubPIIGuardrail(BaseGuardrailLayer):
 async def test_loaded_history_injection_fails_closed_with_zero_model_calls() -> None:
     """When loaded historical entry contains prompt injection, runner fails closed with
     GUARDRAIL_INPUT_INJECTION ErrorEvent, and strictly 0 graph/model calls occur."""
-    registry = GuardrailRegistry()
-    registry.register(StubInjectionGuardrail())
-    gateway = GuardrailGateway(registry)
+    gateway = GuardrailGateway(
+        _input_layers=(
+            LengthValidator(),
+            PIIDetector(),
+            StubInjectionGuardrail(),
+            TopicBoundary(),
+        )
+    )
 
     mock_client = MagicMock()
     mock_client.create_session = AsyncMock(return_value={"id": "sess-hist-inj"})
@@ -389,9 +394,14 @@ async def test_loaded_history_injection_fails_closed_with_zero_model_calls() -> 
 async def test_loaded_history_pii_fails_closed_with_zero_model_calls() -> None:
     """When loaded historical entry contains sensitive PII, runner fails closed with
     GUARDRAIL_INPUT_PII ErrorEvent, and strictly 0 graph/model calls occur."""
-    registry = GuardrailRegistry()
-    registry.register(StubPIIGuardrail())
-    gateway = GuardrailGateway(registry)
+    gateway = GuardrailGateway(
+        _input_layers=(
+            LengthValidator(),
+            StubPIIGuardrail(),
+            InjectionDetector(),
+            TopicBoundary(),
+        )
+    )
 
     mock_client = MagicMock()
     mock_client.create_session = AsyncMock(return_value={"id": "sess-hist-pii"})
@@ -434,9 +444,14 @@ async def test_loaded_history_pii_fails_closed_with_zero_model_calls() -> None:
 async def test_loaded_summary_injection_is_discarded_and_not_sent_to_model() -> None:
     """When loaded conversation summary contains prompt injection, runner discards
     the summary and proceeds with model execution without injecting unsafe summary into prompt."""
-    registry = GuardrailRegistry()
-    registry.register(StubInjectionGuardrail())
-    gateway = GuardrailGateway(registry)
+    gateway = GuardrailGateway(
+        _input_layers=(
+            LengthValidator(),
+            PIIDetector(),
+            StubInjectionGuardrail(),
+            TopicBoundary(),
+        )
+    )
 
     mock_client = MagicMock()
     mock_client.create_session = AsyncMock(return_value={"id": "sess-sum-inj"})
@@ -492,9 +507,14 @@ async def test_loaded_summary_injection_is_discarded_and_not_sent_to_model() -> 
 async def test_newly_generated_summary_validated_and_discarded_if_unsafe() -> None:
     """MemoryManager validates newly generated summary before persistence;
     if gateway does not return PASS, summary is discarded and client.create_message is NEVER called."""
-    registry = GuardrailRegistry()
-    registry.register(StubInjectionGuardrail())
-    gateway = GuardrailGateway(registry)
+    gateway = GuardrailGateway(
+        _input_layers=(
+            LengthValidator(),
+            PIIDetector(),
+            StubInjectionGuardrail(),
+            TopicBoundary(),
+        )
+    )
 
     manager = MemoryManager(window_size=2, token_budget=100, gateway=gateway)
 

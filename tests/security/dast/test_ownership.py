@@ -92,7 +92,6 @@ from agent.chat_turn.events import ErrorEvent  # noqa: E402
 from agent.chat_turn.runner import ChatTurnRunner  # noqa: E402
 from agent.config import get_settings  # noqa: E402
 from agent.guardrails.gateway import GuardrailGateway  # noqa: E402
-from agent.guardrails.registry import create_production_registry  # noqa: E402
 from agent.middleware.auth import JWTAuthMiddleware  # noqa: E402
 from agent.queue.message_queue import MessageQueueManager  # noqa: E402
 from agent.repositories.session_lock_repository import SessionLockRepository  # noqa: E402
@@ -252,7 +251,7 @@ def test_app():
     app.add_middleware(JWTAuthMiddleware, secret=SECRET, exclude_paths=["/health"])
     app.include_router(streaming_router)
     app.state.message_queue = MessageQueueManager()
-    app.state.guardrail_gateway = GuardrailGateway(create_production_registry())
+    app.state.guardrail_gateway = GuardrailGateway()
     return app
 
 
@@ -641,7 +640,7 @@ async def test_missing_or_invalid_agent_service_api_key_error_handling_unit():
 @pytest.mark.asyncio
 async def test_replaying_consumed_or_expired_handoff_token_fails_closed():
     """[Security Invariant] Replaying consumed or expired handoff fails closed without mutations."""
-    gateway = GuardrailGateway(create_production_registry())
+    gateway = GuardrailGateway()
     mock_client = AsyncMock()
     mock_client.create_booking = AsyncMock()
     mock_client.create_payment = AsyncMock()

@@ -6,9 +6,8 @@ Task T047 [US5]: Fail-Closed Rollout, Rollback & Startup Tests.
 
 Covers:
 1. Fail-Closed Startup Verification:
-   - Missing or corrupted guardrail registry: GuardrailGateway or create_production_registry()
-     with invalid config, missing compulsory layers, or disabled compulsory layers raises
-     RegistryContractError and fails fast.
+   - Invalid guardrail layer composition: GuardrailGateway with invalid config or
+     missing compulsory layers raises LayerOrderError or TypeError and fails fast.
    - Corrupted or invalid regex rules: corrupted or catastrophic patterns fail closed
      at startup / layer initialization and never fall back to pass-through.
    - Missing HMAC keys (JWT_SECRET, CLAIM_TOKEN_SECRET): unauthenticated or forged requests
@@ -49,17 +48,15 @@ from agent.guardrails.base import (
     GUARDRAIL_INPUT_INJECTION,
     GUARDRAIL_TOOL_SCHEMA,
     AdmissionContext,
-    BaseGuardrailLayer,
     PipelineDecision,
     TurnCapabilities,
 )
 from agent.guardrails.gateway import GuardrailGateway
-from agent.guardrails.layers.input import TopicBoundary
-from agent.guardrails.registry import (
-    COMPULSORY_PRODUCTION_LAYERS,
-    GuardrailRegistry,
-    RegistryContractError,
-    create_production_registry,
+from agent.guardrails.layers.input import (
+    InjectionDetector,
+    LengthValidator,
+    PIIDetector,
+    TopicBoundary,
 )
 from agent.main import app
 from agent.models.requests import RouteDecision
@@ -91,7 +88,7 @@ def generate_valid_jwt(
 
 class DegradedGateway(GuardrailGateway):
     def __init__(self) -> None:
-        super().__init__(GuardrailRegistry())
+        super().__init__()
 
     def is_healthy(self) -> bool:
         return False
@@ -102,42 +99,34 @@ class DegradedGateway(GuardrailGateway):
 # ---------------------------------------------------------------------------
 
 
-def test_startup_fails_closed_on_missing_or_corrupted_registry() -> None:
-    """Initializing GuardrailGateway with invalid registry or calling create_production_registry() with invalid config must raise RegistryContractError."""
-    with pytest.raises(RegistryContractError):
-        GuardrailGateway(None)  # type: ignore[arg-type]
+def test_startup_fails_closed_on_invalid_gateway_layers() -> None:
+    """Initializing GuardrailGateway with invalid keyword seams must fail fast."""
+    with pytest.raises((ValueError, TypeError)):
+        GuardrailGateway(_input_layers=())  # type: ignore[arg-type]
 
-    with pytest.raises(RegistryContractError):
-        GuardrailGateway("not-a-registry")  # type: ignore[arg-type]
+    with pytest.raises((ValueError, TypeError)):
+        GuardrailGateway(_input_layers=(LengthValidator(),))  # type: ignore[arg-type]
 
-    with pytest.raises(RegistryContractError):
-        create_production_registry(disabled_keys=12345)  # type: ignore[arg-type]
+    with pytest.raises((ValueError, TypeError)):
+        GuardrailGateway(_input_layers="not-a-tuple")  # type: ignore[arg-type]
 
-    with pytest.raises(RegistryContractError):
-        create_production_registry(disabled_keys=[123])  # type: ignore[list-item]
+    with pytest.raises((ValueError, TypeError)):
+        GuardrailGateway(_tool_layers=())  # type: ignore[arg-type]
 
-    with pytest.raises(RegistryContractError):
-        create_production_registry(disabled_keys=["input.injection", 456])  # type: ignore[list-item]
-
-    with pytest.raises(RegistryContractError):
-        create_production_registry(disabled_keys="invalid-string-not-iterable-of-keys")  # type: ignore[arg-type]
-
-    with pytest.raises(RegistryContractError):
-        create_production_registry(disabled_keys={"input.injection"})
-
-    with pytest.raises(RegistryContractError):
-        create_production_registry(disabled_keys={"tool.schema"})
+    with pytest.raises((ValueError, TypeError)):
+        GuardrailGateway(_tool_layers="not-a-tuple")  # type: ignore[arg-type]
 
 
 def test_startup_fails_closed_on_disabled_compulsory_layers() -> None:
-    """Disabling any compulsory production layer in create_production_registry must raise RegistryContractError."""
-    for compulsory_layer in COMPULSORY_PRODUCTION_LAYERS:
-        with pytest.raises(RegistryContractError):
-            create_production_registry(disabled_keys={compulsory_layer})
+    """Initializing GuardrailGateway with missing compulsory layers must raise ValueError."""
+    # Missing compulsory layers via empty or partial tuple
+    with pytest.raises((ValueError, TypeError)):
+        GuardrailGateway(_input_layers=(LengthValidator(), PIIDetector()))  # type: ignore[arg-type]
 
-    valid_registry = create_production_registry()
-    gateway = GuardrailGateway(valid_registry)
-    assert gateway.registry is valid_registry
+    gateway = GuardrailGateway()
+    assert gateway.is_healthy() is True
+    assert len(gateway._input_layers) == 4
+    assert len(gateway._tool_layers) == 4
 
 
 def test_corrupted_or_invalid_regex_rules_fail_closed_at_startup() -> None:
@@ -337,8 +326,7 @@ def test_gateway_failure_does_not_consume_quota() -> None:
 @pytest.mark.asyncio
 async def test_zero_fail_open_bypass_invariant_input_validation() -> None:
     """Under NO condition (crash, unhandled exception, invalid context) does gateway fail open on input."""
-    registry = create_production_registry()
-    gateway = GuardrailGateway(registry)
+    gateway = GuardrailGateway()
 
     d1 = await gateway.validate_input(None, "Search flights to Tokyo")  # type: ignore[arg-type]
     assert d1.status == "BLOCK"
@@ -347,17 +335,22 @@ async def test_zero_fail_open_bypass_invariant_input_validation() -> None:
     d2 = await gateway.validate_input("not-context", "Search flights")  # type: ignore[arg-type]
     assert d2.status == "BLOCK"
 
-    class ExplodingLayer(BaseGuardrailLayer):
+    class ExplodingLayer(InjectionDetector):
         key: ClassVar[str] = "input.exploding"
         stage: ClassVar[Literal["input"]] = "input"
-        prerequisites: ClassVar[tuple[str, ...]] = ()
+        prerequisites: ClassVar[tuple[str, ...]] = ("input.length", "input.pii")
 
         async def check(self, context: Any, data: Any) -> PipelineDecision[Any]:
             raise RuntimeError("Catastrophic internal crash inside layer!")
 
-    chaos_registry = GuardrailRegistry()
-    chaos_registry.register(ExplodingLayer())
-    chaos_gateway = GuardrailGateway(chaos_registry)
+    chaos_gateway = GuardrailGateway(
+        _input_layers=(
+            LengthValidator(),
+            PIIDetector(),
+            ExplodingLayer(),
+            TopicBoundary(),
+        )
+    )
 
     valid_context = AdmissionContext(
         user_id="usr-123",
@@ -374,8 +367,7 @@ async def test_zero_fail_open_bypass_invariant_input_validation() -> None:
 @pytest.mark.asyncio
 async def test_zero_fail_open_bypass_invariant_tool_execution() -> None:
     """Tool gateway must fail closed under every failure mode: bad caps, unsealed tools, tool crashes."""
-    registry = create_production_registry()
-    gateway = GuardrailGateway(registry)
+    gateway = GuardrailGateway()
 
     caps = TurnCapabilities(
         intent="SEARCH",
@@ -415,8 +407,7 @@ async def test_zero_fail_open_bypass_invariant_tool_execution() -> None:
 @pytest.mark.asyncio
 async def test_zero_fail_open_bypass_invariant_tool_batch_and_result() -> None:
     """Tool batch and result validations must fail closed without partial unauthorized leaks."""
-    registry = create_production_registry()
-    gateway = GuardrailGateway(registry)
+    gateway = GuardrailGateway()
 
     caps = TurnCapabilities(
         intent="SEARCH",

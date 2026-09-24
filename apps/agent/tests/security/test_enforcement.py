@@ -24,10 +24,11 @@ from agent.guardrails.base import (
     TurnCapabilities,
 )
 from agent.guardrails.gateway import GuardrailGateway
-from agent.guardrails.registry import (
-    BaseGuardrailLayer,
-    GuardrailRegistry,
-    create_production_registry,
+from agent.guardrails.layers.input import (
+    InjectionDetector,
+    LengthValidator,
+    PIIDetector,
+    TopicBoundary,
 )
 from agent.memory.manager import MemoryManager
 
@@ -124,7 +125,7 @@ async def test_direct_runner_fails_closed_when_configured_without_gateway() -> N
 # ============================================================================
 
 
-class ExplodingGuardrailLayer(BaseGuardrailLayer):
+class ExplodingGuardrailLayer(InjectionDetector):
     key = "input.injection"
     stage = "input"
 
@@ -144,9 +145,14 @@ class ExplodingGuardrailLayer(BaseGuardrailLayer):
 async def test_classifier_exception_fails_closed_in_gateway() -> None:
     """Gateway.validate_input catches unhandled classifier exception and fails closed
     with status='BLOCK' and generic response_key, discarding any sensitive exception payload."""
-    registry = GuardrailRegistry()
-    registry.register(ExplodingGuardrailLayer("INTERNAL_MODEL_EXPLOSION_CANARY"))
-    gateway = GuardrailGateway(registry)
+    gateway = GuardrailGateway(
+        _input_layers=(
+            LengthValidator(),
+            PIIDetector(),
+            ExplodingGuardrailLayer("INTERNAL_MODEL_EXPLOSION_CANARY"),
+            TopicBoundary(),
+        )
+    )
 
     context = AdmissionContext(
         user_id="user-1",
@@ -169,9 +175,14 @@ async def test_classifier_exception_fails_closed_in_gateway() -> None:
 async def test_classifier_exception_in_controller_fails_closed_without_calling_runner() -> None:
     """Unhandled classifier exception during turn validation fails closed at controller
     level, yielding ErrorEvent and never invoking the runner."""
-    registry = GuardrailRegistry()
-    registry.register(ExplodingGuardrailLayer("CRITICAL_CRASH_SECRET"))
-    gateway = GuardrailGateway(registry)
+    gateway = GuardrailGateway(
+        _input_layers=(
+            LengthValidator(),
+            PIIDetector(),
+            ExplodingGuardrailLayer("CRITICAL_CRASH_SECRET"),
+            TopicBoundary(),
+        )
+    )
 
     mock_runner = MockRunner()
     controller = ChatController(runner=mock_runner, gateway=gateway)
@@ -195,9 +206,14 @@ async def test_classifier_exception_in_controller_fails_closed_without_calling_r
 @pytest.mark.asyncio
 async def test_direct_runner_classifier_exception_fails_closed() -> None:
     """Direct-runner with gateway fails closed when classifier throws unhandled exception."""
-    registry = GuardrailRegistry()
-    registry.register(ExplodingGuardrailLayer("UNHANDLED_RUNNER_BOOM"))
-    gateway = GuardrailGateway(registry)
+    gateway = GuardrailGateway(
+        _input_layers=(
+            LengthValidator(),
+            PIIDetector(),
+            ExplodingGuardrailLayer("UNHANDLED_RUNNER_BOOM"),
+            TopicBoundary(),
+        )
+    )
 
     runner = ChatTurnRunner(gateway=gateway, require_gateway=True)
 
@@ -221,7 +237,7 @@ async def test_direct_runner_classifier_exception_fails_closed() -> None:
 # ============================================================================
 
 
-class BlockingInjectionLayer(BaseGuardrailLayer):
+class BlockingInjectionLayer(InjectionDetector):
     key = "input.injection"
     stage = "input"
 
@@ -241,9 +257,14 @@ class BlockingInjectionLayer(BaseGuardrailLayer):
 async def test_zero_model_calls_on_controller_input_block() -> None:
     """When input guardrail detects a violation, ChatController aborts immediately;
     model and runner invocation count is strictly 0."""
-    registry = GuardrailRegistry()
-    registry.register(BlockingInjectionLayer())
-    gateway = GuardrailGateway(registry)
+    gateway = GuardrailGateway(
+        _input_layers=(
+            LengthValidator(),
+            PIIDetector(),
+            BlockingInjectionLayer(),
+            TopicBoundary(),
+        )
+    )
 
     mock_runner = MockRunner()
     controller = ChatController(runner=mock_runner, gateway=gateway)
@@ -267,9 +288,14 @@ async def test_zero_model_calls_on_controller_input_block() -> None:
 async def test_zero_model_calls_on_direct_runner_input_block() -> None:
     """When direct runner validates input via gateway, a block decision aborts
     before any client calls, session creations, or LangGraph execution."""
-    registry = GuardrailRegistry()
-    registry.register(BlockingInjectionLayer())
-    gateway = GuardrailGateway(registry)
+    gateway = GuardrailGateway(
+        _input_layers=(
+            LengthValidator(),
+            PIIDetector(),
+            BlockingInjectionLayer(),
+            TopicBoundary(),
+        )
+    )
 
     mock_client = MagicMock()
     mock_client.create_session = AsyncMock()
@@ -303,8 +329,7 @@ async def test_direct_runner_blocks_turn_and_prevents_model_call_on_unsafe_loade
     """When loaded conversation history contains unsafe injection/payload,
     direct runner fails closed, yields GUARDRAIL_INPUT_INJECTION ErrorEvent,
     and prevents graph/model invocation."""
-    registry = create_production_registry()
-    gateway = GuardrailGateway(registry)
+    gateway = GuardrailGateway()
 
     mock_client = MagicMock()
     mock_client.create_session = AsyncMock(return_value={"id": "sess-hist-unsafe"})
@@ -350,8 +375,7 @@ async def test_direct_runner_discards_unsafe_loaded_summary_before_invoking_mode
     """When loaded conversation summary contains unsafe prompt injection,
     direct runner discards the summary (setting it to None) and proceeds
     with model invocation without the unsafe summary in messages."""
-    registry = create_production_registry()
-    gateway = GuardrailGateway(registry)
+    gateway = GuardrailGateway()
 
     mock_client = MagicMock()
     mock_client.create_session = AsyncMock(return_value={"id": "sess-sum-unsafe"})
@@ -496,7 +520,7 @@ def test_format_messages_summary_framed_in_lower_trust_envelope() -> None:
 # ============================================================================
 
 
-class BlockingPIILayer(BaseGuardrailLayer):
+class BlockingPIILayer(PIIDetector):
     key = "input.pii"
     stage = "input"
 
@@ -518,8 +542,7 @@ class BlockingPIILayer(BaseGuardrailLayer):
 @pytest.mark.asyncio
 async def test_memory_manager_accepts_gateway() -> None:
     """MemoryManager accepts an optional gateway instance and stores it."""
-    registry = GuardrailRegistry()
-    gateway = GuardrailGateway(registry)
+    gateway = GuardrailGateway()
 
     manager = MemoryManager(window_size=10, token_budget=2000, gateway=gateway)
     assert manager.gateway is gateway
@@ -529,9 +552,14 @@ async def test_memory_manager_accepts_gateway() -> None:
 async def test_summary_generation_blocks_unsafe_summary_and_prevents_persistence() -> None:
     """When LLM generates a summary containing PII/injection, gateway blocks it
     and client.create_message is NEVER called."""
-    registry = GuardrailRegistry()
-    registry.register(BlockingPIILayer())
-    gateway = GuardrailGateway(registry)
+    gateway = GuardrailGateway(
+        _input_layers=(
+            LengthValidator(),
+            BlockingPIILayer(),
+            InjectionDetector(),
+            TopicBoundary(),
+        )
+    )
 
     manager = MemoryManager(window_size=2, token_budget=100, gateway=gateway)
 
@@ -566,9 +594,14 @@ async def test_summary_generation_blocks_unsafe_summary_and_prevents_persistence
 async def test_summary_generation_fails_closed_on_classifier_exception() -> None:
     """When gateway validation encounters an exception during summary validation,
     it fails closed and client.create_message is NEVER called."""
-    registry = GuardrailRegistry()
-    registry.register(ExplodingGuardrailLayer("SUMMARY_CLASSIFIER_CRASH"))
-    gateway = GuardrailGateway(registry)
+    gateway = GuardrailGateway(
+        _input_layers=(
+            LengthValidator(),
+            PIIDetector(),
+            ExplodingGuardrailLayer("SUMMARY_CLASSIFIER_CRASH"),
+            TopicBoundary(),
+        )
+    )
 
     manager = MemoryManager(window_size=2, token_budget=100, gateway=gateway)
 
@@ -593,9 +626,7 @@ async def test_summary_generation_fails_closed_on_classifier_exception() -> None
 @pytest.mark.asyncio
 async def test_summary_generation_persists_when_gateway_passes() -> None:
     """When gateway validation approves the generated summary, client.create_message is called."""
-    registry = GuardrailRegistry()
-    registry.register(BaseGuardrailLayer(key="input.length", stage="input"))
-    gateway = GuardrailGateway(registry)
+    gateway = GuardrailGateway()
 
     manager = MemoryManager(window_size=2, token_budget=100, gateway=gateway)
 
@@ -634,7 +665,7 @@ async def test_canary_does_not_leak_in_error_event_payloads() -> None:
     ensures the canary never appears in ErrorPayload or public event data."""
     canary = "CANARY_SECRET_TOKEN_987654321_XYZ"
 
-    class CanaryBlockingLayer(BaseGuardrailLayer):
+    class CanaryBlockingLayer(InjectionDetector):
         key = "input.injection"
         stage = "input"
 
@@ -649,9 +680,14 @@ async def test_canary_does_not_leak_in_error_event_payloads() -> None:
                 reason=f"Blocked due to {canary}",
             )
 
-    registry = GuardrailRegistry()
-    registry.register(CanaryBlockingLayer())
-    gateway = GuardrailGateway(registry)
+    gateway = GuardrailGateway(
+        _input_layers=(
+            LengthValidator(),
+            PIIDetector(),
+            CanaryBlockingLayer(),
+            TopicBoundary(),
+        )
+    )
 
     mock_runner = MockRunner()
     controller = ChatController(runner=mock_runner, gateway=gateway)
@@ -682,9 +718,14 @@ async def test_canary_does_not_leak_in_summary_validation_logs(
     the raw canary string must never leak into memory manager log records."""
     canary = "CANARY_SUMMARY_SECRET_PAYLOAD_ABC123"
 
-    registry = GuardrailRegistry()
-    registry.register(ExplodingGuardrailLayer(f"Exception containing {canary}"))
-    gateway = GuardrailGateway(registry)
+    gateway = GuardrailGateway(
+        _input_layers=(
+            LengthValidator(),
+            PIIDetector(),
+            ExplodingGuardrailLayer(f"Exception containing {canary}"),
+            TopicBoundary(),
+        )
+    )
 
     manager = MemoryManager(window_size=2, token_budget=100, gateway=gateway)
     mock_client = MagicMock()
@@ -715,9 +756,14 @@ async def test_model_callbacks_do_not_receive_raw_blocked_payload_or_canary() ->
     are NEVER invoked, guaranteeing zero callback payload leaks."""
     canary = "CANARY_CALLBACK_RESTRICTION_456"
 
-    registry = GuardrailRegistry()
-    registry.register(BlockingInjectionLayer())
-    gateway = GuardrailGateway(registry)
+    gateway = GuardrailGateway(
+        _input_layers=(
+            LengthValidator(),
+            PIIDetector(),
+            BlockingInjectionLayer(),
+            TopicBoundary(),
+        )
+    )
 
     callback_handler = DummyCallbackHandler()
     mock_runner = MockRunner(callback_handler=callback_handler)

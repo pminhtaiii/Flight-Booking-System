@@ -25,7 +25,6 @@ try:
     from agent.guardrails.base import OutputGuardrailBlockedError
 except ImportError:
     from agent.guardrails.output_pipeline import OutputGuardrailBlockedError
-from agent.guardrails.registry import create_production_registry
 
 
 def test_chat_turn_command_valid_and_extra_forbid():
@@ -149,7 +148,7 @@ async def test_production_runner_passes_mandatory_gateway_into_graph_config() ->
         }
 
     mock_graph.astream_events = capture_astream_events
-    gateway = GuardrailGateway(create_production_registry())
+    gateway = GuardrailGateway()
     runner = ChatTurnRunner(
         graph=mock_graph,
         client_factory=lambda **_kwargs: mock_client,

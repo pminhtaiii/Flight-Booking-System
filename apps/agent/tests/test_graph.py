@@ -6,7 +6,6 @@ from langchain_core.runnables import RunnableConfig
 
 from agent.graph.graph import graph
 from agent.guardrails.gateway import GuardrailGateway
-from agent.guardrails.registry import create_production_registry
 from agent.models.requests import RouteDecision
 from agent.tools.nestjs_client import NestJSClient
 
@@ -25,7 +24,7 @@ def mock_nestjs_client():
 
 @pytest.fixture
 def guardrail_gateway() -> GuardrailGateway:
-    return GuardrailGateway(create_production_registry())
+    return GuardrailGateway()
 
 
 @pytest.fixture

@@ -57,7 +57,6 @@ from agent.guardrails.output_pipeline import (
     _PHONE,
     OutputGuardrailPipeline,
 )
-from agent.guardrails.registry import create_production_registry
 
 try:
     from agent.guardrails.base import OutputGuardrailBlockedError
@@ -173,8 +172,7 @@ def turn_capabilities() -> TurnCapabilities:
 
 @pytest.fixture
 def production_gateway() -> GuardrailGateway:
-    registry = create_production_registry()
-    return GuardrailGateway(registry)
+    return GuardrailGateway()
 
 
 # ---------------------------------------------------------------------------
@@ -189,8 +187,8 @@ async def test_cold_initialization_vs_warm_execution(
 ) -> None:
     """Measure cold initialization overhead vs. warm execution across all layers.
 
-    Cold initialization covers fresh regex pattern compiles, production registry
-    creation, and all 9 compulsory layer instantiations.
+    Cold initialization covers fresh regex pattern compiles, production gateway
+    creation, and all compulsory layer instantiations.
     Warm execution asserts <= 1.0 ms p95 per typical layer and <= 10.0 ms per turn.
     """
     # 1. Cold Initialization Benchmark (3 independent runs)
@@ -199,8 +197,8 @@ async def test_cold_initialization_vs_warm_execution(
         t0 = time.perf_counter()
         # Compile all injection signatures fresh
         _ = [re.compile(pat) for _, pat in _SIGNATURE_DEFINITIONS]
-        # Create fresh production registry and instantiate all compulsory layers
-        _ = create_production_registry()
+        # Create fresh production gateway and instantiate all compulsory layers
+        _ = GuardrailGateway()
         # Instantiate streaming output pipeline fresh
         _ = OutputGuardrailPipeline(config={"enabled": True})
         cold_init_timings.append((time.perf_counter() - t0) * 1000.0)
@@ -209,8 +207,7 @@ async def test_cold_initialization_vs_warm_execution(
     assert cold_p95 < 250.0, f"Cold initialization exceeded ceiling: {cold_p95:.2f} ms"
 
     # 2. Warm Execution Benchmark across 50 iterations
-    registry = create_production_registry()
-    gateway = GuardrailGateway(registry)
+    gateway = GuardrailGateway()
 
     typical_input = (
         "I need to search for one-way flights from SFO to JFK on 2026-10-15 "
@@ -230,12 +227,8 @@ async def test_cold_initialization_vs_warm_execution(
     }
     tool_output = ToolOutput(tool_name="search_flights", data=typical_tool_result)
 
-    input_layer_timings: dict[str, list[float]] = {
-        layer.key: [] for layer in registry.ordered_layers("input")
-    }
-    tool_layer_timings: dict[str, list[float]] = {
-        layer.key: [] for layer in registry.ordered_layers("tool")
-    }
+    input_layer_timings: dict[str, list[float]] = {layer.key: [] for layer in gateway._input_layers}
+    tool_layer_timings: dict[str, list[float]] = {layer.key: [] for layer in gateway._tool_layers}
     turn_compute_timings: list[float] = []
 
     # Warm-up phase
@@ -245,23 +238,23 @@ async def test_cold_initialization_vs_warm_execution(
 
     # Measurement phase (50 iterations)
     with _benchmark_isolation():
-        for layer in registry.ordered_layers("input"):
+        for layer in gateway._input_layers:
             await layer.check(admission_context, typical_input)
-        for layer in registry.ordered_layers("tool"):
+        for layer in gateway._tool_layers:
             await layer.check(turn_capabilities, tool_output)
         for _ in range(50):
             await asyncio.sleep(0)
             turn_t0 = time.perf_counter()
 
             # Step A: Measure each input layer individually
-            for layer in registry.ordered_layers("input"):
+            for layer in gateway._input_layers:
                 l_t0 = time.perf_counter()
                 d = await layer.check(admission_context, typical_input)
                 assert d.status == "PASS"
                 input_layer_timings[layer.key].append((time.perf_counter() - l_t0) * 1000.0)
 
             # Step B: Measure each tool layer individually
-            for layer in registry.ordered_layers("tool"):
+            for layer in gateway._tool_layers:
                 l_t0 = time.perf_counter()
                 d = await layer.check(turn_capabilities, tool_output)
                 assert d.status == "PASS"

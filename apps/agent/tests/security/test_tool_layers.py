@@ -35,7 +35,6 @@ from agent.guardrails.layers.tool_output import (
     ToolPIIScanner,
     UntrustedContentInjectionDetector,
 )
-from agent.guardrails.registry import create_production_registry
 
 pytestmark = pytest.mark.security
 
@@ -61,13 +60,6 @@ def turn_capabilities() -> TurnCapabilities:
 
 @pytest.fixture
 def gateway() -> GuardrailGateway:
-    sig = inspect.signature(GuardrailGateway.__init__)
-    if (
-        "registry" in sig.parameters
-        and sig.parameters["registry"].default is inspect.Parameter.empty
-    ):
-        registry = create_production_registry()
-        return GuardrailGateway(registry)
     return GuardrailGateway()
 
 
@@ -663,14 +655,7 @@ def test_fixed_tool_layer_order_and_types(gateway: GuardrailGateway) -> None:
         PIIScanner,
         UntrustedContentInjectionDetector,
     )
-    if hasattr(gateway, "_tool_layers"):
-        layers = gateway._tool_layers
-    elif hasattr(gateway, "tool_layers"):
-        layers = gateway.tool_layers
-    elif hasattr(gateway, "registry"):
-        layers = gateway.registry.ordered_layers("tool")
-    else:
-        pytest.fail("Cannot determine tool layers from GuardrailGateway")
+    layers = gateway._tool_layers
 
     assert tuple(type(layer) for layer in layers) == expected_types
     assert len(layers) == 4

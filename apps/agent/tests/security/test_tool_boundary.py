@@ -38,7 +38,6 @@ from agent.guardrails.base import (
     ValidatedToolResult,
 )
 from agent.guardrails.gateway import GuardrailGateway
-from agent.guardrails.registry import create_production_registry
 from agent.observability.chat_observability import ChatTelemetry
 
 pytestmark = pytest.mark.security
@@ -130,11 +129,7 @@ def admission_context() -> AdmissionContext:
 
 @pytest.fixture
 def gateway() -> GuardrailGateway:
-    try:
-        return GuardrailGateway()
-    except (TypeError, Exception):
-        registry = create_production_registry()
-        return GuardrailGateway(registry)
+    return GuardrailGateway()
 
 
 # ============================================================================

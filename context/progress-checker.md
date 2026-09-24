@@ -1,5 +1,21 @@
 # Progress Tracker
  
+### Feature 026 — Agent Boundary Simplification: Phase 4 Complete / US2 100% Complete (Tasks T030–T032 Verified) (2026-09-24)
+
+- **Phase 4 / Slice 4 (User Story 2 Completion: Fixture Cluster Migration, Dead Registry/Pipeline Elimination & Verification Gate) Delivered (Tasks T030–T032)**:
+  - **Fixture Cluster Migration (T030)**:
+    - Migrated registry-constructor fixture clusters across 22 test files (`apps/agent/tests/security/test_enforcement.py`, `test_gateway.py`, `test_input_layers.py`, `test_lifecycle.py`, `test_memory_boundary.py`, `test_model_output_boundary.py`, `test_registry.py`, `test_rollout.py`, `test_security_performance.py`, `test_tool_authority.py`, `test_tool_boundary.py`, `test_tool_integration.py`, `test_tool_layers.py`, `test_chaos_simulation.py`, `test_chat_turn_runner.py`, `test_graph.py`, `test_guardrails.py`, `test_negative_privacy_audit.py`, `test_rollback_matrix.py`, `test_stream_auth_budget.py`, `test_stream_session_control.py`, `test_tools.py`) to direct `GuardrailGateway()` or keyword-only tuple injection (`_input_layers`, `_tool_layers`).
+    - Asserted no test treats `is_healthy()` as constructor recovery.
+  - **Dead Registry & Pipeline File Deletion (T031)**:
+    - Deleted obsolete files: `apps/agent/src/agent/guardrails/registry.py` (including `OutputPIILayer`), `apps/agent/src/agent/guardrails/input_pipeline.py`, `apps/agent/src/agent/guardrails/tool_output_pipeline.py`, and `apps/agent/src/agent/guardrails/tool_schemas.py`.
+    - Symbol census verified zero lingering imports or references to `GuardrailRegistry`, `create_production_registry`, `InputGuardrailPipeline`, `ToolOutputGuardrailPipeline`, or `OutputPIILayer`.
+  - **US2 Verification Gate Execution (T032)**:
+    - Executed focused suites and full non-Redis agent pytest suite: 1141 passed, 4 skipped, 12 deselected (all tests pass).
+    - Ruff check & format: clean (0 errors, 0 warnings).
+    - User Story 2 is 100% complete (Tasks T017–T032 all complete).
+  - **Phase 5 Status**:
+    - Phase 5 (Tasks T033–T037: Polish & Cross-Cutting Verification) remains strictly unstarted.
+
 ### Feature 026 — Agent Boundary Simplification: Phase 4 / Slice 3 Complete (Tasks T024–T029 Verified) (2026-09-24)
 
 - **Phase 4 / Slice 3 (User Story 2 Implementation: Fixed Gateway Refactoring, Stream Session, PII Extraction, SSE Pre-Quota Admission & Canonical Singleton) Delivered (Tasks T024–T029)**:
