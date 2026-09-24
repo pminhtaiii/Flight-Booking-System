@@ -109,7 +109,6 @@ _TEST_ENV = _resolve_test_env()
 from agent.config import get_settings  # noqa: E402
 from agent.guardrails.base import AdmissionContext  # noqa: E402
 from agent.guardrails.gateway import GuardrailGateway  # noqa: E402
-from agent.guardrails.registry import create_production_registry  # noqa: E402
 from agent.main import app  # noqa: E402
 from agent.models.requests import ChatStreamRequest  # noqa: E402
 from agent.queue.message_queue import MessageQueueManager  # noqa: E402
@@ -150,7 +149,7 @@ def fast_api_client(setup_test_redis: InMemRedis) -> Any:
     if not hasattr(app.state, "message_queue") or app.state.message_queue is None:
         app.state.message_queue = MessageQueueManager()
     if not hasattr(app.state, "guardrail_gateway") or app.state.guardrail_gateway is None:
-        app.state.guardrail_gateway = GuardrailGateway(create_production_registry())
+        app.state.guardrail_gateway = GuardrailGateway()
 
     with patch("agent.infrastructure.redis.close_redis", new_callable=AsyncMock):
         with TestClient(app) as client:
@@ -707,7 +706,7 @@ def test_injection_payloads_fastapi_chat_stream_endpoint(
 )
 def test_injection_guardrail_input_pipeline(payload: str) -> None:
     """Verify GuardrailGateway safely evaluates injection vectors without unhandled exceptions."""
-    gateway = GuardrailGateway(create_production_registry())
+    gateway = GuardrailGateway()
     admission_ctx = AdmissionContext(
         user_id="sec-injection-tester",
         chat_session_id="session-sec-injection",
@@ -1017,9 +1016,7 @@ async def test_route_inventory_all_45_routes_http_or_contract(
 
         elif svc == "api" and is_live_api:
             if clean_path.startswith("/api/"):
-                target_url = (
-                    f"{api_url[:-4] if api_url.endswith('/api') else api_url}{clean_path}"
-                )
+                target_url = f"{api_url[:-4] if api_url.endswith('/api') else api_url}{clean_path}"
             elif clean_path == "/health" or clean_path.startswith("/health/"):
                 base_origin = api_url[:-4] if api_url.endswith("/api") else api_url
                 target_url = f"{base_origin}{clean_path}"
@@ -1261,9 +1258,7 @@ async def test_route_inventory_admin_routes_reject_standard_user() -> None:
                 if path.startswith("/api/"):
                     req_url = f"{api_url[:-4] if api_url.endswith('/api') else api_url}{path}"
                 else:
-                    req_url = (
-                        f"{api_url if api_url.endswith('/api') else f'{api_url}/api'}{path}"
-                    )
+                    req_url = f"{api_url if api_url.endswith('/api') else f'{api_url}/api'}{path}"
 
                 # 1. Unauthenticated request returns 401
                 resp_unauth = await client.post(

@@ -23,21 +23,11 @@ from agent.guardrails.base import (
     GUARDRAIL_TOOL_PII,
     GUARDRAIL_TOOL_SCHEMA,
     AdmissionContext,
+    OutputGuardrailBlockedError,
     TurnCapabilities,
 )
 from agent.guardrails.gateway import GuardrailGateway
-from agent.guardrails.layers.tool_output import (
-    PIIScanner,
-    SchemaValidator,
-    SizeStructureValidator,
-    UntrustedContentInjectionDetector,
-)
-from agent.guardrails.output_pipeline import (
-    OutputGuardrailBlockedError,
-    OutputGuardrailPipeline,
-)
-from agent.guardrails.registry import create_production_registry
-from agent.guardrails.tool_output_pipeline import ToolOutputGuardrailPipeline
+from agent.guardrails.output_pipeline import OutputGuardrailPipeline
 
 pytestmark = [pytest.mark.security, pytest.mark.asyncio]
 
@@ -71,7 +61,7 @@ async def test_input_attack_ingestion_corpus_replay() -> None:
     assert len(malicious_cases) == 100
     assert len(benign_cases) == 250
 
-    gateway = GuardrailGateway(create_production_registry())
+    gateway = GuardrailGateway()
     admission_ctx = AdmissionContext(
         user_id="dast-evaluator",
         chat_session_id="session-dast-input",
@@ -114,7 +104,7 @@ async def test_input_attack_ingestion_corpus_replay() -> None:
 
 async def test_input_attack_blocks_before_downstream_dispatch() -> None:
     """Replay malicious injection through ChatTurnRunner; assert ZERO downstream calls."""
-    gateway = GuardrailGateway(create_production_registry())
+    gateway = GuardrailGateway()
     mock_graph = MagicMock()
     mock_graph.astream_events = MagicMock()
     mock_client = AsyncMock()
@@ -187,13 +177,7 @@ async def test_tool_indirect_injection_corpus_replay() -> None:
     assert len(malicious_cases) == 50
     assert len(benign_cases) == 125
 
-    layers = (
-        SizeStructureValidator(),
-        SchemaValidator(),
-        PIIScanner(),
-        UntrustedContentInjectionDetector(),
-    )
-    pipeline = ToolOutputGuardrailPipeline(layers)
+    gateway = GuardrailGateway()
     capabilities = TurnCapabilities(
         intent="SEARCH",
         provenance="trusted_router",
@@ -209,7 +193,7 @@ async def test_tool_indirect_injection_corpus_replay() -> None:
     malicious_blocked = 0
     for case in malicious_cases:
         mock_resp = case["fixture"]["mockToolResponse"]
-        decision = await pipeline.validate(capabilities, "search_flights", mock_resp)
+        decision = await gateway.validate_tool_result(capabilities, "search_flights", mock_resp)
         if decision.status == "BLOCK":
             assert decision.response_key in allowed_tool_block_keys
             assert decision.validated_data is None
@@ -218,7 +202,7 @@ async def test_tool_indirect_injection_corpus_replay() -> None:
     benign_blocked = 0
     for case in benign_cases:
         mock_resp = case["fixture"]["mockToolResponse"]
-        decision = await pipeline.validate(capabilities, "search_flights", mock_resp)
+        decision = await gateway.validate_tool_result(capabilities, "search_flights", mock_resp)
         if decision.status == "BLOCK":
             benign_blocked += 1
         else:
@@ -384,7 +368,7 @@ async def test_stage_reachability_invariant() -> None:
     expected_marker = malicious_tool_case["oracle"]["reachedStageMarker"]
     assert expected_marker, "Expected reachedStageMarker in oracle"
 
-    gateway = GuardrailGateway(create_production_registry())
+    gateway = GuardrailGateway()
     reached_markers: list[str] = []
 
     async def mock_graph_stream(*args: Any, **kwargs: Any) -> Any:
@@ -473,20 +457,12 @@ async def test_stage_reachability_invariant() -> None:
     mock_graph.astream_events.assert_called_once()
     assert expected_marker in reached_markers
 
-    tool_pipeline = ToolOutputGuardrailPipeline(
-        (
-            SizeStructureValidator(),
-            SchemaValidator(),
-            PIIScanner(),
-            UntrustedContentInjectionDetector(),
-        )
-    )
     capabilities = TurnCapabilities(
         intent="SEARCH",
         provenance="trusted_router",
         sealed_tools=("search_flights",),
     )
-    tool_decision = await tool_pipeline.validate(
+    tool_decision = await gateway.validate_tool_result(
         capabilities, "search_flights", malicious_tool_case["fixture"]["mockToolResponse"]
     )
 

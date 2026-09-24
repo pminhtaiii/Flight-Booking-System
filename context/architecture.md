@@ -1,8 +1,20 @@
 # Architecture
 
-## Feature 026 — Agent Boundary Simplification (Phase 4 / Slice 3 Complete: Production US2 Implementation - Tasks T024–T029)
+## Feature 026 — Agent Boundary Simplification (Phase 4 Complete: User Story 2 Complete — Tasks T017–T032)
 
 Planning artifacts: [specification](../specs/026-agent-boundary-simplification/spec.md), [plan](../specs/026-agent-boundary-simplification/plan.md), and [tasks](../specs/026-agent-boundary-simplification/tasks.md).
+
+#### Fixture Migration, Dead Code Elimination & US2 Verification Gate (US2 Phase 4 Slice 4 / Tasks T030–T032)
+- **Registry Fixture Cluster Migration (T030)**:
+  - Migrated test fixtures across 22 test suites (`test_enforcement.py`, `test_gateway.py`, `test_input_layers.py`, `test_lifecycle.py`, `test_memory_boundary.py`, `test_model_output_boundary.py`, `test_registry.py`, `test_rollout.py`, `test_security_performance.py`, `test_tool_authority.py`, `test_tool_boundary.py`, `test_tool_integration.py`, `test_tool_layers.py`, `test_chaos_simulation.py`, `test_chat_turn_runner.py`, `test_graph.py`, `test_guardrails.py`, `test_negative_privacy_audit.py`, `test_rollback_matrix.py`, `test_stream_auth_budget.py`, `test_stream_session_control.py`, `test_tools.py`) from deprecated `create_production_registry()` / `GuardrailRegistry` fixtures to direct `GuardrailGateway()` instantiation or keyword-only tuple injection (`_input_layers`, `_tool_layers`).
+  - Verified no test treats `is_healthy()` as constructor recovery.
+- **Dead File & Obsolete Symbol Elimination (T031)**:
+  - Deleted obsolete files: `apps/agent/src/agent/guardrails/registry.py` (and `OutputPIILayer`), `apps/agent/src/agent/guardrails/input_pipeline.py`, `apps/agent/src/agent/guardrails/tool_output_pipeline.py`, and `apps/agent/src/agent/guardrails/tool_schemas.py`.
+  - Repository census confirmed zero lingering imports or references to `GuardrailRegistry`, `create_production_registry`, `InputGuardrailPipeline`, `ToolOutputGuardrailPipeline`, or `OutputPIILayer`.
+- **US2 Verification Gate Execution (T032)**:
+  - Verified full test suite passes (1141 passed in non-Redis agent pytest suite).
+  - Code hygiene verified: clean ruff check & ruff format (0 errors, 0 warnings).
+  - US2 is 100% complete. Phase 5 remains strictly unstarted.
 
 #### Production Gateway Refactoring, Stream Session, PII Extraction & Ingress Admission (US2 Phase 4 Slice 3)
 - **Direct Tuple Composition & Layer Ordering (`assert_layer_order`) (T024)**:
@@ -409,7 +421,7 @@ Planning artifacts: [specification](../specs/024-event-driven-module-deepening/s
 │   ├── agent/                         → Python/FastAPI agent service
 │   │   ├── src/agent/                 → FastAPI source code
 │   │   │   ├── chat_turn/             → ChatController (thin delegator), ChatTurnRunner (causal cleanup) & event models
-│   │   │   ├── guardrails/            → GuardrailGateway, deterministic input/output pipelines, closed registry, bounded PII scanning, pipeline decisions
+│   │   │   ├── guardrails/            → GuardrailGateway (direct production layer tuple ownership), OutputGuardrailPipeline, bounded PII scanning, pipeline decisions
 │   │   │   ├── middleware/            → BodyLimitMiddleware (raw ASGI 64 KiB ceiling), auth & rate limit middlewares
 │   │   │   ├── memory/                → MemoryManager (sliding window, lower-trust envelope, summary gateway validation)
 │   │   │   ├── trusted_search_snapshot/ → 3-key Redis protocol & safe projections
@@ -483,34 +495,49 @@ Feature 023 establishes a deterministic, multi-layered security architecture tha
    - Enforces pre-execution input admission validation via `gateway.validate_input(context, message)` using an immutable `AdmissionContext`. If rejected, it immediately yields `ErrorEvent(code=decision.response_key)` without touching session state or LLMs.
 
 2. **Mandatory Security Gateway (`apps/agent/src/agent/guardrails/gateway.py`)**:
+   - Direct Production Layer Tuple Construction & Ownership:
+     - `GuardrailGateway` directly constructs and owns the production layer tuples:
+       - Input layers: `(LengthValidator, PIIDetector, InjectionDetector, TopicBoundary)`
+       - Tool output layers: `(SizeStructureValidator, SchemaValidator, PIIScanner, UntrustedContentInjectionDetector)`
+     - Layer composition and ordering are asserted at instantiation time via `assert_layer_order(stage, layers, expected_types)`: checks exact layer count, correct type per position, unique keys across stages, and linear declaration of same-stage prerequisites. Invalid composition raises fail-closed `ValueError` at constructor time.
+     - Keyword-only private parameters `_input_layers` and `_tool_layers` provide explicit seams for unit tests without mutable registries.
    - `validate_input(context, message)`:
      - Strict type checking: enforces `AdmissionContext` (zero tool authority).
-     - Layer ordering: queries `registry.ordered_layers("input")` and fails closed (`GUARDRAIL_INPUT_INJECTION`) if the registry contains no input layers or throws an exception.
+     - Sequentially evaluates the owned `_input_layers` tuple and fails closed (`GUARDRAIL_INPUT_INJECTION`) if no input layers are configured or if an unhandled classifier exception occurs.
      - Short-circuits on the first `BLOCK` decision, completely discarding unvalidated payload data.
-     - Catches unhandled classifier exceptions and fails closed with generic response keys, preventing exception leaks or canary disclosure.
+     - Prevents exception leaks or canary disclosure by catching errors and failing closed with generic response keys.
+   - `validate_tool_result(context, tool_name, result)`:
+     - Sole public tool verification method; executes owned `_tool_layers` tuple.
+     - Evaluates raw tool result payloads with raw extra-field PII scanning before schema projection (`PIIScanner` scans raw result; `GUARDRAIL_TOOL_PII` wins over `GUARDRAIL_TOOL_SCHEMA` without tuple indexing).
    - `execute_tool(context, call, invoke)`:
      - Enforces `TurnCapabilities` validation; verifies the requested tool call is present in `context.sealed_tools`.
      - Denies unauthorized tools with `GUARDRAIL_TOOL_SCHEMA` before invocation.
      - Fails closed on execution crashes without leaking internal traceback details.
-   - `stream_output(context, tokens)`:
-     - Yields `ApprovedChunk` instances for safe emitted tokens and terminates safely upon boundary violations.
+   - `stream_output(context, *, config, session_id)`:
+     - Exposes an `OutputStreamSession` async context manager facade wrapping `OutputGuardrailPipeline`.
+     - Provides `process_token(token)` for chunk-buffered token analysis, one-shot `flush()`, and idempotent non-flushing `close()`.
+     - Preserves `OutputGuardrailBlockedError` in `agent.guardrails.base` with original partial response, layer, rule, and message.
    - Tool-result validation is a fixed fail-closed chain: size/iterative structure bounds (max 64 KiB, depth <= 5, nodes <= 500), strict minimized result-schema projection, PII scanning, then untrusted-content injection detection. The live graph seals per-turn capabilities, authorizes an entire proposed batch before invocation, and validates each result before publishing a `ToolMessage`; raw tool callbacks are never exposed on SSE.
    - The six tool-facing NestJS client operations stream decompressed response bytes through a 64 KiB bound before JSON loading; missing or false `Content-Length` values cannot bypass the cumulative check, and pre-parse JSON delimiter scanning rejects structures above the endpoint depth allowance or 5,000 nodes.
    - Upstream responses remain bounded to 64 KiB and 5,000 structural nodes so an unpaginated 50-booking history remains valid. The default depth limit is 5; attested V2 flight search alone permits depth 7 for safe structured match explanations (`{ key, params }`).
 
-3. **Closed Registry with Topological Dependency Sorting (`apps/agent/src/agent/guardrails/registry.py`)**:
-   - Closed keyset enforcement: strictly forbids unverified or arbitrary layer registration.
-   - DAG ordering: implements Kahn's in-degree reduction topological sort with cycle detection, ensuring prerequisites (e.g. `input.length`) execute before dependent layers (e.g. `input.pii`, `input.injection`, `input.topic`).
-   - Anti-patterns prohibited: zero dynamic imports (`__import__`, `importlib.import_module`, `eval`, `exec`).
-   - Compulsory production registry (`create_production_registry`):
-     - `COMPULSORY_PRODUCTION_LAYERS`: immutable set containing `input.length`, `input.pii`, `input.injection`, `input.topic`, and `output.pii`.
-     - Disallowing or disabling any compulsory layer raises `RegistryContractError`.
-     - Production layers execute deterministic checks:
-       - `InputLengthLayer`: validates max characters (4096) and max UTF-8 bytes (16384) with static `GUARDRAIL_INPUT_LENGTH`.
-       - `InputPIILayer`: evaluates passport numbers, credit card numbers (Luhn checked), emails, and phone numbers via `detect_pii` with `GUARDRAIL_INPUT_PII`.
-       - `InputInjectionLayer`: evaluates raw text and multi-step normalized variants (`bounded_normalize`, `detect_base64_payloads`) against compiled injection signatures with `GUARDRAIL_INPUT_INJECTION`.
-       - `InputTopicLayer`: filters out-of-domain requests (code generation, creative writing, medical/legal advice) while permitting greetings and travel inquiries with `GUARDRAIL_INPUT_TOPIC`.
-       - `OutputPIILayer`: checks emitted chunk text for confidential PII via `detect_pii` with `GUARDRAIL_OUTPUT_PII`.
+3. **Elimination of Dynamic Registry & Direct Gateway Tuple Ownership (Feature 026 / US2)**:
+   - `GuardrailRegistry`, `create_production_registry`, `InputGuardrailPipeline`, `ToolOutputGuardrailPipeline`, and `OutputPIILayer` have been eliminated and deleted (`apps/agent/src/agent/guardrails/registry.py`, `input_pipeline.py`, `tool_output_pipeline.py`).
+   - In their place, `GuardrailGateway` directly constructs and owns the production layer tuples:
+     - Input layers: `(LengthValidator, PIIDetector, InjectionDetector, TopicBoundary)` with keys `("input.length", "input.pii", "input.injection", "input.topic")`.
+     - Tool output layers: `(SizeStructureValidator, SchemaValidator, PIIScanner, UntrustedContentInjectionDetector)` with keys `("tool.size_structure", "tool.schema", "tool.pii", "tool.untrusted_content_injection")`.
+   - Layer ordering is asserted at instantiation time via `assert_layer_order(stage, layers, expected_types)`: checks exact layer count, correct type per position, unique keys across stages, and linear declaration of same-stage prerequisites. Invalid composition raises fail-closed `ValueError` at constructor time.
+   - Individual layer checks execute deterministically:
+     - `LengthValidator`: validates max characters (4096) and max UTF-8 bytes (16384) with static `GUARDRAIL_INPUT_LENGTH`.
+     - `PIIDetector`: evaluates passport numbers, credit card numbers (Luhn checked), emails, and phone numbers via `detect_pii` with `GUARDRAIL_INPUT_PII`.
+     - `InjectionDetector`: evaluates raw text and multi-step normalized variants (`bounded_normalize`, `detect_base64_payloads`) against compiled injection signatures with `GUARDRAIL_INPUT_INJECTION`.
+     - `TopicBoundary`: filters out-of-domain requests (code generation, creative writing, medical/legal advice) while permitting greetings and travel inquiries with `GUARDRAIL_INPUT_TOPIC`.
+     - `SizeStructureValidator`: validates size (max 64 KiB), JSON depth (<= 5), and node count (<= 500) with `GUARDRAIL_TOOL_SIZE`.
+     - `SchemaValidator`: validates projected tool payload schema conformance with `GUARDRAIL_TOOL_SCHEMA`.
+     - `PIIScanner`: scans raw tool result payloads for PII leaks with `GUARDRAIL_TOOL_PII`.
+     - `UntrustedContentInjectionDetector`: scans tool payload text for prompt injection tokens with `GUARDRAIL_TOOL_INJECTION`.
+   - Output PII scanning (`OutputPIILayer` deleted) is handled by `OutputGuardrailPipeline` using centralized `deterministic_pii_match` in `agent.guardrails.pii`.
+   - Legacy `tool_schemas.py` has been deleted; schema validation uses registered tool `args_schema` and `TOOL_INPUT_SCHEMAS`.
 
 4. **Normalization & ReDoS Safe Execution (`apps/agent/src/agent/guardrails/normalization.py`)**:
    - `bounded_normalize`: composites Unicode NFKC normalization, zero-width character stripping, recursive nested URL decoding (bounded rounds), and homoglyph translation.
@@ -522,8 +549,8 @@ Feature 023 establishes a deterministic, multi-layered security architecture tha
    - `PipelineDecision[T]`: frozen decision container automatically stripping payload data when `status == "BLOCK"`.
 
 6. **Gateway Health Contract & Zero Fail-Open Ingress (`apps/agent/src/agent/guardrails/gateway.py`, `apps/agent/src/agent/streaming/sse.py`, `apps/agent/src/agent/main.py`)**:
-   - `GuardrailGateway.is_healthy() -> bool`: Verifies that `self.registry` is a valid `GuardrailRegistry`, and if in production mode (`self.registry.production == True`), verifies that all compulsory layers (`COMPULSORY_PRODUCTION_LAYERS`) are present and registered.
-   - Fail-Closed Ingress (`/chat/stream`): If `request.app.state.guardrail_gateway` is `None` or degraded (`is_healthy() == False`), immediately aborts turn creation with HTTP 503 (`GUARDRAIL_GATEWAY_UNAVAILABLE`), preventing any unshielded model or tool invocations.
+   - `GuardrailGateway.is_healthy() -> bool`: Serves as a post-construction runtime readiness check (returns `True` when gateway instance is ready to serve). It does not perform registry validation (as `GuardrailRegistry` has been eliminated) and never recovers from an invalid constructor failure.
+   - Fail-Closed Ingress (`/chat/stream`): If `request.app.state.guardrail_gateway` is `None` or degraded (`is_healthy() == False`), immediately aborts turn creation with HTTP 503 (`GUARDRAIL_GATEWAY_UNAVAILABLE`), preventing any unshielded model or tool invocations. Pre-quota ingress evaluates gateway health and `validate_input` before quota admission or Redis client initialization.
    - Deep Health Probe (`/health`): Monitors `dependencies.guardrails`, `dependencies.redis`, and `dependencies.nestjsApi`. If `guardrail_gateway` is uninitialized or degraded, or if any mandatory HMAC secret (`AGENT_SERVICE_API_KEY`, `JWT_SECRET`, `CLAIM_TOKEN_SECRET`) is missing/empty, `guardrails` reports `status: "down"` and the overall service status degrades to `"degraded"`.
    - Liveness Probe (`/health/live`): Fast (< 10ms), zero LLM model calls, zero guardrail classification overhead, and zero external network/cache I/O for orchestrator probes.
 
@@ -537,8 +564,8 @@ trusted snapshot lifecycle. Router and checkout-gate code seal output-only
 capability fallbacks. A proposed tool batch is authorized before any member runs, and
 each result passes the size/structure, strict schema, PII, and untrusted-instruction
 layers before it can become a `ToolMessage`, graph update, callback projection,
-checkpoint, model input, or public event. A production registry with no tool layers is
-fail-closed. Runner events and `ACTION_HANDOFF` use only validated output, while
+checkpoint, model input, or public event. A gateway with no tool layers fails
+closed. Runner events and `ACTION_HANDOFF` use only validated output, while
 owner/session snapshot binding and single-lease cleanup remain enforced on block,
 error, cancellation, and disconnect.
 
@@ -587,7 +614,7 @@ closure and workflow signoff are complete for this slice.
 2. **Adversarial Holdout Corpus Replay Engine (`tests/security/dast/test_adversarial.py` / T039)**:
    - Executes the automated in-memory replay engine against all 700 frozen holdout corpus cases (`tests/security/corpus/`):
      - **Input Attack Ingestion (350 cases)**: 100 malicious prompt injections, jailbreaks, PII inputs + 250 benign travel queries and greetings replayed through `GuardrailGateway` and `ChatTurnRunner`. Enforces static safe rejection events (`GUARDRAIL_BLOCKED`, `GUARDRAIL_INPUT_INJECTION`, `GUARDRAIL_INPUT_PII`) with zero downstream model/tool calls. Achieves TPR 100% (100/100 $\ge 95\%$) and FPR 0% (0/250 $\le 2\%$).
-     - **Tool Indirect Injection Replay (175 cases)**: 50 malicious tool outputs carrying indirect injection directives, JSON bombs, and PII leaks + 125 benign tool responses. Enforces `ToolOutputGuardrailPipeline` (`SizeStructureValidator`, `SchemaValidator`, `PIIScanner`, `UntrustedContentInjectionDetector`) blocking payloads before LangGraph state publication. Achieves TPR 100% (50/50 $\ge 95\%$) and FPR 0% (0/125 $\le 2\%$).
+     - **Tool Indirect Injection Replay (175 cases)**: 50 malicious tool outputs carrying indirect injection directives, JSON bombs, and PII leaks + 125 benign tool responses. Enforces tool layer tuple via `validate_tool_result` (`SizeStructureValidator`, `SchemaValidator`, `PIIScanner`, `UntrustedContentInjectionDetector`) blocking payloads before LangGraph state publication. Achieves TPR 100% (50/50 $\ge 95\%$) and FPR 0% (0/125 $\le 2\%$).
      - **Output Token Partition Streaming Replay (175 cases)**: 50 malicious model outputs with PII/credentials + 125 benign outputs streamed across variable chunk boundaries (1-char, 3-char, word boundaries). Enforces candidate holdback via `OutputGuardrailPipeline` and `ChunkBuffer`, emitting `OUTPUT_GUARDRAIL_BLOCKED` with 0 sensitive bytes received by the client. Achieves TPR 100% (50/50 $\ge 95\%$) and FPR 0% (0/125 $\le 2\%$).
      - **Stage Reachability Invariant (SEC28)**: Captures payload-free `reachedStageMarker` values tied to turn IDs and validates that unexpected upstream blocks do NOT count as downstream detector true positives.
 
@@ -1577,8 +1604,7 @@ CI review follow-up (2026-09-11): application and shared-package changes route b
 
 2. **Fail-Closed Rollout, Rollback & Health Probe Guarantees (`apps/agent/tests/security/test_rollout.py`, `docs/security/rollout.md`)**:
    - **Fail-Closed Startup Verification**:
-     - `GuardrailGateway` requires an instance of `GuardrailRegistry`; invalid configurations raise `RegistryContractError`.
-     - `create_production_registry` enforces all $9$ compulsory layers; attempts to disable compulsory layers raise `RegistryContractError`.
+     - `GuardrailGateway` directly constructs and owns the production layer tuples; invalid layer compositions raise fail-closed `ValueError` at construction time via `assert_layer_order`. (Note: `GuardrailRegistry`, `create_production_registry`, `InputGuardrailPipeline`, `ToolOutputGuardrailPipeline`, and `OutputPIILayer` were eliminated in Feature 026).
      - Corrupted or invalid regex rules fail closed at startup with `ValueError`.
      - Missing `AGENT_SERVICE_API_KEY`, `JWT_SECRET`, or `CLAIM_TOKEN_SECRET` halts boot via Pydantic `ValidationError`. Unauthenticated ingress returns 401; unauthorized origins return 403; requests never reach the runner or tools.
      - Ingress fail-closed guard in `/chat/stream`: returns HTTP 503 (`GUARDRAIL_GATEWAY_UNAVAILABLE`) if `guardrail_gateway` is None or degraded without consuming daily/burst user quota or invoking runner.
@@ -1626,12 +1652,12 @@ CI review follow-up (2026-09-11): application and shared-package changes route b
 ### Phase 8 — Closure, Release Gates, Findings Ledger & Context Synchronization
 
 1. **Deterministic Three-Stage Guardrail Architecture**:
-   - **Input Pipeline** (`agent.guardrails.input_pipeline`):
+   - **Input Layers** (owned directly by `GuardrailGateway` as an immutable tuple; `input_pipeline.py` eliminated in Feature 026):
      - `LengthValidator`: Evaluates strict raw byte ceiling and UTF-8 scalar boundaries before parsing or decoding. Rejects overlong payloads with `LENGTH_EXCEEDED` without LLM consumption.
      - `PIIDetector`: Scans for high-entropy secrets, passport IDs, credit cards, emails, and phone numbers with regexes and Luhn checks; allows valid flight numbers (`AA123`, `FL-456`), timestamps, and prices.
      - `InjectionDetector`: Normalizes Unicode (NFKC), strips control characters, unmasks Cyrillic/homoglyph obfuscations, and evaluates bounded regexes against >=50 direct prompt injection signatures.
      - `TopicBoundary`: Deterministic allowlist/denial matching flight booking domain boundaries. Redirects off-topic queries statically without invoking LLM judge.
-   - **Tool Pipeline** (`agent.guardrails.tool_output_pipeline`):
+   - **Tool Layers** (owned directly by `GuardrailGateway` as an immutable tuple; `tool_output_pipeline.py` eliminated in Feature 026):
      - `SizeStructureValidator`: Enforces bounded payload size (<=64 KiB) and maximum AST/JSON nesting depth (<=5 levels, <=500 structural nodes). Fast-rejects oversized or malformed payloads in <0.1 ms.
      - `SchemaValidator`: Enforces exact Pydantic schema contracts against 6 allowed tool output signatures. Prohibits unexpected extra properties and forged action signals.
      - `PIIScanner`: Inspects tool outputs recursively for nested synthetic PII canaries and customer credentials, masking sensitive values before state persistence.
@@ -1646,7 +1672,7 @@ CI review follow-up (2026-09-11): application and shared-package changes route b
    - **Post-Gate Sealing**: In `apps/agent/src/agent/graph/checkout_gate.py`, sensitive financial/booking mutations require explicit confirmation gates. Passing the gate yields an unforgeable attestation token that grants single-use capability.
 
 3. **Fail-Closed Gateway Lifecycle & Ingress Guarantees**:
-   - **Compulsory 9-Layer Production Registry**: `GuardrailGateway` requires `create_production_registry` with all 9 compulsory layers active. Disabling or skipping any compulsory layer raises `RegistryContractError` during startup.
+   - **Immutable Production Layer Tuples**: `GuardrailGateway` directly constructs and owns the production layer tuples (`(LengthValidator, PIIDetector, InjectionDetector, TopicBoundary)` for input and `(SizeStructureValidator, SchemaValidator, PIIScanner, UntrustedContentInjectionDetector)` for tool output). Layer composition is verified at construction time via `assert_layer_order`. `GuardrailRegistry` and `create_production_registry` have been eliminated in Feature 026.
    - **Ingress Availability Guard (`/chat/stream`)**: Gateway status is evaluated _prior_ to Redis quota admission. If `guardrail_gateway` is None or degraded, returns HTTP 503 `GUARDRAIL_GATEWAY_UNAVAILABLE` immediately without consuming user daily/burst quotas or invoking LLM runners.
    - **Zero Fail-Open Bypass**: Unexpected exceptions in input parsing, layer evaluation, or tool execution default to `PipelineDecision(status="BLOCK")` and safe user-facing fallbacks.
 

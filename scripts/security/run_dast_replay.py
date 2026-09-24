@@ -2,7 +2,7 @@
 
 Executes:
 1. Live execution of 700 holdout cases (350 input, 175 tool, 175 output)
-   against real GuardrailGateway, ToolOutputGuardrailPipeline, and OutputGuardrailPipeline.
+   against real GuardrailGateway and OutputGuardrailPipeline.
    Verifies sensitive leak patterns, reachability markers, TPR >= 0.95, FPR <= 0.02.
    Writes artifacts/security/detector-corpus.json (version 1.0.0).
 2. Live execution of 25 invariants from tests/security/corpus/invariant_manifest.jsonl.
@@ -48,15 +48,14 @@ import jwt
 from fastapi.testclient import TestClient
 
 from agent.config import get_settings
-from agent.guardrails.base import AdmissionContext, TurnCapabilities
+from agent.guardrails.base import (
+    AdmissionContext,
+    OutputGuardrailBlockedError,
+    TurnCapabilities,
+)
 from agent.guardrails.gateway import GuardrailGateway
 from agent.guardrails.layers.input import LengthValidator
-from agent.guardrails.output_pipeline import (
-    OutputGuardrailBlockedError,
-    OutputGuardrailPipeline,
-)
-from agent.guardrails.registry import create_production_registry
-from agent.guardrails.tool_output_pipeline import ToolOutputGuardrailPipeline
+from agent.guardrails.output_pipeline import OutputGuardrailPipeline
 from agent.main import app
 from agent.queue.message_queue import MessageQueueManager
 from agent.repositories.chat_budget_repository import (
@@ -92,10 +91,7 @@ async def run_holdout_replay(artifacts_dir: Path) -> dict[str, Any]:
     assert len(tol_cases) == 175, f"Expected 175 tool cases, got {len(tol_cases)}"
     assert len(out_cases) == 175, f"Expected 175 output cases, got {len(out_cases)}"
 
-    registry = create_production_registry()
-    gateway = GuardrailGateway(registry)
-    tool_layers = registry.ordered_layers("tool")
-    tool_pipeline = ToolOutputGuardrailPipeline(tool_layers)
+    gateway = GuardrailGateway()
     caps = TurnCapabilities(
         intent="SEARCH",
         provenance="trusted_router",
@@ -144,7 +140,7 @@ async def run_holdout_replay(artifacts_dir: Path) -> dict[str, Any]:
         if not marker:
             missing_markers += 1
         mock_resp = case.get("fixture", {}).get("mockToolResponse")
-        decision = await tool_pipeline.validate(caps, "search_flights", mock_resp)
+        decision = await gateway.validate_tool_result(caps, "search_flights", mock_resp)
         actual = "BLOCK" if decision.status == "BLOCK" else "PASS"
         expected = case["oracle"]["expectedDecision"]
 
@@ -316,7 +312,7 @@ async def run_invariant_replay(artifacts_dir: Path) -> dict[str, Any]:
 
     # Prepare TestClient for HTTP invariants
     app.state.message_queue = MessageQueueManager()
-    app.state.guardrail_gateway = GuardrailGateway(create_production_registry())
+    app.state.guardrail_gateway = GuardrailGateway()
 
     with TestClient(app) as client:
         for c in inv_cases:
@@ -614,7 +610,7 @@ async def run_route_census(artifacts_dir: Path) -> dict[str, Any]:
     assert len(routes) == 45, f"Expected 45 routes in catalog, got {len(routes)}"
 
     app.state.message_queue = MessageQueueManager()
-    app.state.guardrail_gateway = GuardrailGateway(create_production_registry())
+    app.state.guardrail_gateway = GuardrailGateway()
     _ = get_settings()
 
     findings = []
