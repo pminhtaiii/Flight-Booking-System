@@ -102,11 +102,11 @@
 
 **Purpose**: Prove both slices integrate without scope drift and synchronize project documentation after implementation.
 
-- [ ] T033 Run exact post-change censuses over API/agent source and tests to prove zero chat-to-gateway imports, zero attested-search `ChatModule` imports, zero old crypto imports, zero references to removed registry symbols, exactly one matcher/predicate/approved-content definition in `pii.py`, production pipeline construction only in `guardrails/gateway.py`, and zero external imports of `OutputGuardrailPipeline` or `OutputGuardrailBlockedError` from `output_pipeline.py`; explicitly allow external `payload_free_config` imports.
-- [ ] T034 [P] Confirm the final diff has no persistent-schema, migration, endpoint-catalog, dependency, feature-flag, or external-API changes in `apps/api/prisma/`, `apps/api/package.json`, `apps/agent/pyproject.toml`, `pnpm-lock.yaml`, `apps/api/src/app.module.ts`, and `apps/agent/src/agent/main.py`.
-- [ ] T035 Update ownership, dependency direction, fixed guardrail sequences, and the authoritative runner-to-gateway-to-output-pipeline flow in `context/architecture.md` after US1 and US2 implementation is complete.
-- [ ] T036 Update completed task/status, independent verification evidence, remaining risks, and rollback boundaries in `context/progress-checker.md` after implementation and test gates pass.
-- [ ] T037 Execute the complete API and agent change-aware verification matrix from `context/workflow.md` plus both independent quickstart checks in `specs/026-agent-boundary-simplification/quickstart.md`, and confirm final exit codes and census results before merge.
+- [x] T033 Run exact post-change censuses over API/agent source and tests to prove zero chat-to-gateway imports, zero attested-search `ChatModule` imports, zero old crypto imports, zero references to removed registry symbols, exactly one matcher/predicate/approved-content definition in `pii.py`, production pipeline construction only in `guardrails/gateway.py`, and zero external imports of `OutputGuardrailPipeline` or `OutputGuardrailBlockedError` from `output_pipeline.py`; explicitly allow external `payload_free_config` imports.
+- [x] T034 [P] Confirm the final diff has no persistent-schema, migration, endpoint-catalog, dependency, feature-flag, or external-API changes in `apps/api/prisma/`, `apps/api/package.json`, `apps/agent/pyproject.toml`, `pnpm-lock.yaml`, `apps/api/src/app.module.ts`, and `apps/agent/src/agent/main.py`.
+- [x] T035 Update ownership, dependency direction, fixed guardrail sequences, and the authoritative runner-to-gateway-to-output-pipeline flow in `context/architecture.md` after US1 and US2 implementation is complete.
+- [x] T036 Update completed task/status, independent verification evidence, remaining risks, and rollback boundaries in `context/progress-checker.md` after implementation and test gates pass.
+- [x] T037 Execute the complete API and agent change-aware verification matrix from `context/workflow.md` plus both independent quickstart checks in `specs/026-agent-boundary-simplification/quickstart.md`, and confirm final exit codes and census results before merge.
 
 ---
 

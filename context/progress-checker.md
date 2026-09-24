@@ -1,5 +1,43 @@
 # Progress Tracker
  
+### Feature 026 — Agent Boundary Simplification: Phase 5 Complete / Feature 100% Complete (Tasks T033–T037 Verified) (2026-09-24)
+
+- **Phase 5 (Polish & Cross-Cutting Verification) & Feature 026 100% Delivered (Tasks T033–T037)**:
+  - **Static Ripgrep Censuses (T033)**:
+    - Executed 5 authoritative queries from `specs/026-agent-boundary-simplification/quickstart.md`.
+    - Zero (0) references to `agent-gateway` under `apps/api/src/chat/` (exit code 1, 0 matches).
+    - Zero (0) references to `@/chat/chat-message-crypto.service`, `GuardrailRegistry`, `create_production_registry`, `OutputPIILayer`, `InputGuardrailPipeline`, or `ToolOutputGuardrailPipeline` across `apps/api` and `apps/agent` (exit code 1, 0 matches).
+    - Production `OutputGuardrailPipeline` construction strictly isolated inside `apps/agent/src/agent/guardrails/gateway.py:98` (exit code 0, 1 match).
+    - Zero (0) external imports of `OutputGuardrailPipeline` or `OutputGuardrailBlockedError` from `output_pipeline.py`. Callers import `OutputGuardrailBlockedError` strictly from `agent.guardrails.base` and external callers only import permitted stateless `payload_free_config` and `approved_model_content`.
+    - Exactly one definition each of `deterministic_pii_match`, `_is_output_guardrail_disabled`, and `approved_model_content` strictly in `apps/agent/src/agent/guardrails/pii.py` (exit code 0, 3 matches).
+  - **Scope & Diff Guard Confirmation (T034)**:
+    - Zero (0) Prisma schema changes or migrations in `apps/api/prisma/` (`git diff origin/development...HEAD -- apps/api/prisma` clean).
+    - Zero (0) dependency changes in `apps/api/package.json`, `pnpm-lock.yaml`, or `apps/agent/pyproject.toml` (`git diff` clean).
+    - Zero (0) new endpoints or feature flag additions in `apps/api/src/app.module.ts` or `apps/agent/src/agent/main.py`.
+    - SHA256 hashes of protected baseline files verified identical.
+  - **Documentation Synchronization (T035 & T036)**:
+    - Updated `context/architecture.md` to `Feature 026 — Agent Boundary Simplification (Complete - Tasks T001–T037)` detailing NestJS boundary separation (`AgentChatModule`, `ChatMessageCryptoModule`, isolated `ChatModule`) and Python guardrail gateway architecture (fixed 4-tuples, `OutputStreamSession`, standalone PII ownership).
+    - Updated `context/progress-checker.md` recording full completion status of Feature 026 (Tasks T001–T037 complete).
+    - Updated `specs/026-agent-boundary-simplification/tasks.md` marking T001–T037 100% complete.
+  - **Complete Verification Gate Execution (T037)**:
+    - NestJS API Gate (`specs/026-agent-boundary-simplification/verification/api-final.md`):
+      - Unit Tests: 5 suites, 98 passed, exit code 0.
+      - E2E Tests: 10 suites, 123 passed, exit code 0.
+      - ESLint: 0 errors, 0 warnings, exit code 0 (`pnpm exec eslint "apps/api/**/*.ts" "packages/shared/**/*.ts" --max-warnings 0`).
+      - Shared Types: 23 suites, 110 passed, exit code 0 (`pnpm --filter @shared/types test`).
+      - TypeScript: 0 errors, exit code 0 (`pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`).
+      - Production Build: Clean, exit code 0 (`pnpm --filter @api/backend build`).
+    - Python Agent Gate (`specs/026-agent-boundary-simplification/verification/agent-final.md`):
+      - Ruff Lint: Clean, exit code 0 (`uv run --package agent ruff check apps/agent`).
+      - Ruff Format: Clean, exit code 0 (`uv run --package agent ruff format --check apps/agent`, 153 files formatted).
+      - Targeted Security Pytest: 7 suites, 265 passed, 1 skipped in 56.11s, exit code 0 (`test_gateway.py`, `test_input_layers.py`, `test_tool_layers.py`, `test_output_stream.py`, `test_output_pipeline.py`, `test_chat_turn_runner.py`, `test_sse.py`).
+      - Full Non-Redis Pytest: 1141 passed, 4 skipped, 12 deselected, 0 failed in 98.19s, exit code 0.
+  - **Confirmed Rollback Boundaries**:
+    - US1 NestJS slice independently revertible via `git revert` of US1 commits without impacting Python service.
+    - US2 Python slice independently revertible via `git revert` of US2 commits without impacting NestJS API.
+  - **Feature Completion Status**:
+    - Feature 026 (Agent Boundary Simplification) is 100% complete across both User Stories (US1 & US2), fully verified, and ready for dual-axis code review.
+
 ### Feature 026 — Agent Boundary Simplification: Phase 4 Complete / US2 100% Complete (Tasks T030–T032 Verified) (2026-09-24)
 
 - **Phase 4 / Slice 4 (User Story 2 Completion: Fixture Cluster Migration, Dead Registry/Pipeline Elimination & Verification Gate) Delivered (Tasks T030–T032)**:
