@@ -1,8 +1,36 @@
 # Architecture
 
-## Feature 026 — Agent Boundary Simplification (Phase 4 Complete: User Story 2 Complete — Tasks T017–T032)
+## Feature 026 — Agent Boundary Simplification (Complete - Tasks T001–T037)
 
 Planning artifacts: [specification](../specs/026-agent-boundary-simplification/spec.md), [plan](../specs/026-agent-boundary-simplification/plan.md), and [tasks](../specs/026-agent-boundary-simplification/tasks.md).
+
+#### Post-Change Static Censuses, Documentation Sync & Full Gate Verification (Phase 5 / Tasks T033–T037 Complete)
+- **Static Ripgrep Censuses (T033)**:
+  - Zero (0) references to `agent-gateway` under `apps/api/src/chat/`.
+  - Zero (0) references to `@/chat/chat-message-crypto.service`, `GuardrailRegistry`, `create_production_registry`, `OutputPIILayer`, `InputGuardrailPipeline`, or `ToolOutputGuardrailPipeline` across `apps/api` and `apps/agent`.
+  - Production `OutputGuardrailPipeline` construction strictly localized inside `apps/agent/src/agent/guardrails/gateway.py`.
+  - Zero (0) external imports of `OutputGuardrailPipeline` or `OutputGuardrailBlockedError` from `output_pipeline.py`. Callers import `OutputGuardrailBlockedError` strictly from `agent.guardrails.base` and only use stateless `payload_free_config` from `output_pipeline.py`.
+  - Exactly one definition each of `deterministic_pii_match`, `_is_output_guardrail_disabled`, and `approved_model_content` strictly in `apps/agent/src/agent/guardrails/pii.py`.
+- **Scope & Diff Guard Confirmation (T034)**:
+  - Zero (0) Prisma schema changes or migrations in `apps/api/prisma/`.
+  - Zero (0) dependency changes in `apps/api/package.json`, `pnpm-lock.yaml`, or `apps/agent/pyproject.toml`.
+  - Zero (0) new endpoints or feature flag additions in `apps/api/src/app.module.ts` or `apps/agent/src/agent/main.py`.
+- **Architectural Boundary Invariants (T035)**:
+  - **NestJS Architecture**:
+    - `AgentChatModule` (`apps/api/src/agent-gateway/agent-chat/`) owns edge persistence, controller, and access adapter under `@UseGuards(AgentApiKeyGuard, ClaimTokenGuard)` with claim token bypass for `/access/check`.
+    - `ChatMessageCryptoModule` (`apps/api/src/common/`) is the sole provider and export owner of record-bound AES-256-GCM encryption with 12-byte random nonce and 16-byte authentication tag.
+    - Isolated `ChatModule` (`apps/api/src/chat/`) exports strictly only `ChatService` with zero inward edge/gateway dependencies.
+    - Decoupled `AttestedFlightSearchModule` consumes `ChatMessageCryptoModule` directly with zero dependency on `ChatModule`.
+  - **Python Guardrail Architecture**:
+    - `GuardrailGateway` (`apps/agent/src/agent/guardrails/gateway.py`) enforces immutable default 4-tuples for input validation `(LengthValidator, PIIDetector, InjectionDetector, TopicBoundary)` and tool results `(SizeStructureValidator, SchemaValidator, PIIScanner, UntrustedContentInjectionDetector)` validated at constructor time via `assert_layer_order`.
+    - `OutputStreamSession` async context manager per-turn lifecycle spans all runner branches (final text, tool arguments, token stream) with one-shot `flush()` and idempotent non-flushing `close()`.
+    - Strict causal cleanup ordering enforced across all runner exits: `partial_persist` -> `close` (non-flushing) -> `release` (lease release).
+    - Ingress pre-quota admission in `apps/agent/src/agent/streaming/sse.py` terminates early with zero Redis calls on any blocked input.
+    - Standalone `agent.guardrails.pii` owns all PII pattern matching and disabled-guardrail detection.
+- **Complete Verification Gate Execution (T037)**:
+  - NestJS API Gate: 5 unit suites (98/98 passed), 10 E2E suites (123/123 passed), ESLint clean (0 errors, 0 warnings), Shared types (110/110 passed), TypeScript `tsc --noEmit` clean, and production build clean (all exit code 0).
+  - Python Agent Gate: Ruff check clean (exit code 0), Ruff format clean (exit code 0), targeted security pytest suite (265 passed, 1 skipped, exit code 0), and full pytest suite excluding redis integration (1141 passed, 4 skipped, 12 deselected, 0 failed, exit code 0).
+  - Evidence recorded in `specs/026-agent-boundary-simplification/verification/api-final.md` and `agent-final.md`.
 
 #### Fixture Migration, Dead Code Elimination & US2 Verification Gate (US2 Phase 4 Slice 4 / Tasks T030–T032)
 - **Registry Fixture Cluster Migration (T030)**:
@@ -14,7 +42,7 @@ Planning artifacts: [specification](../specs/026-agent-boundary-simplification/s
 - **US2 Verification Gate Execution (T032)**:
   - Verified full test suite passes (1141 passed in non-Redis agent pytest suite).
   - Code hygiene verified: clean ruff check & ruff format (0 errors, 0 warnings).
-  - US2 is 100% complete. Phase 5 remains strictly unstarted.
+  - US2 is 100% complete.
 
 #### Production Gateway Refactoring, Stream Session, PII Extraction & Ingress Admission (US2 Phase 4 Slice 3)
 - **Direct Tuple Composition & Layer Ordering (`assert_layer_order`) (T024)**:
