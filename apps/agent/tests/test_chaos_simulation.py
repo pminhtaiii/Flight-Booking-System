@@ -11,7 +11,6 @@ from fastapi.testclient import TestClient
 
 from agent.config import get_settings
 from agent.guardrails.gateway import GuardrailGateway
-from agent.guardrails.registry import create_production_registry
 from agent.main import app
 from agent.middleware.auth import JWTAuthMiddleware
 from agent.middleware.rate_limit import RateLimitMiddleware
@@ -199,7 +198,7 @@ async def test_abrupt_client_disconnect_releases_session_lock():
     mock_app = MagicMock()
     mock_app.state.message_queue = queue_manager
     mock_app.state.guardrails = None
-    mock_app.state.guardrail_gateway = GuardrailGateway(create_production_registry())
+    mock_app.state.guardrail_gateway = GuardrailGateway()
 
     scope = {
         "type": "http",

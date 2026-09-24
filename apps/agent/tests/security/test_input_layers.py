@@ -30,14 +30,11 @@ from agent.guardrails.normalization import (
     detect_base64_payloads,
     is_catastrophic_regex,
 )
-from agent.guardrails.registry import (
-    GuardrailRegistry,
-    InputInjectionLayer,
-    InputLengthLayer,
-    InputPIILayer,
-    InputTopicLayer,
-    create_production_registry,
-)
+
+InputLengthLayer = LengthValidator
+InputPIILayer = PIIDetector
+InputInjectionLayer = InjectionDetector
+InputTopicLayer = TopicBoundary
 
 pytestmark = pytest.mark.security
 
@@ -56,40 +53,16 @@ def admission_context() -> AdmissionContext:
 def _create_gateway(
     layers: list[GuardrailLayer] | tuple[GuardrailLayer, ...] | None = None,
 ) -> GuardrailGateway:
-    """Transitional compatibility helper constructing GuardrailGateway across phases.
-    Supports current registry-backed GuardrailGateway and future zero-arg / injected constructor."""
-    sig = inspect.signature(GuardrailGateway.__init__)
-    if (
-        "registry" in sig.parameters
-        and sig.parameters["registry"].default is inspect.Parameter.empty
-    ):
-        registry = GuardrailRegistry()
-        target_layers = (
-            list(layers)
-            if layers is not None
-            else [
-                LengthValidator(),
-                PIIDetector(),
-                InjectionDetector(),
-                TopicBoundary(),
-            ]
-        )
-        for layer in target_layers:
-            registry.register(layer)
-        return GuardrailGateway(registry)
     if layers is not None:
-        return GuardrailGateway(_input_layers=tuple(layers))  # type: ignore[call-arg]
-    return GuardrailGateway()  # type: ignore[call-arg]
+        return GuardrailGateway(_input_layers=tuple(layers))
+    return GuardrailGateway()
 
 
 def _get_gateway_input_layers(gateway: GuardrailGateway) -> tuple[GuardrailLayer, ...]:
-    """Extract input layers tuple from GuardrailGateway in both transitional and future architectures."""
     if hasattr(gateway, "_input_layers"):
         return tuple(getattr(gateway, "_input_layers"))
     if hasattr(gateway, "input_layers"):
         return tuple(getattr(gateway, "input_layers"))
-    if hasattr(gateway, "registry") and gateway.registry is not None:
-        return tuple(gateway.registry.ordered_layers("input"))
     raise AttributeError("Unable to resolve input layers from GuardrailGateway")
 
 
@@ -763,21 +736,8 @@ async def test_gateway_validate_input_fail_closed_exceptions(
         failing_layer.check = original_check  # type: ignore[method-assign]
 
     # 3. No input layers configured / empty layer composition
-    sig = inspect.signature(GuardrailGateway.__init__)
-    if (
-        "registry" in sig.parameters
-        and sig.parameters["registry"].default is inspect.Parameter.empty
-    ):
-        # Pre-T024 transitional: registry with 0 input layers exercises runtime fail-closed guard
-        empty_gateway = GuardrailGateway(GuardrailRegistry())
-        decision_empty = await empty_gateway.validate_input(admission_context, "Find flights")
-        assert decision_empty.status == "BLOCK"
-        assert decision_empty.response_key == GUARDRAIL_INPUT_INJECTION
-        assert decision_empty.validated_data is None
-    else:
-        # Post-T024 target: empty layer tuple is rejected directly at construction
-        with pytest.raises((ValueError, TypeError)):
-            GuardrailGateway(_input_layers=())
+    with pytest.raises((ValueError, TypeError)):
+        GuardrailGateway(_input_layers=())
 
 
 def test_guardrail_input_response_keys_unchanged() -> None:
@@ -1042,11 +1002,11 @@ def test_registry_reexport_and_aliases() -> None:
     assert InputInjectionLayer is InjectionDetector
     assert InputTopicLayer is TopicBoundary
 
-    registry = create_production_registry()
-    assert isinstance(registry.get("input.length"), LengthValidator)
-    assert isinstance(registry.get("input.pii"), PIIDetector)
-    assert isinstance(registry.get("input.injection"), InjectionDetector)
-    assert isinstance(registry.get("input.topic"), TopicBoundary)
+    gw = GuardrailGateway()
+    assert isinstance(gw._input_layers[0], LengthValidator)
+    assert isinstance(gw._input_layers[1], PIIDetector)
+    assert isinstance(gw._input_layers[2], InjectionDetector)
+    assert isinstance(gw._input_layers[3], TopicBoundary)
 
 
 @pytest.mark.asyncio

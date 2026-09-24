@@ -71,10 +71,9 @@ def setup_env(monkeypatch):
     agent.infrastructure.redis._redis_client = mock_redis
 
     from agent.guardrails.gateway import GuardrailGateway
-    from agent.guardrails.registry import create_production_registry
     from agent.main import app
 
-    app.state.guardrail_gateway = GuardrailGateway(create_production_registry())
+    app.state.guardrail_gateway = GuardrailGateway()
 
     # Keep variables set, but yield for test duration
     yield

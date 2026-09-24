@@ -15,7 +15,6 @@ from agent.chat_turn.runner import ChatTurnRunner
 from agent.graph.nodes import final_answer_node
 from agent.graph.router import invoke_router
 from agent.guardrails.gateway import GuardrailGateway
-from agent.guardrails.registry import create_production_registry
 from agent.memory.manager import MemoryManager
 from agent.models.requests import RouteDecision
 
@@ -65,7 +64,7 @@ async def test_agent_model_paths_strip_caller_callbacks_and_do_not_export_unsafe
     """Forwarding caller callbacks or raw AIMessage content leaks the output canary."""
     caller_callback = object()
     model = _CapturingModel(AIMessage(content=f"Sensitive output {OUTPUT_CANARY}"))
-    gateway = GuardrailGateway(create_production_registry())
+    gateway = GuardrailGateway()
     config = {
         "callbacks": [caller_callback],
         "configurable": {
@@ -162,7 +161,7 @@ async def test_unsafe_generated_summary_is_not_persisted_or_logged_and_uses_call
 ) -> None:
     """Skipping summary validation or callback suppression leaks a generated canary."""
     model = _CapturingModel(AIMessage(content=f"Summary contains {OUTPUT_CANARY}"))
-    gateway = GuardrailGateway(create_production_registry())
+    gateway = GuardrailGateway()
     manager = MemoryManager(window_size=2, token_budget=1, gateway=gateway)
     client = MagicMock()
     client.trace_id = "trace-summary-boundary"

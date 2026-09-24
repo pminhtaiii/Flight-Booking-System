@@ -17,14 +17,19 @@ from agent.guardrails.base import (
     ValidatedInput,
 )
 from agent.guardrails.gateway import GuardrailGateway, OutputStreamSession
+from agent.guardrails.layers.input import (
+    InjectionDetector,
+    LengthValidator,
+    PIIDetector,
+    TopicBoundary,
+)
 from agent.guardrails.output_pipeline import OutputGuardrailPipeline
-from agent.guardrails.registry import BaseGuardrailLayer, GuardrailRegistry
 from agent.queue.message_queue import MessageQueueManager
 
 pytestmark = pytest.mark.security
 
 
-class BlockingInjectionLayer(BaseGuardrailLayer):
+class BlockingInjectionLayer(InjectionDetector):
     key = "input.injection"
     stage = "input"
 
@@ -55,9 +60,14 @@ async def test_lifecycle_input_blocked_never_acquires_lock_zero_model_calls() ->
     2. No NestJS session/message client calls occur.
     3. Strictly 0 graph / model invocations occur.
     4. Terminal ErrorEvent is returned."""
-    registry = GuardrailRegistry()
-    registry.register(BlockingInjectionLayer())
-    gateway = GuardrailGateway(registry)
+    gateway = GuardrailGateway(
+        _input_layers=(
+            LengthValidator(),
+            PIIDetector(),
+            BlockingInjectionLayer(),
+            TopicBoundary(),
+        )
+    )
 
     mock_queue = MagicMock(spec=MessageQueueManager)
     mock_queue.acquire = AsyncMock()
@@ -112,9 +122,14 @@ async def test_lifecycle_unsafe_history_releases_session_lock_zero_model_calls()
     4. Partial response is empty, so no partial response is persisted.
     5. Strictly 0 graph / model invocations occur.
     6. Terminal ErrorEvent is returned."""
-    registry = GuardrailRegistry()
-    registry.register(BlockingInjectionLayer())
-    gateway = GuardrailGateway(registry)
+    gateway = GuardrailGateway(
+        _input_layers=(
+            LengthValidator(),
+            PIIDetector(),
+            BlockingInjectionLayer(),
+            TopicBoundary(),
+        )
+    )
 
     mock_queue = MagicMock(spec=MessageQueueManager)
     mock_queue.acquire = AsyncMock(return_value="req-lock-123")
@@ -177,9 +192,7 @@ async def test_lifecycle_partial_response_persisted_and_lock_released_on_midturn
     2. Output guardrail pipeline is closed (aclose called).
     3. Session lock is explicitly released (queue_manager.release).
     4. Terminal ErrorEvent references the partial message ID."""
-    registry = GuardrailRegistry()
-    registry.register(BaseGuardrailLayer(key="input.length", stage="input"))
-    gateway = GuardrailGateway(registry)
+    gateway = GuardrailGateway()
 
     mock_queue = MagicMock(spec=MessageQueueManager)
     mock_queue.acquire = AsyncMock(return_value="req-lock-midturn")
@@ -252,9 +265,14 @@ async def test_lifecycle_partial_response_persisted_and_lock_released_on_midturn
 async def test_lifecycle_controller_blocks_before_runner_invoked() -> None:
     """ChatController ensures that blocked input stops at controller boundary:
     runner.run is never called, lock is never acquired, 0 downstream calls."""
-    registry = GuardrailRegistry()
-    registry.register(BlockingInjectionLayer())
-    gateway = GuardrailGateway(registry)
+    gateway = GuardrailGateway(
+        _input_layers=(
+            LengthValidator(),
+            PIIDetector(),
+            BlockingInjectionLayer(),
+            TopicBoundary(),
+        )
+    )
 
     mock_runner = MagicMock()
     mock_runner.run = MagicMock()
@@ -281,9 +299,7 @@ async def test_chat_controller_delegates_single_validation_pass() -> None:
     """When a valid command streams through ChatController and ChatTurnRunner,
     input validation runs strictly ONCE at admission rather than redundantly running
     in both controller and runner."""
-    registry = GuardrailRegistry()
-    registry.register(BaseGuardrailLayer(key="input.length", stage="input"))
-    gateway = GuardrailGateway(registry)
+    gateway = GuardrailGateway()
 
     # Wrap gateway.validate_input with AsyncMock spy
     original_validate = gateway.validate_input

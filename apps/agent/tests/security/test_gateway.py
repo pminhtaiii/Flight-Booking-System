@@ -35,12 +35,6 @@ from agent.guardrails.layers.tool_output import (
     SizeStructureValidator,
     UntrustedContentInjectionDetector,
 )
-from agent.guardrails.registry import (
-    BaseGuardrailLayer,
-    GuardrailRegistry,
-    RegistryContractError,
-    create_production_registry,
-)
 
 pytestmark = pytest.mark.security
 
@@ -131,17 +125,7 @@ def turn_capabilities() -> TurnCapabilities:
 async def test_validate_input_with_passing_layers_returns_pass(
     admission_context: AdmissionContext,
 ) -> None:
-    registry = GuardrailRegistry()
-    registry.register(BaseGuardrailLayer(key="input.length", stage="input"))
-    registry.register(
-        BaseGuardrailLayer(
-            key="input.pii",
-            stage="input",
-            prerequisites=("input.length",),
-        )
-    )
-
-    gateway = GuardrailGateway(registry)
+    gateway = GuardrailGateway()
     decision = await gateway.validate_input(admission_context, "Find flights to Tokyo")
 
     assert decision.status == "PASS"
@@ -154,8 +138,13 @@ async def test_validate_input_with_passing_layers_returns_pass(
 async def test_validate_input_with_empty_registry_fails_closed(
     admission_context: AdmissionContext,
 ) -> None:
-    registry = GuardrailRegistry()
-    gateway = GuardrailGateway(registry)
+    valid_tool = (
+        SizeStructureValidator(),
+        SchemaValidator(),
+        PIIScanner(),
+        UntrustedContentInjectionDetector(),
+    )
+    gateway = GuardrailGateway(_tool_layers=valid_tool)
     decision = await gateway.validate_input(admission_context, "Find flights to Tokyo")
 
     assert decision.status == "BLOCK"
@@ -168,7 +157,7 @@ async def test_validate_input_with_empty_registry_fails_closed(
 async def test_validate_input_short_circuits_on_first_block_layer(
     admission_context: AdmissionContext,
 ) -> None:
-    class BlockingPIILayer(BaseGuardrailLayer):
+    class BlockingPIILayer(PIIDetector):
         key = "input.pii"
         stage = "input"
         prerequisites = ("input.length",)
@@ -184,7 +173,7 @@ async def test_validate_input_short_circuits_on_first_block_layer(
                 reason="Input contains confidential PII",
             )
 
-    class SpyThirdLayer(BaseGuardrailLayer):
+    class SpyThirdLayer(InjectionDetector):
         key = "input.injection"
         stage = "input"
         prerequisites = ("input.length",)
@@ -198,13 +187,15 @@ async def test_validate_input_short_circuits_on_first_block_layer(
             self.called = True
             return PipelineDecision(status="PASS", validated_data=ValidatedInput(content=str(data)))
 
-    registry = GuardrailRegistry()
-    registry.register(BaseGuardrailLayer(key="input.length", stage="input"))
-    registry.register(BlockingPIILayer())
     spy_layer = SpyThirdLayer()
-    registry.register(spy_layer)
-
-    gateway = GuardrailGateway(registry)
+    valid_input = (LengthValidator(), BlockingPIILayer(), spy_layer, TopicBoundary())
+    valid_tool = (
+        SizeStructureValidator(),
+        SchemaValidator(),
+        PIIScanner(),
+        UntrustedContentInjectionDetector(),
+    )
+    gateway = GuardrailGateway(_input_layers=valid_input, _tool_layers=valid_tool)
     decision = await gateway.validate_input(admission_context, "Contact me at secret@corp.example")
 
     assert decision.status == "BLOCK"
@@ -218,8 +209,8 @@ async def test_validate_input_short_circuits_on_first_block_layer(
 async def test_validate_input_fails_closed_when_layer_raises_exception(
     admission_context: AdmissionContext,
 ) -> None:
-    class CrashingLayer(BaseGuardrailLayer):
-        key = "input.crash"
+    class CrashingLayer(InjectionDetector):
+        key = "input.injection"
         stage = "input"
 
         async def check(
@@ -229,10 +220,14 @@ async def test_validate_input_fails_closed_when_layer_raises_exception(
         ) -> PipelineDecision[Any]:
             raise RuntimeError("Database connection timed out or classifier crashed")
 
-    registry = GuardrailRegistry()
-    registry.register(CrashingLayer())
-
-    gateway = GuardrailGateway(registry)
+    valid_input = (LengthValidator(), PIIDetector(), CrashingLayer(), TopicBoundary())
+    valid_tool = (
+        SizeStructureValidator(),
+        SchemaValidator(),
+        PIIScanner(),
+        UntrustedContentInjectionDetector(),
+    )
+    gateway = GuardrailGateway(_input_layers=valid_input, _tool_layers=valid_tool)
     decision = await gateway.validate_input(admission_context, "Safe message")
 
     assert decision.status == "BLOCK"
@@ -244,9 +239,7 @@ async def test_validate_input_fails_closed_when_layer_raises_exception(
 
 @pytest.mark.asyncio
 async def test_validate_input_fails_closed_on_invalid_context() -> None:
-    registry = GuardrailRegistry()
-    registry.register(BaseGuardrailLayer(key="input.length", stage="input"))
-    gateway = GuardrailGateway(registry)
+    gateway = GuardrailGateway()
 
     # Passing invalid context type
     decision = await gateway.validate_input(
@@ -282,7 +275,7 @@ async def test_chat_controller_stream_yields_configuration_error_when_gateway_is
 
 @pytest.mark.asyncio
 async def test_chat_controller_stream_short_circuits_when_input_blocked() -> None:
-    class BlockingLayer(BaseGuardrailLayer):
+    class BlockingLayer(InjectionDetector):
         key = "input.injection"
         stage = "input"
 
@@ -297,9 +290,14 @@ async def test_chat_controller_stream_short_circuits_when_input_blocked() -> Non
                 reason="Detected prompt injection attempt",
             )
 
-    registry = GuardrailRegistry()
-    registry.register(BlockingLayer())
-    gateway = GuardrailGateway(registry)
+    valid_input = (LengthValidator(), PIIDetector(), BlockingLayer(), TopicBoundary())
+    valid_tool = (
+        SizeStructureValidator(),
+        SchemaValidator(),
+        PIIScanner(),
+        UntrustedContentInjectionDetector(),
+    )
+    gateway = GuardrailGateway(_input_layers=valid_input, _tool_layers=valid_tool)
 
     runner = MockRunner()
     controller = ChatController(runner=runner, gateway=gateway)
@@ -322,9 +320,7 @@ async def test_chat_controller_stream_short_circuits_when_input_blocked() -> Non
 
 @pytest.mark.asyncio
 async def test_chat_controller_stream_delegates_to_runner_when_input_passes() -> None:
-    registry = GuardrailRegistry()
-    registry.register(BaseGuardrailLayer(key="input.length", stage="input"))
-    gateway = GuardrailGateway(registry)
+    gateway = GuardrailGateway()
 
     runner = MockRunner(
         events=[
@@ -353,20 +349,26 @@ async def test_chat_controller_stream_delegates_to_runner_when_input_passes() ->
 async def test_execute_tool_success_and_fail_closed(
     turn_capabilities: TurnCapabilities,
 ) -> None:
-    registry = GuardrailRegistry()
-    gateway = GuardrailGateway(registry)
+    gateway = GuardrailGateway()
 
     # 1. Permitted tool succeeds
     call = DummyToolCall("search_flights")
+    valid_flight = {
+        "flight_id": "FL-123",
+        "airline": "SkyWays",
+        "price": 250.0,
+        "origin": "SFO",
+        "destination": "JFK",
+    }
 
     async def invoke_ok() -> dict[str, Any]:
-        return {"flights": ["FL-123"]}
+        return {"flights": [valid_flight]}
 
     decision = await gateway.execute_tool(turn_capabilities, call, invoke_ok)
     assert decision.status == "PASS"
     assert decision.validated_data == ValidatedToolResult(
         tool_name="search_flights",
-        data={"flights": ["FL-123"]},
+        data={"flights": [valid_flight]},
     )
 
     # 2. Forbidden tool denied before invocation
@@ -398,8 +400,7 @@ async def test_execute_tool_success_and_fail_closed(
 async def test_stream_output_yields_approved_chunks(
     turn_capabilities: TurnCapabilities,
 ) -> None:
-    registry = GuardrailRegistry()
-    gateway = GuardrailGateway(registry)
+    gateway = GuardrailGateway()
 
     async def token_gen() -> AsyncIterator[str]:
         for t in ["Hello", " ", "world"]:
@@ -417,24 +418,9 @@ def test_guardrail_gateway_production_default_instantiation_contract() -> None:
     """
     FR-008 / internal-boundaries: GuardrailGateway() MUST construct the production
     tuples with no caller-supplied registry.
-    Transitional compatibility check: if registry is currently required in pre-T024
-    state, verify GuardrailGateway() raises TypeError/RegistryContractError, and
-    instantiating with a production registry succeeds.
     """
-    sig = inspect.signature(GuardrailGateway.__init__)
-    requires_registry = (
-        "registry" in sig.parameters
-        and sig.parameters["registry"].default is inspect.Parameter.empty
-    )
-
-    if requires_registry:
-        with pytest.raises((TypeError, RegistryContractError)):
-            GuardrailGateway()  # type: ignore[call-arg]
-        gw = GuardrailGateway(create_production_registry())
-        assert gw.is_healthy() is True
-    else:
-        gw = GuardrailGateway()
-        assert gw.is_healthy() is True
+    gw = GuardrailGateway()
+    assert gw.is_healthy() is True
 
 
 def test_guardrail_gateway_keyword_only_private_injection_seam_contract() -> None:
@@ -593,21 +579,7 @@ def test_guardrail_gateway_is_healthy_runtime_readiness_not_constructor_recovery
     internal-boundaries: is_healthy() represents only post-construction runtime readiness
     and never recovers an invalid constructor. Invalid composition raises during construction.
     """
-    sig = inspect.signature(GuardrailGateway.__init__)
-    requires_registry = (
-        "registry" in sig.parameters
-        and sig.parameters["registry"].default is inspect.Parameter.empty
-    )
-
-    if requires_registry:
-        with pytest.raises((TypeError, RegistryContractError)):
-            GuardrailGateway(None)  # type: ignore[arg-type]
-        with pytest.raises((TypeError, RegistryContractError)):
-            GuardrailGateway()  # type: ignore[call-arg]
-        gw = GuardrailGateway(create_production_registry())
-    else:
-        with pytest.raises((ValueError, TypeError)):
-            GuardrailGateway(_input_layers=(LengthValidator(),))
-        gw = GuardrailGateway()
-
+    with pytest.raises((ValueError, TypeError)):
+        GuardrailGateway(_input_layers=(LengthValidator(),))
+    gw = GuardrailGateway()
     assert gw.is_healthy() is True

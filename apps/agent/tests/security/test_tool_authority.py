@@ -27,7 +27,12 @@ from agent.guardrails.base import (
     TurnCapabilities,
 )
 from agent.guardrails.gateway import GuardrailGateway
-from agent.guardrails.registry import GuardrailRegistry, create_production_registry
+from agent.guardrails.layers.input import (
+    InjectionDetector,
+    LengthValidator,
+    PIIDetector,
+    TopicBoundary,
+)
 from agent.models.requests import RouteDecision
 from agent.tools.registry import (
     get_tools,
@@ -40,17 +45,16 @@ from agent.trusted_search_snapshot import (
 pytestmark = pytest.mark.security
 
 
-def _make_gateway(registry: GuardrailRegistry | None = None) -> GuardrailGateway:
-    """Instantiate GuardrailGateway with transitional and target compatibility."""
-    if registry is not None:
-        try:
-            return GuardrailGateway(registry)
-        except TypeError:
-            return GuardrailGateway()
-    try:
-        return GuardrailGateway()
-    except TypeError:
-        return GuardrailGateway(create_production_registry())
+def _make_gateway() -> GuardrailGateway:
+    """Instantiate GuardrailGateway with keyword seam for tool authority tests."""
+    return GuardrailGateway(
+        _input_layers=(
+            LengthValidator(),
+            PIIDetector(),
+            InjectionDetector(),
+            TopicBoundary(),
+        )
+    )
 
 
 TRAVEL_TOOL_NAMES: tuple[str, ...] = (
@@ -464,7 +468,7 @@ class TestCapabilitySealingTruthTable:
             provenance="trusted_router",
             sealed_tools=(),
         )
-        gateway = _make_gateway(GuardrailRegistry())
+        gateway = _make_gateway()
         invoked = False
 
         async def dummy_invoke() -> Dict[str, Any]:
@@ -490,7 +494,7 @@ class TestCapabilitySealingTruthTable:
             provenance="trusted_router",
             sealed_tools=(),
         )
-        gateway = _make_gateway(GuardrailRegistry())
+        gateway = _make_gateway()
         decision = await gateway.validate_tool_result(caps, tool_name, {"status": "ok"})
         assert decision.status == "BLOCK"
         assert decision.response_key == GUARDRAIL_TOOL_SCHEMA
@@ -507,7 +511,7 @@ class TestCapabilitySealingTruthTable:
             provenance="trusted_router",
             sealed_tools=TRAVEL_TOOL_NAMES,
         )
-        gateway = _make_gateway(GuardrailRegistry())
+        gateway = _make_gateway()
         invoked = False
 
         async def dummy_invoke() -> Dict[str, Any]:
@@ -536,7 +540,7 @@ class TestCapabilitySealingTruthTable:
             provenance="trusted_router",
             sealed_tools=TRAVEL_TOOL_NAMES,
         )
-        gateway = _make_gateway(GuardrailRegistry())
+        gateway = _make_gateway()
         decision = await gateway.validate_tool_result(
             caps, "signal_checkout_intent", {"signal": "ok"}
         )
@@ -555,7 +559,7 @@ class TestCapabilitySealingTruthTable:
             provenance="trusted_router",
             sealed_tools=CHECKOUT_TOOL_NAMES,
         )
-        gateway = _make_gateway(GuardrailRegistry())
+        gateway = _make_gateway()
         invoked = False
 
         async def dummy_invoke() -> Dict[str, Any]:
@@ -585,7 +589,7 @@ class TestCapabilitySealingTruthTable:
             provenance="trusted_router",
             sealed_tools=CHECKOUT_TOOL_NAMES,
         )
-        gateway = _make_gateway(GuardrailRegistry())
+        gateway = _make_gateway()
         decision = await gateway.validate_tool_result(caps, travel_tool, {"status": "ok"})
         assert decision.status == "BLOCK"
         assert decision.response_key == GUARDRAIL_TOOL_SCHEMA
@@ -639,7 +643,7 @@ class TestWholeBatchDenialRule:
 
         config = {
             "configurable": {
-                "guardrail_gateway": _make_gateway(GuardrailRegistry()),
+                "guardrail_gateway": _make_gateway(),
                 "turn_capabilities": caps,
                 "thread_id": "session-batch-test",
                 "user_id": "user-batch-test",
@@ -692,7 +696,7 @@ class TestWholeBatchDenialRule:
         }
         config = {
             "configurable": {
-                "guardrail_gateway": _make_gateway(GuardrailRegistry()),
+                "guardrail_gateway": _make_gateway(),
                 "turn_capabilities": caps,
                 "thread_id": "session-batch-test",
                 "user_id": "user-batch-test",
@@ -712,7 +716,7 @@ class TestWholeBatchDenialRule:
     @pytest.mark.asyncio
     async def test_gateway_execute_tool_batch_denies_mixed_batches(self) -> None:
         """GuardrailGateway.execute_tool_batch must fail closed (BLOCK) if any call is unauthorized."""
-        gateway = _make_gateway(GuardrailRegistry())
+        gateway = _make_gateway()
         caps = TurnCapabilities(
             intent="SEARCH",
             provenance="trusted_router",
@@ -782,7 +786,7 @@ class TestWholeBatchDenialRule:
         }
         config = {
             "configurable": {
-                "guardrail_gateway": _make_gateway(GuardrailRegistry()),
+                "guardrail_gateway": _make_gateway(),
                 "turn_capabilities": caps,
                 "thread_id": "session-batch-test",
                 "user_id": "user-batch-test",
@@ -828,7 +832,7 @@ class TestWholeBatchDenialRule:
         config = {
             "callbacks": [MagicMock()],
             "configurable": {
-                "guardrail_gateway": _make_gateway(create_production_registry()),
+                "guardrail_gateway": _make_gateway(),
                 "thread_id": "session-checkout-state-injection",
                 "user_id": "user-checkout-state-injection",
             },
@@ -899,7 +903,7 @@ class TestWholeBatchDenialRule:
     @pytest.mark.asyncio
     async def test_gateway_execute_tool_batch_pii_priority_in_batch(self) -> None:
         """execute_tool_batch blocks with GUARDRAIL_TOOL_PII when a tool result contains PII in extra fields."""
-        gateway = _make_gateway()
+        gateway = GuardrailGateway()
         caps = TurnCapabilities(
             intent="SEARCH",
             provenance="trusted_router",
