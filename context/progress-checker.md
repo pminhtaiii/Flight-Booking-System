@@ -1,5 +1,40 @@
 # Progress Tracker
  
+### Feature 026 — Agent Boundary Simplification: Phase 4 / Slice 3 Complete (Tasks T024–T029 Verified) (2026-09-24)
+
+- **Phase 4 / Slice 3 (User Story 2 Implementation: Fixed Gateway Refactoring, Stream Session, PII Extraction, SSE Pre-Quota Admission & Canonical Singleton) Delivered (Tasks T024–T029)**:
+  - **Fixed Gateway Refactoring & Tuple Composition (T024)**:
+    - In `apps/agent/src/agent/guardrails/gateway.py`: `GuardrailGateway()` builds immutable production layer tuples without caller-supplied registry.
+    - Added `assert_layer_order(stage, layers, expected_types)` asserting exact layer count, positions, unique keys, and linear prerequisites; raises on invalid composition during construction.
+    - Keyword-only private tuple injection `_input_layers` and `_tool_layers` enabled for testing.
+    - Sealed `validate_tool_result(context, tool_name, result)` as the sole public tool method with raw extra-field PII priority.
+    - `is_healthy()` covers runtime readiness only and never recovers an invalid constructor.
+  - **OutputStreamSession & Causal Cleanup (T025, T026)**:
+    - Implemented `GuardrailGateway.stream_output` returning `OutputStreamSession` async context manager facade.
+    - Per-turn session exposes `process_token`, one-shot `flush`, and idempotent non-flushing `close`.
+    - Preserved `OutputGuardrailBlockedError` in `agent.guardrails.base` with original partial response, layer, rule, and message.
+    - Updated `ChatTurnRunner` to use one stream session spanning all execution branches (final text, tool arguments, token stream).
+    - Preserved strict causal cleanup ordering across all exit paths: `partial_persist` -> `close` (non-flushing) -> `release` (lease release).
+  - **Standalone PII Utility Ownership (T027)**:
+    - Created `apps/agent/src/agent/guardrails/pii.py` as sole owner of `deterministic_pii_match`, `_is_output_guardrail_disabled` (covering all 5 shapes), and `approved_model_content`.
+    - Removed duplicate definitions across modules; updated `output_pipeline.py` to import directly from `pii.py` while retaining `payload_free_config`. Zero circular dependencies.
+  - **SSE Pre-Quota Ingress Admission & Block Handling (T028)**:
+    - In `apps/agent/src/agent/streaming/sse.py`: ingress order strictly enforces `access check -> length guard -> gateway health -> validate_input -> quota/Redis`.
+    - Pre-quota ingress admission returns immediately on ANY blocked decision before touching Redis or admitting budget.
+    - PII blocks yield `GUARDRAIL_BLOCKED` (`Your message contains protected personal information and cannot be processed.`).
+    - Non-PII blocks yield `code = decision.response_key or "GUARDRAIL_INPUT_BLOCKED"` (`Input rejected by security guardrail: {code}`).
+    - Guaranteed zero Redis calls or quota consumption for ANY blocked input.
+    - Forwarded admission decision to `ChatController.stream` to prevent redundant revalidation on admitted turns.
+  - **Canonical Gateway Singleton (T029)**:
+    - In `apps/agent/src/agent/main.py`: added `get_guardrail_gateway()` canonical singleton factory with fast double-checked locking.
+    - Lifespan and module-level lookups reuse single instance; construction failures abort startup fail-closed.
+  - **Verification Gate**:
+    - Pytest: 49/49 passed across `test_sse.py`, `test_chat_controller.py`, and `security/test_gateway.py`.
+    - Ruff check & format: clean (0 errors, 0 warnings).
+  - **Scope Discipline**:
+    - Zero deletions of `registry.py` or touches to tasks T030–T032.
+    - Tasks T024–T029 marked complete.
+
 ### Feature 026 — Agent Boundary Simplification: Phase 4 / Slice 2 Complete (Tasks T020, T021, T023 Verified) (2026-09-23)
 
 - **Phase 4 / Slice 2 (User Story 2 Test Characterization: Persistent Stream Sessions, Delegate Pipeline & Shared PII Utilities) Delivered (Tasks T020, T021, T023)**:

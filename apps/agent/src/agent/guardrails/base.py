@@ -34,6 +34,18 @@ GUARDRAIL_RESPONSE_KEYS: Mapping[str, str] = MappingProxyType(
 )
 
 
+class OutputGuardrailBlockedError(Exception):
+    def __init__(
+        self,
+        partial_response: str,
+        layer: str,
+        rule: str,
+        message: str = "Response was blocked for safety reasons.",
+    ) -> None:
+        self.partial_response, self.layer, self.rule = partial_response, layer, rule
+        super().__init__(message)
+
+
 class _ImmutableContract(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
 
