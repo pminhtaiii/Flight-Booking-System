@@ -18,6 +18,10 @@ from .events import (
     ToolResultEvent,
     ToolResultPayload,
 )
+from .interpreter import (
+    GraphEventInterpreter,
+    ProjectionBlockedException,
+)
 from .resolver import (
     HandoffResolution,
     ToolResolution,
@@ -39,7 +43,9 @@ __all__ = [
     "ErrorPayload",
     "FlightResultsEvent",
     "FlightResultsPayload",
+    "GraphEventInterpreter",
     "HandoffResolution",
+    "ProjectionBlockedException",
     "TokenEvent",
     "TokenPayload",
     "ToolCallEvent",
