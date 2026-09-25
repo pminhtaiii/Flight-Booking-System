@@ -34,8 +34,8 @@
 
 - [x] T012 [P] [US2] Write context-fetch, window/offset, unsafe-summary/history, exact AdmissionContext identity/policy forwarding, and `totalMessageCount + 2` compaction tests in `apps/agent/tests/test_conversation_memory.py`.
 - [x] T013 [US2] Implement `ConversationMemory.get_context(session_id, client, admission_context)` and `schedule_compaction` in `apps/agent/src/agent/memory/conversation.py`, delegating to existing NestJSClient, GuardrailGateway, and `apps/agent/src/agent/memory/manager.py`.
-- [ ] T014 [US2] Replace inline memory fetch/re-scan and compaction scheduling in `apps/agent/src/agent/chat_turn/runner.py` with ConversationMemory calls; preserve direct runner fallback behavior.
-- [ ] T015 [US2] Run `apps/agent/tests/test_conversation_memory.py`, `apps/agent/tests/test_memory.py`, and `apps/agent/tests/test_chat_turn_runner.py`; record parity in `specs/027-chat-turn-decomposition/verification.md`.
+- [x] T014 [US2] Replace inline memory fetch/re-scan and compaction scheduling in `apps/agent/src/agent/chat_turn/runner.py` with ConversationMemory calls; preserve direct runner fallback behavior.
+- [x] T015 [US2] Run `apps/agent/tests/test_conversation_memory.py`, `apps/agent/tests/test_memory.py`, and `apps/agent/tests/test_chat_turn_runner.py`; record parity in `specs/027-chat-turn-decomposition/verification.md`.
 
 ## Phase 5: User Story 3 - Reuse ordered admission (P3)
 
