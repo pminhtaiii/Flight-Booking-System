@@ -12,7 +12,7 @@ uv run --package agent pytest apps/agent/tests/test_chat_admission.py apps/agent
 uv run --package agent pytest apps/agent/tests/test_chat_turn_runner.py apps/agent/tests/test_sse_integration.py apps/agent/tests/characterization/test_sse_characterization.py
 ```
 
-The three new test files named above are created during implementation. Expected: exit code 0; synthetic graph events preserve ToolResultEvent plus specialized follow-ups, all model-output branches are guardrail-scanned, and blocked input consumes no quota.
+The four new test files named above are created during implementation. Expected: exit code 0; accepted synthetic tool completions preserve ToolResultEvent plus specialized follow-ups, invalid readiness emits no ToolResultEvent, stale fences suppress action events, all model-output branches are guardrail-scanned, and blocked input consumes no quota.
 
 ## Final gate
 

@@ -16,7 +16,7 @@ Run from repository root in PowerShell with dependencies already installed. Focu
   'apps/web/app/api/booking-management/bookings/[bookingId]/cancellation/quote/route.spec.ts'
 ```
 
-`backend-client.spec.ts` is created during implementation. Expected: exit code 0; GET retry matrix, no mutation replay, missing-token short circuit, dashboard INVALID_RESPONSE, booking error-body forwarding, and route mapping parity all pass.
+`backend-client.spec.ts` is created during implementation. Expected: exit code 0; GET retry matrix with a 31-second total deadline, no mutation replay, missing-token short circuit, dashboard INVALID_RESPONSE, malformed-error-body status retention, bodyless disruption success, and route mapping parity all pass.
 
 ## Final gate
 

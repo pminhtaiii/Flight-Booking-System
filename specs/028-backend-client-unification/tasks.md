@@ -13,8 +13,8 @@
 
 ## Phase 2: Foundational client contract
 
-- [ ] T005 Write failing factory, default/injected token provider, URL precedence, missing-token, no-store, 10-second timeout, success schema, HTTP body, and safe cause-code tests in `apps/web/lib/server/backend-client.spec.ts`.
-- [ ] T006 Extend `apps/web/lib/server/backend-client.spec.ts` with the exact GET retry matrix (network/timeout/502/503/504/429 with Retry-After), three-attempt cap, 100 ms exponential base, 500 and other status no-retry, and all mutation methods single-attempt.
+- [ ] T005 Write failing factory, default/injected token provider, URL precedence, missing-token, no-store, 10-second attempt timeout, JSON schema/none-mode success, malformed successful JSON versus malformed non-2xx status/body, and safe cause-code tests in `apps/web/lib/server/backend-client.spec.ts`.
+- [ ] T006 Extend `apps/web/lib/server/backend-client.spec.ts` with the exact GET retry matrix, three-attempt and 31-second total caps, 100 ms exponential base, delta/HTTP-date Retry-After including far-future header, 500 and other status no-retry, and all mutation methods single-attempt.
 - [ ] T007 Implement `createBackendClient`, default `backendClient`, inline TransportResult/RequestOpts, parsing/validation, safe diagnostics, and bounded retry in `apps/web/lib/server/backend-client.ts` until T005–T006 pass.
 
 ## Phase 3: User Story 1 - Resilient dashboard reads (P1)
@@ -40,9 +40,9 @@
 **Goal**: All eight booking operations share transport without changing domain results or replaying mutations.
 **Independent test**: Existing booking tests cover list/detail/status/quote/cancel/acknowledge/accept/revisions, including error-body forwarding and single-send mutations.
 
-- [ ] T014 [US3] Add tests for raw-response boundary validation, 400/422 body messages, invalid data mapping, GET retry policy, and mutation send count in `apps/web/lib/server/booking-management.spec.ts`.
-- [ ] T015 [US3] Migrate `listBookings`, `getBookingDetail`, `getCancellationStatus`, and `getCancellationQuote` in `apps/web/lib/server/booking-management.ts` to the client, adding operation-specific raw schemas where mapped-view schemas cannot validate upstream shape.
-- [ ] T016 [US3] Migrate `cancelBooking`, `acknowledgeDisruption`, `acceptDisruption`, and `getItineraryRevisions` in `apps/web/lib/server/booking-management.ts` to the client; retain status-to-booking outcome and mapped-view validation.
+- [ ] T014 [US3] Add tests for six JSON-consuming operation schemas, malformed 400/422 error-body fallback, invalid successful JSON, empty-body acknowledge/accept success, GET retry policy, and mutation send count in `apps/web/lib/server/booking-management.spec.ts`.
+- [ ] T015 [US3] Migrate `listBookings`, `getBookingDetail`, `getCancellationStatus`, and `getCancellationQuote` in `apps/web/lib/server/booking-management.ts` to the client with raw list/detail/cancellation-status/cancellation-quote schemas preserving current tolerated fields/defaults.
+- [ ] T016 [US3] Migrate `cancelBooking` and `getItineraryRevisions` in `apps/web/lib/server/booking-management.ts` using raw cancellation-result/revisions schemas, and migrate `acknowledgeDisruption` and `acceptDisruption` using explicit none mode; retain domain mapping and view validation.
 - [ ] T017 [US3] Run `apps/web/lib/server/booking-management.spec.ts` and `apps/web/lib/server/backend-client.spec.ts`; record eight-operation parity in `specs/028-backend-client-unification/verification.md`.
 
 ## Phase 6: User Story 4 - Share booking response mapping (P4)

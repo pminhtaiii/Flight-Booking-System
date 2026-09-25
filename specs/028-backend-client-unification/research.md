@@ -12,19 +12,21 @@
 
 ## R2. Transport contract and response validation
 
-**Decision**: Keep the ADR's success / HTTP / transport result union. The transport branch exposes only stable, safe cause codes (`missing_token`, `network`, `timeout`, `invalid_json`, `invalid_payload`) while detailed causes stay in internal structured logs. Each caller maps HTTP statuses and safe transport codes to its existing domain outcomes. Parse 400/422 HTTP bodies so booking error messages remain available. Validate successful raw responses with caller-supplied Zod schemas before returning data; retain domain-view validation after mapping where it protects projections.
+**Decision**: Keep the ADR's success / HTTP / transport result union. The transport branch exposes only stable, safe cause codes (`missing_token`, `network`, `timeout`, `invalid_json`, `invalid_payload`) while detailed causes stay in internal structured logs. Each caller maps HTTP statuses and safe transport codes to its existing domain outcomes. Parse 400/422 HTTP bodies when possible so booking error messages remain available; retain status and default wording when parsing fails. Validate successful JSON responses with caller-supplied Zod schemas before returning data; use explicit none mode for status-only success and retain domain-view validation after mapping where it protects projections.
 
-**Rationale**: Dashboard currently distinguishes malformed JSON/schema as non-retryable `INVALID_RESPONSE`; a completely opaque transport failure would erase that distinction. Booking and flight usually map these failures to `UPSTREAM_UNAVAILABLE`. Cause codes retain the two-kind failure union without exposing exception text. Raw upstream schemas may need to be defined per operation where current code validates only mapped views.
+**Rationale**: Dashboard currently distinguishes malformed successful JSON/schema as non-retryable `INVALID_RESPONSE`; a completely opaque transport failure would erase that distinction. Booking and flight usually map these failures to `UPSTREAM_UNAVAILABLE`. Malformed non-2xx bodies retain HTTP status and fall back to existing booking 400/422 wording. Cause codes retain the two-kind failure union without exposing exception text. Six booking operations consume JSON and need raw schemas that preserve current tolerated fields/defaults; acknowledge and accept disruption currently inspect status only and must also accept bodyless 2xx through explicit none mode.
 
 **Alternative considered**: Returning raw Response keeps duplicate parse/validation logic; returning domain Outcome couples transport to three vocabularies.
 
 ## R3. Retry and timeout
 
-**Decision**: GET only; at most three total attempts; retry network/timeout and 502/503/504; retry 429 only with valid Retry-After; exponential base 100 ms, honoring the header; no mutation retries. Preserve 10-second timeout per attempt and `no-store` behavior.
+**Decision**: GET only; at most three total attempts; retry network/timeout and 502/503/504; retry 429 only with valid Retry-After; exponential base 100 ms, honoring the header; no mutation retries. Bound all attempts and waits to 31 seconds, with each attempt at most 10 seconds. If a Retry-After delay would exceed the remaining budget, return 429 without waiting or retrying early. Preserve `no-store` behavior.
 
 **Rationale**: Current flight and booking helpers retry any 5xx GET, including 500. The ADR deliberately narrows this policy. Dashboard currently does not retry. This is the only intended resilience behavior change.
 
 **Alternative considered**: Retrying all 5xx or mutations risks replaying deterministic failures or uncertain writes.
+
+The ADR says seven booking endpoints; the current server module exports eight upstream operations. This plan enumerates the eight actual operations; six route handler files are a separate count.
 
 ## R4. Auth and route mapping
 

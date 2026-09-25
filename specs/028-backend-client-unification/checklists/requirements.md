@@ -27,3 +27,5 @@
 ## Notes
 
 This architectural refactor specification names existing modules and outcomes because they define the scope and compatibility contract. It contains no production implementation body.
+
+GPT 6 Luna Max reviewed the spec, plan, contract, and tasks against the code on 2026-09-25. The initial three medium findings (unbounded Retry-After, bodyless success/schema coverage, malformed error-body status) were corrected and the second review found no remaining high or medium concern. The ADR's stale seven-endpoint count is reconciled against eight current operations in research.md.

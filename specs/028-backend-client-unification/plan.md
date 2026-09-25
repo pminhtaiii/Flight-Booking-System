@@ -16,8 +16,8 @@ Extract one server-side backend client for the three core consumers. It owns URL
 **Testing**: Existing web server/route specs plus new isolated client spec; web lint, typecheck, build
 **Target Platform**: Next.js server and route handlers
 **Project Type**: Internal web transport refactor
-**Performance Goals**: At most three attempts for eligible GET and one attempt for mutations; no request for missing token
-**Constraints**: Current 10-second per-attempt timeout, no-store, auth and public outcome compatibility, PII-safe logs
+**Performance Goals**: At most three attempts and 31 seconds total for eligible GET; one attempt for mutations; no request for missing token
+**Constraints**: At most 10 seconds per attempt, no-store, auth and public outcome compatibility, PII-safe logs
 **Scale/Scope**: Three server modules, one new client, one booking-specific route adapter, six route files, focused tests
 
 ## Constitution Check
@@ -77,7 +77,7 @@ apps/web/app/api/booking-management/bookings/[bookingId]/
 
 ## Phase 0: Research
 
-[research.md](./research.md) records five choices. Current flight and booking helpers retry any 5xx GET, whereas the ADR narrows to 502/503/504 and 429 with Retry-After; dashboard currently has no retry. The current dashboard maps invalid JSON/schema data to `INVALID_RESPONSE`, so the client must expose a stable safe failure cause under the transport kind. Booking 400/422 body messages must survive the HTTP failure branch. No `NEEDS CLARIFICATION` remains.
+[research.md](./research.md) records five choices. Current flight and booking helpers retry any 5xx GET, whereas the ADR narrows to 502/503/504 and 429 with Retry-After; dashboard currently has no retry. A 31-second total deadline prevents an unbounded Retry-After wait. Dashboard invalid successful JSON/schema data maps to `INVALID_RESPONSE`; malformed non-2xx bodies retain HTTP status so booking 400/422 fallback messages survive. Acknowledge/accept disruption accept bodyless 2xx via explicit none mode. No `NEEDS CLARIFICATION` remains.
 
 ## Phase 1: Design and Contracts
 
@@ -87,10 +87,10 @@ apps/web/app/api/booking-management/bookings/[bookingId]/
 
 ### Migration steps
 
-1. Create and isolate-test `backend-client.ts`: default/injected auth and URL, missing-token short circuit, 10-second per-attempt abort, no-store, safe HTTP body parsing, schema validation, retry matrix, safe cause code and structured diagnostics.
+1. Create and isolate-test `backend-client.ts`: default/injected auth and URL, missing-token short circuit, 10-second per-attempt and 31-second total deadline, no-store, HTTP error status with optional body, JSON/none success modes, schema validation, retry matrix, safe cause code and structured diagnostics.
 2. Migrate `dashboard.ts` first; retain `INVALID_RESPONSE` for invalid JSON/schema and existing 401/403/unavailable wording. Add transient GET retry.
 3. Migrate `flight-search.ts` request paths; preserve local input validation, domain transformations, outcome mapping, and final view validation. Search POST remains single-attempt; offer GET uses narrow retries.
-4. Migrate all eight exported operations in `booking-management.ts`, retaining booking-specific status/error-body mapping and domain view projections. Each mutation remains single-attempt.
+4. Migrate all eight exported operations in `booking-management.ts`. Use raw schemas for list/detail/cancellation status/quote/cancel/revisions and none mode for disruption acknowledge/accept; retain booking-specific status/error-body mapping, domain view projections, and bodyless 2xx success. Each mutation remains single-attempt.
 5. Move `mapOutcomeToResponse` to booking-specific `outcome-response.ts`; update all six route handlers. Run route parity tests and static duplicate census.
 6. Delete orphaned transport helpers from the three consumers after parity checks; run full web gate.
 

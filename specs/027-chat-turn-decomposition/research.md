@@ -12,7 +12,7 @@
 
 ## R2. Actual graph completion source and wire compatibility
 
-**Decision**: Invoke the resolver once for each guardrail-validated ToolMessage in the existing `on_chain_end` / `name == "tools"` output. Preserve `on_tool_end` for timing telemetry. The interpreter emits the current ToolResultEvent and then any specialized follow-up event in the current order. Invalid readiness and blocked tool results retain their fail-closed path. Keep handoff projection for its existing chain-end nodes.
+**Decision**: Invoke the resolver once for each guardrail-validated ToolMessage in the existing `on_chain_end` / `name == "tools"` output, before emitting ToolResultEvent. Preserve `on_tool_end` for timing telemetry. An accepted result emits the current ToolResultEvent and then any specialized follow-up in the current order; invalid readiness blocks before ToolResultEvent, though a prior ToolCallEvent may already have been emitted. The resolver must be able to supply the current readiness summary override or a safe block decision, not just an optional event. Keep handoff projection for its existing chain-end nodes. The coordinator checks the active fence before forwarding ActionRequiredEvent or ActionHandoffEvent.
 
 **Rationale**: The ADR describes `on_tool_end` as the resolver point and a specialized-or-default result. Current `on_tool_end` has no authoritative validated message; `on_chain_end` is where the runner receives validated tool messages, emits ToolResultEvent, and may then emit FlightResultsEvent or ActionRequiredEvent. Literal use of the ADR pseudocode would drop events and change the SSE contract. This is a necessary source and return-shape reconciliation while retaining the ADR's tool-name-agnostic interpreter boundary.
 
@@ -28,7 +28,7 @@
 
 ## R4. Memory and admission
 
-**Decision**: ConversationMemory delegates to NestJSClient, GuardrailGateway, and existing MemoryManager, preserving the `totalMessageCount + 2` compaction count. Auth, input, and quota rules move to reusable services. FastAPI Depends wrappers express ordering while SSE remains an adapter. Preserve current length and gateway-health precedence, PII before Redis/quota, and one validated decision passed to ChatController.
+**Decision**: ConversationMemory delegates to NestJSClient, GuardrailGateway, and existing MemoryManager, forwarding the same per-turn AdmissionContext (user/session/trace/correlation/policy) for history re-scan and preserving the `totalMessageCount + 2` compaction count. Auth, input, and quota rules move to reusable services. FastAPI Depends wrappers express ordering while SSE remains an adapter. Preserve current length and gateway-health precedence, PII before Redis/quota, and one validated decision passed to ChatController.
 
 **Rationale**: Current `sse.py` already passes precomputed admission to the controller; the extraction should retain that behavior rather than add a second scan.
 

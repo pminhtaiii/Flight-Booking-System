@@ -12,7 +12,7 @@
 
 ## Phase 2: Foundational graph behavior baseline
 
-- [ ] T004 Add synthetic graph fixtures covering `on_chain_end` validated tool messages, `on_tool_end` timing-only events, and ToolResultEvent-before-specialized order to `apps/agent/tests/test_chat_turn_runner.py`.
+- [ ] T004 Add synthetic graph fixtures covering `on_chain_end` validated tool messages, `on_tool_end` timing-only events, accepted ToolResultEvent-before-specialized order, and invalid-readiness no-ToolResultEvent to `apps/agent/tests/test_chat_turn_runner.py`.
 - [ ] T005 Add model stream, model-end fallback, final-node fallback, and chunk-dedup assertions to `apps/agent/tests/test_chat_turn_runner.py` before extraction.
 
 ## Phase 3: User Story 1 - Isolate graph event translation (P1)
@@ -20,11 +20,11 @@
 **Goal**: Tool-name-agnostic translation with domain projections owned by resolver.
 **Independent test**: Fake graph stream/resolver yields current event sequence without live model, Redis, or NestJS.
 
-- [ ] T006 [P] [US1] Write resolver tests for validated search snapshot projection, readiness success/failure, and checkout handoff in `apps/agent/tests/test_tool_result_resolver.py`.
-- [ ] T007 [US1] Implement ToolResultResolver port and concrete projections in `apps/agent/src/agent/chat_turn/resolver.py`, consuming validated tool messages from the `tools` chain-end output and preserving existing fail-closed decisions.
-- [ ] T008 [US1] Write interpreter tests for model-token fallbacks/dedup, tool-call/result order, resolver invocation count, specialized follow-ups, and timing-only `on_tool_end` in `apps/agent/tests/test_chat_turn_interpreter.py`.
+- [ ] T006 [P] [US1] Write resolver tests for validated search snapshots, readiness summary/block decisions, and all three handoff node-completion outputs including HANDOFF_FAILED and force-persistence in `apps/agent/tests/test_tool_result_resolver.py`.
+- [ ] T007 [US1] Implement the tool-resolution and typed handoff-node-completion operations in `apps/agent/src/agent/chat_turn/resolver.py`, consuming validated `tools` chain-end messages or the three existing handoff chain-end outputs and preserving safe block decisions.
+- [ ] T008 [US1] Write interpreter tests for model-token fallbacks/dedup, accepted tool-call/result/follow-up order, invalid-readiness no-ToolResultEvent, resolver invocation count, handoff-node routing/failure, and timing-only `on_tool_end` in `apps/agent/tests/test_chat_turn_interpreter.py`.
 - [ ] T009 [US1] Implement GraphEventInterpreter in `apps/agent/src/agent/chat_turn/interpreter.py` with no tool-name branching, Redis/NestJS call, or guardrail construction.
-- [ ] T010 [US1] Wire the interpreter into `apps/agent/src/agent/chat_turn/runner.py`, passing every raw TokenEvent through the existing single OutputStreamSession and retaining approved partial-response accounting.
+- [ ] T010 [US1] Wire the interpreter into `apps/agent/src/agent/chat_turn/runner.py`, catching typed projection-block decisions for existing cleanup, passing every raw TokenEvent through the existing single OutputStreamSession, and retaining approved partial-response accounting.
 - [ ] T011 [US1] Run resolver, interpreter, runner, snapshot, and stream-session focused suites from `specs/027-chat-turn-decomposition/quickstart.md`; record event parity in `specs/027-chat-turn-decomposition/verification.md`.
 
 ## Phase 4: User Story 2 - Coordinate conversation memory (P2)
@@ -32,8 +32,8 @@
 **Goal**: One safe context and compaction interface over existing mechanisms.
 **Independent test**: Fake backend/gateway/manager reproduces history selection, unsafe handling, and summarization trigger.
 
-- [ ] T012 [P] [US2] Write context-fetch, window/offset, unsafe-summary, unsafe-history, and `totalMessageCount + 2` compaction tests in `apps/agent/tests/test_conversation_memory.py`.
-- [ ] T013 [US2] Implement `ConversationMemory.get_context` and `schedule_compaction` in `apps/agent/src/agent/memory/conversation.py`, delegating to existing NestJSClient, GuardrailGateway, and `apps/agent/src/agent/memory/manager.py`.
+- [ ] T012 [P] [US2] Write context-fetch, window/offset, unsafe-summary/history, exact AdmissionContext identity/policy forwarding, and `totalMessageCount + 2` compaction tests in `apps/agent/tests/test_conversation_memory.py`.
+- [ ] T013 [US2] Implement `ConversationMemory.get_context(session_id, client, admission_context)` and `schedule_compaction` in `apps/agent/src/agent/memory/conversation.py`, delegating to existing NestJSClient, GuardrailGateway, and `apps/agent/src/agent/memory/manager.py`.
 - [ ] T014 [US2] Replace inline memory fetch/re-scan and compaction scheduling in `apps/agent/src/agent/chat_turn/runner.py` with ConversationMemory calls; preserve direct runner fallback behavior.
 - [ ] T015 [US2] Run `apps/agent/tests/test_conversation_memory.py`, `apps/agent/tests/test_memory.py`, and `apps/agent/tests/test_chat_turn_runner.py`; record parity in `specs/027-chat-turn-decomposition/verification.md`.
 
@@ -54,7 +54,7 @@
 **Goal**: Focused turn coordinator with unchanged output, persistence, and lease behavior.
 **Independent test**: Existing successful, blocked, cancelled, stale-fence, and exception scenarios preserve events and cleanup order.
 
-- [ ] T022 [US4] Extend normal, block, cancellation, stale-fence, and exception cleanup assertions in `apps/agent/tests/test_chat_turn_runner.py` and `apps/agent/tests/test_stream_session_control.py` before moving lifecycle code.
+- [ ] T022 [US4] Extend normal, invalid-readiness block, handoff failure, cancellation, stale-fence ActionRequiredEvent/ActionHandoffEvent suppression, and exception cleanup assertions in `apps/agent/tests/test_chat_turn_runner.py` and `apps/agent/tests/test_stream_session_control.py` before moving lifecycle code.
 - [ ] T023 [US4] Extract sequential TurnSessionCoordinator ownership within `apps/agent/src/agent/chat_turn/runner.py`, retaining session bootstrap, lease/fencing, snapshot load, persistence, one output-session flush/close, and background compaction.
 - [ ] T024 [US4] Keep `apps/agent/src/agent/chat_turn/controller.py` and `apps/agent/src/agent/streaming/sse.py` integration signatures compatible; run `apps/agent/tests/test_sse_integration.py` and `apps/agent/tests/test_chat_turn_runner.py` for event and error parity.
 
