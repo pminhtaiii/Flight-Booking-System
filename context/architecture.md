@@ -1,6 +1,6 @@
 # Architecture
 
-## Feature 027 — Chat Turn Decomposition (In Progress — Phases 1 & 2 Complete)
+## Feature 027 — Chat Turn Decomposition (In Progress — Phases 1, 2 & Phase 3 Slices 1-2 Complete)
 
 - [Feature 027 specification](../specs/027-chat-turn-decomposition/spec.md), [plan](../specs/027-chat-turn-decomposition/plan.md), and [tasks](../specs/027-chat-turn-decomposition/tasks.md) decompose Python chat turn event translation, domain projections, memory coordination, admission, and lifecycle while preserving SSE and security contracts.
 - **Phase 1: Event Transport Decoupling (Tasks T001–T003 Complete)**:
@@ -11,6 +11,17 @@
   - Authoritative synthetic graph event fixtures locked in `apps/agent/tests/test_chat_turn_runner.py` before extracting `GraphEventInterpreter` and `ToolResultResolver`.
   - Established validated tool execution invariants: `on_chain_end` for `tools` is the sole source of validated tool messages; `on_tool_end` is strictly timing-only; `ToolResultEvent` strictly precedes specialized events (`FlightResultsEvent`, `ActionRequiredEvent`); invalid readiness fails closed with no `ToolResultEvent`.
   - Established output streaming and fallback invariants: incremental token streaming via `on_chat_model_stream`; empty-stream fallback to `on_chat_model_end`; empty-model-end fallback to final-node message output; chunk deduplication preventing duplicate token emission; all output paths route through the single per-turn `OutputStreamSession`.
+- **Phase 3: User Story 1 — Isolate Graph Event Translation (In Progress — Slices 1 & 2 Complete)**:
+  - **Slice 1: ToolResultResolver Extraction (Tasks T006–T007 Complete)**:
+    - Pure domain projection engine `ToolResultResolver` in `apps/agent/src/agent/chat_turn/resolver.py` maps validated tool results and handoff node completions to typed `ToolResolution` and `HandoffResolution`.
+    - Sanitizes booking readiness, loads active search snapshots, and handles handoff node outcomes fail-closed.
+  - **Slice 2: GraphEventInterpreter Extraction (Tasks T008–T009 Complete)**:
+    - Pure async generator stream translator `GraphEventInterpreter` in `apps/agent/src/agent/chat_turn/interpreter.py` translates LangGraph v2 event streams into domain `ChatTurnEvent` items.
+    - Completely tool-name agnostic: 0 tool name inspections (`git grep -n -E "tool_name\s*(==|in)"` = 0).
+    - Pure port isolation: strictly 0 imports or calls to Redis, NestJS client, or Guardrails.
+    - Raises typed `ProjectionBlockedException` fail-closed upon blocked tool or handoff node resolution, with zero `ToolResultEvent` emitted.
+    - Model streaming, model-end fallback, and node-end fallback deduplicated with raw `TokenEvent` emission.
+    - `runner.py` remains untouched; wiring deferred to Slice 3 (Task T010).
 
 ## Feature 028 — Backend Client Unification (Planned, 2026-09-25)
 

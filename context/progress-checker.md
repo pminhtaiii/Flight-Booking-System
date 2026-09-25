@@ -1,5 +1,26 @@
 # Progress Tracker
 
+### Feature 027 — Chat Turn Decomposition: Phase 3 / Slice 2 Complete (Tasks T008–T009 Verified) (2026-09-25)
+
+- **Phase 3 / Slice 2 (User Story 1: GraphEventInterpreter Extraction) Completed (Tasks T008–T009)**:
+  - **T008: Characterization & Isolated Tests for GraphEventInterpreter**: Implemented 29 comprehensive tests in `apps/agent/tests/test_chat_turn_interpreter.py` asserting:
+    - Tool-name agnostic invariant: Arbitrary tool names forwarded identically to `resolver.resolve()`.
+    - Accepted tool execution order: `ToolCallEvent` -> `resolver.resolve()` -> `ToolResultEvent` -> `follow_up_event`.
+    - Invalid readiness / blocked resolution: `is_blocked=True` raises `ProjectionBlockedException`; 0 `ToolResultEvent` emitted.
+    - Unvalidated tool output block: `tool_blocked=True` or missing/false `guardrail_validated` flag raises `ProjectionBlockedException(GUARDRAIL_TOOL_SCHEMA)` with 0 `ToolResultEvent`.
+    - Handoff node completions: Forwards to `resolver.resolve_handoff_node()`, yields `ActionHandoffEvent` on success, raises `ProjectionBlockedException(HANDOFF_FAILED)` on error.
+    - Model streaming, fallback & deduplication: Raw `TokenEvent` chunks; fallback to model end or node end; no duplicates when already streamed.
+    - Timing-only `on_tool_end`: Yields zero domain events.
+  - **T009: Implemented `GraphEventInterpreter` & `ProjectionBlockedException`**: Created `apps/agent/src/agent/chat_turn/interpreter.py` containing:
+    - `ProjectionBlockedException`: Typed exception carrying `error_code`, `error_message`, `error_detail`.
+    - `GraphEventInterpreter`: Pure stream interpreter translating LangGraph v2 events into `ChatTurnEvent` domain union.
+    - Strictly zero tool-name branching (`git grep -n -E "tool_name\s*(==|in)"` = 0).
+    - Strictly zero Redis, NestJS client, or guardrail imports/calls.
+    - Strictly zero `Any` typing.
+    - Exported in `chat_turn/__init__.py`.
+  - **Zero Runner Modifications**: `apps/agent/src/agent/chat_turn/runner.py` remains untouched (wiring deferred to Slice 3 / T010).
+  - **Verification**: 29 passed in `test_chat_turn_interpreter.py` (exit code 0); 50 passed, 1 skipped in regression suite (`test_tool_result_resolver.py`, `test_chat_turn_runner.py`) (exit code 0); `ruff check` and `ruff format` passed (exit code 0); dual-axis code review passed (Standards: PASS, Spec: PASS).
+
 ### Feature 027 — Chat Turn Decomposition: Phase 3 / Slice 1 Complete (Tasks T006–T007 Verified) (2026-09-25)
 
 - **Phase 3 / Slice 1 (User Story 1: ToolResultResolver Extraction) Completed (Tasks T006–T007)**:
