@@ -564,4 +564,87 @@ All checks passed!
 | **FR-008**: Timing-only `on_tool_end` | `interpreter.py` | Verified | Consumes `on_tool_end` for latency metrics; produces zero domain events |
 | **Wire & SSE Parity** | `sse.py` & Characterization | Verified | 100% byte-for-byte serialization match across all 8 canonical domain events |
 
+---
+
+# Verification Evidence: Chat Turn Decomposition (Phase 4 — User Story 2, Slice 1)
+
+## Overview & Metadata
+
+- **Feature**: 027 Chat Turn Decomposition
+- **Phase**: Phase 4: User Story 2 — Coordinate conversation memory
+- **Slice**: Slice 1: ConversationMemory Extraction & Unit Tests
+- **Tasks**: T012, T013
+- **Execution Timestamp**: `2026-09-25T20:14:00+07:00`
+- **Deliverables**:
+  - `apps/agent/src/agent/memory/conversation.py`
+  - `apps/agent/src/agent/memory/__init__.py`
+  - `apps/agent/tests/test_conversation_memory.py`
+
+---
+
+## 1. Test Suite Verification (Pytest — Focused Memory Suites)
+
+### Command Executed
+```powershell
+$env:PYTHONPATH = "$PWD/tests/ci/python;$PWD/apps/agent/src"
+uv run --package agent pytest apps/agent/tests/test_conversation_memory.py apps/agent/tests/test_memory.py -v
+```
+
+### Execution Result
+- **Exit Code**: `0`
+- **Total Tests**: 25 passed in 7.82s
+- **Suite Breakdown**:
+  - `apps/agent/tests/test_conversation_memory.py`: 20 passed (100%)
+  - `apps/agent/tests/test_memory.py`: 5 passed (100%)
+
+---
+
+## 2. Full Non-Redis Agent Test Suite Regression Verification
+
+### Command Executed
+```powershell
+$env:PYTHONPATH = "$PWD/tests/ci/python;$PWD/apps/agent/src"
+uv run --package agent pytest apps/agent/tests -m "not redis_integration" -q
+```
+
+### Execution Result
+- **Exit Code**: `0`
+- **Outcome**: 1240 passed, 4 skipped, 12 deselected in 97.04s
+
+---
+
+## 3. Linter & Formatter Verification (Ruff)
+
+### Commands Executed
+```powershell
+$env:UV_CACHE_DIR = "C:\Booking Systems\.t093-uv-cache"
+uv run --package agent ruff check apps/agent/src/agent/memory/ apps/agent/tests/test_conversation_memory.py
+uv run --package agent ruff format --check apps/agent/src/agent/memory/ apps/agent/tests/test_conversation_memory.py
+```
+
+### Execution Result
+- **Exit Code**: `0`
+- **Output**:
+```text
+All checks passed!
+4 files already formatted
+```
+
+---
+
+## 4. Invariant & Boundary Verification Matrix
+
+| Invariant / Requirement | Target | Status | Evidence / Notes |
+|---|---|---|---|
+| **FR-009**: Exact identity & policy forwarding | `ConversationMemory.get_context` | Verified | `user_id`, `chat_session_id`, `trace_id`, `correlation_id`, and `policy_version` forwarded verbatim to `gateway.validate_input()` |
+| **Fail-closed historical messages** | `ConversationMemory.get_context` | Verified | History message `BLOCK` or exception raises `ContextBlockedException` with block code (`GUARDRAIL_INPUT_INJECTION`, `GUARDRAIL_INPUT_PII`) |
+| **Unsafe summary discard** | `ConversationMemory.get_context` | Verified | Persisted summary `BLOCK` or validation exception discards summary (`summary = None`) while safe history is preserved |
+| **Window size / offset handling** | `ConversationMemory.get_context` | Verified | Passes configured `MEMORY_WINDOW_SIZE` (or default 20) as `recent_count` to `client.get_memory` |
+| **Error mapping** | `ConversationMemory.get_context` | Verified | `404`/`NOT_FOUND` mapped to `SessionNotFoundException`; generic errors mapped to `MemoryPersistenceException` |
+| **Compaction accounting** | `ConversationMemory.schedule_compaction` | Verified | Preserves `total_count = total_message_count + 2` calling `MemoryManager.check_and_summarize` |
+| **Task tracking & cleanup** | `ConversationMemory.schedule_compaction` | Verified | Registers task in `background_tasks` set; adds `add_done_callback(background_tasks.discard)` |
+| **Strict Typing** | `conversation.py`, `__init__.py`, `test_conversation_memory.py` | Verified | Strictly 0 instances of `Any` |
+| **Slice Isolation** | `runner.py` | Verified | `runner.py` untouched; wiring deferred to Slice 2 (T014–T015) |
+
+
 
