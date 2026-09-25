@@ -57,65 +57,6 @@ class ToolResultResolver:
         self.snapshot_lifecycle = snapshot_lifecycle
 
     @staticmethod
-    def _validate_readiness(data: dict[str, object]) -> Optional[dict[str, object]]:
-        validated = validate_booking_readiness_response(data)
-        if validated is not None:
-            return validated
-
-        if not isinstance(data.get("ready"), bool):
-            return None
-        if not isinstance(data.get("nextAction"), str):
-            return None
-        passengers = data.get("passengers")
-        if passengers is not None and not isinstance(passengers, list):
-            return None
-
-        safe_passengers: list[dict[str, object]] = []
-        if isinstance(passengers, list):
-            for passenger in passengers:
-                if not isinstance(passenger, dict):
-                    return None
-                safe_sections: list[dict[str, object]] = []
-                sections = passenger.get("sections")
-                if isinstance(sections, list):
-                    for section in sections:
-                        if not isinstance(section, dict):
-                            return None
-                        safe_fields: list[dict[str, object]] = []
-                        fields = section.get("fields")
-                        if isinstance(fields, list):
-                            for field in fields:
-                                if not isinstance(field, dict):
-                                    return None
-                                safe_fields.append(
-                                    {
-                                        "name": field.get("name"),
-                                        "status": field.get("status"),
-                                        "reason": field.get("reason"),
-                                    }
-                                )
-                        safe_sections.append(
-                            {
-                                "name": section.get("name"),
-                                "fields": safe_fields,
-                            }
-                        )
-                safe_passengers.append(
-                    {
-                        "passengerType": passenger.get("passengerType"),
-                        "passengerOrdinal": passenger.get("passengerOrdinal"),
-                        "sections": safe_sections,
-                    }
-                )
-
-        return {
-            "scope": data.get("scope"),
-            "ready": data["ready"],
-            "passengers": safe_passengers,
-            "nextAction": data["nextAction"],
-        }
-
-    @staticmethod
     def _extract_safe_passengers(passengers_raw: object) -> list[dict[str, object]]:
         if not isinstance(passengers_raw, list):
             return []
@@ -135,23 +76,30 @@ class ToolResultResolver:
                         for field in fields_raw:
                             if not isinstance(field, dict):
                                 continue
+                            raw_name = field.get("name")
+                            raw_status = field.get("status")
+                            raw_reason = field.get("reason")
                             safe_fields.append(
                                 {
-                                    "name": field.get("name"),
-                                    "status": field.get("status"),
-                                    "reason": field.get("reason"),
+                                    "name": str(raw_name) if raw_name is not None else "",
+                                    "status": str(raw_status) if raw_status is not None else "",
+                                    "reason": str(raw_reason) if raw_reason is not None else None,
                                 }
                             )
                     safe_sections.append(
                         {
-                            "name": section.get("name"),
+                            "name": str(section.get("name") or ""),
                             "fields": safe_fields,
                         }
                     )
+            passenger_type = passenger.get("passengerType")
+            passenger_ordinal = passenger.get("passengerOrdinal")
             safe_passengers.append(
                 {
-                    "passengerType": passenger.get("passengerType"),
-                    "passengerOrdinal": passenger.get("passengerOrdinal"),
+                    "passengerType": str(passenger_type) if passenger_type is not None else "",
+                    "passengerOrdinal": (
+                        int(passenger_ordinal) if isinstance(passenger_ordinal, int) else 1
+                    ),
                     "sections": safe_sections,
                 }
             )
@@ -163,13 +111,25 @@ class ToolResultResolver:
         validated_result: object,
         context: object,
     ) -> ToolResolution:
+        summary_str = (
+            validated_result
+            if isinstance(validated_result, str)
+            else json.dumps(validated_result, ensure_ascii=False)
+            if isinstance(validated_result, dict)
+            else "Tool completed safely."
+        )
+
         if tool_name == "check_booking_readiness":
             output_data: object = validated_result
             if isinstance(output_data, str):
                 try:
                     output_data = json.loads(output_data)
                 except (json.JSONDecodeError, TypeError, ValueError):
-                    pass
+                    return ToolResolution(
+                        is_blocked=True,
+                        error_code="READINESS_RESPONSE_INVALID",
+                        error_message="Booking readiness could not be verified safely.",
+                    )
 
             if not isinstance(output_data, dict) or "error" in output_data:
                 return ToolResolution(
@@ -178,7 +138,7 @@ class ToolResultResolver:
                     error_message="Booking readiness could not be verified safely.",
                 )
 
-            safe_readiness = self._validate_readiness(output_data)
+            safe_readiness = validate_booking_readiness_response(output_data)
             if safe_readiness is None:
                 return ToolResolution(
                     is_blocked=True,
@@ -243,22 +203,20 @@ class ToolResultResolver:
                             ]
                             return ToolResolution(
                                 is_blocked=False,
+                                summary_override=summary_str,
                                 follow_up_event=FlightResultsEvent(
                                     data=FlightResultsPayload(results=raw_results)
                                 ),
                             )
                 except Exception:
-                    logger.warning("search_result_projection_failed")
+                    logger.warning("search_result_projection_failed", exc_info=True)
 
-            return ToolResolution(is_blocked=False, follow_up_event=None)
+            return ToolResolution(
+                is_blocked=False,
+                summary_override=summary_str,
+                follow_up_event=None,
+            )
 
-        summary_str = (
-            validated_result
-            if isinstance(validated_result, str)
-            else json.dumps(validated_result, ensure_ascii=False)
-            if isinstance(validated_result, dict)
-            else "Tool completed safely."
-        )
         return ToolResolution(
             is_blocked=False,
             summary_override=summary_str,
@@ -281,10 +239,11 @@ class ToolResultResolver:
         if not isinstance(node_output, dict):
             return HandoffResolution(is_blocked=False, handoff_event=None, force_persistence=False)
 
-        action_res: object = (
-            node_output.get("action")
-            if "action" in node_output and isinstance(node_output.get("action"), dict)
-            else node_output
+        output = node_output if isinstance(node_output, dict) else {}
+        action_res = (
+            output.get("action")
+            if isinstance(output, dict) and isinstance(output.get("action"), dict)
+            else {}
         )
 
         if isinstance(action_res, dict) and "error" in action_res:
@@ -292,7 +251,7 @@ class ToolResultResolver:
             return HandoffResolution(
                 is_blocked=True,
                 error_code="HANDOFF_FAILED",
-                error_message=err_msg,
+                error_message="Checkout handoff could not be created.",
                 error_detail=err_msg,
             )
 
