@@ -114,3 +114,104 @@ Inspection of `apps/agent/src/agent/chat_turn/events.py` validates complete tran
 - **Minimal imports**: Standard library `typing` (`Annotated`, `Any`, `Dict`, `List`, `Literal`, `Optional`, `Union`) and `pydantic` (`BaseModel`, `ConfigDict`, `Field`).
 - **Zero non-standard imports**: No external HTTP or transport-layer packages.
 - **Architectural Seam**: Transport serialization strictly isolated in `apps/agent/src/agent/streaming/sse.py`.
+
+---
+
+# Verification Evidence: Chat Turn Decomposition (Phase 2)
+
+## Overview & Metadata
+
+- **Feature**: 027 Chat Turn Decomposition
+- **Phase**: Phase 2 - Foundational Graph Behavior Baseline
+- **Tasks**: T004, T005
+- **Execution Timestamp**: `2026-09-25T11:55:00+07:00`
+
+---
+
+## 1. Test Suite Verification (Pytest)
+
+### Command Executed
+```powershell
+$env:PYTHONPATH = "$PWD/tests/ci/python;$PWD/apps/agent/src"
+uv run --package agent pytest apps/agent/tests/test_chat_turn_runner.py -v
+```
+
+### Execution Result
+- **Exit Code**: `0`
+- **Output**:
+```text
+============================= test session starts =============================
+platform win32 -- Python 3.11.15, pytest-9.1.1, pluggy-1.6.0
+rootdir: C:\Booking Systems\apps\agent
+configfile: pyproject.toml
+plugins: anyio-4.14.2, langsmith-0.11.1, asyncio-1.4.0, cov-7.1.0, mock-3.15.1
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 28 items
+
+apps\agent\tests\test_chat_turn_runner.py::test_chat_turn_command_valid_and_extra_forbid PASSED [  3%]
+apps\agent\tests\test_chat_turn_runner.py::test_runner_happy_path_streaming PASSED [  7%]
+apps\agent\tests\test_chat_turn_runner.py::test_production_runner_passes_mandatory_gateway_into_graph_config PASSED [ 10%]
+apps\agent\tests\test_chat_turn_runner.py::test_runner_session_auto_creation_when_none PASSED [ 14%]
+apps\agent\tests\test_chat_turn_runner.py::test_runner_tool_calls_and_flight_results PASSED [ 17%]
+apps\agent\tests\test_chat_turn_runner.py::test_runner_check_booking_readiness_sanitized_and_action_required PASSED [ 21%]
+apps\agent\tests\test_chat_turn_runner.py::test_runner_tool_block_emits_static_guardrail_error_without_raw_callbacks PASSED [ 25%]
+apps\agent\tests\test_chat_turn_runner.py::test_runner_action_handoff_event PASSED [ 28%]
+apps\agent\tests\test_chat_turn_runner.py::test_runner_causal_failure_cleanup_on_guardrail_block PASSED [ 32%]
+apps\agent\tests\test_chat_turn_runner.py::test_stream_session_covers_all_three_runner_branches_per_turn PASSED [ 35%]
+apps\agent\tests\test_chat_turn_runner.py::test_runner_causal_failure_cleanup_on_llm_error PASSED [ 39%]
+apps\agent\tests\test_chat_turn_runner.py::test_runner_stale_fence_aborts_persistence PASSED [ 42%]
+apps\agent\tests\test_chat_turn_runner.py::test_runner_cancellation_shielded_persistence PASSED [ 46%]
+apps\agent\tests\test_chat_turn_runner.py::test_runner_generator_exit_shielded_persistence PASSED [ 50%]
+apps\agent\tests\test_chat_turn_runner.py::test_runner_cancellation_bounded_timeout_on_stuck_dependency SKIPPED [ 53%]
+apps\agent\tests\test_chat_turn_runner.py::test_on_chat_model_end_prevents_duplicate_on_chain_end PASSED [ 57%]
+apps\agent\tests\test_chat_turn_runner.py::test_multiple_model_invocations_emit_later_model_output_without_duplication PASSED [ 60%]
+apps\agent\tests\test_chat_turn_runner.py::test_streaming_first_model_and_non_streaming_second_model_with_run_ids PASSED [ 64%]
+apps\agent\tests\test_chat_turn_runner.py::test_t004_tools_chain_end_requires_guardrail_validated PASSED [ 67%]
+apps\agent\tests\test_chat_turn_runner.py::test_t004_on_tool_end_is_strictly_timing_only PASSED [ 71%]
+apps\agent\tests\test_chat_turn_runner.py::test_t004_flight_search_ordering_tool_result_before_flight_results PASSED [ 75%]
+apps\agent\tests\test_chat_turn_runner.py::test_t004_booking_readiness_ordering_tool_result_before_action_required PASSED [ 78%]
+apps\agent\tests\test_chat_turn_runner.py::test_t004_invalid_readiness_fail_closed_no_tool_result PASSED [ 82%]
+apps\agent\tests\test_chat_turn_runner.py::test_t005_token_stream_processing PASSED [ 85%]
+apps\agent\tests\test_chat_turn_runner.py::test_t005_model_end_fallback_when_stream_empty PASSED [ 89%]
+apps\agent\tests\test_chat_turn_runner.py::test_t005_final_node_fallback_when_stream_and_model_end_empty PASSED [ 92%]
+apps\agent\tests\test_chat_turn_runner.py::test_t005_chunk_deduplication_prevents_duplicate_emission PASSED [ 96%]
+apps\agent\tests\test_chat_turn_runner.py::test_t005_single_output_guardrail_session_routed PASSED [100%]
+
+======================= 27 passed, 1 skipped in 12.63s ========================
+```
+
+---
+
+## 2. Linter & Formatter Verification (Ruff)
+
+### Commands Executed
+```powershell
+$env:UV_CACHE_DIR = "C:\Booking Systems\.t093-uv-cache"
+uv run --package agent ruff check apps/agent/tests/test_chat_turn_runner.py
+uv run --package agent ruff format --check apps/agent/tests/test_chat_turn_runner.py
+```
+
+### Execution Result
+- **Exit Code**: `0`
+- **Output**:
+```text
+All checks passed!
+1 file already formatted
+```
+
+---
+
+## 3. Characterization Invariants Verified
+
+| Invariant | Test Method | Outcome |
+|---|---|---|
+| `on_chain_end` for `tools` requires `guardrail_validated: True` | `test_t004_tools_chain_end_requires_guardrail_validated` | Passed (`GUARDRAIL_TOOL_SCHEMA` on unvalidated) |
+| `on_tool_end` is strictly timing-only | `test_t004_on_tool_end_is_strictly_timing_only` | Passed (Zero wire domain events emitted) |
+| Flight search ordering: `ToolCallEvent` -> `ToolResultEvent` -> `FlightResultsEvent` | `test_t004_flight_search_ordering_tool_result_before_flight_results` | Passed (Strict ordering confirmed) |
+| Readiness ordering: `ToolCallEvent` -> `ToolResultEvent` -> `ActionRequiredEvent` | `test_t004_booking_readiness_ordering_tool_result_before_action_required` | Passed (Strict ordering confirmed) |
+| Invalid readiness fails closed with no `ToolResultEvent` | `test_t004_invalid_readiness_fail_closed_no_tool_result` | Passed (`READINESS_RESPONSE_INVALID` error, no `ToolResultEvent`) |
+| Token streaming via `on_chat_model_stream` | `test_t005_token_stream_processing` | Passed (Token chunks yielded to client) |
+| Model-end fallback when stream empty | `test_t005_model_end_fallback_when_stream_empty` | Passed (Message content emitted from model end) |
+| Final-node fallback when stream and model-end empty | `test_t005_final_node_fallback_when_stream_and_model_end_empty` | Passed (Emitted from final_answer node) |
+| Chunk deduplication across stream and node ends | `test_t005_chunk_deduplication_prevents_duplicate_emission` | Passed (No duplicate tokens emitted) |
+| Single output guardrail session routed | `test_t005_single_output_guardrail_session_routed` | Passed (Routed via single `OutputStreamSession`) |

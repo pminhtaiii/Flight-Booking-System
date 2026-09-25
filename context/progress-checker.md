@@ -1,5 +1,21 @@
 # Progress Tracker
 
+### Feature 027 — Chat Turn Decomposition: Phase 2 Complete (Tasks T004–T005 Verified) (2026-09-25)
+
+- **Phase 2 (Foundational Graph Behavior Baseline) Completed (Tasks T004–T005)**:
+  - **T004: Synthetic Graph Fixtures for Validated Tools, Timing Events & Readiness Ordering**: Added synthetic characterization tests to `apps/agent/tests/test_chat_turn_runner.py` verifying:
+    - `on_chain_end` for `tools` node delivering `ToolMessage` with `guardrail_validated: True` is the authoritative source; unvalidated messages fail closed with `GUARDRAIL_TOOL_SCHEMA`.
+    - `on_tool_end` events are strictly timing-only and emit zero wire domain events.
+    - Accepted `ToolResultEvent` strictly precedes specialized follow-up events (`FlightResultsEvent`, `ActionRequiredEvent`).
+    - Invalid booking readiness emits `ToolCallEvent` but NO `ToolResultEvent`, failing closed with `READINESS_RESPONSE_INVALID`.
+  - **T005: Model Stream, Model-End Fallback, Final-Node Fallback & Chunk Deduplication**: Added characterization tests in `apps/agent/tests/test_chat_turn_runner.py` verifying:
+    - Incremental tokens arriving via `on_chat_model_stream` emit `TokenEvent` chunks to client.
+    - Empty stream falls back to full message in `on_chat_model_end`.
+    - Empty stream and model-end falls back to final graph node message (`final_answer` node `on_chain_end`).
+    - Chunk deduplication prevents duplicate token emission when both stream chunks and model-end/final-node messages are present.
+    - All three model output paths (stream, model-end fallback, final-node fallback) route through the single per-turn `OutputStreamSession` facade before external emission or persistence.
+  - **Verification**: 27 passed, 1 skipped in `test_chat_turn_runner.py` (exit code 0); `ruff check` and `ruff format` passed (exit code 0); zero production code modified.
+
 ### Feature 027 — Chat Turn Decomposition: Phase 1 Complete (Tasks T001–T003 Verified) (2026-09-25)
 
 - **Phase 1 (Setup and Event Transport Boundary) Completed (Tasks T001–T003)**:

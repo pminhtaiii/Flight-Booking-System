@@ -12,8 +12,8 @@
 
 ## Phase 2: Foundational graph behavior baseline
 
-- [ ] T004 Add synthetic graph fixtures covering `on_chain_end` validated tool messages, `on_tool_end` timing-only events, accepted ToolResultEvent-before-specialized order, and invalid-readiness no-ToolResultEvent to `apps/agent/tests/test_chat_turn_runner.py`.
-- [ ] T005 Add model stream, model-end fallback, final-node fallback, and chunk-dedup assertions to `apps/agent/tests/test_chat_turn_runner.py` before extraction.
+- [x] T004 Add synthetic graph fixtures covering `on_chain_end` validated tool messages, `on_tool_end` timing-only events, accepted ToolResultEvent-before-specialized order, and invalid-readiness no-ToolResultEvent to `apps/agent/tests/test_chat_turn_runner.py`.
+- [x] T005 Add model stream, model-end fallback, final-node fallback, and chunk-dedup assertions to `apps/agent/tests/test_chat_turn_runner.py` before extraction.
 
 ## Phase 3: User Story 1 - Isolate graph event translation (P1)
 
