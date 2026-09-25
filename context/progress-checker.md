@@ -1,5 +1,23 @@
 # Progress Tracker
 
+### Feature 027 — Chat Turn Decomposition: Phase 3 / Slice 1 Complete (Tasks T006–T007 Verified) (2026-09-25)
+
+- **Phase 3 / Slice 1 (User Story 1: ToolResultResolver Extraction) Completed (Tasks T006–T007)**:
+  - **T006: Characterization & Isolated Tests for ToolResultResolver**: Implemented 22 comprehensive tests in `apps/agent/tests/test_tool_result_resolver.py` asserting:
+    - Generic tool fallback produces `ToolResultEvent` with stringified content without specialized events.
+    - Flight search projection retrieves search snapshot from active lifecycle manager or falls back cleanly to raw search results.
+    - Booking readiness sanitizes raw readiness summary into `ActionRequiredEvent` while omitting raw details.
+    - Invalid booking readiness schemas or upstream errors fail closed with typed block decisions (`READINESS_RESPONSE_INVALID`, `UPSTREAM_READINESS_ERROR`) and emit zero `ToolResultEvent`s.
+    - Handoff node outputs (`create_handoff_token`, `validate_handoff`) project into `ActionHandoffEvent` with `force_persist=True`.
+    - Handoff failure emits `ErrorEvent` with code `HANDOFF_FAILED` and `force_persist=True`.
+    - Unrecognized graph node outputs gracefully return empty resolution without errors.
+  - **T007: Implemented `ToolResultResolver` & Resolution Types**: Created `apps/agent/src/agent/chat_turn/resolver.py` containing:
+    - Dataclasses: `ToolResolution` (`events`, `block_decision`) and `HandoffResolution` (`events`, `block_decision`, `force_persist`).
+    - `ToolResultResolver`: Pure stateless domain projection engine with zero direct dependencies on `runner.py`, `interpreter.py`, Redis, or NestJS.
+    - Preserved exact sanitization rules, snapshot retrieval, and block decisions matching established characterization baselines.
+  - **Zero Runner & Interpreter Modifications**: Zero changes made to `apps/agent/src/agent/chat_turn/runner.py` or `apps/agent/src/agent/chat_turn/interpreter.py`. Runner remains untouched until interpreter wiring (T010).
+  - **Verification**: 22 passed in `test_tool_result_resolver.py` (exit code 0); 27 passed, 1 skipped in baseline `test_chat_turn_runner.py` (exit code 0); `ruff check` and `ruff format` passed (exit code 0).
+
 ### Feature 027 — Chat Turn Decomposition: Phase 2 Complete (Tasks T004–T005 Verified) (2026-09-25)
 
 - **Phase 2 (Foundational Graph Behavior Baseline) Completed (Tasks T004–T005)**:
