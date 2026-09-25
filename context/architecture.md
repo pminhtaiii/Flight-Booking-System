@@ -1,5 +1,11 @@
 # Architecture
 
+## Features 027–028 — Architectural Refactors (Planned, 2026-09-25)
+
+- [Feature 027 specification](../specs/027-chat-turn-decomposition/spec.md), [plan](../specs/027-chat-turn-decomposition/plan.md), and [tasks](../specs/027-chat-turn-decomposition/tasks.md) decompose Python chat turn event translation, domain projections, memory coordination, admission, and lifecycle while preserving SSE and security contracts. The plan explicitly binds projection to the current validated `tools` chain-end messages and keeps `on_tool_end` for telemetry.
+- [Feature 028 specification](../specs/028-backend-client-unification/spec.md), [plan](../specs/028-backend-client-unification/plan.md), and [tasks](../specs/028-backend-client-unification/tasks.md) unify the three core web server transport consumers and six booking route response adapters. Dashboard `INVALID_RESPONSE`, booking error-body forwarding, and mutation single-send behavior remain contract requirements.
+- Both features are plans only. Existing runtime architecture remains as documented below until their tasks are implemented and verified.
+
 ## Feature 026 — Agent Boundary Simplification (Complete - Tasks T001–T037)
 
 Planning artifacts: [specification](../specs/026-agent-boundary-simplification/spec.md), [plan](../specs/026-agent-boundary-simplification/plan.md), and [tasks](../specs/026-agent-boundary-simplification/tasks.md).
