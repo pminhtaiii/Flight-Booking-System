@@ -42,12 +42,12 @@
 **Goal**: Reusable auth, input, and quota services with thin FastAPI wrappers.
 **Independent test**: PII block uses zero Redis/quota; valid input reaches runner once; gateway outage and SSE responses remain unchanged.
 
-- [ ] T016 [P] [US3] Write admission ordering and gateway-unavailable/PII/quota tests in `apps/agent/tests/test_chat_admission.py`, including a one-scan assertion through `apps/agent/tests/test_chat_controller.py`.
-- [ ] T017 [US3] Create `apps/agent/src/agent/admission/__init__.py` and extract JWT decode and NestJS access rules from `apps/agent/src/agent/streaming/sse.py` into `apps/agent/src/agent/admission/auth.py`.
-- [ ] T018 [US3] Extract length/gateway-health and input validation with existing deterministic PII fallback into `apps/agent/src/agent/admission/input_admission.py`.
-- [ ] T019 [US3] Extract Redis daily/burst quota admission into `apps/agent/src/agent/admission/quota.py` without changing accounting.
-- [ ] T020 [US3] Add ordered thin FastAPI dependency wrappers and reduce transport policy code in `apps/agent/src/agent/streaming/sse.py`; pass the existing validated decision through `apps/agent/src/agent/chat_turn/controller.py` to the runner.
-- [ ] T021 [US3] Run `apps/agent/tests/test_chat_admission.py`, `apps/agent/tests/test_sse.py`, `apps/agent/tests/test_chat_controller.py`, and `apps/agent/tests/test_stream_auth_budget.py`; record zero-Redis and single-scan results in `specs/027-chat-turn-decomposition/verification.md`.
+- [x] T016 [P] [US3] Write admission ordering and gateway-unavailable/PII/quota tests in `apps/agent/tests/test_chat_admission.py`, including a one-scan assertion through `apps/agent/tests/test_chat_controller.py`.
+- [x] T017 [US3] Create `apps/agent/src/agent/admission/__init__.py` and extract JWT decode and NestJS access rules from `apps/agent/src/agent/streaming/sse.py` into `apps/agent/src/agent/admission/auth.py`.
+- [x] T018 [US3] Extract length/gateway-health and input validation with existing deterministic PII fallback into `apps/agent/src/agent/admission/input_admission.py`.
+- [x] T019 [US3] Extract Redis daily/burst quota admission into `apps/agent/src/agent/admission/quota.py` without changing accounting.
+- [x] T020 [US3] Add ordered thin FastAPI dependency wrappers and reduce transport policy code in `apps/agent/src/agent/streaming/sse.py`; pass the existing validated decision through `apps/agent/src/agent/chat_turn/controller.py` to the runner.
+- [x] T021 [US3] Run `apps/agent/tests/test_chat_admission.py`, `apps/agent/tests/test_sse.py`, `apps/agent/tests/test_chat_controller.py`, and `apps/agent/tests/test_stream_auth_budget.py`; record zero-Redis and single-scan results in `specs/027-chat-turn-decomposition/verification.md`.
 
 ## Phase 6: User Story 4 - Expose a sequential lifecycle (P4)
 

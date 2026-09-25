@@ -1,5 +1,27 @@
 # Progress Tracker
 
+### Feature 027 — Chat Turn Decomposition: Phase 5 / User Story 3 Complete (Tasks T016–T021 Verified) (2026-09-25)
+
+- **Phase 5 (User Story 3: Reuse Ordered Admission) Fully Completed (Tasks T016–T021)**:
+  - **T016: Characterization & Admission Invariant Tests**:
+    - Created `apps/agent/tests/test_chat_admission.py` asserting strict admission ordering (`auth` -> `length` -> `gateway_health` -> `input_scan` -> `quota` -> `runner`), zero-Redis PII short-circuit, single-scan guarantee end-to-end, and gateway outage fail-closed handling.
+  - **T017: Extracted `AuthService`**:
+    - Created `apps/agent/src/agent/admission/auth.py` extracting JWT decoding/ring verification, claim validation, correlation mapping, and NestJS user access verification into reusable `AuthService` returning typed `AuthenticatedUser`.
+  - **T018: Extracted `InputAdmissionService`**:
+    - Created `apps/agent/src/agent/admission/input_admission.py` encapsulating max-length checks, gateway availability/health validation, deterministic PII detection fallback, and input guardrail scanning into `InputAdmissionService` returning typed `InputAdmissionResult`.
+  - **T019: Extracted `QuotaService`**:
+    - Created `apps/agent/src/agent/admission/quota.py` encapsulating Redis client health, daily/burst budget checking, and telemetry emission into reusable `QuotaService`.
+  - **T020: Wired Thin FastAPI Dependencies in `sse.py`**:
+    - Replaced monolithic transport policy code in `apps/agent/src/agent/streaming/sse.py` with thin FastAPI dependency providers (`get_auth_service`, `get_authenticated_user`, `get_input_admission_service`, `get_admitted_input`, `get_quota_service`, `check_chat_quota`).
+    - Provided direct-call fallback handling and dynamic test patch resolution for existing unit tests.
+    - Forwarded validated admission decision directly through `ChatController.stream()` to preserve single-scan guarantee.
+  - **T021: Comprehensive US3 Verification Gate & Parity Recorded**:
+    - Ran focused admission and streaming suites: 90 passed in 27.68s (100% pass rate, exit code 0 across `test_chat_admission.py`, `test_sse.py`, `test_chat_controller.py`, `test_stream_auth_budget.py`, `test_sse_integration.py`).
+    - Ran full non-Redis regression suite: 1270 passed, 4 skipped, 20 deselected in 146.56s (100% pass rate, exit code 0).
+    - Ruff check & format check: 0 errors (exit code 0).
+    - Recorded complete verification evidence in `specs/027-chat-turn-decomposition/verification.md`.
+    - Checked off T016 and T021 in `specs/027-chat-turn-decomposition/tasks.md`.
+
 ### Feature 027 — Chat Turn Decomposition: Phase 4 / User Story 2 Complete (Tasks T012–T015 Verified) (2026-09-25)
 
 - **Phase 4 (User Story 2: Coordinate Conversation Memory) Fully Completed (Tasks T012–T015)**:

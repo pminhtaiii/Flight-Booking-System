@@ -137,3 +137,45 @@ async def test_chat_controller_validation_exception_fails_closed():
     assert len(events) == 1
     assert events[0].event == "error"
     assert events[0].data.code == "GUARDRAIL_INPUT_INJECTION"
+
+
+@pytest.mark.asyncio
+async def test_chat_controller_single_scan_guarantee_forwards_validated_input():
+    """
+    Single-Scan Guarantee:
+    Input validated once during admission; ChatController forwards validated input
+    to runner without re-scanning.
+    """
+    mock_runner = MagicMock()
+    captured = {}
+
+    async def mock_run_gen(command, validated_input=None):
+        captured["command"] = command
+        captured["validated_input"] = validated_input
+        yield TokenEvent(data=TokenPayload(content="Hello"))
+        yield DoneEvent(data=DonePayload(sessionId=command.session_id))
+
+    mock_runner.run = mock_run_gen
+
+    mock_gateway = MagicMock(spec=GuardrailGateway)
+    mock_gateway.validate_input = AsyncMock()
+
+    controller = ChatController(runner=mock_runner, gateway=mock_gateway)
+    command = ChatTurnCommand(
+        user_id="user-123",
+        session_id="sess-test",
+        message="Search flights",
+        token="test-token",
+    )
+    validated_payload = ValidatedInput(content="Sanitized flight query")
+    admission_decision = PipelineDecision(
+        status="PASS",
+        validated_data=validated_payload,
+    )
+
+    events = [ev async for ev in controller.stream(command, admission_decision=admission_decision)]
+    assert len(events) == 2
+    # Gateway was not called to re-scan
+    assert mock_gateway.validate_input.call_count == 0
+    # Runner received the exact validated_input produced by admission
+    assert captured.get("validated_input") is validated_payload
