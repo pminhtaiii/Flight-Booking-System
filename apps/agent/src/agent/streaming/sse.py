@@ -1,11 +1,19 @@
 import asyncio
 import json
 import logging
-import time
+import sys
 
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, Request
 from sse_starlette.sse import EventSourceResponse
 
+from agent.admission import (
+    AuthenticatedUser,
+    AuthService,
+    InputAdmissionResult,
+    InputAdmissionService,
+    QuotaService,
+    create_blocked_sse_response,
+)
 from agent.chat_turn.command import ChatTurnCommand
 from agent.chat_turn.controller import ChatController
 from agent.chat_turn.events import (
@@ -16,24 +24,12 @@ from agent.chat_turn.events import (
 from agent.chat_turn.runner import ChatTurnRunner, _persist_response
 from agent.config import get_settings
 from agent.graph.graph import graph
-from agent.guardrails.base import (
-    GUARDRAIL_INPUT_INJECTION,
-    GUARDRAIL_INPUT_PII,
-    AdmissionContext,
-    PipelineDecision,
-    ValidatedInput,
-)
 from agent.guardrails.gateway import GuardrailGateway
-from agent.guardrails.pii import deterministic_pii_match
 from agent.infrastructure.redis import get_redis_client
 from agent.models.requests import ChatStreamRequest
-from agent.observability.chat_observability import ChatTelemetry, safe_opaque_id
+from agent.observability.chat_observability import safe_opaque_id
 from agent.repositories import chat_budget_repository
-from agent.repositories.chat_budget_repository import (
-    BudgetExceededException,
-    ChatBudgetRepository,
-    RedisUnavailableException,
-)
+from agent.repositories.chat_budget_repository import ChatBudgetRepository
 from agent.tools.nestjs_client import NestJSClient
 from agent.trusted_search_snapshot import TrustedSnapshotRepository
 
@@ -45,19 +41,22 @@ __all__ = [
     "NestJSClient",
     "TrustedSnapshotRepository",
     "_persist_response",
+    "chat_budget_repository",
     "chat_stream",
+    "check_chat_quota",
     "format_sse",
+    "get_admitted_input",
+    "get_auth_service",
+    "get_authenticated_user",
+    "get_input_admission_service",
+    "get_quota_service",
     "get_redis_client",
     "graph",
     "router",
 ]
 
-_ORIGINAL_BUDGET_REPO = chat_budget_repository.ChatBudgetRepository
-
 logger = logging.getLogger("agent.streaming")
-guardrails_logger = logging.getLogger("agent.guardrails")
 router = APIRouter()
-chat_telemetry = ChatTelemetry(logger)
 
 
 def format_sse(event: ChatTurnEvent) -> str:
@@ -69,226 +68,169 @@ def _resolve_correlation_id(value: str | None) -> str:
     return safe_opaque_id(value)
 
 
+def get_auth_service() -> AuthService:
+    mod = sys.modules[__name__]
+    client_factory = getattr(mod, "NestJSClient")
+    return AuthService(client_factory=client_factory)
+
+
+def get_input_admission_service() -> InputAdmissionService:
+    return InputAdmissionService()
+
+
+_ORIGINAL_BUDGET_REPO: type[ChatBudgetRepository] = ChatBudgetRepository
+
+
+def get_quota_service() -> QuotaService:
+    mod = sys.modules[__name__]
+    redis_client_factory = getattr(mod, "get_redis_client")
+    chat_budget_repo = getattr(mod, "ChatBudgetRepository")
+    cbr_mod = getattr(mod, "chat_budget_repository", None)
+    if chat_budget_repo is not _ORIGINAL_BUDGET_REPO:
+        budget_repo_factory = chat_budget_repo
+    elif (
+        cbr_mod is not None
+        and hasattr(cbr_mod, "ChatBudgetRepository")
+        and getattr(cbr_mod, "ChatBudgetRepository") is not _ORIGINAL_BUDGET_REPO
+    ):
+        budget_repo_factory = getattr(cbr_mod, "ChatBudgetRepository")
+    else:
+        budget_repo_factory = chat_budget_repo
+    return QuotaService(
+        redis_client_factory=redis_client_factory,
+        budget_repo_factory=budget_repo_factory,
+    )
+
+
+async def get_authenticated_user(
+    authorization: str | None = Header(None),
+    x_trace_id: str | None = Header(None, alias="X-Trace-Id"),
+    x_correlation_id: str | None = Header(None, alias="X-Correlation-Id"),
+    auth_service: AuthService = Depends(get_auth_service),
+) -> AuthenticatedUser:
+    return await auth_service.authenticate(
+        authorization=authorization,
+        x_trace_id=x_trace_id,
+        x_correlation_id=x_correlation_id,
+    )
+
+
+async def get_admitted_input(
+    request: Request,
+    body: ChatStreamRequest,
+    user: AuthenticatedUser = Depends(get_authenticated_user),
+    input_service: InputAdmissionService = Depends(get_input_admission_service),
+) -> InputAdmissionResult:
+    gateway: GuardrailGateway | None = getattr(request.app.state, "guardrail_gateway", None)
+    return await input_service.admit_input(
+        message=body.message,
+        session_id=body.sessionId,
+        user=user,
+        gateway=gateway,
+    )
+
+
+async def check_chat_quota(
+    user: AuthenticatedUser = Depends(get_authenticated_user),
+    admitted: InputAdmissionResult = Depends(get_admitted_input),
+    quota_service: QuotaService = Depends(get_quota_service),
+) -> None:
+    if not admitted.is_blocked:
+        await quota_service.check_quota(
+            user_id=user.user_id,
+            trace_id=user.trace_id,
+            correlation_id=user.correlation_id,
+        )
+
+
 @router.post("/chat/stream")
 async def chat_stream(
     request: Request,
     body: ChatStreamRequest,
-    authorization: str = Header(None),
-    x_trace_id: str = Header(None, alias="X-Trace-Id"),
-    x_correlation_id: str = Header(None, alias="X-Correlation-Id"),
-):
+    authorization: str | None = Header(None),
+    x_trace_id: str | None = Header(None, alias="X-Trace-Id"),
+    x_correlation_id: str | None = Header(None, alias="X-Correlation-Id"),
+    user: AuthenticatedUser | None = Depends(get_authenticated_user),
+    admitted_input: InputAdmissionResult | None = Depends(get_admitted_input),
+    _quota: None = Depends(check_chat_quota),
+) -> EventSourceResponse:
     """
-    Handle POST /chat/stream requests, performing validation, checking guardrails,
-    and delegating streaming execution to ChatTurnRunner.
+    Handle POST /chat/stream requests, delegating admission to dependencies
+    and streaming execution to ChatTurnRunner.
     """
-    settings = get_settings()
-
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    token = authorization.split(" ", 1)[1]
-
-    from agent.utils.auth import decode_and_verify_jwt
-
-    try:
-        issuer = getattr(settings, "JWT_ISSUER", "booking-systems-api")
-        audience = getattr(settings, "JWT_AUDIENCE", "booking-systems-clients")
-        secrets_to_try = (
-            settings.jwt_secret_ring
-            if hasattr(settings, "jwt_secret_ring")
-            else settings.JWT_SECRET
+    if not isinstance(user, AuthenticatedUser):
+        auth_service = get_auth_service()
+        user = await auth_service.authenticate(
+            authorization=authorization,
+            x_trace_id=x_trace_id,
+            x_correlation_id=x_correlation_id,
         )
-        payload = decode_and_verify_jwt(
-            token=token,
-            secret=secrets_to_try,
-            issuer=issuer,
-            audience=audience,
+    if not isinstance(admitted_input, InputAdmissionResult):
+        input_service = get_input_admission_service()
+        gateway_candidate: GuardrailGateway | None = getattr(
+            request.app.state, "guardrail_gateway", None
         )
-        user_id = str(payload.get("sub") or payload.get("id") or "")
-        jti = payload.get("jti")
-    except Exception as err:
-        raise HTTPException(status_code=401, detail="Invalid token") from err
-
-    trace_id = _resolve_correlation_id(x_trace_id)
-    correlation_id = _resolve_correlation_id(x_correlation_id)
-
-    client = NestJSClient(
-        base_url=settings.NESTJS_API_URL,
-        token=token,
-        trace_id=trace_id,
-        correlation_id=correlation_id,
-    )
-    if hasattr(client, "trace_id"):
-        client.trace_id = trace_id
-    if hasattr(client, "correlation_id"):
-        client.correlation_id = correlation_id
-
-    access_res = await client.check_user_access(sub=user_id, jti=jti)
-    if not access_res.get("allowed"):
-        raise HTTPException(status_code=401, detail="User account inactive or token revoked")
-
-    if body.message and len(body.message) > settings.MAX_MESSAGE_LENGTH:
-        raise HTTPException(status_code=400, detail="Message exceeds maximum length")
-
-    gateway = getattr(request.app.state, "guardrail_gateway", None)
-    if gateway is None or not isinstance(gateway, GuardrailGateway) or not gateway.is_healthy():
-        raise HTTPException(
-            status_code=503,
-            detail="GUARDRAIL_GATEWAY_UNAVAILABLE: Guardrail gateway is uninitialized or degraded",
+        admitted_input = await input_service.admit_input(
+            message=body.message,
+            session_id=body.sessionId,
+            user=user,
+            gateway=gateway_candidate,
         )
-
-    decision = None
-    if body.message:
-        admission_context = AdmissionContext(
-            user_id=user_id,
-            chat_session_id=body.sessionId or "unassigned",
-            trace_id=trace_id,
-            correlation_id=correlation_id,
-            policy_version="2026-09-05",
-        )
-        try:
-            decision = await gateway.validate_input(admission_context, body.message)
-        except Exception:
-            decision = PipelineDecision(
-                status="BLOCK",
-                response_key=GUARDRAIL_INPUT_INJECTION,
-                reason="Input validation failed closed",
+        if not admitted_input.is_blocked:
+            quota_service = get_quota_service()
+            await quota_service.check_quota(
+                user_id=user.user_id,
+                trace_id=user.trace_id,
+                correlation_id=user.correlation_id,
             )
 
-        if not isinstance(decision, PipelineDecision):
-            if deterministic_pii_match(body.message):
-                decision = PipelineDecision(
-                    status="BLOCK",
-                    response_key=GUARDRAIL_INPUT_PII,
-                    reason="PII detected",
+    if admitted_input.is_blocked:
+        if admitted_input.blocked_event is not None:
+            return create_blocked_sse_response(admitted_input.blocked_event)
+        return create_blocked_sse_response(
+            ErrorEvent(
+                data=ErrorPayload(
+                    code=admitted_input.decision.response_key or "GUARDRAIL_INPUT_BLOCKED",
+                    message="Input rejected by security guardrail",
+                    partialMessageId=None,
                 )
-            else:
-                decision = PipelineDecision(
-                    status="PASS",
-                    validated_data=ValidatedInput(content=body.message),
-                )
-
-        if decision.status == "BLOCK":
-            if decision.response_key == GUARDRAIL_INPUT_PII:
-                guardrails_logger.warning("Ingress PII detected in user message: REDACTED")
-
-                async def pii_error_generator():
-                    event = ErrorEvent(
-                        data=ErrorPayload(
-                            code="GUARDRAIL_BLOCKED",
-                            message="Your message contains protected personal information and cannot be processed.",
-                            partialMessageId=None,
-                        )
-                    )
-                    yield {"event": event.event, "data": event.data.model_dump_json()}
-
-                return EventSourceResponse(pii_error_generator())
-            else:
-                code = decision.response_key or "GUARDRAIL_INPUT_BLOCKED"
-                guardrails_logger.warning(
-                    "Ingress input blocked by security guardrail: %s (reason: %s)",
-                    code,
-                    decision.reason,
-                )
-
-                async def blocked_error_generator():
-                    event = ErrorEvent(
-                        data=ErrorPayload(
-                            code=code,
-                            message=f"Input rejected by security guardrail: {code}",
-                            partialMessageId=None,
-                        )
-                    )
-                    yield {"event": event.event, "data": event.data.model_dump_json()}
-
-                return EventSourceResponse(blocked_error_generator())
-
-    quota_started = time.perf_counter()
-    try:
-        redis_client = get_redis_client()
-        if not redis_client:
-            raise ValueError("Redis client not initialized")
-    except Exception as e:
-        raise HTTPException(status_code=503, detail="CHAT_CONTROL_PLANE_UNAVAILABLE") from e
-
-    if chat_budget_repository.ChatBudgetRepository is not _ORIGINAL_BUDGET_REPO:
-        budget_repo_cls = chat_budget_repository.ChatBudgetRepository
-    elif ChatBudgetRepository is not _ORIGINAL_BUDGET_REPO:
-        budget_repo_cls = ChatBudgetRepository
-    else:
-        budget_repo_cls = chat_budget_repository.ChatBudgetRepository
-
-    budget_repo = budget_repo_cls(redis_client)
-    try:
-        burst_window_seconds = getattr(settings, "CHAT_BURST_WINDOW_SECONDS", 60)
-        daily_limit = getattr(
-            settings, "CHAT_DAILY_MESSAGE_LIMIT", getattr(settings, "CHAT_QUOTA_DAILY", 50)
+            )
         )
-        burst_limit = getattr(
-            settings, "CHAT_BURST_LIMIT", getattr(settings, "CHAT_QUOTA_BURST", 60)
-        )
-        burst_window_id = f"w_{int(time.time()) // burst_window_seconds}"
-        await budget_repo.admit_request(
-            user_id=user_id,
-            burst_window_id=burst_window_id,
-            daily_limit=daily_limit,
-            burst_limit=burst_limit,
-            burst_ttl=burst_window_seconds,
-        )
-        chat_telemetry.emit_safely(
-            "quota_admission",
-            status="accepted",
-            latency_ms=(time.perf_counter() - quota_started) * 1000,
-            trace_id=trace_id,
-            correlation_id=correlation_id,
-            fields={"outcome": "admitted", "dependency": "redis"},
-        )
-    except BudgetExceededException as e:
-        reason = "daily_quota" if "daily" in str(e).lower() else "burst_limit"
-        chat_telemetry.emit_safely(
-            "quota_admission",
-            status="rejected",
-            latency_ms=(time.perf_counter() - quota_started) * 1000,
-            trace_id=trace_id,
-            correlation_id=correlation_id,
-            fields={"outcome": "rejected", "error_class": reason},
-        )
-        if "daily" in str(e).lower():
-            raise HTTPException(status_code=429, detail="CHAT_DAILY_QUOTA_EXCEEDED") from e
-        raise HTTPException(status_code=429, detail="CHAT_BURST_LIMIT_EXCEEDED") from e
-    except RedisUnavailableException as e:
-        chat_telemetry.emit_safely(
-            "quota_admission",
-            status="failed",
-            latency_ms=(time.perf_counter() - quota_started) * 1000,
-            trace_id=trace_id,
-            correlation_id=correlation_id,
-            fields={"outcome": "unavailable", "error_class": "control_plane_unavailable"},
-        )
-        raise HTTPException(status_code=503, detail="CHAT_CONTROL_PLANE_UNAVAILABLE") from e
+
+    settings = get_settings()
 
     command = ChatTurnCommand(
-        user_id=user_id,
+        user_id=user.user_id,
         session_id=body.sessionId,
         message=body.message,
         action_required=getattr(body, "actionRequired", False),
         action_type=getattr(body, "actionType", None),
         action_payload=getattr(body, "actionPayload", None),
-        token=token,
-        trace_id=trace_id,
-        correlation_id=correlation_id,
+        token=user.token,
+        trace_id=user.trace_id,
+        correlation_id=user.correlation_id,
     )
 
+    gateway: GuardrailGateway | None = getattr(request.app.state, "guardrail_gateway", None)
     queue_manager = getattr(request.app.state, "message_queue", None)
 
-    runner = ChatTurnRunner(
+    mod = sys.modules[__name__]
+    client_factory = getattr(mod, "NestJSClient")
+    runner_cls = getattr(mod, "ChatTurnRunner")
+    redis_factory = getattr(mod, "get_redis_client")
+
+    runner = runner_cls(
         settings=settings,
         graph=graph,
         queue_manager=queue_manager,
-        redis_client=get_redis_client(),
-        client_factory=NestJSClient,
+        redis_client=redis_factory(),
+        client_factory=client_factory,
         gateway=gateway,
         require_gateway=True,
     )
+
+    controller_cls = getattr(mod, "ChatController")
+    controller = controller_cls(runner=runner, gateway=gateway)
 
     async def sse_generator():
         current_task = asyncio.current_task()
@@ -300,8 +242,7 @@ async def chat_stream(
             except ImportError:
                 pass
 
-        controller = ChatController(runner=runner, gateway=gateway)
-        generator = controller.stream(command, admission_decision=decision)
+        generator = controller.stream(command, admission_decision=admitted_input.decision)
         try:
             async for event in generator:
                 try:

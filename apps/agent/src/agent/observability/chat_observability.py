@@ -107,6 +107,7 @@ _ALLOWED_STRING_VALUES: dict[str, frozenset[str]] = {
             "accepted",
             "rejected",
             "failed",
+            "degraded",
             "hit",
             "miss",
             "unavailable",
@@ -328,7 +329,7 @@ def _resolve_standardized_metric(
 ) -> str:
     outcome = fields.get("outcome") if fields else None
     if operation == "quota_admission":
-        if status in {"rejected", "failed", "denied"} or outcome in {
+        if status in {"rejected", "failed", "denied", "degraded"} or outcome in {
             "rejected",
             "unavailable",
             "failed",
