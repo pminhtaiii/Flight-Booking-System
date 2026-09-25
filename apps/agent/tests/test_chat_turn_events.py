@@ -238,6 +238,18 @@ def test_format_sse_produces_exact_wire_format() -> None:
         assert sse_str.startswith(expected_event_line)
         assert expected_data_line in sse_str
         assert sse_str == f"{expected_event_line}{expected_data_line}"
+        assert sse_str == f"event: {event.event}\ndata: {event.data.model_dump_json()}\n\n"
+        assert sse_str.endswith("\n\n")
+        assert not sse_str.endswith("\n\n\n")
+
+        # Byte-level wire validation
+        wire_bytes = sse_str.encode("utf-8")
+        assert (
+            wire_bytes
+            == f"event: {event.event}\ndata: {event.data.model_dump_json()}\n\n".encode("utf-8")
+        )
+        assert wire_bytes.endswith(b"\n\n")
+        assert not wire_bytes.endswith(b"\n\n\n")
 
         lines = sse_str.strip().split("\n")
         assert len(lines) == 2
@@ -245,6 +257,96 @@ def test_format_sse_produces_exact_wire_format() -> None:
         data_json = lines[1].removeprefix("data: ")
         parsed_data = json.loads(data_json)
         assert parsed_data == event.data.model_dump()
+
+
+@pytest.mark.parametrize(
+    ("event", "expected_event_type"),
+    [
+        (TokenEvent(data=TokenPayload(content="test content")), "token"),
+        (
+            ToolCallEvent(
+                data=ToolCallPayload(
+                    name="search_flights",
+                    inputs={"origin": "SFO", "destination": "JFK"},
+                )
+            ),
+            "tool_call",
+        ),
+        (
+            ToolResultEvent(data=ToolResultPayload(name="search_flights", result="Found flights")),
+            "tool_result",
+        ),
+        (
+            FlightResultsEvent(
+                data=FlightResultsPayload(results=[{"flightNumber": "AA100", "price": 350}])
+            ),
+            "flight_results",
+        ),
+        (
+            ActionHandoffEvent(
+                data=ActionHandoffPayload(
+                    version=1,
+                    action="begin_checkout",
+                    handoffToken="chk_tok_123",
+                    expiresAt="2026-08-30T12:00:00Z",
+                    display={"airline": "Delta", "price": "450"},
+                )
+            ),
+            "ACTION_HANDOFF",
+        ),
+        (
+            ActionRequiredEvent(
+                data=ActionRequiredPayload(
+                    action="COMPLETE_PROFILE",
+                    target="/profile",
+                    scope="PASSENGER_DETAILS",
+                    passengers=[{"passengerType": "adult"}],
+                )
+            ),
+            "ACTION_REQUIRED",
+        ),
+        (
+            DoneEvent(data=DonePayload(messageId="msg_123", sessionId="ses_456")),
+            "done",
+        ),
+        (
+            ErrorEvent(
+                data=ErrorPayload(
+                    code="PERSISTENCE_ERROR",
+                    message="Failed to save",
+                    partialMessageId="msg_partial",
+                    error="details",
+                )
+            ),
+            "error",
+        ),
+    ],
+)
+def test_format_sse_wire_bytes_across_all_canonical_events(
+    event: ChatTurnEvent, expected_event_type: str
+) -> None:
+    # 1. Event type matches canonical constant
+    assert event.event == expected_event_type
+
+    # 2. Strict extra="forbid" config on both event and payload
+    assert event.model_config.get("extra") == "forbid"
+    assert event.data.model_config.get("extra") == "forbid"
+
+    # 3. Exact string pattern: f"event: {event.event}\ndata: {event.data.model_dump_json()}\n\n"
+    expected_wire_str = f"event: {event.event}\ndata: {event.data.model_dump_json()}\n\n"
+    wire_str = format_sse(event)
+    assert wire_str == expected_wire_str
+
+    # 4. Strict double-newline framing
+    assert wire_str.endswith("\n\n")
+    assert not wire_str.endswith("\n\n\n")
+    assert wire_str.count("\n\n") == 1
+
+    # 5. Byte-for-byte wire equality
+    wire_bytes = wire_str.encode("utf-8")
+    assert wire_bytes == expected_wire_str.encode("utf-8")
+    assert wire_bytes.endswith(b"\n\n")
+    assert not wire_bytes.endswith(b"\n\n\n")
 
 
 def test_discriminated_union_parsing() -> None:
