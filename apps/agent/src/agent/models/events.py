@@ -21,7 +21,6 @@ from agent.chat_turn.events import (
     ToolResultEvent,
     ToolResultPayload,
 )
-from agent.streaming.sse import format_sse
 
 
 class BaseSSEEvent(BaseModel):
@@ -90,5 +89,13 @@ __all__ = [
     "ToolCallPayload",
     "ToolResultEvent",
     "ToolResultPayload",
-    "format_sse",
+    "format_sse",  # noqa: F822
 ]
+
+
+def __getattr__(name: str):
+    if name == "format_sse":
+        from agent.streaming.sse import format_sse
+
+        return format_sse
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -456,3 +456,14 @@ def test_privacy_and_pii_isolation() -> None:
         ErrorPayload(code="E", message="m", offerId="duffel_leak")
     with pytest.raises(ValidationError):
         ErrorPayload(code="E", message="m", rawOffer={"id": "duffel_123"})
+
+
+def test_circular_import_and_format_sse_resolution() -> None:
+    import agent.main
+    from agent.chat_turn import format_sse as chat_turn_format_sse
+    from agent.models.events import format_sse as models_format_sse
+    from agent.streaming.sse import format_sse as direct_format_sse
+
+    assert agent.main is not None
+    assert chat_turn_format_sse is direct_format_sse
+    assert models_format_sse is direct_format_sse
