@@ -1,6 +1,6 @@
 # Architecture
 
-## Feature 027 — Chat Turn Decomposition (In Progress — Phases 1, 2 & Phase 3 Slices 1-2 Complete)
+## Feature 027 — Chat Turn Decomposition (In Progress — Phases 1, 2, 3 Complete)
 
 - [Feature 027 specification](../specs/027-chat-turn-decomposition/spec.md), [plan](../specs/027-chat-turn-decomposition/plan.md), and [tasks](../specs/027-chat-turn-decomposition/tasks.md) decompose Python chat turn event translation, domain projections, memory coordination, admission, and lifecycle while preserving SSE and security contracts.
 - **Phase 1: Event Transport Decoupling (Tasks T001–T003 Complete)**:
@@ -11,7 +11,7 @@
   - Authoritative synthetic graph event fixtures locked in `apps/agent/tests/test_chat_turn_runner.py` before extracting `GraphEventInterpreter` and `ToolResultResolver`.
   - Established validated tool execution invariants: `on_chain_end` for `tools` is the sole source of validated tool messages; `on_tool_end` is strictly timing-only; `ToolResultEvent` strictly precedes specialized events (`FlightResultsEvent`, `ActionRequiredEvent`); invalid readiness fails closed with no `ToolResultEvent`.
   - Established output streaming and fallback invariants: incremental token streaming via `on_chat_model_stream`; empty-stream fallback to `on_chat_model_end`; empty-model-end fallback to final-node message output; chunk deduplication preventing duplicate token emission; all output paths route through the single per-turn `OutputStreamSession`.
-- **Phase 3: User Story 1 — Isolate Graph Event Translation (In Progress — Slices 1 & 2 Complete)**:
+- **Phase 3: User Story 1 — Isolate Graph Event Translation (Tasks T006–T011 Complete)**:
   - **Slice 1: ToolResultResolver Extraction (Tasks T006–T007 Complete)**:
     - Pure domain projection engine `ToolResultResolver` in `apps/agent/src/agent/chat_turn/resolver.py` maps validated tool results and handoff node completions to typed `ToolResolution` and `HandoffResolution`.
     - Sanitizes booking readiness, loads active search snapshots, and handles handoff node outcomes fail-closed.
@@ -21,7 +21,12 @@
     - Pure port isolation: strictly 0 imports or calls to Redis, NestJS client, or Guardrails.
     - Raises typed `ProjectionBlockedException` fail-closed upon blocked tool or handoff node resolution, with zero `ToolResultEvent` emitted.
     - Model streaming, model-end fallback, and node-end fallback deduplicated with raw `TokenEvent` emission.
-    - `runner.py` remains untouched; wiring deferred to Slice 3 (Task T010).
+  - **Slice 3: Runner Wiring & Verification Gate (Tasks T010–T011 Complete)**:
+    - Wired `GraphEventInterpreter` and `ToolResultResolver` into `apps/agent/src/agent/chat_turn/runner.py`, eliminating ~560 lines of legacy inline translation.
+    - Preserved 4-step causal failure cleanup when `ProjectionBlockedException` occurs, emitting static `ErrorEvent`.
+    - Maintained single `OutputStreamSession` routing for all raw token chunks and approved partial response token accounting.
+    - Verified 100% pass across all 7 focused test suites (180 passed, 2 skipped, 0 failed; exit code 0).
+    - Ruff check & format check: 0 errors (exit code 0).
 
 ## Feature 028 — Backend Client Unification (Planned, 2026-09-25)
 

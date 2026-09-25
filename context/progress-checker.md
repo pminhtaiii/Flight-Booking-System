@@ -1,5 +1,20 @@
 # Progress Tracker
 
+### Feature 027 — Chat Turn Decomposition: Phase 3 / User Story 1 Complete (Tasks T010–T011 Verified) (2026-09-25)
+
+- **Phase 3 (User Story 1: Isolate Graph Event Translation) Fully Completed (Tasks T006–T011)**:
+  - **T010: Wired `GraphEventInterpreter` & `ToolResultResolver` into `runner.py`**:
+    - Replaced ~560 lines of complex inline graph stream interpretation, fallback handling, tool message extraction, and handoff token processing with delegation to `GraphEventInterpreter` and `ToolResultResolver`.
+    - Integrated tool call argument sanitization and input projection helper into resolver.
+    - Preserved 4-step causal failure cleanup when `ProjectionBlockedException` is caught from the interpreter, emitting static `ErrorEvent`.
+    - Maintained exact token streaming path through single per-turn `OutputStreamSession` and approved partial-response token accounting.
+  - **T011: Comprehensive US1 Verification Gate & Event Parity Recorded**:
+    - Executed all 7 focused test suites for User Story 1: `test_chat_turn_events.py`, `test_tool_result_resolver.py`, `test_chat_turn_interpreter.py`, `test_chat_turn_runner.py`, `test_sse_integration.py`, `test_sse_characterization.py`, `test_output_stream.py`.
+    - Result: 180 passed, 2 skipped, 0 failed in 17.94s (100% pass rate, exit code 0).
+    - Ruff check & format check: 0 errors across 92 files (exit code 0).
+    - Recorded complete verification evidence, git commit/HEAD status, and parity matrix in `specs/027-chat-turn-decomposition/verification.md`.
+    - Updated `specs/027-chat-turn-decomposition/tasks.md` checking off T010 and T011.
+
 ### Feature 027 — Chat Turn Decomposition: Phase 3 / Slice 2 Complete (Tasks T008–T009 Verified) (2026-09-25)
 
 - **Phase 3 / Slice 2 (User Story 1: GraphEventInterpreter Extraction) Completed (Tasks T008–T009)**:

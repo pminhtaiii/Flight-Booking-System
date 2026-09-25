@@ -1,5 +1,6 @@
 import asyncio
 import json
+from typing import AsyncIterator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -2423,3 +2424,118 @@ async def test_t005_single_output_guardrail_session_routed():
     assert (
         agent_msgs[0]["content"] == "[GUARDED]TokenA [GUARDED]TokenB [GUARDED]TokenC[GUARDED_FLUSH]"
     )
+
+
+@pytest.mark.asyncio
+async def test_runner_delegates_to_graph_event_interpreter():
+    mock_client = MagicMock()
+    mock_client.get_memory = AsyncMock(
+        return_value={"recentMessages": [], "summary": None, "totalMessageCount": 0}
+    )
+    mock_client.create_message_batch = AsyncMock(
+        return_value={"messages": [{"id": "msg_agent_1", "sender": "AGENT"}]}
+    )
+    mock_client.set_fencing_token = MagicMock()
+
+    mock_queue = MagicMock()
+    mock_queue.acquire = AsyncMock(return_value="req-123")
+    mock_queue.get_fence = MagicMock(return_value=42)
+    mock_queue.validate_active_fence = AsyncMock(return_value=True)
+    mock_queue.release = AsyncMock()
+
+    mock_graph = MagicMock()
+
+    async def mock_astream_events(
+        *args: object, **kwargs: object
+    ) -> AsyncIterator[dict[str, object]]:
+        yield {
+            "event": "on_chain_end",
+            "name": "travel",
+            "data": {
+                "output": {
+                    "messages": [
+                        AIMessage(
+                            content="",
+                            tool_calls=[
+                                {
+                                    "id": "call_delegate_1",
+                                    "name": "check_booking_readiness",
+                                    "args": {},
+                                }
+                            ],
+                        )
+                    ]
+                }
+            },
+        }
+        yield {
+            "event": "on_chain_end",
+            "name": "tools",
+            "data": {
+                "output": {
+                    "messages": [
+                        ToolMessage(
+                            content=json.dumps(
+                                {
+                                    "scope": "DOMESTIC",
+                                    "ready": True,
+                                    "nextAction": "CONTINUE_CHECKOUT",
+                                    "passengers": [],
+                                }
+                            ),
+                            tool_call_id="call_delegate_1",
+                            name="check_booking_readiness",
+                            additional_kwargs={"guardrail_validated": True},
+                        )
+                    ]
+                }
+            },
+        }
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": MagicMock(content="Hello via interpreter!")},
+        }
+
+    mock_graph.astream_events = mock_astream_events
+
+    mock_redis = MagicMock()
+    runner = ChatTurnRunner(
+        graph=mock_graph,
+        queue_manager=mock_queue,
+        client_factory=lambda **kwargs: mock_client,
+        redis_client=mock_redis,
+    )
+
+    command = ChatTurnCommand(
+        user_id="user-123",
+        session_id="session-456",
+        message="Hello",
+        token="jwt.token.val",
+        trace_id="chat_0123456789abcdef0123456789abcdef",
+        correlation_id="chat_fedcba9876543210fedcba9876543210",
+    )
+
+    events = [e async for e in runner.run(command)]
+
+    # 1. Verify ToolCallEvent input projection via GraphEventInterpreter -> ToolResultResolver
+    tool_calls = [e for e in events if isinstance(e, ToolCallEvent)]
+    assert len(tool_calls) == 1
+    assert tool_calls[0].data.name == "check_booking_readiness"
+    assert tool_calls[0].data.inputs == {"message": "Checking booking readiness..."}
+
+    # 2. Verify ToolResultEvent summary override via GraphEventInterpreter -> ToolResultResolver
+    tool_results = [e for e in events if isinstance(e, ToolResultEvent)]
+    assert len(tool_results) == 1
+    assert tool_results[0].data.name == "check_booking_readiness"
+    assert tool_results[0].data.result == "Successfully checked booking readiness."
+
+    # 3. Verify TokenEvent streaming through output guardrail pipeline
+    tokens = [e for e in events if isinstance(e, TokenEvent)]
+    assert len(tokens) == 1
+    assert tokens[0].data.content == "Hello via interpreter!"
+
+    # 4. Verify DoneEvent emitted and queue lease released
+    done_events = [e for e in events if isinstance(e, DoneEvent)]
+    assert len(done_events) == 1
+    assert done_events[0].data.sessionId == "session-456"
+    mock_queue.release.assert_awaited_once_with("session-456", "req-123")

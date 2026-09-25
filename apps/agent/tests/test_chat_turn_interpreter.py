@@ -947,3 +947,66 @@ async def test_on_tool_end_yields_zero_domain_events() -> None:
 
     assert len(events) == 0
     mock_resolver.resolve.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_tool_call_input_projection_delegates_to_resolver() -> None:
+    """ToolCallEvent projects input via resolver.project_tool_inputs without interpreter inspecting tool names."""
+    context = FakeTurnContext()
+    mock_resolver = MagicMock(spec=ToolResultResolver)
+    mock_resolver.project_tool_inputs.return_value = {"projected": "param"}
+    mock_resolver.resolve = AsyncMock(
+        return_value=ToolResolution(
+            is_blocked=False,
+            summary_override="Done",
+            follow_up_event=None,
+        )
+    )
+
+    stream = to_stream(
+        {
+            "event": "on_chain_end",
+            "name": "travel",
+            "data": {
+                "output": {
+                    "messages": [
+                        AIMessage(
+                            content="",
+                            tool_calls=[
+                                {
+                                    "id": "call_any_tool",
+                                    "name": "any_tool_name",
+                                    "args": {"raw": "arg"},
+                                }
+                            ],
+                        )
+                    ]
+                }
+            },
+        },
+        {
+            "event": "on_chain_end",
+            "name": "tools",
+            "data": {
+                "output": {
+                    "messages": [
+                        ToolMessage(
+                            content="raw output",
+                            tool_call_id="call_any_tool",
+                            name="any_tool_name",
+                            additional_kwargs={"guardrail_validated": True},
+                        )
+                    ]
+                }
+            },
+        },
+    )
+
+    interpreter = GraphEventInterpreter(resolver=mock_resolver, context=context)
+    events = await collect_events(interpreter, stream, context=context)
+
+    mock_resolver.project_tool_inputs.assert_called_once_with("any_tool_name", {"raw": "arg"})
+    assert len(events) == 2
+    assert isinstance(events[0], ToolCallEvent)
+    assert events[0].data.name == "any_tool_name"
+    assert events[0].data.inputs == {"projected": "param"}
