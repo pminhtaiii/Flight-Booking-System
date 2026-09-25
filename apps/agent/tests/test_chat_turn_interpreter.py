@@ -11,12 +11,6 @@ from typing import AsyncIterator, Optional
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from agent.chat_turn.interpreter import (
-    GraphEventInterpreter,
-    ProjectionBlockedException,
-)
-from langchain_core.messages import AIMessage, ToolMessage
-
 from agent.chat_turn.events import (
     ActionHandoffEvent,
     ActionHandoffPayload,
@@ -29,12 +23,17 @@ from agent.chat_turn.events import (
     ToolCallEvent,
     ToolResultEvent,
 )
+from agent.chat_turn.interpreter import (
+    GraphEventInterpreter,
+    ProjectionBlockedException,
+)
 from agent.chat_turn.resolver import (
     HandoffResolution,
     ToolResolution,
     ToolResultResolver,
 )
 from agent.guardrails.base import GUARDRAIL_TOOL_SCHEMA
+from langchain_core.messages import AIMessage, ToolMessage
 
 
 @dataclass
