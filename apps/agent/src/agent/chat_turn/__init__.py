@@ -17,7 +17,6 @@ from .events import (
     ToolCallPayload,
     ToolResultEvent,
     ToolResultPayload,
-    format_sse,
 )
 from .runner import ChatTurnRunner
 
@@ -43,3 +42,11 @@ __all__ = [
     "ToolResultPayload",
     "format_sse",
 ]
+
+
+def __getattr__(name: str):
+    if name == "format_sse":
+        from agent.streaming.sse import format_sse
+
+        return format_sse
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

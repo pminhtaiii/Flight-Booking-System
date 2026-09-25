@@ -8,10 +8,23 @@ import httpx
 import jwt
 import pytest
 from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage, ToolMessage
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, ValidationError
 
+import agent.chat_turn as domain_events
+from agent.chat_turn import (
+    ActionHandoffEvent,
+    ActionRequiredEvent,
+    ChatTurnEvent,
+    DoneEvent,
+    ErrorEvent,
+    FlightResultsEvent,
+    TokenEvent,
+    ToolCallEvent,
+    ToolResultEvent,
+)
 from agent.main import app
 from agent.models.events import HandoffEvent
+from agent.streaming.sse import format_sse
 from agent.trusted_search_snapshot import (
     TrustedSearchSnapshot,
     TrustedSnapshotRepository,
@@ -320,6 +333,118 @@ class TestAuthoritativeSSEWireEvents:
         parsed = parse_sse_wire_chunk(sse_wire)
         assert parsed["event"] == "error"
         assert parsed["data"]["code"] == "OUTPUT_GUARDRAIL_BLOCKED"
+
+    def test_format_sse_produces_verbatim_wire_output_matching_authoritative_payloads_and_framing(
+        self,
+    ):
+        """
+        Verify format_sse produces verbatim wire output matching the authoritative payload models
+        and double-newline framing for all 8 canonical events.
+        """
+        canonical_events: List[ChatTurnEvent] = [
+            TokenEvent(data=domain_events.TokenPayload(content="Hello world")),
+            ToolCallEvent(
+                data=domain_events.ToolCallPayload(
+                    name="search_flights",
+                    inputs={"origin": "SGN", "destination": "HAN"},
+                )
+            ),
+            ToolResultEvent(
+                data=domain_events.ToolResultPayload(
+                    name="search_flights",
+                    result="Found 3 flights",
+                )
+            ),
+            FlightResultsEvent(
+                data=domain_events.FlightResultsPayload(
+                    results=[
+                        {
+                            "index": 1,
+                            "airline": "Vietnam Airlines",
+                            "origin": "SGN",
+                            "destination": "HAN",
+                            "price": "120.00",
+                        }
+                    ]
+                )
+            ),
+            ActionHandoffEvent(
+                data=domain_events.ActionHandoffPayload(
+                    version=1,
+                    action="begin_checkout",
+                    handoffToken="jwt_token_sample_characterization",
+                    expiresAt="2026-09-01T08:15:00Z",
+                    display={"airline": "Vietnam Airlines", "price": "120.00"},
+                )
+            ),
+            ActionRequiredEvent(
+                data=domain_events.ActionRequiredPayload(
+                    action="COMPLETE_PROFILE",
+                    target="/profile",
+                    scope="INTERNATIONAL",
+                    passengers=[{"passengerType": "ADULT"}],
+                )
+            ),
+            DoneEvent(
+                data=domain_events.DonePayload(
+                    messageId="msg_char_789",
+                    sessionId="ses_char_456",
+                )
+            ),
+            ErrorEvent(
+                data=domain_events.ErrorPayload(
+                    code="OUTPUT_GUARDRAIL_BLOCKED",
+                    message="Response was blocked for safety reasons.",
+                    partialMessageId="msg_part_123",
+                )
+            ),
+        ]
+
+        assert len(canonical_events) == 8
+        event_names = [e.event for e in canonical_events]
+        assert set(event_names) == set(AUTHORITATIVE_EVENT_PAYLOAD_MAP.keys())
+
+        for event in canonical_events:
+            # 1. Format using canonical format_sse
+            wire_str = format_sse(event)
+
+            # 2. Assert exact string pattern: f"event: {event.event}\ndata: {event.data.model_dump_json()}\n\n"
+            expected_pattern = f"event: {event.event}\ndata: {event.data.model_dump_json()}\n\n"
+            assert wire_str == expected_pattern
+
+            # 3. Assert exact double-newline framing
+            assert wire_str.endswith("\n\n")
+            assert not wire_str.endswith("\n\n\n")
+            assert wire_str.count("\n\n") == 1
+
+            # 4. Assert byte-for-byte serialization
+            wire_bytes = wire_str.encode("utf-8")
+            assert wire_bytes == expected_pattern.encode("utf-8")
+            assert wire_bytes.endswith(b"\n\n")
+            assert not wire_bytes.endswith(b"\n\n\n")
+
+            # 5. Parse wire chunk and validate against authoritative payload model
+            parsed_chunk = parse_sse_wire_chunk(wire_str)
+            assert parsed_chunk["event"] == event.event
+            authoritative_cls = AUTHORITATIVE_EVENT_PAYLOAD_MAP[event.event]
+            validated_payload = authoritative_cls.model_validate(parsed_chunk["data"])
+            assert validated_payload.model_dump() == event.data.model_dump()
+
+            # 6. Assert extra="forbid" behavior on authoritative model, event payload, and event wrapper
+            assert authoritative_cls.model_config.get("extra") == "forbid"
+            assert type(event.data).model_config.get("extra") == "forbid"
+            assert type(event).model_config.get("extra") == "forbid"
+
+            with pytest.raises(ValidationError):
+                authoritative_cls.model_validate(
+                    {**parsed_chunk["data"], "extra_forbidden_field": "disallowed"}
+                )
+            with pytest.raises(ValidationError):
+                type(event.data).model_validate(
+                    {**parsed_chunk["data"], "extra_forbidden_field": "disallowed"}
+                )
+            with pytest.raises(ValidationError):
+                type(event)(data=event.data, extra_forbidden_field="disallowed")
 
 
 # =========================================================================
