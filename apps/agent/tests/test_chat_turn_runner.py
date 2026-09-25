@@ -27,6 +27,15 @@ try:
 except ImportError:
     from agent.guardrails.output_pipeline import OutputGuardrailBlockedError
 
+from agent.chat_turn.runner import background_tasks
+from agent.memory.conversation import (
+    ContextBlockedException,
+    ConversationMemory,
+    MemoryPersistenceException,
+    SessionNotFoundException,
+    ValidatedConversationContext,
+)
+
 
 def test_chat_turn_command_valid_and_extra_forbid():
     cmd = ChatTurnCommand(
@@ -2539,3 +2548,206 @@ async def test_runner_delegates_to_graph_event_interpreter():
     assert len(done_events) == 1
     assert done_events[0].data.sessionId == "session-456"
     mock_queue.release.assert_awaited_once_with("session-456", "req-123")
+
+
+@pytest.mark.asyncio
+async def test_runner_delegates_to_conversation_memory_and_schedules_compaction() -> None:
+    mock_client = MagicMock()
+    mock_client.create_message_batch = AsyncMock(
+        return_value={"messages": [{"id": "msg_agent_1", "sender": "AGENT"}]}
+    )
+    mock_client.set_fencing_token = MagicMock()
+
+    mock_queue = MagicMock()
+    mock_queue.acquire = AsyncMock(return_value="req-123")
+    mock_queue.get_fence = MagicMock(return_value=42)
+    mock_queue.validate_active_fence = AsyncMock(return_value=True)
+    mock_queue.release = AsyncMock()
+
+    mock_graph = MagicMock()
+
+    async def mock_astream_events(
+        *args: object, **kwargs: object
+    ) -> AsyncIterator[dict[str, object]]:
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": MagicMock(content="Hello!")},
+        }
+
+    mock_graph.astream_events = mock_astream_events
+
+    mock_memory = MagicMock(spec=ConversationMemory)
+    mock_memory.get_context = AsyncMock(
+        return_value=ValidatedConversationContext(
+            history=[],
+            summary=None,
+            total_message_count=10,
+        )
+    )
+    mock_memory.schedule_compaction = MagicMock()
+
+    runner = ChatTurnRunner(
+        graph=mock_graph,
+        queue_manager=mock_queue,
+        client_factory=lambda **_kwargs: mock_client,
+        redis_client=MagicMock(),
+        conversation_memory=mock_memory,
+    )
+
+    command = ChatTurnCommand(
+        user_id="user-123",
+        session_id="session-456",
+        message="Hello",
+        token="jwt.token.val",
+        trace_id="trace-123",
+        correlation_id="corr-456",
+    )
+
+    events = [e async for e in runner.run(command)]
+
+    assert any(isinstance(e, DoneEvent) for e in events)
+
+    mock_memory.get_context.assert_awaited_once()
+    get_ctx_kwargs = mock_memory.get_context.await_args.kwargs
+    assert get_ctx_kwargs["session_id"] == "session-456"
+    assert get_ctx_kwargs["client"] is mock_client
+    admission_ctx = get_ctx_kwargs["admission_context"]
+    assert admission_ctx.user_id == "user-123"
+    assert admission_ctx.chat_session_id == "session-456"
+    assert admission_ctx.trace_id == "trace-123"
+    assert admission_ctx.correlation_id == "corr-456"
+
+    mock_memory.schedule_compaction.assert_called_once_with(
+        session_id="session-456",
+        client=mock_client,
+        total_count=10,
+        background_tasks=background_tasks,
+    )
+
+
+@pytest.mark.asyncio
+async def test_runner_memory_session_not_found_cleanup() -> None:
+    mock_client = MagicMock()
+    mock_client.create_message_batch = AsyncMock(return_value={"messages": []})
+
+    mock_queue = MagicMock()
+    mock_queue.acquire = AsyncMock(return_value="req-not-found")
+    mock_queue.get_fence = MagicMock(return_value=1)
+    mock_queue.validate_active_fence = AsyncMock(return_value=True)
+    mock_queue.release = AsyncMock()
+
+    mock_graph = MagicMock()
+
+    mock_memory = MagicMock(spec=ConversationMemory)
+    mock_memory.get_context = AsyncMock(
+        side_effect=SessionNotFoundException("Chat session not found.")
+    )
+
+    runner = ChatTurnRunner(
+        graph=mock_graph,
+        queue_manager=mock_queue,
+        client_factory=lambda **_kwargs: mock_client,
+        redis_client=MagicMock(),
+        conversation_memory=mock_memory,
+    )
+
+    command = ChatTurnCommand(
+        user_id="user-123",
+        session_id="session-456",
+        message="Hello",
+        token="jwt.token.val",
+    )
+
+    events = [e async for e in runner.run(command)]
+
+    error_events = [e for e in events if isinstance(e, ErrorEvent)]
+    assert len(error_events) == 1
+    assert error_events[0].data.code == "CHAT_SESSION_NOT_FOUND"
+    assert error_events[0].data.message == "Chat session not found."
+    mock_queue.release.assert_awaited_once_with("session-456", "req-not-found")
+
+
+@pytest.mark.asyncio
+async def test_runner_memory_persistence_error_cleanup() -> None:
+    mock_client = MagicMock()
+    mock_client.create_message_batch = AsyncMock(return_value={"messages": []})
+
+    mock_queue = MagicMock()
+    mock_queue.acquire = AsyncMock(return_value="req-persist-err")
+    mock_queue.get_fence = MagicMock(return_value=1)
+    mock_queue.validate_active_fence = AsyncMock(return_value=True)
+    mock_queue.release = AsyncMock()
+
+    mock_graph = MagicMock()
+
+    mock_memory = MagicMock(spec=ConversationMemory)
+    mock_memory.get_context = AsyncMock(
+        side_effect=MemoryPersistenceException("Failed to fetch chat session memory.")
+    )
+
+    runner = ChatTurnRunner(
+        graph=mock_graph,
+        queue_manager=mock_queue,
+        client_factory=lambda **_kwargs: mock_client,
+        redis_client=MagicMock(),
+        conversation_memory=mock_memory,
+    )
+
+    command = ChatTurnCommand(
+        user_id="user-123",
+        session_id="session-456",
+        message="Hello",
+        token="jwt.token.val",
+    )
+
+    events = [e async for e in runner.run(command)]
+
+    error_events = [e for e in events if isinstance(e, ErrorEvent)]
+    assert len(error_events) == 1
+    assert error_events[0].data.code == "PERSISTENCE_ERROR"
+    assert error_events[0].data.message == "Failed to fetch chat session memory."
+    mock_queue.release.assert_awaited_once_with("session-456", "req-persist-err")
+
+
+@pytest.mark.asyncio
+async def test_runner_memory_context_blocked_cleanup() -> None:
+    mock_client = MagicMock()
+    mock_client.create_message_batch = AsyncMock(return_value={"messages": []})
+
+    mock_queue = MagicMock()
+    mock_queue.acquire = AsyncMock(return_value="req-blocked")
+    mock_queue.get_fence = MagicMock(return_value=1)
+    mock_queue.validate_active_fence = AsyncMock(return_value=True)
+    mock_queue.release = AsyncMock()
+
+    mock_graph = MagicMock()
+
+    mock_memory = MagicMock(spec=ConversationMemory)
+    mock_memory.get_context = AsyncMock(
+        side_effect=ContextBlockedException(error_code="GUARDRAIL_PROMPT_INJECTION")
+    )
+
+    runner = ChatTurnRunner(
+        graph=mock_graph,
+        queue_manager=mock_queue,
+        client_factory=lambda **_kwargs: mock_client,
+        redis_client=MagicMock(),
+        conversation_memory=mock_memory,
+    )
+
+    command = ChatTurnCommand(
+        user_id="user-123",
+        session_id="session-456",
+        message="Hello",
+        token="jwt.token.val",
+    )
+
+    events = [e async for e in runner.run(command)]
+
+    error_events = [e for e in events if isinstance(e, ErrorEvent)]
+    assert len(error_events) == 1
+    assert error_events[0].data.code == "GUARDRAIL_PROMPT_INJECTION"
+    assert (
+        error_events[0].data.message == "Historical conversation context contains unsafe content."
+    )
+    mock_queue.release.assert_awaited_once_with("session-456", "req-blocked")
