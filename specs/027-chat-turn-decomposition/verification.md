@@ -727,6 +727,92 @@ All checks passed!
 | **Background Task Registry & GC Safety** | `runner.py` -> `ConversationMemory.schedule_compaction` | Verified | Compaction task registered in runner's `background_tasks` set with `add_done_callback(background_tasks.discard)`. |
 | **Strict Typing** | `runner.py`, `conversation.py` | Verified | Fully typed; zero unresolved type issues; clean mypy/pyright compatibility. |
 
+---
+
+# Verification Evidence: Chat Turn Decomposition (Phase 5 — User Story 3)
+
+## Overview & Metadata
+
+- **Feature**: 027 Chat Turn Decomposition
+- **Phase**: Phase 5: User Story 3 — Reuse ordered admission
+- **Tasks**: T016, T017, T018, T019, T020, T021
+- **Execution Timestamp**: `2026-09-25T23:00:00+07:00`
+- **Deliverables**:
+  - `apps/agent/src/agent/admission/__init__.py`
+  - `apps/agent/src/agent/admission/auth.py` (`AuthService`, `AuthenticatedUser`)
+  - `apps/agent/src/agent/admission/input_admission.py` (`InputAdmissionService`, `InputAdmissionResult`, `create_blocked_sse_response`)
+  - `apps/agent/src/agent/admission/quota.py` (`QuotaService`)
+  - `apps/agent/src/agent/streaming/sse.py` (thin FastAPI dependencies `get_auth_service`, `get_authenticated_user`, `get_input_admission_service`, `get_admitted_input`, `get_quota_service`, `check_chat_quota`, direct-call backward compatibility fallback)
+  - `apps/agent/tests/test_chat_admission.py` (endpoint admission, service unit tests, strict ordering, single-scan, PII short-circuit)
+
+---
+
+## 1. Test Suite Verification (Pytest — Focused Admission & Transport Suites)
+
+### Command Executed
+```powershell
+$env:PYTHONPATH = "$PWD/tests/ci/python;$PWD/apps/agent/src"
+uv run --package agent pytest apps/agent/tests/test_chat_admission.py apps/agent/tests/test_sse.py apps/agent/tests/test_chat_controller.py apps/agent/tests/test_stream_auth_budget.py apps/agent/tests/test_sse_integration.py -v
+```
+
+### Execution Result
+- **Exit Code**: `0`
+- **Total Tests**: 90 passed in 27.68s
+- **Suite Breakdown**:
+  - `apps/agent/tests/test_chat_admission.py`: 28 passed (100%)
+  - `apps/agent/tests/test_sse.py`: 30 passed (100%)
+  - `apps/agent/tests/test_chat_controller.py`: 6 passed (100%)
+  - `apps/agent/tests/test_stream_auth_budget.py`: 9 passed (100%)
+  - `apps/agent/tests/test_sse_integration.py`: 17 passed (100%)
+
+---
+
+## 2. Full Non-Redis Agent Test Suite Regression Verification
+
+### Command Executed
+```powershell
+$env:PYTHONPATH = "$PWD/tests/ci/python;$PWD/apps/agent/src"
+uv run --package agent pytest apps/agent/tests -m "not redis_integration" -k "not test_security_performance" -q
+```
+
+### Execution Result
+- **Exit Code**: `0`
+- **Outcome**: 1270 passed, 4 skipped, 20 deselected, 9 warnings in 146.56s (0:02:26)
+- **Regressions**: 0 failures
+
+---
+
+## 3. Linter & Formatter Verification (Ruff)
+
+### Commands Executed
+```powershell
+$env:UV_CACHE_DIR = "C:\Booking Systems\.t093-uv-cache"
+uv run --package agent ruff check apps/agent/src/agent/admission apps/agent/src/agent/streaming/sse.py apps/agent/tests/test_chat_admission.py
+uv run --package agent ruff format --check apps/agent/src/agent/admission apps/agent/src/agent/streaming/sse.py apps/agent/tests/test_chat_admission.py
+```
+
+### Execution Result
+- **Exit Code**: `0`
+- **Output**:
+```text
+All checks passed!
+6 files already formatted
+```
+
+---
+
+## 4. Invariant & Parity Verification Matrix
+
+| Invariant / Requirement | Target | Status | Evidence / Notes |
+|---|---|---|---|
+| **Zero-Redis PII Short-Circuit** | `InputAdmissionService` & `sse.py` | Verified | Ingress message with PII immediately yields `ErrorEvent(GUARDRAIL_BLOCKED)` SSE stream before quota admission, resulting in zero Redis client initialization and zero quota consumed (`test_pii_ingress_short_circuit_zero_redis_zero_quota`, `test_ingress_pii_detected_yields_guardrail_blocked_event`). |
+| **Single-Scan Guarantee** | `InputAdmissionService` -> `ChatController` | Verified | Input message validated exactly once during admission; validated `decision` forwarded to `ChatController.stream()` and runner without redundant re-scanning (`test_single_scan_guarantee_end_to_end`, `test_chat_controller_single_scan_guarantee_forwards_validated_input`). |
+| **Ordered Admission Progression** | `sse.py` dependencies | Verified | Progression enforced: `auth` (header + JWT + NestJS active check) -> `length` -> `gateway_health` -> `input_scan` -> `quota` -> `runner`. Any failure short-circuits subsequent stages (`test_strict_ordering_auth_then_input_then_quota`). |
+| **Error Contract Parity** | `AuthService`, `InputAdmissionService`, `QuotaService` | Verified | Exact parity with prior contracts: 400 for max length / invalid input (`Message exceeds maximum length`), 401 for missing/invalid header, bad JWT, revoked account (`Invalid authorization header`, `Invalid token`, `User account inactive or token revoked`), 429 for daily/burst quota (`CHAT_DAILY_QUOTA_EXCEEDED`, `CHAT_BURST_LIMIT_EXCEEDED`), 503 for degraded gateway or redis down (`GUARDRAIL_GATEWAY_UNAVAILABLE`, `CHAT_CONTROL_PLANE_UNAVAILABLE`). |
+| **Dynamic Dependency Resolution Compatibility** | `sse.py` / `QuotaService` | Verified | Thin dependency factories dynamically inspect `sys.modules[__name__]` and module-level attributes, guaranteeing full compatibility with existing test monkeypatches (`patch("agent.streaming.sse.ChatBudgetRepository")`, `patch("agent.streaming.sse.NestJSClient")`, etc.) and direct test function invocations. |
+| **Strict Zero `Any` Typing** | `apps/agent/src/agent/admission/`, `sse.py` | Verified | `git grep -n -w "Any"` yields 0 matches in admission services and modified streaming endpoints. |
+
+
 
 
 

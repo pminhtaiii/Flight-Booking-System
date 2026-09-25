@@ -1,6 +1,6 @@
 # Architecture
 
-## Feature 027 — Chat Turn Decomposition (In Progress — Phases 1, 2, 3 Complete)
+## Feature 027 — Chat Turn Decomposition (In Progress — Phases 1, 2, 3, 4, 5 Complete)
 
 - [Feature 027 specification](../specs/027-chat-turn-decomposition/spec.md), [plan](../specs/027-chat-turn-decomposition/plan.md), and [tasks](../specs/027-chat-turn-decomposition/tasks.md) decompose Python chat turn event translation, domain projections, memory coordination, admission, and lifecycle while preserving SSE and security contracts.
 - **Phase 1: Event Transport Decoupling (Tasks T001–T003 Complete)**:
@@ -27,6 +27,22 @@
     - Maintained single `OutputStreamSession` routing for all raw token chunks and approved partial response token accounting.
     - Verified 100% pass across all 7 focused test suites (180 passed, 2 skipped, 0 failed; exit code 0).
     - Ruff check & format check: 0 errors (exit code 0).
+- **Phase 4: User Story 2 — Coordinate Conversation Memory (Tasks T012–T015 Complete)**:
+  - Extracted `ConversationMemory` in `apps/agent/src/agent/memory/conversation.py` providing unified `get_context()` and `schedule_compaction()` interfaces.
+  - Encapsulated historical message guardrail scanning, unsafe summary discarding, window size defaults, and typed exception mapping (`SessionNotFoundException`, `MemoryPersistenceException`, `ContextBlockedException`).
+  - Preserved `totalMessageCount + 2` post-turn compaction accounting and GC-safe `background_tasks` registration.
+  - Wired into `apps/agent/src/agent/chat_turn/runner.py` with exact `AdmissionContext` policy/identity forwarding and preserved direct-call fallback behavior.
+- **Phase 5: User Story 3 — Reuse Ordered Admission (Tasks T016–T021 Complete)**:
+  - Extracted reusable modular admission package `apps/agent/src/agent/admission/`:
+    - `AuthService` (`auth.py`): Decodes and verifies JWT tokens against secret ring, extracts `sub`/`jti`/trace/correlation IDs, and enforces active account status via NestJS client `/access/check`, returning typed `AuthenticatedUser`.
+    - `InputAdmissionService` (`input_admission.py`): Enforces max message length, checks gateway health/availability, and validates input through `GuardrailGateway.validate_input()` with deterministic PII fallback, returning typed `InputAdmissionResult`.
+    - `QuotaService` (`quota.py`): Enforces Redis daily message limits and burst window rate limiting with structured telemetry, supporting dynamic repository class resolution for test compatibility.
+  - Thin FastAPI dependency wrappers in `apps/agent/src/agent/streaming/sse.py`:
+    - Implemented ordered dependency providers (`get_auth_service`, `get_authenticated_user`, `get_input_admission_service`, `get_admitted_input`, `get_quota_service`, `check_chat_quota`).
+    - Enforced strict ordered progression: `auth` -> `length` -> `gateway_health` -> `input_scan` -> `quota` -> `runner`.
+    - Zero-Redis PII short-circuit: Ingress messages with PII immediately return `ErrorEvent(GUARDRAIL_BLOCKED)` SSE stream before quota checks or Redis client initialization.
+    - Single-scan guarantee: Validated admission decision forwarded directly through `ChatController.stream()` to runner without redundant re-scanning.
+    - Transparent backward compatibility: Direct-call fallback and module-level monkeypatch compatibility for legacy tests.
 
 ## Feature 028 — Backend Client Unification (Planned, 2026-09-25)
 
