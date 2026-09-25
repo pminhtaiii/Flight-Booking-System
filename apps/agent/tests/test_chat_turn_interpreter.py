@@ -11,6 +11,8 @@ from typing import AsyncIterator, Optional
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from langchain_core.messages import AIMessage, ToolMessage
+
 from agent.chat_turn.events import (
     ActionHandoffEvent,
     ActionHandoffPayload,
@@ -33,7 +35,6 @@ from agent.chat_turn.resolver import (
     ToolResultResolver,
 )
 from agent.guardrails.base import GUARDRAIL_TOOL_SCHEMA
-from langchain_core.messages import AIMessage, ToolMessage
 
 
 @dataclass
