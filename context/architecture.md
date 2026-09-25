@@ -1,10 +1,16 @@
 # Architecture
 
-## Features 027–028 — Architectural Refactors (Planned, 2026-09-25)
+## Feature 027 — Chat Turn Decomposition (In Progress — Phase 1 Complete)
 
-- [Feature 027 specification](../specs/027-chat-turn-decomposition/spec.md), [plan](../specs/027-chat-turn-decomposition/plan.md), and [tasks](../specs/027-chat-turn-decomposition/tasks.md) decompose Python chat turn event translation, domain projections, memory coordination, admission, and lifecycle while preserving SSE and security contracts. The plan explicitly binds projection to the current validated `tools` chain-end messages and keeps `on_tool_end` for telemetry.
+- [Feature 027 specification](../specs/027-chat-turn-decomposition/spec.md), [plan](../specs/027-chat-turn-decomposition/plan.md), and [tasks](../specs/027-chat-turn-decomposition/tasks.md) decompose Python chat turn event translation, domain projections, memory coordination, admission, and lifecycle while preserving SSE and security contracts.
+- **Phase 1: Event Transport Decoupling (Tasks T001–T003 Complete)**:
+  - Transport serialization `format_sse(event: ChatTurnEvent) -> str` relocated from domain definitions into `apps/agent/src/agent/streaming/sse.py`.
+  - Domain models in `apps/agent/src/agent/chat_turn/events.py` are strictly pure Pydantic models and discriminated unions with zero transport logic and imports limited to standard library `typing` and `pydantic`.
+  - Wire compatibility verified byte-for-byte across all 8 canonical events (`token`, `tool_call`, `tool_result`, `flight_results`, `ACTION_HANDOFF`, `ACTION_REQUIRED`, `done`, `error`).
+
+## Feature 028 — Backend Client Unification (Planned, 2026-09-25)
+
 - [Feature 028 specification](../specs/028-backend-client-unification/spec.md), [plan](../specs/028-backend-client-unification/plan.md), and [tasks](../specs/028-backend-client-unification/tasks.md) unify the three core web server transport consumers and six booking route response adapters. Dashboard `INVALID_RESPONSE`, booking error-body forwarding, and mutation single-send behavior remain contract requirements.
-- Both features are plans only. Existing runtime architecture remains as documented below until their tasks are implemented and verified.
 
 ## Feature 026 — Agent Boundary Simplification (Complete - Tasks T001–T037)
 

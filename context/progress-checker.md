@@ -1,12 +1,14 @@
 # Progress Tracker
 
-### Features 027–028 — Planning complete; implementation not started (2026-09-25)
+### Feature 027 — Chat Turn Decomposition: Phase 1 Complete (Tasks T001–T003 Verified) (2026-09-25)
 
-- Feature 027 Chat Turn Decomposition: [spec](../specs/027-chat-turn-decomposition/spec.md), [plan](../specs/027-chat-turn-decomposition/plan.md), [tasks](../specs/027-chat-turn-decomposition/tasks.md), research, transient data model, internal contract, quickstart, and quality checklist drafted from the 2026-09-24 decision record. All implementation tasks remain unchecked.
-- Feature 028 Backend Client Unification: [spec](../specs/028-backend-client-unification/spec.md), [plan](../specs/028-backend-client-unification/plan.md), [tasks](../specs/028-backend-client-unification/tasks.md), research, transient data model, internal contract, quickstart, and quality checklist drafted from the 2026-09-24 decision record. All implementation tasks remain unchecked.
-- Codebase exploration identified and documented two compatibility reconciliations: validated tool projections originate from `on_chain_end` of `tools` and emit ToolResultEvent before specialized follow-ups; dashboard malformed payloads map to `INVALID_RESPONSE`.
-- GPT 6 Luna Max plan/spec convergence review (2026-09-25): six initial medium findings were corrected across both artifact sets and re-reviewed with zero remaining high or medium concerns. Feature 027 now specifies invalid-readiness no-result ordering, exact AdmissionContext forwarding, and separate handoff-node resolution. Feature 028 now specifies a 31-second total retry deadline, status-only success mode, and malformed non-2xx body handling. Implementation remains unstarted.
-- No source implementation or runtime verification has been performed for Features 027–028.
+- **Phase 1 (Setup and Event Transport Boundary) Completed (Tasks T001–T003)**:
+  - **T001: Characterized Exact Wire Bytes Across 8 Events**: Asserted byte-for-byte serialization in `apps/agent/tests/test_chat_turn_events.py` and `apps/agent/tests/characterization/test_sse_characterization.py` across `TokenEvent`, `ToolCallEvent`, `ToolResultEvent`, `FlightResultsEvent`, `ActionHandoffEvent`, `ActionRequiredEvent`, `DoneEvent`, `ErrorEvent`, strictly enforcing `\n\n` framing and `extra="forbid"`.
+  - **T002: Relocated `format_sse` to `apps/agent/src/agent/streaming/sse.py`**: Relocated `format_sse` into `streaming/sse.py` and exported in `__all__`. Purged all transport formatting logic from `apps/agent/src/agent/chat_turn/events.py`, ensuring `events.py` strictly holds domain models with standard library `typing` and `pydantic` imports. Updated bridges in `chat_turn/__init__.py`, `models/events.py`, and test imports.
+  - **T003: Verified Parity & Recorded Evidence**: All 112 focused tests passed (111 passed, 1 skipped). Static boundary census confirmed `def format_sse` exists only in `apps/agent/src/agent/streaming/sse.py`. Recorded execution metrics, commit hashes (`360ca39e`, `37fcf8db`), and exact parity confirmation in `specs/027-chat-turn-decomposition/verification.md`. Updated `specs/027-chat-turn-decomposition/tasks.md` marking T001–T003 complete.
+
+### Feature 028 — Backend Client Unification: Planning complete; implementation not started (2026-09-25)
+- Feature 028 Backend Client Unification: [spec](../specs/028-backend-client-unification/spec.md), [plan](../specs/028-backend-client-unification/plan.md), [tasks](../specs/028-backend-client-unification/tasks.md). All implementation tasks remain unchecked.
  
 ### Feature 026 — Agent Boundary Simplification: Phase 5 Complete / Feature 100% Complete (Tasks T033–T037 Verified) (2026-09-24)
 
