@@ -1,6 +1,6 @@
 # Feature Specification: Chat Turn Decomposition
 
-**Feature Branch**: `codex/027-028-transport-chat-boundaries`
+**Feature Branch**: `codex/027-028-specs-review`
 **Created**: 2026-09-25
 **Status**: Draft for review
 **Input**: [Chat turn decision record](../../docs/adr/research-chatturnrunner-decomposition-grilling-session.md)

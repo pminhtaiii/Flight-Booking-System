@@ -1,6 +1,6 @@
 # Implementation Plan: Chat Turn Decomposition
 
-**Branch**: `codex/027-028-transport-chat-boundaries` | **Date**: 2026-09-25 | **Spec**: [spec.md](./spec.md)
+**Branch**: `codex/027-028-specs-review` | **Date**: 2026-09-25 | **Spec**: [spec.md](./spec.md)
 
 **Input**: [Feature specification](./spec.md), [decision record](../../docs/adr/research-chatturnrunner-decomposition-grilling-session.md), and [research reconciliation](./research.md).
 

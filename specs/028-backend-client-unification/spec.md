@@ -1,6 +1,6 @@
 # Feature Specification: Backend Client Unification
 
-**Feature Branch**: `codex/027-028-transport-chat-boundaries`
+**Feature Branch**: `codex/027-028-specs-review`
 **Created**: 2026-09-25
 **Status**: Draft for review
 **Input**: [Backend client decision record](../../docs/adr/research-backend-client-unification-grilling-session.md)
