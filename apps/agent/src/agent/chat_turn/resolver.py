@@ -56,6 +56,22 @@ class ToolResultResolver:
     ) -> None:
         self.snapshot_lifecycle = snapshot_lifecycle
 
+    def project_tool_inputs(self, tool_name: str, raw_args: object) -> dict[str, object]:
+        if tool_name == "check_booking_readiness":
+            return {"message": "Checking booking readiness..."}
+        from agent.guardrails.schemas.tools import TOOL_INPUT_SCHEMAS
+
+        schema = TOOL_INPUT_SCHEMAS.get(tool_name)
+        if schema is None or not isinstance(raw_args, dict):
+            return {}
+        try:
+            return schema.model_validate(raw_args).model_dump(
+                exclude_none=True,
+                exclude_unset=True,
+            )
+        except (TypeError, ValueError):
+            return {}
+
     @staticmethod
     def _extract_safe_passengers(passengers_raw: object) -> list[dict[str, object]]:
         if not isinstance(passengers_raw, list):
@@ -174,10 +190,16 @@ class ToolResultResolver:
             )
 
         if tool_name == "search_flights":
-            lifecycle = self.snapshot_lifecycle or getattr(context, "snapshot_lifecycle", None)
+
+            def _get_ctx(key: str, default: object = None) -> object:
+                if isinstance(context, dict):
+                    return context.get(key, default)
+                return getattr(context, key, default)
+
+            lifecycle = self.snapshot_lifecycle or _get_ctx("snapshot_lifecycle")
             if lifecycle is None:
-                repo = getattr(context, "snapshot_repository", None)
-                redis_client = getattr(context, "redis_client", None)
+                repo = _get_ctx("snapshot_repository")
+                redis_client = _get_ctx("redis_client")
                 if repo is not None:
                     lifecycle = TrustedSearchSnapshotLifecycle(repo)
                 elif redis_client is not None:
@@ -185,10 +207,8 @@ class ToolResultResolver:
                         TrustedSnapshotRepository(redis_client)
                     )
 
-            user_id = str(getattr(context, "user_id", "") or "")
-            session_id = str(
-                getattr(context, "session_id", getattr(context, "chat_session_id", "")) or ""
-            )
+            user_id = str(_get_ctx("user_id", "") or "")
+            session_id = str(_get_ctx("session_id", _get_ctx("chat_session_id", "")) or "")
 
             if lifecycle is not None and user_id and session_id:
                 try:

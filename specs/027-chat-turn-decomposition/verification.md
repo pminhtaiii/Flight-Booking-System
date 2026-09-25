@@ -480,3 +480,88 @@ git diff --name-only origin/development...HEAD apps/agent/src/agent/chat_turn/ru
 | Streaming deduplication | `GraphEventInterpreter` | Verified | Preserves model-end and node-end fallbacks without duplicate emission |
 | Timing-only `on_tool_end` | `GraphEventInterpreter` | Verified | Absorbs `on_tool_end` with zero domain event emission |
 
+---
+
+# Verification Evidence: Chat Turn Decomposition (Phase 3 / Slice 3 - User Story 1 Verification Gate)
+
+## Overview & Metadata
+
+- **Feature**: 027 Chat Turn Decomposition
+- **Phase/Slice**: Phase 3 / Slice 3 (User Story 1 - Runner Wiring & Comprehensive US1 Verification Gate)
+- **Tasks**: T010, T011
+- **Execution Timestamp**: `2026-09-25T19:21:00+07:00`
+- **Git HEAD SHA**: `7f5fe12c` (`style(agent): place third-party langchain imports before first-party agent imports`)
+- **Files Modified**:
+  - `apps/agent/src/agent/chat_turn/runner.py` (Wired `GraphEventInterpreter` and `ToolResultResolver`; eliminated ~560 lines of legacy translation logic)
+  - `apps/agent/src/agent/chat_turn/interpreter.py` (Tool call input projection integration)
+  - `apps/agent/src/agent/chat_turn/resolver.py` (Typed input projection helpers)
+  - `apps/agent/tests/test_chat_turn_runner.py` (Delegation and invariant tests)
+  - `apps/agent/tests/test_chat_turn_interpreter.py`
+  - `apps/agent/tests/test_tool_result_resolver.py`
+  - `specs/027-chat-turn-decomposition/tasks.md`
+
+---
+
+## 1. Test Suite Verification (Pytest - 7 Focused US1 Suites)
+
+### Command Executed
+```powershell
+$env:PYTHONPATH = "$PWD/tests/ci/python;$PWD/apps/agent/src"
+uv run --package agent pytest `
+  apps/agent/tests/test_chat_turn_events.py `
+  apps/agent/tests/test_tool_result_resolver.py `
+  apps/agent/tests/test_chat_turn_interpreter.py `
+  apps/agent/tests/test_chat_turn_runner.py `
+  apps/agent/tests/test_sse_integration.py `
+  apps/agent/tests/characterization/test_sse_characterization.py `
+  apps/agent/tests/security/test_output_stream.py -v
+```
+
+### Execution Result
+- **Exit Code**: `0`
+- **Total Tests**: 182 items (180 passed, 2 skipped, 0 failed in 17.94s)
+- **Suite Breakdown**:
+  - `apps/agent/tests/test_chat_turn_events.py`: 16 passed
+  - `apps/agent/tests/test_tool_result_resolver.py`: 28 passed
+  - `apps/agent/tests/test_chat_turn_interpreter.py`: 30 passed
+  - `apps/agent/tests/test_chat_turn_runner.py`: 28 passed, 1 skipped (`test_runner_cancellation_bounded_timeout_on_stuck_dependency`)
+  - `apps/agent/tests/test_sse_integration.py`: 12 passed
+  - `apps/agent/tests/characterization/test_sse_characterization.py`: 15 passed, 1 skipped (canonical failure finalization)
+  - `apps/agent/tests/security/test_output_stream.py`: 51 passed
+
+---
+
+## 2. Linter & Formatter Verification (Ruff)
+
+### Commands Executed
+```powershell
+$env:UV_CACHE_DIR = "C:\Booking Systems\.t093-uv-cache"
+uv run --package agent ruff check apps/agent/src/agent/chat_turn/ apps/agent/tests/
+uv run --package agent ruff format --check apps/agent/src/agent/chat_turn/ apps/agent/tests/
+```
+
+### Execution Result
+- **Exit Code**: `0`
+- **Output**:
+```text
+All checks passed!
+92 files already formatted
+```
+
+---
+
+## 3. User Story 1 Event Parity Evidence & Invariant Audit
+
+| Invariant / Requirement | Verification Target | Status | Evidence / Notes |
+|---|---|---|---|
+| **FR-001**: Tool-name agnostic translation | `GraphEventInterpreter` | Verified | Interpreter contains 0 tool-name conditionals; delegates tool results unconditionally to `ToolResultResolver` |
+| **FR-002**: Tool projection separation | `ToolResultResolver` | Verified | Encapsulates search snapshot projection, booking readiness schema validation/sanitization, and handoff token extractions |
+| **FR-003**: Event ordering | `GraphEventInterpreter` / `Runner` | Verified | Accepted tool emits `tool_call` then `tool_result`, followed by domain projections (`flight_results`, `ACTION_REQUIRED`) |
+| **FR-004**: Single OutputStreamSession | `runner.py` | Verified | Every raw `TokenEvent` from interpreter passes through single `OutputStreamSession.push()` for PII scanning |
+| **FR-005**: Fail-closed projection blocking | `resolver.py` / `runner.py` | Verified | `ProjectionBlockedException` caught by runner; triggers 4-step causal failure cleanup and emits static `ErrorEvent` |
+| **FR-006**: Handoff node routing | `interpreter.py` / `resolver.py` | Verified | Dispatches `create_handoff_token`, `create_handoff_token_node`, `validate_handoff` to typed completions |
+| **FR-007**: Streaming deduplication | `interpreter.py` | Verified | Streaming chunks, model-end fallbacks, and node-end fallbacks deduplicated without double emissions |
+| **FR-008**: Timing-only `on_tool_end` | `interpreter.py` | Verified | Consumes `on_tool_end` for latency metrics; produces zero domain events |
+| **Wire & SSE Parity** | `sse.py` & Characterization | Verified | 100% byte-for-byte serialization match across all 8 canonical domain events |
+
+

@@ -2,6 +2,7 @@
 
 import inspect
 import json
+import time
 from typing import AsyncIterable, AsyncIterator, Optional
 
 from agent.chat_turn.events import (
@@ -14,8 +15,18 @@ from agent.chat_turn.events import (
     ToolResultPayload,
 )
 from agent.chat_turn.resolver import ToolResultResolver
+from agent.observability.chat_observability import safe_tool_name
 
 GUARDRAIL_TOOL_SCHEMA: str = "GUARDRAIL_TOOL_SCHEMA"
+
+
+def _get_context_val(ctx: Optional[object], key: str) -> object:
+    if isinstance(ctx, dict):
+        return ctx.get(key)
+    if ctx is not None:
+        return getattr(ctx, key, None)
+    return None
+
 
 HANDOFF_NODES: frozenset[str] = frozenset(
     {
@@ -50,12 +61,6 @@ class ProjectionBlockedException(Exception):
         self.error_detail = error_detail
 
 
-def _project_public_tool_inputs(raw_args: object) -> dict[str, object]:
-    if not isinstance(raw_args, dict):
-        return {}
-    return {str(k): v for k, v in raw_args.items()}
-
-
 class GraphEventInterpreter:
     """Interprets LangGraph event stream into domain-typed ChatTurnEvents."""
 
@@ -81,6 +86,7 @@ class GraphEventInterpreter:
         streamed_run_ids: set[str] = set()
         active_model_streamed: bool = False
         streamed_since_last_node_end: bool = False
+        tool_started_at: dict[str, float] = {}
 
         async for event in stream:
             if not isinstance(event, dict):
@@ -146,14 +152,37 @@ class GraphEventInterpreter:
                     if content is None and isinstance(message, dict):
                         content = message.get("content")
                     if isinstance(content, str) and content:
+                        streamed_since_last_node_end = True
                         yield TokenEvent(data=TokenPayload(content=content))
 
             elif kind == "on_tool_start":
                 active_model_streamed = False
                 streamed_since_last_node_end = False
+                tool_name = event.get("name")
+                if isinstance(tool_name, str):
+                    tool_started_at[tool_name] = time.perf_counter()
 
             elif kind == "on_tool_end":
-                pass
+                tool_name = event.get("name")
+                if isinstance(tool_name, str):
+                    started_at = tool_started_at.pop(tool_name, time.perf_counter())
+                    telemetry = _get_context_val(effective_context, "telemetry")
+                    trace_id = _get_context_val(effective_context, "trace_id")
+                    correlation_id = _get_context_val(effective_context, "correlation_id")
+                    if telemetry is not None and hasattr(telemetry, "emit_safely"):
+                        telemetry.emit_safely(
+                            "tool_call",
+                            status="completed",
+                            latency_ms=(time.perf_counter() - started_at) * 1000,
+                            trace_id=trace_id if isinstance(trace_id, str) else None,
+                            correlation_id=(
+                                correlation_id if isinstance(correlation_id, str) else None
+                            ),
+                            fields={
+                                "tool_name": safe_tool_name(tool_name),
+                                "outcome": "completed",
+                            },
+                        )
 
             elif kind == "on_chain_end":
                 node_name = event.get("name")
@@ -231,7 +260,7 @@ class GraphEventInterpreter:
                         block_key = output.get("tool_block_response_key") or GUARDRAIL_TOOL_SCHEMA
                         raise ProjectionBlockedException(
                             error_code=str(block_key),
-                            error_message="Tool result was blocked for safety reasons.",
+                            error_message="Tool execution was blocked for safety reasons.",
                         )
 
                     messages_out = output.get("messages", []) if isinstance(output, dict) else []
@@ -283,9 +312,14 @@ class GraphEventInterpreter:
                                     if isinstance(pending_call, dict)
                                     else {}
                                 )
-                                safe_input = _project_public_tool_inputs(
-                                    tool_input,
-                                )
+                                safe_input: dict[str, object] = {}
+                                if hasattr(self.resolver, "project_tool_inputs"):
+                                    res_input = self.resolver.project_tool_inputs(
+                                        str_tool_ident,
+                                        tool_input,
+                                    )
+                                    if isinstance(res_input, dict):
+                                        safe_input = res_input
                                 yield ToolCallEvent(
                                     data=ToolCallPayload(
                                         name=str_tool_ident,

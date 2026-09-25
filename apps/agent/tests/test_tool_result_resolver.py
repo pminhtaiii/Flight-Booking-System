@@ -471,3 +471,58 @@ def test_resolve_handoff_node_non_dict_output(
     assert res.is_blocked is False
     assert res.handoff_event is None
     assert res.force_persistence is False
+
+
+# ============================================================================
+# 5. Tool Input Projections (project_tool_inputs)
+# ============================================================================
+
+
+def test_project_tool_inputs_check_booking_readiness(
+    resolver: ToolResultResolver,
+) -> None:
+    inputs = resolver.project_tool_inputs("check_booking_readiness", {"ignored": "value"})
+    assert inputs == {"message": "Checking booking readiness..."}
+
+
+def test_project_tool_inputs_known_schema_valid(
+    resolver: ToolResultResolver,
+) -> None:
+    raw = {
+        "origin": "SFO",
+        "destination": "JFK",
+        "date": "2026-10-15",
+        "passengers": 2,
+    }
+    inputs = resolver.project_tool_inputs("search_flights", raw)
+    assert inputs == {
+        "origin": "SFO",
+        "destination": "JFK",
+        "date": "2026-10-15",
+        "passengers": 2,
+    }
+
+
+def test_project_tool_inputs_known_schema_invalid(
+    resolver: ToolResultResolver,
+) -> None:
+    raw = {
+        "origin": "SFO",
+        # missing destination, date
+    }
+    inputs = resolver.project_tool_inputs("search_flights", raw)
+    assert inputs == {}
+
+
+def test_project_tool_inputs_unknown_tool(
+    resolver: ToolResultResolver,
+) -> None:
+    inputs = resolver.project_tool_inputs("unknown_custom_tool", {"a": 1})
+    assert inputs == {}
+
+
+def test_project_tool_inputs_non_dict_args(
+    resolver: ToolResultResolver,
+) -> None:
+    inputs = resolver.project_tool_inputs("search_flights", "not-a-dict")
+    assert inputs == {}
