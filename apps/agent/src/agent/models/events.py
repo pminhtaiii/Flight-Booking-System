@@ -20,8 +20,8 @@ from agent.chat_turn.events import (
     ToolCallPayload,
     ToolResultEvent,
     ToolResultPayload,
-    format_sse,
 )
+from agent.streaming.sse import format_sse
 
 
 class BaseSSEEvent(BaseModel):

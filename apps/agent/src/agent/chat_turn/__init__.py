@@ -1,3 +1,5 @@
+from agent.streaming.sse import format_sse
+
 from .command import ChatTurnCommand
 from .events import (
     ActionHandoffEvent,
@@ -17,7 +19,6 @@ from .events import (
     ToolCallPayload,
     ToolResultEvent,
     ToolResultPayload,
-    format_sse,
 )
 from .runner import ChatTurnRunner
 

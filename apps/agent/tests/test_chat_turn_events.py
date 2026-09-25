@@ -21,8 +21,8 @@ from agent.chat_turn import (
     ToolCallPayload,
     ToolResultEvent,
     ToolResultPayload,
-    format_sse,
 )
+from agent.streaming.sse import format_sse
 
 
 def test_all_eight_wire_event_payloads_valid() -> None:

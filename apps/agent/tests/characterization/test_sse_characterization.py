@@ -21,10 +21,10 @@ from agent.chat_turn import (
     TokenEvent,
     ToolCallEvent,
     ToolResultEvent,
-    format_sse,
 )
 from agent.main import app
 from agent.models.events import HandoffEvent
+from agent.streaming.sse import format_sse
 from agent.trusted_search_snapshot import (
     TrustedSearchSnapshot,
     TrustedSnapshotRepository,

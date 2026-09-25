@@ -6,14 +6,14 @@ import time
 from fastapi import APIRouter, Header, HTTPException, Request
 from sse_starlette.sse import EventSourceResponse
 
-from agent.chat_turn import (
-    ChatTurnCommand,
-    ChatTurnRunner,
+from agent.chat_turn.command import ChatTurnCommand
+from agent.chat_turn.controller import ChatController
+from agent.chat_turn.events import (
+    ChatTurnEvent,
     ErrorEvent,
     ErrorPayload,
 )
-from agent.chat_turn.controller import ChatController
-from agent.chat_turn.runner import _persist_response
+from agent.chat_turn.runner import ChatTurnRunner, _persist_response
 from agent.config import get_settings
 from agent.graph.graph import graph
 from agent.guardrails.base import (
@@ -46,6 +46,7 @@ __all__ = [
     "TrustedSnapshotRepository",
     "_persist_response",
     "chat_stream",
+    "format_sse",
     "get_redis_client",
     "graph",
     "router",
@@ -57,6 +58,10 @@ logger = logging.getLogger("agent.streaming")
 guardrails_logger = logging.getLogger("agent.guardrails")
 router = APIRouter()
 chat_telemetry = ChatTelemetry(logger)
+
+
+def format_sse(event: ChatTurnEvent) -> str:
+    return f"event: {event.event}\ndata: {event.data.model_dump_json()}\n\n"
 
 
 def _resolve_correlation_id(value: str | None) -> str:

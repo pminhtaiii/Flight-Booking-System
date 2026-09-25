@@ -10,8 +10,8 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from agent.chat_turn import ChatTurnCommand, ErrorEvent, TokenEvent
-from agent.chat_turn.events import format_sse
 from agent.chat_turn.runner import ChatTurnRunner
+from agent.streaming.sse import format_sse
 
 try:
     from agent.guardrails.base import OutputGuardrailBlockedError
