@@ -9,6 +9,8 @@ from typing import Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
+from agent.guardrails.base import AdmissionContext
 from agent.memory.conversation import (
     ContextBlockedException,
     ConversationMemory,
@@ -16,9 +18,6 @@ from agent.memory.conversation import (
     SessionNotFoundException,
     ValidatedConversationContext,
 )
-
-from agent.config import settings
-from agent.guardrails.base import AdmissionContext
 
 
 def _make_pass_decision() -> MagicMock:
@@ -181,16 +180,16 @@ async def test_get_context_window_size_from_settings(
     mock_client: MagicMock,
     mock_gateway: MagicMock,
     admission_context: AdmissionContext,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     mock_client.get_memory.return_value = {
         "recentMessages": [],
         "summary": None,
         "totalMessageCount": 0,
     }
-    monkeypatch.setattr(settings, "MEMORY_WINDOW_SIZE", 15)
+    custom_settings = MagicMock()
+    custom_settings.MEMORY_WINDOW_SIZE = 15
 
-    memory = ConversationMemory(gateway=mock_gateway)
+    memory = ConversationMemory(settings=custom_settings, gateway=mock_gateway)
     await memory.get_context("session-test-001", mock_client, admission_context)
 
     mock_client.get_memory.assert_awaited_once_with("session-test-001", recent_count=15)
@@ -459,7 +458,7 @@ async def test_get_context_error_mapping_persistence_error_generic(
 
 
 @patch("agent.memory.conversation.MemoryManager")
-def test_schedule_compaction_instantiates_manager_and_calls_summarize(
+async def test_schedule_compaction_instantiates_manager_and_calls_summarize(
     mock_manager_cls: MagicMock,
     mock_client: MagicMock,
     mock_gateway: MagicMock,
@@ -491,10 +490,11 @@ def test_schedule_compaction_instantiates_manager_and_calls_summarize(
         total_count=10,  # 8 + 2
     )
     assert isinstance(task, asyncio.Task)
+    await task
 
 
 @patch("agent.memory.conversation.MemoryManager")
-def test_schedule_compaction_total_count_zero(
+async def test_schedule_compaction_total_count_zero(
     mock_manager_cls: MagicMock,
     mock_client: MagicMock,
     mock_gateway: MagicMock,
@@ -517,6 +517,7 @@ def test_schedule_compaction_total_count_zero(
         total_count=2,  # 0 + 2
     )
     assert isinstance(task, asyncio.Task)
+    await task
 
 
 # ============================================================================
