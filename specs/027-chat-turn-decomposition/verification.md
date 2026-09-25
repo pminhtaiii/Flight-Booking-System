@@ -229,6 +229,7 @@ All checks passed!
 - **Commit SHA Anchors**:
   - T006: `2aeb236a5eee13b214007d1ca3374b848b602fc0` (`test(agent): characterization tests for ToolResultResolver (T006)`)
   - T007: `17d28bf5d73063d4f46f08420c02fa916144be86` (`feat(agent): implement ToolResultResolver and resolution types (T007)`)
+  - Review Fixes: `038b37d2145e08c50688a8efba3df9e3da6531c9` (`fix(agent): align resolver summary overrides, strict readiness validation, and handoff error message`)
 
 ---
 
@@ -251,32 +252,33 @@ rootdir: C:\Booking Systems\apps\agent
 configfile: pyproject.toml
 plugins: anyio-4.14.2, langsmith-0.11.1, asyncio-1.4.0, cov-7.1.0, mock-3.15.1
 asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
-collecting ... collected 22 items
+collecting ... collected 23 items
 
 apps\agent\tests\test_tool_result_resolver.py::test_resolve_generic_tool_string_result PASSED [  4%]
-apps\agent\tests\test_tool_result_resolver.py::test_resolve_generic_tool_dict_result PASSED [  9%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_generic_tool_dict_result PASSED [  8%]
 apps\agent\tests\test_tool_result_resolver.py::test_resolve_generic_tool_other_type_result PASSED [ 13%]
-apps\agent\tests\test_tool_result_resolver.py::test_resolve_search_flights_with_active_snapshot PASSED [ 18%]
-apps\agent\tests\test_tool_result_resolver.py::test_resolve_search_flights_with_no_snapshot PASSED [ 22%]
-apps\agent\tests\test_tool_result_resolver.py::test_resolve_search_flights_with_no_lifecycle PASSED [ 27%]
-apps\agent\tests\test_tool_result_resolver.py::test_resolve_check_booking_readiness_valid_ready_true PASSED [ 31%]
-apps\agent\tests\test_tool_result_resolver.py::test_resolve_check_booking_readiness_valid_ready_true_json_string PASSED [ 36%]
-apps\agent\tests\test_tool_result_resolver.py::test_resolve_check_booking_readiness_valid_ready_false_complete_profile PASSED [ 40%]
-apps\agent\tests\test_tool_result_resolver.py::test_resolve_check_booking_readiness_valid_ready_false_other_action PASSED [ 45%]
-apps\agent\tests\test_tool_result_resolver.py::test_resolve_check_booking_readiness_upstream_error PASSED [ 50%]
-apps\agent\tests\test_tool_result_resolver.py::test_resolve_check_booking_readiness_invalid_schema PASSED [ 54%]
-apps\agent\tests\test_tool_result_resolver.py::test_resolve_check_booking_readiness_invalid_string PASSED [ 59%]
-apps\agent\tests\test_tool_result_resolver.py::test_resolve_handoff_node_valid_token PASSED [ 63%]
-apps\agent\tests\test_tool_result_resolver.py::test_resolve_handoff_node_node_aliases[create_handoff_token_node] PASSED [ 68%]
-apps\agent\tests\test_tool_result_resolver.py::test_resolve_handoff_node_node_aliases[validate_handoff] PASSED [ 72%]
-apps\agent\tests\test_tool_result_resolver.py::test_resolve_handoff_node_token_alias PASSED [ 77%]
-apps\agent\tests\test_tool_result_resolver.py::test_resolve_handoff_node_action_error PASSED [ 81%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_search_flights_with_active_snapshot PASSED [ 17%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_search_flights_with_no_snapshot PASSED [ 21%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_search_flights_with_no_lifecycle PASSED [ 26%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_check_booking_readiness_valid_ready_true PASSED [ 30%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_check_booking_readiness_valid_ready_true_json_string PASSED [ 34%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_check_booking_readiness_valid_ready_false_complete_profile PASSED [ 39%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_check_booking_readiness_valid_ready_false_other_action PASSED [ 43%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_check_booking_readiness_upstream_error PASSED [ 47%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_check_booking_readiness_invalid_schema PASSED [ 52%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_check_booking_readiness_unknown_scope PASSED [ 56%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_check_booking_readiness_invalid_string PASSED [ 60%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_handoff_node_valid_token PASSED [ 65%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_handoff_node_node_aliases[create_handoff_token_node] PASSED [ 69%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_handoff_node_node_aliases[validate_handoff] PASSED [ 73%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_handoff_node_token_alias PASSED [ 78%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_handoff_node_action_error PASSED [ 82%]
 apps\agent\tests\test_tool_result_resolver.py::test_resolve_handoff_node_action_error_empty_string PASSED [ 86%]
-apps\agent\tests\test_tool_result_resolver.py::test_resolve_handoff_node_unrecognized_node PASSED [ 90%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_handoff_node_unrecognized_node PASSED [ 91%]
 apps\agent\tests\test_tool_result_resolver.py::test_resolve_handoff_node_missing_action PASSED [ 95%]
 apps\agent\tests\test_tool_result_resolver.py::test_resolve_handoff_node_non_dict_output PASSED [100%]
 
-============================= 22 passed in 5.82s ==============================
+============================= 23 passed in 11.60s =============================
 ```
 
 ### 1.2 Baseline Chat Turn Runner Suite Regression Check
