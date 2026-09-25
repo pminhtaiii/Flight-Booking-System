@@ -18,7 +18,7 @@ As a chat maintainer, I can reason about graph events and domain projections ind
 **Acceptance Scenarios**:
 
 1. **Given** model and tool events, **when** interpreted, **then** existing domain event types, payloads, and order are retained.
-2. **Given** a validated tool completion, **when** interpreted, **then** the resolver is called once and the current default result and any specialized follow-up event retain their established order.
+2. **Given** a guardrail-validated tool completion, **when** interpreted, **then** the resolver is called before ToolResultEvent emission; accepted completions retain the current result-then-specialized order, while invalid booking readiness emits no ToolResultEvent.
 3. **Given** streamed model tokens, **when** interpreted, **then** raw token events reach the caller, which applies the existing output guardrail before delivery or persistence.
 
 ---
@@ -67,6 +67,7 @@ As a chat maintainer, I can trace session setup, lease/fencing, graph execution,
 
 - Unknown or malformed graph events retain safe handling; raw tool payloads cannot reach clients through a new path.
 - Resolver I/O failures retain current blocking or fallback behavior.
+- Invalid booking readiness may emit its existing ToolCallEvent but MUST fail closed before ToolResultEvent; a stale fence prevents ActionRequiredEvent or ActionHandoffEvent delivery.
 - Sensitive text split across token chunks passes through one output stream session.
 - Gateway unavailability retains admission precedence and fail-closed response.
 - PII-blocked input consumes zero quota and performs zero Redis calls.
@@ -77,10 +78,10 @@ As a chat maintainer, I can trace session setup, lease/fencing, graph execution,
 ### Functional Requirements
 
 - **FR-001**: A graph event interpreter MUST translate the existing graph event stream to the existing ChatTurnEvent union without domain-specific I/O or tool-name checks.
-- **FR-002**: Every validated tool completion MUST invoke a ToolResultResolver. The interpreter MUST preserve the current ToolResultEvent and any specialized follow-up event in their established order; the resolver chooses the specialized projection or none.
-- **FR-003**: The resolver MUST own existing search snapshot, booking readiness, and checkout handoff projections and retain their authorization and data-safety behavior.
+- **FR-002**: Every guardrail-validated tool completion MUST invoke a ToolResultResolver before ToolResultEvent emission. Accepted completions MUST preserve the current ToolResultEvent and any specialized follow-up event in their established order; invalid booking readiness MUST emit no ToolResultEvent and retain its existing error/cleanup behavior.
+- **FR-003**: The resolver MUST own existing search snapshot and booking readiness tool projections plus checkout handoff projection from the existing handoff node-completion outputs, including safe summary overrides, force-persistence decisions, and fail-closed errors. ActionRequiredEvent and ActionHandoffEvent MUST pass the existing active-fence check before external emission.
 - **FR-004**: The interpreter MUST emit raw token events; the caller MUST route all emitted model content through the existing per-turn output guardrail before delivery or persistence.
-- **FR-005**: ConversationMemory MUST coordinate existing history fetch, window slicing, history guardrail re-scan, and background summarization without replacing their mechanisms.
+- **FR-005**: ConversationMemory MUST coordinate existing history fetch, window slicing, history guardrail re-scan, and background summarization without replacing their mechanisms. Re-scanning MUST receive the per-turn AdmissionContext with its existing user, session, trace, correlation, and policy values.
 - **FR-006**: Shared admission services MUST preserve auth, length/health, input validation, and quota order. Input validation MUST occur once and its result MUST reach the runner.
 - **FR-007**: FastAPI dependency wrappers MUST be thin; admission rules MUST be callable without FastAPI.
 - **FR-008**: SSE formatting MUST move from the event model to the SSE adapter with byte-for-byte compatible output.
@@ -106,6 +107,7 @@ As a chat maintainer, I can trace session setup, lease/fencing, graph execution,
 - **SC-003**: Interpreter tests run with synthetic graph events and fake collaborators, with zero live model, Redis, or backend calls.
 - **SC-004**: Every covered normal, blocked, cancelled, and exceptional turn closes its output session and releases its lease exactly as before.
 - **SC-005**: Static inspection finds zero tool-name checks or output guardrail construction in the interpreter and zero SSE formatting in the event-model module.
+- **SC-006**: Invalid readiness emits zero ToolResultEvents, and stale-fence turns emit zero action-required or handoff events in the focused suites.
 
 ## Assumptions
 
