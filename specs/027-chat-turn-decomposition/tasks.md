@@ -6,9 +6,9 @@
 
 ## Phase 1: Setup and event transport boundary
 
-- [ ] T001 Characterize exact `format_sse` bytes and current domain event payloads in `apps/agent/tests/test_chat_turn_events.py` and `apps/agent/tests/characterization/test_sse_characterization.py`.
-- [ ] T002 Move `format_sse` from `apps/agent/src/agent/chat_turn/events.py` to `apps/agent/src/agent/streaming/sse.py`, updating imports/exports in those files and `apps/agent/tests/test_chat_turn_events.py`.
-- [ ] T003 Run `apps/agent/tests/test_chat_turn_events.py` and `apps/agent/tests/characterization/test_sse_characterization.py`; record exact byte parity in `specs/027-chat-turn-decomposition/verification.md`.
+- [x] T001 Characterize exact `format_sse` bytes and current domain event payloads in `apps/agent/tests/test_chat_turn_events.py` and `apps/agent/tests/characterization/test_sse_characterization.py`.
+- [x] T002 Move `format_sse` from `apps/agent/src/agent/chat_turn/events.py` to `apps/agent/src/agent/streaming/sse.py`, updating imports/exports in those files and `apps/agent/tests/test_chat_turn_events.py`.
+- [x] T003 Run `apps/agent/tests/test_chat_turn_events.py` and `apps/agent/tests/characterization/test_sse_characterization.py`; record exact byte parity in `specs/027-chat-turn-decomposition/verification.md`.
 
 ## Phase 2: Foundational graph behavior baseline
 
