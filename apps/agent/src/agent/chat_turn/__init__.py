@@ -18,6 +18,11 @@ from .events import (
     ToolResultEvent,
     ToolResultPayload,
 )
+from .resolver import (
+    HandoffResolution,
+    ToolResolution,
+    ToolResultResolver,
+)
 from .runner import ChatTurnRunner
 
 __all__ = [
@@ -34,12 +39,15 @@ __all__ = [
     "ErrorPayload",
     "FlightResultsEvent",
     "FlightResultsPayload",
+    "HandoffResolution",
     "TokenEvent",
     "TokenPayload",
     "ToolCallEvent",
     "ToolCallPayload",
+    "ToolResolution",
     "ToolResultEvent",
     "ToolResultPayload",
+    "ToolResultResolver",
     "format_sse",
 ]
 
