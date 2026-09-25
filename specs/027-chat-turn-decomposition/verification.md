@@ -646,5 +646,87 @@ All checks passed!
 | **Strict Typing** | `conversation.py`, `__init__.py`, `test_conversation_memory.py` | Verified | Strictly 0 instances of `Any` |
 | **Slice Isolation** | `runner.py` | Verified | `runner.py` untouched; wiring deferred to Slice 2 (T014–T015) |
 
+---
+
+# Verification Evidence: Chat Turn Decomposition (Phase 4 — User Story 2, Slice 2)
+
+## Overview & Metadata
+
+- **Feature**: 027 Chat Turn Decomposition
+- **Phase**: Phase 4: User Story 2 — Coordinate conversation memory
+- **Slice**: Slice 2: ChatTurnRunner Memory Wiring & Parity Verification
+- **Tasks**: T014, T015
+- **Execution Timestamp**: `2026-09-25T21:05:00+07:00`
+- **Deliverables**:
+  - `apps/agent/src/agent/chat_turn/runner.py` (wired to `ConversationMemory.get_context` and `ConversationMemory.schedule_compaction`)
+  - `apps/agent/tests/test_chat_turn_runner.py` (unit tests verifying memory delegation, session not found cleanup, persistence error cleanup, context blocked cleanup)
+
+---
+
+## 1. Test Suite Verification (Pytest — Focused Memory & Runner Suites)
+
+### Command Executed
+```powershell
+$env:PYTHONPATH = "$PWD/tests/ci/python;$PWD/apps/agent/src"
+uv run --package agent pytest apps/agent/tests/test_conversation_memory.py apps/agent/tests/test_memory.py apps/agent/tests/test_chat_turn_runner.py -v
+```
+
+### Execution Result
+- **Exit Code**: `0`
+- **Total Tests**: 57 passed, 1 skipped in 10.47s
+- **Suite Breakdown**:
+  - `apps/agent/tests/test_conversation_memory.py`: 20 passed (100%)
+  - `apps/agent/tests/test_memory.py`: 5 passed (100%)
+  - `apps/agent/tests/test_chat_turn_runner.py`: 32 passed, 1 skipped (100% of runnable)
+
+---
+
+## 2. Full Non-Redis Agent Test Suite Regression Verification
+
+### Command Executed
+```powershell
+$env:PYTHONPATH = "$PWD/tests/ci/python;$PWD/apps/agent/src"
+uv run --package agent pytest apps/agent/tests -m "not redis_integration" -k "not test_security_performance" -q
+```
+
+### Execution Result
+- **Exit Code**: `0`
+- **Outcome**: 1236 passed, 4 skipped, 20 deselected, 9 warnings in 110.82s
+
+---
+
+## 3. Linter & Formatter Verification (Ruff)
+
+### Commands Executed
+```powershell
+$env:UV_CACHE_DIR = "C:\Booking Systems\.t093-uv-cache"
+uv run --package agent ruff check apps/agent/src/agent/chat_turn/runner.py apps/agent/tests/test_chat_turn_runner.py
+uv run --package agent ruff format --check apps/agent/src/agent/chat_turn/runner.py apps/agent/tests/test_chat_turn_runner.py
+```
+
+### Execution Result
+- **Exit Code**: `0`
+- **Output**:
+```text
+All checks passed!
+2 files already formatted
+```
+
+---
+
+## 4. Invariant & Parity Verification Matrix
+
+| Invariant / Requirement | Target | Status | Evidence / Notes |
+|---|---|---|---|
+| **FR-009: Exact AdmissionContext Forwarding** | `runner.py` -> `ConversationMemory.get_context` | Verified | Runner passes `session_id`, `client`, and constructed `AdmissionContext` (carrying `user_id`, `chat_session_id`, `trace_id`, `correlation_id`, `policy_version`) verbatim to memory coordinator. |
+| **Direct Runner Fallback (None admission_context)** | `runner.py` / `conversation.py` | Verified | When runner invoked directly without `admission_context`, `ConversationMemory.get_context` constructs default context from `user_id`/`session_id` preserving backward compatibility. |
+| **Causal Cleanup on Session Missing** | `runner.py` -> `SessionNotFoundException` | Verified | Missing session triggers 4-step causal failure cleanup (release lock, audit log, record metrics, clear active session) and emits static `ErrorEvent(SESSION_NOT_FOUND)`. |
+| **Causal Cleanup on Persistence Error** | `runner.py` -> `MemoryPersistenceException` | Verified | Upstream persistence error triggers 4-step causal failure cleanup and emits static `ErrorEvent(UPSTREAM_PERSISTENCE_ERROR)`. |
+| **Causal Cleanup on Context Blocked** | `runner.py` -> `ContextBlockedException` | Verified | Blocked context (injection/PII in historical messages) triggers 4-step causal failure cleanup and emits static `ErrorEvent(error_code)`. |
+| **Compaction Accounting (`totalMessageCount + 2`)** | `runner.py` -> `ConversationMemory.schedule_compaction` | Verified | Runner delegates post-turn background compaction to `ConversationMemory.schedule_compaction` preserving `total_count = total_message_count + 2`. |
+| **Background Task Registry & GC Safety** | `runner.py` -> `ConversationMemory.schedule_compaction` | Verified | Compaction task registered in runner's `background_tasks` set with `add_done_callback(background_tasks.discard)`. |
+| **Strict Typing** | `runner.py`, `conversation.py` | Verified | Fully typed; zero unresolved type issues; clean mypy/pyright compatibility. |
+
+
 
 

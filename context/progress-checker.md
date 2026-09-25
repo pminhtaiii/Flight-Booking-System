@@ -1,5 +1,24 @@
 # Progress Tracker
 
+### Feature 027 — Chat Turn Decomposition: Phase 4 / User Story 2 Complete (Tasks T012–T015 Verified) (2026-09-25)
+
+- **Phase 4 (User Story 2: Coordinate Conversation Memory) Fully Completed (Tasks T012–T015)**:
+  - **T012–T013: Extracted `ConversationMemory` & Unit Tests**:
+    - Created `apps/agent/src/agent/memory/conversation.py` providing unified `ConversationMemory.get_context()` and `schedule_compaction()`.
+    - Handled historical message scanning, unsafe summary discarding, window size defaults, and error mapping (`SessionNotFoundException`, `MemoryPersistenceException`, `ContextBlockedException`).
+    - Added 20 focused tests in `apps/agent/tests/test_conversation_memory.py`.
+  - **T014: Wired `ConversationMemory` into `ChatTurnRunner`**:
+    - Replaced ~140 lines of inline memory fetch, scan, error handling, and compaction scheduling in `runner.py` with `ConversationMemory.get_context()` and `ConversationMemory.schedule_compaction()`.
+    - Preserved exact 4-step causal failure cleanup across `SessionNotFoundException`, `MemoryPersistenceException`, and `ContextBlockedException`.
+    - Preserved `AdmissionContext` verbatim forwarding with fallback when running without external admission context.
+    - Preserved post-turn `totalMessageCount + 2` compaction trigger and GC-safe `background_tasks` registration.
+  - **T015: Comprehensive US2 Verification Gate & Parity Recorded**:
+    - Ran focused memory and runner suites: 57 passed, 1 skipped in 10.47s (100% pass rate, exit code 0).
+    - Ran full non-Redis regression suite: 1236 passed, 4 skipped, 20 deselected in 110.82s (100% pass rate, exit code 0).
+    - Ruff check & format check: 0 errors (exit code 0).
+    - Recorded complete verification evidence in `specs/027-chat-turn-decomposition/verification.md`.
+    - Updated `specs/027-chat-turn-decomposition/tasks.md` checking off T014 and T015.
+
 ### Feature 027 — Chat Turn Decomposition: Phase 3 / User Story 1 Complete (Tasks T010–T011 Verified) (2026-09-25)
 
 - **Phase 3 (User Story 1: Isolate Graph Event Translation) Fully Completed (Tasks T006–T011)**:

@@ -32,7 +32,12 @@ from agent.guardrails.output_pipeline import (
     payload_free_config,
 )
 from agent.infrastructure.redis import get_redis_client
-from agent.memory.manager import MemoryManager
+from agent.memory.conversation import (
+    ContextBlockedException,
+    ConversationMemory,
+    MemoryPersistenceException,
+    SessionNotFoundException,
+)
 from agent.observability.chat_observability import ChatTelemetry, safe_opaque_id
 from agent.tools.nestjs_client import NestJSClient
 from agent.trusted_search_snapshot import (
@@ -95,6 +100,7 @@ class ChatTurnRunner:
         telemetry: Any = None,
         gateway: Optional[Any] = None,
         require_gateway: bool = False,
+        conversation_memory: Optional[ConversationMemory] = None,
     ):
         self._settings = settings
         self._graph = graph
@@ -105,6 +111,15 @@ class ChatTurnRunner:
         self._telemetry = telemetry
         self.gateway = gateway
         self.require_gateway = require_gateway
+        self._conversation_memory = conversation_memory
+
+    @property
+    def conversation_memory(self) -> ConversationMemory:
+        if self._conversation_memory is None:
+            self._conversation_memory = ConversationMemory(
+                settings=self.settings, gateway=self.gateway
+            )
+        return self._conversation_memory
 
     @property
     def settings(self) -> Any:
@@ -381,24 +396,24 @@ class ChatTurnRunner:
                     return
 
             # 3. Memory context fetch
+            mem_context = AdmissionContext(
+                user_id=command.user_id,
+                chat_session_id=session_id or "unassigned",
+                trace_id=command.trace_id or "trace-default",
+                correlation_id=command.correlation_id,
+                policy_version="2026-09-05",
+            )
             try:
-                memory_window = getattr(settings, "MEMORY_WINDOW_SIZE", 20)
-                memory_data = await client.get_memory(session_id, recent_count=memory_window)
-                history = (
-                    memory_data.get("recentMessages", []) if isinstance(memory_data, dict) else []
+                validated_mem = await self.conversation_memory.get_context(
+                    session_id=session_id,
+                    client=client,
+                    admission_context=mem_context,
                 )
-                summary = (
-                    memory_data.get("summary", None) if isinstance(memory_data, dict) else None
-                )
-            except Exception as e:
-                logger.error("nestjs_memory_fetch_failed")
-                err_msg = str(e)
-                if "NOT_FOUND" in err_msg or "404" in err_msg:
-                    code = "CHAT_SESSION_NOT_FOUND"
-                    msg = "Chat session not found."
-                else:
-                    code = "PERSISTENCE_ERROR"
-                    msg = "Failed to fetch chat session memory."
+                history = validated_mem.history
+                summary = validated_mem.summary
+                original_total = validated_mem.total_message_count
+            except SessionNotFoundException:
+                logger.error("chat_session_not_found")
                 _, _, err_event = await self._finalize_cleanup(
                     session_id=session_id,
                     req_id=req_id,
@@ -409,8 +424,8 @@ class ChatTurnRunner:
                     user_msg_content=user_msg_content,
                     user_msg_persisted=user_msg_persisted,
                     persisted=persisted,
-                    error_code=code,
-                    error_message=msg,
+                    error_code="CHAT_SESSION_NOT_FOUND",
+                    error_message="Chat session not found.",
                 )
                 pipeline = None
                 req_id = None
@@ -418,83 +433,51 @@ class ChatTurnRunner:
                 if err_event:
                     yield err_event
                 return
-
-            mem_context = AdmissionContext(
-                user_id=command.user_id,
-                chat_session_id=session_id or "unassigned",
-                trace_id=command.trace_id or "trace-default",
-                correlation_id=command.correlation_id,
-                policy_version="2026-09-05",
-            )
-            if self.gateway is not None:
-                if summary:
-                    summary_content = (
-                        summary.get("content")
-                        if isinstance(summary, dict)
-                        else (getattr(summary, "content", None) or str(summary))
-                    )
-                    if isinstance(summary, str):
-                        summary_content = summary
-                    try:
-                        summary_decision = await self.gateway.validate_input(
-                            mem_context, summary_content
-                        )
-                        if summary_decision.status == "BLOCK":
-                            logger.warning(
-                                "Unsafe persisted summary discarded by guardrail gateway: %s",
-                                summary_decision.response_key,
-                            )
-                            summary = None
-                    except Exception:
-                        logger.warning(
-                            "Exception validating persisted summary; discarding summary."
-                        )
-                        summary = None
-
-                for msg in history:
-                    msg_content = (
-                        msg.get("content")
-                        if isinstance(msg, dict)
-                        else (getattr(msg, "content", None) or str(msg))
-                    )
-                    if not msg_content or not isinstance(msg_content, str):
-                        continue
-                    try:
-                        history_decision = await self.gateway.validate_input(
-                            mem_context, msg_content
-                        )
-                    except Exception:
-                        history_decision = None
-
-                    if history_decision is None or history_decision.status == "BLOCK":
-                        block_code = (
-                            history_decision.response_key
-                            if history_decision and history_decision.response_key
-                            else "GUARDRAIL_INPUT_INJECTION"
-                        )
-                        logger.warning(
-                            "Unsafe historical conversation context blocked by guardrail gateway: %s",
-                            block_code,
-                        )
-                        _, _, err_event = await self._finalize_cleanup(
-                            session_id=session_id,
-                            req_id=req_id,
-                            queue_manager=queue_manager,
-                            client=client,
-                            pipeline=None,
-                            partial_response=partial_response,
-                            user_msg_content=user_msg_content,
-                            user_msg_persisted=user_msg_persisted,
-                            persisted=persisted,
-                            error_code=block_code,
-                            error_message="Historical conversation context contains unsafe content.",
-                        )
-                        pipeline = None
-                        req_id = None
-                        released = True
-                        if err_event:
-                            yield err_event
-                        return
+            except MemoryPersistenceException:
+                logger.error("nestjs_memory_fetch_failed")
+                _, _, err_event = await self._finalize_cleanup(
+                    session_id=session_id,
+                    req_id=req_id,
+                    queue_manager=queue_manager,
+                    client=client,
+                    pipeline=None,
+                    partial_response=partial_response,
+                    user_msg_content=user_msg_content,
+                    user_msg_persisted=user_msg_persisted,
+                    persisted=persisted,
+                    error_code="PERSISTENCE_ERROR",
+                    error_message="Failed to fetch chat session memory.",
+                )
+                pipeline = None
+                req_id = None
+                released = True
+                if err_event:
+                    yield err_event
+                return
+            except ContextBlockedException as exc:
+                logger.warning(
+                    "Unsafe historical conversation context blocked by guardrail gateway: %s",
+                    exc.error_code,
+                )
+                _, _, err_event = await self._finalize_cleanup(
+                    session_id=session_id,
+                    req_id=req_id,
+                    queue_manager=queue_manager,
+                    client=client,
+                    pipeline=None,
+                    partial_response=partial_response,
+                    user_msg_content=user_msg_content,
+                    user_msg_persisted=user_msg_persisted,
+                    persisted=persisted,
+                    error_code=exc.error_code,
+                    error_message="Historical conversation context contains unsafe content.",
+                )
+                pipeline = None
+                req_id = None
+                released = True
+                if err_event:
+                    yield err_event
+                return
 
             # 4. TrustedSearchSnapshot loading via lifecycle + telemetry emit
             trusted_snapshot_dict = None
@@ -856,21 +839,12 @@ class ChatTurnRunner:
                 yield DoneEvent(data=DonePayload(messageId=agent_message_id, sessionId=session_id))
 
                 # Schedule non-blocking memory summarization
-                memory_mgr = MemoryManager(
-                    window_size=getattr(settings, "MEMORY_WINDOW_SIZE", 20),
-                    token_budget=getattr(settings, "MEMORY_TOKEN_BUDGET", 4000),
-                    gateway=self.gateway,
+                self.conversation_memory.schedule_compaction(
+                    session_id=session_id,
+                    client=client,
+                    total_count=original_total,
+                    background_tasks=background_tasks,
                 )
-                original_total = (
-                    memory_data.get("totalMessageCount", 0) if isinstance(memory_data, dict) else 0
-                )
-                summarize_task = asyncio.create_task(
-                    memory_mgr.check_and_summarize(
-                        session_id, client, total_count=original_total + 2
-                    )
-                )
-                background_tasks.add(summarize_task)
-                summarize_task.add_done_callback(background_tasks.discard)
             else:
                 logger.warning("empty_response_generated")
                 if pipeline is not None:
