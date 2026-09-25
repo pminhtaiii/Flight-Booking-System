@@ -215,3 +215,127 @@ All checks passed!
 | Final-node fallback when stream and model-end empty | `test_t005_final_node_fallback_when_stream_and_model_end_empty` | Passed (Emitted from final_answer node) |
 | Chunk deduplication across stream and node ends | `test_t005_chunk_deduplication_prevents_duplicate_emission` | Passed (No duplicate tokens emitted) |
 | Single output guardrail session routed | `test_t005_single_output_guardrail_session_routed` | Passed (Routed via single `OutputStreamSession`) |
+
+---
+
+# Verification Evidence: Chat Turn Decomposition (Phase 3 / Slice 1)
+
+## Overview & Metadata
+
+- **Feature**: 027 Chat Turn Decomposition
+- **Phase/Slice**: Phase 3 / Slice 1 (User Story 1 - ToolResultResolver Extraction)
+- **Tasks**: T006, T007
+- **Execution Timestamp**: `2026-09-25T14:24:00+07:00`
+- **Commit SHA Anchors**:
+  - T006: `2aeb236a5eee13b214007d1ca3374b848b602fc0` (`test(agent): characterization tests for ToolResultResolver (T006)`)
+  - T007: `17d28bf5d73063d4f46f08420c02fa916144be86` (`feat(agent): implement ToolResultResolver and resolution types (T007)`)
+
+---
+
+## 1. Test Suite Verification (Pytest)
+
+### 1.1 ToolResultResolver Dedicated Suite (T006 / T007)
+```powershell
+$env:PYTHONPATH = "$PWD/tests/ci/python;$PWD/apps/agent/src"
+uv run --package agent pytest apps/agent/tests/test_tool_result_resolver.py -v
+```
+
+**Execution Result**:
+- **Exit Code**: `0`
+- **Output**:
+```text
+============================= test session starts =============================
+platform win32 -- Python 3.11.15, pytest-9.1.1, pluggy-1.6.0 -- C:\Booking Systems\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Booking Systems\apps\agent
+configfile: pyproject.toml
+plugins: anyio-4.14.2, langsmith-0.11.1, asyncio-1.4.0, cov-7.1.0, mock-3.15.1
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 22 items
+
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_generic_tool_string_result PASSED [  4%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_generic_tool_dict_result PASSED [  9%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_generic_tool_other_type_result PASSED [ 13%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_search_flights_with_active_snapshot PASSED [ 18%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_search_flights_with_no_snapshot PASSED [ 22%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_search_flights_with_no_lifecycle PASSED [ 27%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_check_booking_readiness_valid_ready_true PASSED [ 31%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_check_booking_readiness_valid_ready_true_json_string PASSED [ 36%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_check_booking_readiness_valid_ready_false_complete_profile PASSED [ 40%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_check_booking_readiness_valid_ready_false_other_action PASSED [ 45%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_check_booking_readiness_upstream_error PASSED [ 50%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_check_booking_readiness_invalid_schema PASSED [ 54%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_check_booking_readiness_invalid_string PASSED [ 59%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_handoff_node_valid_token PASSED [ 63%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_handoff_node_node_aliases[create_handoff_token_node] PASSED [ 68%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_handoff_node_node_aliases[validate_handoff] PASSED [ 72%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_handoff_node_token_alias PASSED [ 77%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_handoff_node_action_error PASSED [ 81%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_handoff_node_action_error_empty_string PASSED [ 86%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_handoff_node_unrecognized_node PASSED [ 90%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_handoff_node_missing_action PASSED [ 95%]
+apps\agent\tests\test_tool_result_resolver.py::test_resolve_handoff_node_non_dict_output PASSED [100%]
+
+============================= 22 passed in 5.82s ==============================
+```
+
+### 1.2 Baseline Chat Turn Runner Suite Regression Check
+```powershell
+uv run --package agent pytest apps/agent/tests/test_chat_turn_runner.py
+```
+
+**Execution Result**:
+- **Exit Code**: `0`
+- **Output**:
+```text
+============================= test session starts =============================
+platform win32 -- Python 3.11.15, pytest-9.1.1, pluggy-1.6.0
+rootdir: C:\Booking Systems\apps\agent
+configfile: pyproject.toml
+plugins: anyio-4.14.2, langsmith-0.11.1, asyncio-1.4.0, cov-7.1.0, mock-3.15.1
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 28 items
+
+apps\agent\tests\test_chat_turn_runner.py ..............s.............   [100%]
+
+======================== 27 passed, 1 skipped in 6.90s ========================
+```
+
+---
+
+## 2. Linter & Formatter Verification (Ruff)
+
+### Commands Executed
+```powershell
+$env:UV_CACHE_DIR = "C:\Booking Systems\.t093-uv-cache"
+uv run --package agent ruff check apps/agent/src/agent/chat_turn/resolver.py apps/agent/tests/test_tool_result_resolver.py
+uv run --package agent ruff format --check apps/agent/src/agent/chat_turn/resolver.py apps/agent/tests/test_tool_result_resolver.py
+```
+
+**Execution Result**:
+- **Exit Code**: `0`
+- **Output**:
+```text
+All checks passed!
+2 files already formatted
+```
+
+---
+
+## 3. Boundary & Non-Regression Invariants
+
+| Invariant / Constraint | Target | Status | Notes |
+|---|---|---|---|
+| Zero runner modifications | `apps/agent/src/agent/chat_turn/runner.py` | Verified | 0 modifications; intact for subsequent wiring (T010) |
+| Zero interpreter modifications | `apps/agent/src/agent/chat_turn/interpreter.py` | Verified | Unmodified / preserved for T008-T009 |
+| Generic tool fallback | `resolve_tool_message` | Verified | Emits `ToolResultEvent` with stringified content; no follow-up |
+| Flight search snapshot | `search_flights` | Verified | Emits `ToolResultEvent` followed by `FlightResultsEvent` via snapshot payload |
+| Flight search empty snapshot fallback | `search_flights` | Verified | Fallback to raw flights list if snapshot empty or missing |
+| Valid readiness summary | `check_booking_readiness` | Verified | Emits `ToolResultEvent` then `ActionRequiredEvent` with sanitized summary |
+| Invalid readiness fail-closed | `check_booking_readiness` | Verified | Sets `block_decision` (`READINESS_RESPONSE_INVALID`), emits NO `ToolResultEvent` |
+| Upstream readiness error fail-closed | `check_booking_readiness` | Verified | Sets `block_decision` (`UPSTREAM_READINESS_ERROR`), emits NO `ToolResultEvent` |
+| Handoff token generation | `create_handoff_token` | Verified | Emits `ActionHandoffEvent` (`force_persist=True`) |
+| Handoff validation | `validate_handoff` | Verified | Emits `ActionHandoffEvent` (`force_persist=True`) |
+| Handoff failure fail-closed | handoff nodes | Verified | Emits `ErrorEvent` with code `HANDOFF_FAILED` (`force_persist=True`) |
+| Unrecognized handoff node | other nodes | Verified | No-op resolution (`events=[]`, `block_decision=None`, `force_persist=False`) |
+

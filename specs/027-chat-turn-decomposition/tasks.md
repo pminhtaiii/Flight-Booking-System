@@ -20,8 +20,8 @@
 **Goal**: Tool-name-agnostic translation with domain projections owned by resolver.
 **Independent test**: Fake graph stream/resolver yields current event sequence without live model, Redis, or NestJS.
 
-- [ ] T006 [P] [US1] Write resolver tests for validated search snapshots, readiness summary/block decisions, and all three handoff node-completion outputs including HANDOFF_FAILED and force-persistence in `apps/agent/tests/test_tool_result_resolver.py`.
-- [ ] T007 [US1] Implement the tool-resolution and typed handoff-node-completion operations in `apps/agent/src/agent/chat_turn/resolver.py`, consuming validated `tools` chain-end messages or the three existing handoff chain-end outputs and preserving safe block decisions.
+- [x] T006 [P] [US1] Write resolver tests for validated search snapshots, readiness summary/block decisions, and all three handoff node-completion outputs including HANDOFF_FAILED and force-persistence in `apps/agent/tests/test_tool_result_resolver.py`.
+- [x] T007 [US1] Implement the tool-resolution and typed handoff-node-completion operations in `apps/agent/src/agent/chat_turn/resolver.py`, consuming validated `tools` chain-end messages or the three existing handoff chain-end outputs and preserving safe block decisions.
 - [ ] T008 [US1] Write interpreter tests for model-token fallbacks/dedup, accepted tool-call/result/follow-up order, invalid-readiness no-ToolResultEvent, resolver invocation count, handoff-node routing/failure, and timing-only `on_tool_end` in `apps/agent/tests/test_chat_turn_interpreter.py`.
 - [ ] T009 [US1] Implement GraphEventInterpreter in `apps/agent/src/agent/chat_turn/interpreter.py` with no tool-name branching, Redis/NestJS call, or guardrail construction.
 - [ ] T010 [US1] Wire the interpreter into `apps/agent/src/agent/chat_turn/runner.py`, catching typed projection-block decisions for existing cleanup, passing every raw TokenEvent through the existing single OutputStreamSession, and retaining approved partial-response accounting.
