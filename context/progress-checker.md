@@ -1,5 +1,27 @@
 # Progress Tracker
 
+### Feature 028 — Backend Client Unification: Phase 5 / User Story 3 Complete (Tasks T014–T017 Verified) (2026-09-26)
+
+- **T014 Booking Transport Result Mapping & Mutation Safety Tests**: Extended `apps/web/lib/server/booking-management.spec.ts` with dedicated Phase 5 test suite:
+  - Six JSON-consuming operation raw schemas: verifies `listBookings`, `getBookingDetail`, `getCancellationStatus`, `getCancellationQuote`, `cancelBooking`, and `getItineraryRevisions` tolerate optional fields, normalize omitted inputs, and strip provider identifiers (`duffelOrderId`, `duffelSegmentId`, `duffelCancellationQuoteId`, `stripePaymentIntentId`, `passportNumber`, etc.).
+  - 400 and 422 error body forwarding and fallback: forwards `data.message` as `INVALID_COMMAND` across all 8 operations, falling back to `'Invalid request. Please check your details and try again.'` when unparseable or absent.
+  - Malformed successful JSON: maps unparseable 200 text and schema validation mismatches to `UPSTREAM_UNAVAILABLE` (`retryable: true`) across operations without throwing.
+  - Empty-body disruption acknowledge & accept success: 200 and 204 empty responses return `{ ok: true, data: { ok: true } }`.
+  - Mutation single-send guarantee: `getCancellationQuote`, `cancelBooking`, `acknowledgeDisruption`, and `acceptDisruption` POST requests are sent at most once (zero retries) on 502/503/504, 429 (with `Retry-After`), network error, and timeout abort error.
+  - GET retry policy: bounded retry up to 3 attempts on 502/503/504 and transient recovery on attempt 2 for `listBookings`, `getBookingDetail`, `getCancellationStatus`, and `getItineraryRevisions`; non-transient statuses (400, 401, 403, 404, 409, 422) dispatch once.
+- **T015 & T016 Backend Client Migration**:
+  - Migrated all eight operations in `apps/web/lib/server/booking-management.ts` to `backendClient.request`.
+  - Six JSON operations use operation-specific raw response schemas (`RawBookingListResponseSchema`, `RawBookingDetailResponseSchema`, `RawCancellationStatusResponseSchema`, `RawCancellationQuoteResponseSchema`, `RawCancellationResultResponseSchema`, `RawItineraryRevisionsResponseSchema`) with `.passthrough()`.
+  - Disruption mutations (`acknowledgeDisruption`, `acceptDisruption`) use `z.void()`, `responseMode: 'none'`, and pass `body: JSON.stringify({ revisionId: revisionId.trim() })`.
+  - Removed all orphaned transport helpers and constants: `fetchWithRetry`, `apiUrl()`, `getAccessToken()`, `delay()`, `handleUpstreamStatus()`, `MAX_READ_ATTEMPTS`, `RETRY_BASE_DELAY_MS`, `REQUEST_TIMEOUT_MS`, `FetchResult`, `NextAuth`, and `authOptions`.
+  - Preserved raw custom header casing in `backend-client.ts` to support exact header contracts.
+- **T017 Verification Gates & Parity**: Executed full verification suite with zero errors and exit code 0 across all checks:
+  - `backend-client.spec.ts` and `booking-management.spec.ts`: 68 passed, 0 failed.
+  - `dashboard.spec.ts`, `flight-search.spec.ts`, and booking API route tests: 93 passed, 0 failed.
+  - `@web/frontend` lint: 0 warnings, 0 errors.
+  - `@web/frontend` typecheck: clean (`tsc --noEmit`).
+  - Recorded verification evidence and marked T014–T017 complete in `specs/028-backend-client-unification/tasks.md` and `verification.md`.
+
 ### Feature 028 — Backend Client Unification: Phase 4 / User Story 2 Complete (Tasks T011–T013 Verified) (2026-09-26)
 
 - **T011 Flight Characterization & Transport Invariant Tests**: Extended `apps/web/lib/server/flight-search.spec.ts` with dedicated Phase 4 test suite locking:

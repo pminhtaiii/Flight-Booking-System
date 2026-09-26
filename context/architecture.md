@@ -58,7 +58,7 @@
   - Static censuses found no `format_sse` in `chat_turn/events.py`, no tool-name branching or guardrail/gateway construction in `chat_turn/interpreter.py`, and no `Any` in the extracted coordinator, runner, admission, interpreter, resolver, or conversation modules.
   - Full-package Ruff lint and format checks passed. The eight focused decomposition suites passed (184 passed, 1 skipped); the Phase 7 non-Redis regression gate excluding `test_security_performance` passed (1,272 passed, 11 skipped, 20 deselected). Exact commands, exit codes, and timings are in `specs/027-chat-turn-decomposition/verification.md`.
 
-## Feature 028 — Backend Client Unification (Phase 4 User Story 2 complete, 2026-09-26)
+## Feature 028 — Backend Client Unification (Phase 5 User Story 3 complete, 2026-09-26)
 
 - [Feature 028 specification](../specs/028-backend-client-unification/spec.md), [plan](../specs/028-backend-client-unification/plan.md), and [tasks](../specs/028-backend-client-unification/tasks.md) unify the three core web server transport consumers and six booking route response adapters. Dashboard `INVALID_RESPONSE`, booking error-body forwarding, and mutation single-send behavior remain contract requirements.
 - **Phase 1: Baseline Characterization (T001–T004 Complete)**: Locks current behavior in dashboard, flight-search, booking-management, and cancellation route specs. Covers 400/422 message forwarding and fallback, transient mutation single-send, response status/body/header mapping, and provider-ID stripping across 103 baseline tests.
@@ -92,6 +92,18 @@
   - Purged obsolete duplicated helpers (`apiUrl`, `getAccessToken`, `fetchWithRetry`, `delay`, timeout constants, NextAuth imports) from `flight-search.ts`.
   - Locked behavior with 55 unit tests in `apps/web/lib/server/flight-search.spec.ts` (73 passing across client + flight search).
   - See [execution evidence](../specs/028-backend-client-unification/verification.md).
+- **Phase 5: User Story 3 — Preserve Booking Outcomes (T014–T017 Complete)**:
+  - Migrated all eight operations in `apps/web/lib/server/booking-management.ts` to `backendClient.request`.
+  - Six JSON-consuming operations (`listBookings`, `getBookingDetail`, `getCancellationStatus`, `getCancellationQuote`, `cancelBooking`, `getItineraryRevisions`) use operation-specific raw response schemas with `.passthrough()`, followed by view mapping and domain view validation.
+  - Disruption mutations (`acknowledgeDisruption`, `acceptDisruption`) use `responseMode: 'none'` with `z.void()`, dispatching `body: JSON.stringify({ revisionId })` and returning `{ ok: true, data: { ok: true } }` on bodyless 200/204.
+  - Preserved 100% exact outcome contract parity: status mapping (401 -> `UNAUTHENTICATED`, 403 -> `FORBIDDEN`, 404 -> `NOT_FOUND`, 409 -> `STALE_REVISION`, 400/422 -> `INVALID_COMMAND` with string message forwarding or default fallback), stripping provider Duffel IDs from view models.
+  - Enforced zero automatic mutation replay (single-send) for `getCancellationQuote`, `cancelBooking`, `acknowledgeDisruption`, and `acceptDisruption` on any error/timeout.
+  - Enforced bounded GET recovery (up to 3 attempts on 502/503/504) for `listBookings`, `getBookingDetail`, `getCancellationStatus`, and `getItineraryRevisions`.
+  - Purged all orphaned transport helpers (`fetchWithRetry`, `apiUrl()`, `getAccessToken()`, `delay()`, `handleUpstreamStatus()`, retry/timeout constants, `NextAuth`, `authOptions`) from `booking-management.ts`.
+  - Preserved exact original catch-block copies (`unavailableOutcomeFailure()`) and view safeParse failure messages.
+  - Locked behavior with 50 passing unit tests in `apps/web/lib/server/booking-management.spec.ts` (68 passing across client + booking management).
+  - See [execution evidence](../specs/028-backend-client-unification/verification.md).
+
 
 ## Feature 026 — Agent Boundary Simplification (Complete - Tasks T001–T037)
 

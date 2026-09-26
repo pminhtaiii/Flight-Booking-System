@@ -815,10 +815,15 @@ describe('booking-management server domain module', () => {
   describe('acknowledgeDisruption', () => {
     it('sends acknowledge disruption mutation and returns ok: true', async () => {
       let requestedUrl = '';
+      let requestedInit: RequestInit | undefined;
       let attempts = 0;
-      globalThis.fetch = async (input: RequestInfo | URL): Promise<Response> => {
+      globalThis.fetch = async (
+        input: RequestInfo | URL,
+        init?: RequestInit,
+      ): Promise<Response> => {
         attempts += 1;
         requestedUrl = String(input);
+        requestedInit = init;
         return new Response(
           JSON.stringify({
             bookingId: 'booking-uuid-001',
@@ -839,6 +844,10 @@ describe('booking-management server domain module', () => {
       assert.match(
         requestedUrl,
         /\/api\/bookings\/booking-uuid-001\/disruptions\/rev-uuid-001\/acknowledge$/,
+      );
+      assert.strictEqual(
+        requestedInit?.body,
+        JSON.stringify({ revisionId: 'rev-uuid-001' }),
       );
     });
 
@@ -887,10 +896,15 @@ describe('booking-management server domain module', () => {
   describe('acceptDisruption', () => {
     it('sends accept disruption mutation and returns ok: true', async () => {
       let requestedUrl = '';
+      let requestedInit: RequestInit | undefined;
       let attempts = 0;
-      globalThis.fetch = async (input: RequestInfo | URL): Promise<Response> => {
+      globalThis.fetch = async (
+        input: RequestInfo | URL,
+        init?: RequestInit,
+      ): Promise<Response> => {
         attempts += 1;
         requestedUrl = String(input);
+        requestedInit = init;
         return new Response(
           JSON.stringify({
             bookingId: 'booking-uuid-001',
@@ -911,6 +925,10 @@ describe('booking-management server domain module', () => {
       assert.match(
         requestedUrl,
         /\/api\/bookings\/booking-uuid-001\/disruptions\/rev-uuid-001\/accept$/,
+      );
+      assert.strictEqual(
+        requestedInit?.body,
+        JSON.stringify({ revisionId: 'rev-uuid-001' }),
       );
     });
 
@@ -1022,4 +1040,724 @@ describe('booking-management server domain module', () => {
       assert.strictEqual(attempts, 3);
     });
   });
+
+  describe('Phase 5: backendClient transport mapping and single-send invariants', () => {
+    describe('1. Six JSON operation raw response schemas & optional field tolerance', () => {
+      it('tolerates omitted bookings, omitted pagination, and sparse booking items while stripping provider IDs in listBookings', async () => {
+        globalThis.fetch = async (): Promise<Response> => {
+          return new Response(
+            JSON.stringify({
+              bookings: [
+                {
+                  id: 'booking-sparse-001',
+                  status: 'CONFIRMED',
+                  totalAmount: '150.00',
+                  currency: 'USD',
+                  duffelOrderId: 'ord_secret_list',
+                  flightSnapshot: {
+                    segments: [mockUpstreamSegment],
+                  },
+                },
+              ],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          );
+        };
+
+        const outcome = await listBookings('upcoming', 1, 10);
+        assert.strictEqual(outcome.ok, true);
+        if (outcome.ok) {
+          assert.strictEqual(outcome.data.bookings.length, 1);
+          assert.strictEqual(outcome.data.bookings[0].id, 'booking-sparse-001');
+          assert.strictEqual(outcome.data.bookings[0].totalAmount, '150.00');
+          assert.strictEqual(outcome.data.bookings[0].airline?.iataCode, 'HZ');
+          assert.strictEqual(outcome.data.pagination.page, 1);
+          assert.strictEqual(outcome.data.pagination.limit, 10);
+          assert.strictEqual(outcome.data.pagination.total, 1);
+          assert.strictEqual(outcome.data.pagination.totalPages, 1);
+        }
+        const serialized = JSON.stringify(outcome);
+        assert.strictEqual(serialized.includes('ord_secret_list'), false);
+        assert.strictEqual(serialized.includes('duffelOrderId'), false);
+        assert.strictEqual(serialized.includes('duffelSegmentId'), false);
+
+        globalThis.fetch = async (): Promise<Response> => {
+          return new Response(JSON.stringify({}), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        };
+        const emptyOutcome = await listBookings('upcoming', 1, 10);
+        assert.strictEqual(emptyOutcome.ok, true);
+        if (emptyOutcome.ok) {
+          assert.deepEqual(emptyOutcome.data.bookings, []);
+          assert.strictEqual(emptyOutcome.data.pagination.total, 0);
+        }
+      });
+
+      it('tolerates omitted optional fields and maps sparse upstream detail while stripping provider and payment IDs in getBookingDetail', async () => {
+        globalThis.fetch = async (): Promise<Response> => {
+          return new Response(
+            JSON.stringify({
+              id: 'booking-uuid-002',
+              status: 'CONFIRMED',
+              totalAmount: '250.00',
+              currency: 'USD',
+              createdAt: timestamp,
+              updatedAt: timestamp,
+              flightSnapshot: {
+                segments: [mockUpstreamSegment],
+              },
+              passengerSnapshot: [
+                {
+                  type: 'ADULT',
+                  givenName: 'Grace',
+                  familyName: 'Hopper',
+                  duffelPassengerId: 'pax_secret_id',
+                  passportNumber: 'ENC:masked_5678',
+                },
+              ],
+              duffelOrderId: 'ord_secret_999',
+              payment: {
+                id: 'pay-002',
+                status: 'SUCCEEDED',
+                stripePaymentIntentId: 'pi_secret_999',
+              },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          );
+        };
+
+        const outcome = await getBookingDetail('booking-uuid-002');
+        assert.strictEqual(outcome.ok, true);
+        if (outcome.ok) {
+          assert.strictEqual(outcome.data.id, 'booking-uuid-002');
+          assert.strictEqual(outcome.data.passengers.length, 1);
+          assert.strictEqual(outcome.data.passengers[0].firstName, 'Grace');
+          assert.strictEqual(outcome.data.passengers[0].lastName, 'Hopper');
+          assert.strictEqual(outcome.data.itinerary.segments.length, 1);
+          assert.strictEqual(outcome.data.cancellation, undefined);
+          assert.strictEqual(outcome.data.ancillarySummary, undefined);
+          assert.strictEqual(outcome.data.disruption, undefined);
+        }
+        const serialized = JSON.stringify(outcome);
+        assert.strictEqual(serialized.includes('ord_secret_999'), false);
+        assert.strictEqual(serialized.includes('duffelOrderId'), false);
+        assert.strictEqual(serialized.includes('pi_secret_999'), false);
+        assert.strictEqual(serialized.includes('stripePaymentIntentId'), false);
+        assert.strictEqual(serialized.includes('pax_secret_id'), false);
+        assert.strictEqual(serialized.includes('passportNumber'), false);
+      });
+
+      it('tolerates nullable optional fields and maps sparse cancellation status while stripping internal retry and quote IDs in getCancellationStatus', async () => {
+        globalThis.fetch = async (): Promise<Response> => {
+          return new Response(
+            JSON.stringify({
+              bookingId: 'booking-uuid-003',
+              bookingStatus: 'CONFIRMED',
+              cancellationDeadline: null,
+              airlineRefundAmount: null,
+              customerRefundAmount: null,
+              refundStatus: null,
+              nextRetryAt: null,
+              escalationMessage: null,
+              duffelCancellationQuoteId: 'cquo_secret_provider_abc',
+              retryCount: 0,
+              lastErrorCode: null,
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          );
+        };
+
+        const outcome = await getCancellationStatus('booking-uuid-003');
+        assert.strictEqual(outcome.ok, true);
+        if (outcome.ok) {
+          assert.strictEqual(outcome.data.bookingId, 'booking-uuid-003');
+          assert.strictEqual(outcome.data.bookingStatus, 'CONFIRMED');
+          assert.strictEqual(outcome.data.cancellationDeadline, null);
+          assert.strictEqual(outcome.data.airlineRefundAmount, null);
+          assert.strictEqual(outcome.data.customerRefundAmount, null);
+          assert.strictEqual(outcome.data.refundStatus, null);
+          assert.strictEqual(outcome.data.nextRetryAt, null);
+          assert.strictEqual(outcome.data.escalationMessage, null);
+        }
+        const serialized = JSON.stringify(outcome);
+        assert.strictEqual(serialized.includes('cquo_secret_provider_abc'), false);
+        assert.strictEqual(serialized.includes('duffelCancellationQuoteId'), false);
+        assert.strictEqual(serialized.includes('retryCount'), false);
+      });
+
+      it('tolerates omitted optional cancellation fields and maps quote while stripping provider order ID in getCancellationQuote', async () => {
+        globalThis.fetch = async (): Promise<Response> => {
+          return new Response(
+            JSON.stringify({
+              bookingId: 'booking-uuid-004',
+              quoteId: 'quote-local-456',
+              refundAmount: '350.00',
+              currency: 'USD',
+              expiresAt: timestamp,
+              refundable: false,
+              duffelOrderId: 'ord_secret_quote_456',
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          );
+        };
+
+        const outcome = await getCancellationQuote('booking-uuid-004');
+        assert.strictEqual(outcome.ok, true);
+        if (outcome.ok) {
+          assert.strictEqual(outcome.data.bookingId, 'booking-uuid-004');
+          assert.strictEqual(outcome.data.quoteId, 'quote-local-456');
+          assert.strictEqual(outcome.data.refundAmount, '350.00');
+          assert.strictEqual(outcome.data.refundable, false);
+          assert.strictEqual(outcome.data.cancellationDeadline, undefined);
+          assert.strictEqual(outcome.data.refundTo, undefined);
+        }
+        const serialized = JSON.stringify(outcome);
+        assert.strictEqual(serialized.includes('ord_secret_quote_456'), false);
+        assert.strictEqual(serialized.includes('duffelOrderId'), false);
+      });
+
+      it('tolerates omitted optional nextRetryAt and maps cancellation result while stripping provider quote ID in cancelBooking', async () => {
+        globalThis.fetch = async (): Promise<Response> => {
+          return new Response(
+            JSON.stringify({
+              bookingId: 'booking-uuid-005',
+              bookingStatus: 'CANCELLED',
+              cancellationStatus: 'CONFIRMED',
+              refundStatus: 'SUCCEEDED',
+              refundAmount: '350.00',
+              duffelCancellationQuoteId: 'cquo_secret_cancel_567',
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          );
+        };
+
+        const outcome = await cancelBooking('booking-uuid-005', 'quote-local-456');
+        assert.strictEqual(outcome.ok, true);
+        if (outcome.ok) {
+          assert.strictEqual(outcome.data.bookingId, 'booking-uuid-005');
+          assert.strictEqual(outcome.data.bookingStatus, 'CANCELLED');
+          assert.strictEqual(outcome.data.cancellationStatus, 'CONFIRMED');
+          assert.strictEqual(outcome.data.refundStatus, 'SUCCEEDED');
+          assert.strictEqual(outcome.data.refundAmount, '350.00');
+          assert.strictEqual(outcome.data.nextRetryAt, undefined);
+        }
+        const serialized = JSON.stringify(outcome);
+        assert.strictEqual(serialized.includes('cquo_secret_cancel_567'), false);
+        assert.strictEqual(serialized.includes('duffelCancellationQuoteId'), false);
+      });
+
+      it('tolerates alternative revisions key, omitted pagination fields, and maps revisions while stripping baselines and diffs in getItineraryRevisions', async () => {
+        globalThis.fetch = async (): Promise<Response> => {
+          return new Response(
+            JSON.stringify({
+              revisions: [
+                {
+                  revisionId: 'rev-sparse-001',
+                  version: 1,
+                  observedAt: timestamp,
+                  isMaterial: false,
+                  materialReasons: [],
+                  segments: [mockUpstreamSegment],
+                  materialBaselines: [{ baselineKey: 'secret_val' }],
+                  incrementalSummary: { diffData: 'secret_diff' },
+                  cumulativeSummary: { diffData: 'secret_diff' },
+                },
+              ],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          );
+        };
+
+        const outcome = await getItineraryRevisions('booking-uuid-006', 1, 5);
+        assert.strictEqual(outcome.ok, true);
+        if (outcome.ok) {
+          assert.strictEqual(outcome.data.revisions.length, 1);
+          assert.strictEqual(outcome.data.revisions[0].revisionId, 'rev-sparse-001');
+          assert.strictEqual(outcome.data.total, 1);
+          assert.strictEqual(outcome.data.totalPages, 1);
+        }
+        const serialized = JSON.stringify(outcome);
+        assert.strictEqual(serialized.includes('materialBaselines'), false);
+        assert.strictEqual(serialized.includes('incrementalSummary'), false);
+        assert.strictEqual(serialized.includes('cumulativeSummary'), false);
+        assert.strictEqual(serialized.includes('duffelSegmentId'), false);
+      });
+    });
+
+    describe('2. 400 and 422 error body forwarding and fallback', () => {
+      it('forwards custom data.message for 400 and 422 across all operations when message is a string', async () => {
+        const operations: Array<{
+          name: string;
+          run: () => Promise<{ ok: boolean; reason?: string; message?: string }>;
+        }> = [
+          { name: 'listBookings', run: () => listBookings('upcoming', 1, 10) },
+          { name: 'getBookingDetail', run: () => getBookingDetail('booking-uuid-001') },
+          { name: 'getCancellationStatus', run: () => getCancellationStatus('booking-uuid-001') },
+          { name: 'getCancellationQuote', run: () => getCancellationQuote('booking-uuid-001') },
+          { name: 'cancelBooking', run: () => cancelBooking('booking-uuid-001', 'quote-001') },
+          {
+            name: 'acknowledgeDisruption',
+            run: () => acknowledgeDisruption('booking-uuid-001', 'rev-001'),
+          },
+          { name: 'acceptDisruption', run: () => acceptDisruption('booking-uuid-001', 'rev-001') },
+          {
+            name: 'getItineraryRevisions',
+            run: () => getItineraryRevisions('booking-uuid-001', 1, 5),
+          },
+        ];
+
+        for (const op of operations) {
+          for (const status of [400, 422]) {
+            const customMessage = `Custom upstream error for ${op.name} with status ${status}`;
+            globalThis.fetch = async (): Promise<Response> => {
+              return new Response(JSON.stringify({ message: customMessage }), {
+                status,
+                headers: { 'Content-Type': 'application/json' },
+              });
+            };
+
+            const outcome = await op.run();
+            assert.strictEqual(outcome.ok, false, `${op.name} on ${status} should return ok: false`);
+            if (!outcome.ok) {
+              assert.strictEqual(
+                outcome.reason,
+                'INVALID_COMMAND',
+                `${op.name} reason should be INVALID_COMMAND on ${status}`,
+              );
+              assert.strictEqual(
+                outcome.message,
+                customMessage,
+                `${op.name} should forward custom message on ${status}`,
+              );
+            }
+          }
+        }
+      });
+
+      it('falls back to default error message on 400 and 422 when body is malformed JSON, empty, or non-string message', async () => {
+        const operations: Array<{
+          name: string;
+          run: () => Promise<{ ok: boolean; reason?: string; message?: string }>;
+        }> = [
+          { name: 'listBookings', run: () => listBookings('upcoming', 1, 10) },
+          { name: 'getBookingDetail', run: () => getBookingDetail('booking-uuid-001') },
+          { name: 'getCancellationStatus', run: () => getCancellationStatus('booking-uuid-001') },
+          { name: 'getCancellationQuote', run: () => getCancellationQuote('booking-uuid-001') },
+          { name: 'cancelBooking', run: () => cancelBooking('booking-uuid-001', 'quote-001') },
+          {
+            name: 'acknowledgeDisruption',
+            run: () => acknowledgeDisruption('booking-uuid-001', 'rev-001'),
+          },
+          { name: 'acceptDisruption', run: () => acceptDisruption('booking-uuid-001', 'rev-001') },
+          {
+            name: 'getItineraryRevisions',
+            run: () => getItineraryRevisions('booking-uuid-001', 1, 5),
+          },
+        ];
+
+        const defaultMessage = 'Invalid request. Please check your details and try again.';
+        const badBodies = [
+          'not valid json',
+          '{}',
+          JSON.stringify({ message: 12345 }),
+          JSON.stringify({ message: null }),
+          JSON.stringify({ error: 'different field' }),
+        ];
+
+        for (const op of operations) {
+          for (const status of [400, 422]) {
+            for (const body of badBodies) {
+              globalThis.fetch = async (): Promise<Response> => {
+                return new Response(body, {
+                  status,
+                  headers: { 'Content-Type': 'application/json' },
+                });
+              };
+
+              const outcome = await op.run();
+              assert.strictEqual(
+                outcome.ok,
+                false,
+                `${op.name} on ${status} should return ok: false`,
+              );
+              if (!outcome.ok) {
+                assert.strictEqual(
+                  outcome.reason,
+                  'INVALID_COMMAND',
+                  `${op.name} reason should be INVALID_COMMAND on ${status}`,
+                );
+                assert.strictEqual(
+                  outcome.message,
+                  defaultMessage,
+                  `${op.name} should fallback to default message`,
+                );
+              }
+            }
+          }
+        }
+      });
+    });
+
+    describe('3. Malformed successful JSON handling across operations', () => {
+      it('maps unparseable 200 JSON to UPSTREAM_UNAVAILABLE with retryable true without throwing', async () => {
+        const operations: Array<{
+          name: string;
+          run: () => Promise<{ ok: boolean; reason?: string; retryable?: boolean }>;
+        }> = [
+          { name: 'listBookings', run: () => listBookings('upcoming', 1, 10) },
+          { name: 'getBookingDetail', run: () => getBookingDetail('booking-uuid-001') },
+          { name: 'getCancellationStatus', run: () => getCancellationStatus('booking-uuid-001') },
+          { name: 'getCancellationQuote', run: () => getCancellationQuote('booking-uuid-001') },
+          { name: 'cancelBooking', run: () => cancelBooking('booking-uuid-001', 'quote-001') },
+          {
+            name: 'getItineraryRevisions',
+            run: () => getItineraryRevisions('booking-uuid-001', 1, 5),
+          },
+        ];
+
+        for (const op of operations) {
+          globalThis.fetch = async (): Promise<Response> => {
+            return new Response('<html>502 Bad Gateway or unparseable text</html>', {
+              status: 200,
+              headers: { 'Content-Type': 'text/html' },
+            });
+          };
+
+          const outcome = await op.run();
+          assert.strictEqual(
+            outcome.ok,
+            false,
+            `${op.name} should return ok: false on unparseable JSON`,
+          );
+          if (!outcome.ok) {
+            assert.strictEqual(
+              outcome.reason,
+              'UPSTREAM_UNAVAILABLE',
+              `${op.name} should fail with UPSTREAM_UNAVAILABLE`,
+            );
+            assert.strictEqual(outcome.retryable, true, `${op.name} should be retryable`);
+          }
+        }
+      });
+
+      it('maps schema validation mismatch to UPSTREAM_UNAVAILABLE with retryable true without throwing', async () => {
+        const mismatchCases: Array<{
+          name: string;
+          run: () => Promise<{ ok: boolean; reason?: string; retryable?: boolean }>;
+          mismatchPayload: unknown;
+        }> = [
+          {
+            name: 'listBookings',
+            run: () => listBookings('upcoming', 1, 10),
+            mismatchPayload: { bookings: [{ id: '' }] },
+          },
+          {
+            name: 'getBookingDetail',
+            run: () => getBookingDetail('booking-uuid-001'),
+            mismatchPayload: { unexpectedStructure: 42 },
+          },
+          {
+            name: 'getCancellationStatus',
+            run: () => getCancellationStatus('booking-uuid-001'),
+            mismatchPayload: { bookingId: '' },
+          },
+          {
+            name: 'getCancellationQuote',
+            run: () => getCancellationQuote('booking-uuid-001'),
+            mismatchPayload: { quoteId: '' },
+          },
+          {
+            name: 'cancelBooking',
+            run: () => cancelBooking('booking-uuid-001', 'quote-001'),
+            mismatchPayload: { bookingId: '' },
+          },
+          {
+            name: 'getItineraryRevisions',
+            run: () => getItineraryRevisions('booking-uuid-001', 1, 5),
+            mismatchPayload: { items: [{ revisionId: '', segments: [{}] }] },
+          },
+        ];
+
+        for (const testCase of mismatchCases) {
+          globalThis.fetch = async (): Promise<Response> => {
+            return new Response(JSON.stringify(testCase.mismatchPayload), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            });
+          };
+
+          const outcome = await testCase.run();
+          assert.strictEqual(
+            outcome.ok,
+            false,
+            `${testCase.name} should return ok: false on schema mismatch`,
+          );
+          if (!outcome.ok) {
+            assert.strictEqual(
+              outcome.reason,
+              'UPSTREAM_UNAVAILABLE',
+              `${testCase.name} should fail with UPSTREAM_UNAVAILABLE`,
+            );
+            assert.strictEqual(outcome.retryable, true, `${testCase.name} should be retryable`);
+          }
+        }
+      });
+    });
+
+    describe('4. Empty-body disruption acknowledge & accept success', () => {
+      it('returns { ok: true, data: { ok: true } } on 200 and 204 empty responses for acknowledgeDisruption', async () => {
+        for (const status of [200, 204]) {
+          globalThis.fetch = async (): Promise<Response> => {
+            return new Response(status === 204 ? null : '', { status });
+          };
+
+          const outcome = await acknowledgeDisruption('booking-uuid-001', 'rev-uuid-001');
+          assert.deepEqual(outcome, {
+            ok: true,
+            data: { ok: true },
+          });
+        }
+      });
+
+      it('returns { ok: true, data: { ok: true } } on 200 and 204 empty responses for acceptDisruption', async () => {
+        for (const status of [200, 204]) {
+          globalThis.fetch = async (): Promise<Response> => {
+            return new Response(status === 204 ? null : '', { status });
+          };
+
+          const outcome = await acceptDisruption('booking-uuid-001', 'rev-uuid-001');
+          assert.deepEqual(outcome, {
+            ok: true,
+            data: { ok: true },
+          });
+        }
+      });
+    });
+
+    describe('5. Mutation single-send guarantee (zero replay)', () => {
+      const mutationOperations: Array<{
+        name: string;
+        run: () => Promise<{ ok: boolean; reason?: string }>;
+      }> = [
+        { name: 'getCancellationQuote', run: () => getCancellationQuote('booking-uuid-001') },
+        { name: 'cancelBooking', run: () => cancelBooking('booking-uuid-001', 'quote-local-123') },
+        {
+          name: 'acknowledgeDisruption',
+          run: () => acknowledgeDisruption('booking-uuid-001', 'rev-uuid-001'),
+        },
+        {
+          name: 'acceptDisruption',
+          run: () => acceptDisruption('booking-uuid-001', 'rev-uuid-001'),
+        },
+      ];
+
+      it('dispatches mutations at most once on 502, 503, and 504 gateway responses', async () => {
+        for (const op of mutationOperations) {
+          for (const status of [502, 503, 504]) {
+            let attempts = 0;
+            globalThis.fetch = async (): Promise<Response> => {
+              attempts += 1;
+              return new Response(JSON.stringify({ message: `Gateway error ${status}` }), {
+                status,
+              });
+            };
+
+            const outcome = await op.run();
+            assert.strictEqual(outcome.ok, false, `${op.name} should fail on ${status}`);
+            assert.strictEqual(attempts, 1, `${op.name} must dispatch exactly once on ${status}`);
+          }
+        }
+      });
+
+      it('dispatches mutations at most once on 429 response even with Retry-After header', async () => {
+        for (const op of mutationOperations) {
+          let attempts = 0;
+          globalThis.fetch = async (): Promise<Response> => {
+            attempts += 1;
+            return new Response(JSON.stringify({ message: 'Rate limit exceeded' }), {
+              status: 429,
+              headers: { 'Retry-After': '10' },
+            });
+          };
+
+          const outcome = await op.run();
+          assert.strictEqual(outcome.ok, false, `${op.name} should fail on 429`);
+          assert.strictEqual(attempts, 1, `${op.name} must dispatch exactly once on 429`);
+        }
+      });
+
+      it('dispatches mutations at most once on network connection error', async () => {
+        for (const op of mutationOperations) {
+          let attempts = 0;
+          globalThis.fetch = async (): Promise<Response> => {
+            attempts += 1;
+            throw new TypeError('Failed to fetch');
+          };
+
+          const outcome = await op.run();
+          assert.strictEqual(outcome.ok, false, `${op.name} should fail on network error`);
+          assert.strictEqual(
+            attempts,
+            1,
+            `${op.name} must dispatch exactly once on network error`,
+          );
+        }
+      });
+
+      it('dispatches mutations at most once on timeout abort error', async () => {
+        for (const op of mutationOperations) {
+          let attempts = 0;
+          globalThis.fetch = async (): Promise<Response> => {
+            attempts += 1;
+            throw new DOMException('The operation was aborted', 'AbortError');
+          };
+
+          const outcome = await op.run();
+          assert.strictEqual(outcome.ok, false, `${op.name} should fail on abort timeout`);
+          assert.strictEqual(attempts, 1, `${op.name} must dispatch exactly once on timeout`);
+        }
+      });
+    });
+
+    describe('6. GET retry policy & recovery', () => {
+      const getOperations: Array<{
+        name: string;
+        run: () => Promise<{ ok: boolean; reason?: string; retryable?: boolean }>;
+        successResponse: () => Response;
+      }> = [
+        {
+          name: 'listBookings',
+          run: () => listBookings('upcoming', 1, 10),
+          successResponse: () =>
+            new Response(
+              JSON.stringify({
+                bookings: [mockUpstreamBookingListItem],
+                pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } },
+            ),
+        },
+        {
+          name: 'getBookingDetail',
+          run: () => getBookingDetail('booking-uuid-001'),
+          successResponse: () =>
+            new Response(JSON.stringify(mockUpstreamBookingDetail), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            }),
+        },
+        {
+          name: 'getCancellationStatus',
+          run: () => getCancellationStatus('booking-uuid-001'),
+          successResponse: () =>
+            new Response(
+              JSON.stringify({
+                bookingId: 'booking-uuid-001',
+                bookingStatus: 'CONFIRMED',
+                cancellationDeadline: null,
+                airlineRefundAmount: null,
+                customerRefundAmount: null,
+                refundStatus: null,
+                nextRetryAt: null,
+                escalationMessage: null,
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } },
+            ),
+        },
+        {
+          name: 'getItineraryRevisions',
+          run: () => getItineraryRevisions('booking-uuid-001', 1, 5),
+          successResponse: () =>
+            new Response(
+              JSON.stringify({
+                items: [],
+                page: 1,
+                limit: 5,
+                total: 0,
+                totalPages: 0,
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } },
+            ),
+        },
+      ];
+
+      it('retries transient 503 failures up to 3 attempts across all GET operations', async () => {
+        for (const op of getOperations) {
+          let attempts = 0;
+          globalThis.fetch = async (): Promise<Response> => {
+            attempts += 1;
+            return new Response('Service Unavailable', { status: 503 });
+          };
+
+          const outcome = await op.run();
+          assert.strictEqual(outcome.ok, false, `${op.name} should fail on 503`);
+          if (!outcome.ok) {
+            assert.strictEqual(
+              outcome.reason,
+              'UPSTREAM_UNAVAILABLE',
+              `${op.name} reason should be UPSTREAM_UNAVAILABLE`,
+            );
+            assert.strictEqual(outcome.retryable, true, `${op.name} should be retryable`);
+          }
+          assert.strictEqual(attempts, 3, `${op.name} should retry up to 3 attempts on 503`);
+        }
+      });
+
+      it('retries transient 502 and 504 gateway failures across GET operations', async () => {
+        for (const status of [502, 504]) {
+          let attempts = 0;
+          globalThis.fetch = async (): Promise<Response> => {
+            attempts += 1;
+            return new Response(`Gateway error ${status}`, { status });
+          };
+
+          const outcome = await listBookings('upcoming', 1, 10);
+          assert.strictEqual(outcome.ok, false);
+          assert.strictEqual(attempts, 3, `GET should retry 3 times on status ${status}`);
+        }
+      });
+
+      it('recovers successfully on subsequent attempt when transient error clears across GET operations', async () => {
+        for (const op of getOperations) {
+          let attempts = 0;
+          globalThis.fetch = async (): Promise<Response> => {
+            attempts += 1;
+            if (attempts === 1) {
+              return new Response('Transient 503', { status: 503 });
+            }
+            return op.successResponse();
+          };
+
+          const outcome = await op.run();
+          assert.strictEqual(outcome.ok, true, `${op.name} should recover on attempt 2`);
+          assert.strictEqual(
+            attempts,
+            2,
+            `${op.name} expected 2 attempts for transient recovery`,
+          );
+        }
+      });
+
+      it('dispatches non-transient HTTP errors (400, 401, 403, 404, 409, 422) exactly once across GET operations', async () => {
+        const nonTransientStatuses = [400, 401, 403, 404, 409, 422];
+        for (const status of nonTransientStatuses) {
+          let attempts = 0;
+          globalThis.fetch = async (): Promise<Response> => {
+            attempts += 1;
+            return new Response(JSON.stringify({ message: `Non-transient ${status}` }), {
+              status,
+              headers: { 'Content-Type': 'application/json' },
+            });
+          };
+
+          const outcome = await getBookingDetail('booking-uuid-001');
+          assert.strictEqual(outcome.ok, false);
+          assert.strictEqual(attempts, 1, `GET must not retry non-transient status ${status}`);
+        }
+      });
+    });
+  });
 });
+

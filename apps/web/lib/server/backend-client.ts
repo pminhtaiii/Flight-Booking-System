@@ -53,8 +53,14 @@ export function createBackendClient(config: { tokenProvider?: TokenProvider; bas
       const token = await (config.tokenProvider ?? defaultTokenProvider)();
       if (!token?.trim()) return transportFailure('missing_token');
       const baseUrl = (config.baseUrl || process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001').replace(/\/+$/, '');
+      const rawCustomHeaders: Record<string, string> =
+        opts.headers && !(opts.headers instanceof Headers) && !Array.isArray(opts.headers)
+          ? // Preserves custom headers passed as plain object records so specific casing (e.g. Content-Type) is retained.
+            (opts.headers as Record<string, string>)
+          : {};
       const headers: Record<string, string> = {
         ...Object.fromEntries(new Headers(opts.headers).entries()),
+        ...rawCustomHeaders,
         Authorization: `Bearer ${token}`,
         'Cache-Control': 'no-store',
       };

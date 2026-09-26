@@ -95,6 +95,32 @@ Run from `C:\Booking Systems` on 2026-09-26. All commands exited 0.
 - **T013 Parity & Zero Regression**: Verified zero regressions across client, flight-search, dashboard, booking-management, and route handler suites (141 total passing tests across suites).
 
 **Phase 4 convergence:** T011–T013 requirements in tasks.md, spec.md (US2), and GOAL.md are satisfied. Phases T014–T025 remain ready for migration.
+## Phase 5: User Story 3 — Preserve booking outcomes (T014–T017)
 
+Run from `C:\Booking Systems` on 2026-09-26. All commands exited 0.
 
+| Check | Result |
+| --- | --- |
+| `& '.\node_modules\.bin\tsx.CMD' --test apps/web/lib/server/backend-client.spec.ts apps/web/lib/server/booking-management.spec.ts` | 68 passed, 0 failed (18 backend-client, 50 booking-management). |
+| `& '.\node_modules\.bin\tsx.CMD' --test apps/web/lib/server/dashboard.spec.ts apps/web/lib/server/flight-search.spec.ts "apps/web/app/api/booking-management/**/*.spec.ts"` | 93 passed, 0 failed (28 dashboard, 55 flight, 10 route handlers). |
+| `pnpm --filter @web/frontend lint` | Exit 0; no ESLint warnings or errors. |
+| `pnpm --filter @web/frontend typecheck` | Exit 0; tsc clean with zero errors. |
+
+### Booking Migration & Parity Verification
+- **T014 Booking Test Suite Expansion**: Extended `apps/web/lib/server/booking-management.spec.ts` with Phase 5 test suite locking:
+  - Raw response schema optional field tolerance for all six JSON operations (`listBookings`, `getBookingDetail`, `getCancellationStatus`, `getCancellationQuote`, `cancelBooking`, `getItineraryRevisions`) while strictly stripping provider Duffel IDs (`duffelOrderId`, `duffelSegmentId`, `duffelCancellationQuoteId`, `stripePaymentIntentId`, `passportNumber`, etc.).
+  - 400 and 422 error body forwarding and fallback: forwards `data.message` as `INVALID_COMMAND` across all 8 operations, falling back to `'Invalid request. Please check your details and try again.'` when unparseable or absent.
+  - Malformed successful JSON: maps unparseable 200 text and schema validation mismatches to `UPSTREAM_UNAVAILABLE` (`retryable: true`) across operations without throwing.
+  - Empty-body disruption acknowledge & accept success: 200/204 responses return `{ ok: true, data: { ok: true } }`.
+  - Mutation single-send guarantee: `getCancellationQuote`, `cancelBooking`, `acknowledgeDisruption`, and `acceptDisruption` POST requests are dispatched at most once (0 retries) on 502/503/504, 429 (with `Retry-After`), network error, and timeout abort error.
+  - GET retry policy: bounded retry up to 3 attempts on 502/503/504 and transient recovery on attempt 2 for `listBookings`, `getBookingDetail`, `getCancellationStatus`, and `getItineraryRevisions`; non-transient statuses (400, 401, 403, 404, 409, 422) dispatch once.
+- **T015 & T016 Backend Client Migration**:
+  - Migrated all eight operations in `apps/web/lib/server/booking-management.ts` to `backendClient.request`.
+  - Six JSON operations use operation-specific raw response schemas (`RawBookingListResponseSchema`, `RawBookingDetailResponseSchema`, `RawCancellationStatusResponseSchema`, `RawCancellationQuoteResponseSchema`, `RawCancellationResultResponseSchema`, `RawItineraryRevisionsResponseSchema`) with `.passthrough()`.
+  - Disruption mutations (`acknowledgeDisruption`, `acceptDisruption`) use `z.void()`, `responseMode: 'none'`, and pass `body: JSON.stringify({ revisionId: revisionId.trim() })`.
+  - Removed all orphaned transport helpers and constants: `fetchWithRetry`, `apiUrl()`, `getAccessToken()`, `delay()`, `handleUpstreamStatus()`, `MAX_READ_ATTEMPTS`, `RETRY_BASE_DELAY_MS`, `REQUEST_TIMEOUT_MS`, `FetchResult`, `NextAuth`, and `authOptions`.
+  - Preserved raw custom header casing in `backend-client.ts` to support exact header contracts.
+- **T017 Parity & Zero Regression**: Verified zero regressions across client, booking, dashboard, flight-search, and booking route handler suites (161 total passing tests across suites).
+
+**Phase 5 convergence:** T014–T017 requirements in tasks.md, spec.md (US3), and GOAL.md are satisfied. Phases T018–T025 remain ready for User Story 4 and polish.
 
