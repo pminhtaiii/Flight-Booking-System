@@ -1,5 +1,12 @@
 # Progress Tracker
 
+### Feature 028 — Backend Client Unification: Phase 6 / User Story 4 Complete (Tasks T018–T022 Verified) (2026-09-26)
+
+- Added booking-specific `apps/web/lib/server/outcome-response.ts` as the sole `BookingManagementOutcome` → `NextResponse` mapper; all six booking route files import it. The seven HTTP operations retain their methods, `dynamic` exports, parameter validation, signatures, status/body mapping, and `Cache-Control: private, no-store` headers.
+- Added table-driven adapter tests and route parity tests covering seven operations × eight success/error outcomes. The adapter tests were RED before extraction; after migration, the two new specs passed 64/64 and the parity plus existing cancellation route specs passed 66/66.
+- Server regression specs (`backend-client`, `dashboard`, `flight-search`, `booking-management`) passed 151/151. Web lint and typecheck passed with exit code 0. Static census found exactly one `function mapOutcomeToResponse`, in the shared adapter. Independent task and feature reviews found no remaining blocking issues.
+- Evidence is recorded in `specs/028-backend-client-unification/verification.md`; T018–T022 are checked in `tasks.md`. Phase 7 polish (T023–T025) remains planned.
+
 ### Feature 028 — Backend Client Unification: Phase 5 / User Story 3 Complete (Tasks T014–T017 Verified) (2026-09-26)
 
 - **T014 Booking Transport Result Mapping & Mutation Safety Tests**: Extended `apps/web/lib/server/booking-management.spec.ts` with dedicated Phase 5 test suite:

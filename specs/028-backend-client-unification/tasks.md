@@ -50,11 +50,11 @@
 **Goal**: One booking-specific route adapter used by six route handlers.
 **Independent test**: Representative success/error outcomes return identical status, body, and headers through all six handlers.
 
-- [ ] T018 [US4] Add table-driven mapping tests in `apps/web/lib/server/outcome-response.spec.ts` and six-handler status/body/header parity coverage in `apps/web/app/api/booking-management/route-parity.spec.ts`, reusing existing cancellation route fixtures.
-- [ ] T019 [US4] Extract the unchanged BookingManagementOutcome-to-NextResponse mapping into `apps/web/lib/server/outcome-response.ts`.
-- [ ] T020 [US4] Replace duplicate mapper definitions/imports in `apps/web/app/api/booking-management/bookings/[bookingId]/route.ts`, `cancellation/route.ts`, `cancellation/quote/route.ts`, and `revisions/route.ts`.
-- [ ] T021 [US4] Replace duplicate mapper definitions/imports in `apps/web/app/api/booking-management/bookings/[bookingId]/disruptions/acknowledge/route.ts` and `disruptions/accept/route.ts`.
-- [ ] T022 [US4] Run `apps/web/lib/server/outcome-response.spec.ts`, `apps/web/app/api/booking-management/route-parity.spec.ts`, and both existing cancellation route specs; record six-handler parity in `specs/028-backend-client-unification/verification.md`.
+- [x] T018 [US4] Add table-driven mapping tests in `apps/web/lib/server/outcome-response.spec.ts` and six-handler status/body/header parity coverage in `apps/web/app/api/booking-management/route-parity.spec.ts`, reusing existing cancellation route fixtures.
+- [x] T019 [US4] Extract the unchanged BookingManagementOutcome-to-NextResponse mapping into `apps/web/lib/server/outcome-response.ts`.
+- [x] T020 [US4] Replace duplicate mapper definitions/imports in `apps/web/app/api/booking-management/bookings/[bookingId]/route.ts`, `cancellation/route.ts`, `cancellation/quote/route.ts`, and `revisions/route.ts`.
+- [x] T021 [US4] Replace duplicate mapper definitions/imports in `apps/web/app/api/booking-management/bookings/[bookingId]/disruptions/acknowledge/route.ts` and `disruptions/accept/route.ts`.
+- [x] T022 [US4] Run `apps/web/lib/server/outcome-response.spec.ts`, `apps/web/app/api/booking-management/route-parity.spec.ts`, and both existing cancellation route specs; record six-handler parity in `specs/028-backend-client-unification/verification.md`.
 
 ## Phase 7: Polish and cross-cutting verification
 

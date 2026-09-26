@@ -124,3 +124,20 @@ Run from `C:\Booking Systems` on 2026-09-26. All commands exited 0.
 
 **Phase 5 convergence:** T014–T017 requirements in tasks.md, spec.md (US3), and GOAL.md are satisfied. Phases T018–T025 remain ready for User Story 4 and polish.
 
+## Phase 6: User Story 4 — Share booking response mapping (T018–T022)
+
+Run from `C:\Booking Systems` on 2026-09-26.
+
+| Check | Result |
+| --- | --- |
+| Adapter test RED before extraction | 8 expected module-not-found failures for the absent `outcome-response.ts`. |
+| Adapter and route parity specs | 64 passed, 0 failed (8 adapter cases; 7 HTTP operations × 8 outcomes = 56 route cases). |
+| Route parity plus existing cancellation and quote route specs | 66 passed, 0 failed. The two existing route specs were selected with a `bookings/*/` glob because literal `[bookingId]` paths are interpreted as a glob character class by the runner. |
+| Backend client, dashboard, flight search, and booking management server specs | 151 passed, 0 failed. |
+| `rg -n 'function mapOutcomeToResponse' apps/web` | Exactly one definition, in `apps/web/lib/server/outcome-response.ts`. |
+| Web typecheck | Exit 0; strict TypeScript check clean. |
+| Web lint | Exit 0; no ESLint warnings or errors. The user approved removal of the unused parity-mock parameter; the test records that approval and its assertions remain unchanged. |
+
+The shared booking-specific adapter preserves 200 success, the six known error status mappings (400, 401, 403, 404, 409, 503), unknown-reason 500 fallback, `{ error, message }` error bodies, and `Cache-Control: private, no-store` for success and errors. All six route files now import it. The seven HTTP operations and their `dynamic` exports, handler signatures, and parameter validation remain unchanged. Independent reviews of T018–T021 found no remaining blocking issues after restoring type-only `NextResponse` imports in both disruption routes.
+
+**Phase 6 convergence:** T018–T022 requirements in tasks.md, spec.md (US4), and GOAL.md are satisfied. Phase 7 polish (T023–T025) remains planned and unstarted.
