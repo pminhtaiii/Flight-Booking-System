@@ -1,5 +1,24 @@
 # Progress Tracker
 
+### Feature 028 — Backend Client Unification: Phase 4 / User Story 2 Complete (Tasks T011–T013 Verified) (2026-09-26)
+
+- **T011 Flight Characterization & Transport Invariant Tests**: Extended `apps/web/lib/server/flight-search.spec.ts` with dedicated Phase 4 test suite locking:
+  - Search POST single-send: exactly 1 attempt on 502/503/504, 429, network error, and timeout (zero mutation retries).
+  - Offer selection GET bounded recovery: recovers on 2nd attempt after 502/503/504 or network timeout.
+  - Transport failure mapping: malformed upstream JSON and schema validation failure map to `UPSTREAM_UNAVAILABLE` (`retryable: true`) with exact user-facing message (`'Flight search returned an invalid response. Please try again.'`).
+  - Missing token short-circuit: session `null` or lacking `accessToken` returns `UNAUTHENTICATED` (`retryable: false`) with 0 fetch attempts for both search and selection.
+  - HTTP status mapping parity: 401/403 -> `UNAUTHENTICATED` (single-send), 429 -> `RATE_LIMITED` (`retryable: true`, single-send), 400/422 -> `INVALID_SEARCH` (`retryable: false`, single-send), 404/410 on selection -> `OFFER_EXPIRED` (`retryable: false`, single-send).
+- **T012 Backend Client Migration**: Migrated `searchFlights` and `selectFlightOffer` in `apps/web/lib/server/flight-search.ts` to `backendClient.request`:
+  - Removed bespoke `fetchWithRetry`, `apiUrl()`, `getAccessToken()`, `delay()`, constants, and NextAuth module imports.
+  - Preserved upstream Zod schemas, `validateMatchedSearchCardinality`, offer mapping (`mapOffer`), and view schema checks (`FlightSearchOfferViewSchema`).
+  - Preserved provider identifier stripping and exact checkout route: `/checkout?offerId=${encodeURIComponent(id)}`.
+- **T013 Verification Gates & Parity**: Executed full verification suite with zero errors and exit code 0 across all checks:
+  - `backend-client.spec.ts` and `flight-search.spec.ts`: 73 passed, 0 failed.
+  - `dashboard.spec.ts`, `booking-management.spec.ts`, and booking API route tests: 68 passed, 0 failed.
+  - `@web/frontend` lint: 0 warnings, 0 errors.
+  - `@web/frontend` typecheck: clean (`tsc --noEmit`).
+  - Recorded verification evidence and marked T011–T013 complete in `specs/028-backend-client-unification/tasks.md` and `verification.md`.
+
 ### Feature 028 — Backend Client Unification: Phase 3 / User Story 1 Complete (Tasks T008–T010 Verified) (2026-09-26)
 
 - **T008 Dashboard Characterization & Retry Policy Tests**: Extended `apps/web/lib/server/dashboard.spec.ts` with transient 502/503/504 recovery assertions (successful second attempt), 429 Retry-After handling, strict HTTP 500 single-attempt assertion (zero retries), missing token handling, and malformed payload schema rejection.

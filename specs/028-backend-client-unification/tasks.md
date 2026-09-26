@@ -31,9 +31,9 @@
 **Goal**: Search and offer selection share transport with current domain outcomes.
 **Independent test**: Search POST sends once; offer GET follows narrow retry policy; response projection and outcomes match fixtures.
 
-- [ ] T011 [US2] Add flight tests for transport result mapping, malformed raw payload, GET transient recovery, and search POST single-send in `apps/web/lib/server/flight-search.spec.ts`.
-- [ ] T012 [US2] Migrate `searchFlights` and `selectFlightOffer` in `apps/web/lib/server/flight-search.ts` to the client using current upstream schemas; retain query/offer validation, mapping, and final view schema checks.
-- [ ] T013 [US2] Run `apps/web/lib/server/flight-search.spec.ts` and `apps/web/lib/server/backend-client.spec.ts`; record outcome parity in `specs/028-backend-client-unification/verification.md`.
+- [x] T011 [US2] Add flight tests for transport result mapping, malformed raw payload, GET transient recovery, and search POST single-send in `apps/web/lib/server/flight-search.spec.ts`.
+- [x] T012 [US2] Migrate `searchFlights` and `selectFlightOffer` in `apps/web/lib/server/flight-search.ts` to the client using current upstream schemas; retain query/offer validation, mapping, and final view schema checks.
+- [x] T013 [US2] Run `apps/web/lib/server/flight-search.spec.ts` and `apps/web/lib/server/backend-client.spec.ts`; record outcome parity in `specs/028-backend-client-unification/verification.md`.
 
 ## Phase 5: User Story 3 - Preserve booking outcomes (P3)
 
