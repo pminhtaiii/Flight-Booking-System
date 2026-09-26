@@ -1,6 +1,6 @@
 # Architecture
 
-## Feature 027 — Chat Turn Decomposition (In Progress — Phases 1–5 and Phase 6 Slice 2 Complete)
+## Feature 027 — Chat Turn Decomposition (Complete — Phases 1–7, Tasks T001–T027 Verified)
 
 - [Feature 027 specification](../specs/027-chat-turn-decomposition/spec.md), [plan](../specs/027-chat-turn-decomposition/plan.md), and [tasks](../specs/027-chat-turn-decomposition/tasks.md) decompose Python chat turn event translation, domain projections, memory coordination, admission, and lifecycle while preserving SSE and security contracts.
 - **Phase 1: Event Transport Decoupling (Tasks T001–T003 Complete)**:
@@ -44,11 +44,19 @@
     - Single-scan guarantee: Validated admission decision forwarded directly through `ChatController.stream()` to runner without redundant re-scanning.
     - Transparent backward compatibility: Direct-call fallback and module-level monkeypatch compatibility for legacy tests.
 - **Phase 6: User Story 4 — Sequential Turn Lifecycle (Tasks T022–T024 Complete)**:
-  - `chat_turn/coordinator.py` owns session bootstrap, fenced lease and snapshot handling, memory retrieval, graph interpretation, one output stream session, persistence, and background compaction.
+  - `chat_turn/coordinator.py` owns session bootstrap, lease acquisition and active-fence checks, active search snapshot loading, conversation memory, graph interpretation, one `OutputStreamSession`, message persistence, one success-path flush, and the post-turn compaction trigger. Every model token passes through `pipeline.process_token(token)`.
   - `chat_turn/runner.py` remains a thin `ChatTurnRunner.run(command, validated_input)` facade; `chat_turn/__init__.py` exports `TurnSessionCoordinator`.
-  - Failure cleanup preserves partial persistence (shielded on cancellation), non-flushing output close, lease release, then terminal error construction. A timed-out partial batch is cancelled and joined before lease release; stale fences suppress action-required and handoff events.
+  - Failure cleanup is ordered: approved partial persistence (`asyncio.shield` on cancellation and forced persistence for `HANDOFF_FAILED`), non-flushing `pipeline.close()`/`aclose()`, lease release, then `ErrorEvent` construction. A timed-out partial batch is cancelled and joined before lease release; stale fences suppress `ActionRequiredEvent` and `ActionHandoffEvent` and route to `PERSISTENCE_ERROR`.
   - `ChatController.stream` and `streaming/sse.py` retain their existing validated-input and disconnect handling signatures; neither required a code change.
   - Six-file controller/SSE parity: 126 passed, 1 skipped; full non-Redis agent suite: 1,280 passed, 11 skipped, 12 deselected. Ruff check and format pass for the extracted boundary.
+- **Completed module boundaries**:
+  - `chat_turn/interpreter.py` translates LangGraph events without tool-name branching or guardrail/gateway construction. Validated `tools` chain-end messages reach `resolver.resolve`; `on_tool_end` records timing only.
+  - `chat_turn/resolver.py` owns `ToolResultResolver` domain projections, including search snapshots, booking readiness, and handoff node outcomes.
+  - `memory/conversation.py` owns `ConversationMemory` context selection, historical guardrail re-scan, and compaction delegation using the original per-turn admission context.
+  - `admission/` provides reusable `AuthService`, `InputAdmissionService`, and `QuotaService`; thin FastAPI `Depends` wrappers in `streaming/sse.py` preserve auth, length/health, input scan, then quota order. The validated input reaches the runner without a second scan.
+- **Phase 7: Polish and Cross-Cutting Verification (Tasks T025–T027 Complete)**:
+  - Static censuses found no `format_sse` in `chat_turn/events.py`, no tool-name branching or guardrail/gateway construction in `chat_turn/interpreter.py`, and no `Any` in the extracted coordinator, runner, admission, interpreter, resolver, or conversation modules.
+  - Full-package Ruff lint and format checks passed. The eight focused decomposition suites passed (184 passed, 1 skipped); the Phase 7 non-Redis regression gate excluding `test_security_performance` passed (1,272 passed, 11 skipped, 20 deselected). Exact commands, exit codes, and timings are in `specs/027-chat-turn-decomposition/verification.md`.
 
 ## Feature 028 — Backend Client Unification (Planned, 2026-09-25)
 

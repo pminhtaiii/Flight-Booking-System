@@ -845,5 +845,36 @@ For pytest, `PYTHONPATH` was set to `tests/ci/python;apps/agent/src` and `UV_CAC
 
 T023 review found a timed-out persistence race and a runner patch-point timing difference. Both were corrected before the final gates. T024 independent review found no controller/SSE change needed. Scoped convergence against T023–T024 and GOAL.md found no remaining action; Phase 7 polish tasks remain outside this slice.
 
+# Verification Evidence: Phase 7 — Boundary Censuses (T025)
 
+**Date:** 2026-09-26
 
+| Census | Command / inspection | Result |
+|---|---|---|
+| Event transport separation | `rg -n 'format_sse' apps/agent/src/agent/chat_turn/events.py` | No matches; expected ripgrep exit 1 |
+| Interpreter domain boundary | `rg -n 'search_flights|check_booking_readiness|GuardrailGateway\(|OutputGuardrailPipeline\(|NestJSClient\(' apps/agent/src/agent/chat_turn/interpreter.py`; manual tool-name branch inspection | No matches or tool-name branches. The three handoff *node* names are permitted routing to `resolve_handoff_node`. |
+| Validated hook separation | `rg -n 'on_tool_end|on_chain_end|resolver.resolve' apps/agent/src/agent/chat_turn` plus manual inspection | `interpreter.py:165` `on_tool_end` emits timing telemetry only; `interpreter.py:187` `on_chain_end` validates `tools` messages and calls `resolver.resolve` at line 335 before `ToolResultEvent`. Census exit 0. |
+| Strict typing | `rg -n '\bAny\b'` across `coordinator.py`, `runner.py`, `admission/`, `interpreter.py`, `resolver.py`, `memory/conversation.py` | No matches; expected ripgrep exit 1 |
+
+Independent T025 review confirmed all four censuses and found no boundary violation.
+
+## Phase 7 Gate Execution (T026)
+
+All commands ran from the repository root with `PYTHONPATH="$PWD/tests/ci/python;$PWD/apps/agent/src"` and `UV_CACHE_DIR="$PWD/.t093-uv-cache"`.
+
+Focused command:
+
+```powershell
+uv run --package agent pytest apps/agent/tests/test_chat_turn_events.py apps/agent/tests/test_tool_result_resolver.py apps/agent/tests/test_chat_turn_interpreter.py apps/agent/tests/test_conversation_memory.py apps/agent/tests/test_chat_admission.py apps/agent/tests/test_chat_turn_runner.py apps/agent/tests/test_stream_session_control.py apps/agent/tests/test_sse_integration.py -v
+```
+
+| Gate | Command / scope | Exit code | Result | Pytest runtime |
+|---|---|---:|---|---:|
+| Focused decomposition | `uv run --package agent pytest` on the eight suites named in GOAL.md, from `test_chat_turn_events.py` through `test_sse_integration.py`, `-v` | 0 | 184 passed, 1 skipped | 24.36s |
+| Ruff lint | `uv run --package agent ruff check apps/agent` | 0 | All checks passed | — |
+| Ruff format | `uv run --package agent ruff format --check apps/agent` | 0 | 166 files already formatted | — |
+| Full non-Redis regression | `uv run --package agent pytest apps/agent/tests -m "not redis_integration" -k "not test_security_performance" -q` | 0 | 1,272 passed, 11 skipped, 20 deselected | 141.84s |
+
+Focused execution emitted one pytest cache warning. Full regression emitted nine JWT test-fixture key-length warnings and one pytest cache write warning (`WinError 5`); no test failed. Focused and full gate wall-clock stopwatch times were 45.95s and 154.57s respectively. No source, dependency, schema, or endpoint changes were needed for Phase 7.
+
+Scoped Feature 027 convergence: ✅ Converged — all 27 tasks, 12 functional requirements, six success criteria, and four user stories have no remaining actionable gap. Final Standards and Spec reviews found no blocking issue; their two documentation clarity notes were corrected before sign-off.

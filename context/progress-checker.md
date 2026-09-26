@@ -1,5 +1,11 @@
 # Progress Tracker
 
+### Feature 027 — Chat Turn Decomposition Complete (Phases 1–7, Tasks T001–T027 Verified) (2026-09-26)
+
+- **T025 boundary census**: `chat_turn/events.py` has no `format_sse`; `chat_turn/interpreter.py` has no tool-name branch or guardrail/gateway construction. Validated `tools` chain-end results reach `resolver.resolve`; `on_tool_end` records timing only. Extracted modules have zero `Any` matches.
+- **T026 final gates**: Focused decomposition suites: 184 passed, 1 skipped (exit 0, 24.36s). Ruff check passed (exit 0); Ruff format checked 166 files (exit 0). Phase 7 non-Redis agent regression excluding `test_security_performance`: 1,272 passed, 11 skipped, 20 deselected (exit 0, 141.84s).
+- **T027 documentation**: Completed coordinator, runner, interpreter, resolver, memory, and admission boundaries are recorded in `context/architecture.md`. Gate commands, census results, exit codes, and timings are recorded in `specs/027-chat-turn-decomposition/verification.md`.
+
 ### Feature 027 — Chat Turn Decomposition: Phase 6 / User Story 4 Complete (Tasks T022–T024 Verified) (2026-09-26)
 
 - **T022 lifecycle baseline**: Normal, blocked, handoff failure, stale-fence action suppression, cancellation, and exception cleanup were characterized before extraction in runner/session tests.

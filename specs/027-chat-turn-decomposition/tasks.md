@@ -60,9 +60,9 @@
 
 ## Phase 7: Polish and cross-cutting verification
 
-- [ ] T025 Verify `apps/agent/src/agent/chat_turn/interpreter.py` has no tool-name checks or guardrail construction and `apps/agent/src/agent/chat_turn/events.py` has no `format_sse` using the censuses in `specs/027-chat-turn-decomposition/quickstart.md`.
-- [ ] T026 Run Ruff check/format and the full non-Redis agent pytest gate from `specs/027-chat-turn-decomposition/quickstart.md`; record exit codes in `specs/027-chat-turn-decomposition/verification.md`.
-- [ ] T027 Update `context/architecture.md` and `context/progress-checker.md` with the implemented boundaries and verified task status; do not mark planned work complete before the gate passes.
+- [x] T025 Verify `apps/agent/src/agent/chat_turn/interpreter.py` has no tool-name checks or guardrail construction and `apps/agent/src/agent/chat_turn/events.py` has no `format_sse` using the censuses in `specs/027-chat-turn-decomposition/quickstart.md`.
+- [x] T026 Run Ruff check/format and the full non-Redis agent pytest gate from `specs/027-chat-turn-decomposition/quickstart.md`; record exit codes in `specs/027-chat-turn-decomposition/verification.md`.
+- [x] T027 Update `context/architecture.md` and `context/progress-checker.md` with the implemented boundaries and verified task status; do not mark planned work complete before the gate passes.
 
 ## Dependencies
 
