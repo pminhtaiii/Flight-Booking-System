@@ -1,5 +1,13 @@
 # Progress Tracker
 
+### Feature 027 — Chat Turn Decomposition: Phase 6 / User Story 4 Complete (Tasks T022–T024 Verified) (2026-09-26)
+
+- **T022 lifecycle baseline**: Normal, blocked, handoff failure, stale-fence action suppression, cancellation, and exception cleanup were characterized before extraction in runner/session tests.
+- **T023 coordinator extraction**: Added `apps/agent/src/agent/chat_turn/coordinator.py` for session, lease, snapshot, memory, graph, output, persistence, and compaction lifecycle; `runner.py` is a backward-compatible facade and `chat_turn/__init__.py` re-exports `TurnSessionCoordinator`.
+- **Causal cleanup review fix**: Timed-out partial persistence is cancelled and joined before output-session close and lease release. Repeated cancellation during cleanup no longer skips release. Two public `ChatTurnRunner.run()` regression tests cover these paths. Runtime runner patch points remain resolvable at execution time.
+- **T024 controller/SSE parity**: Existing `ChatController.stream` and `streaming/sse.py` signatures and disconnect cleanup required no code changes. The six requested test files passed: 126 passed, 1 skipped, exit code 0.
+- **Final gate**: Full non-Redis agent suite passed: 1,280 passed, 11 skipped, 12 deselected, exit code 0. Focused runner/session/cleanup tests: 47 passed, 1 skipped. Ruff check and format passed for changed agent boundary files; `git diff --check` passed. Evidence is recorded in `specs/027-chat-turn-decomposition/verification.md`.
+
 ### Feature 027 — Chat Turn Decomposition: Phase 5 / User Story 3 Complete (Tasks T016–T021 Verified) (2026-09-25)
 
 - **Phase 5 (User Story 3: Reuse Ordered Admission) Fully Completed (Tasks T016–T021)**:

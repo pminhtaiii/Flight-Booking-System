@@ -54,9 +54,9 @@
 **Goal**: Focused turn coordinator with unchanged output, persistence, and lease behavior.
 **Independent test**: Existing successful, blocked, cancelled, stale-fence, and exception scenarios preserve events and cleanup order.
 
-- [ ] T022 [US4] Extend normal, invalid-readiness block, handoff failure, cancellation, stale-fence ActionRequiredEvent/ActionHandoffEvent suppression, and exception cleanup assertions in `apps/agent/tests/test_chat_turn_runner.py` and `apps/agent/tests/test_stream_session_control.py` before moving lifecycle code.
-- [ ] T023 [US4] Extract sequential TurnSessionCoordinator ownership within `apps/agent/src/agent/chat_turn/runner.py`, retaining session bootstrap, lease/fencing, snapshot load, persistence, one output-session flush/close, and background compaction.
-- [ ] T024 [US4] Keep `apps/agent/src/agent/chat_turn/controller.py` and `apps/agent/src/agent/streaming/sse.py` integration signatures compatible; run `apps/agent/tests/test_sse_integration.py` and `apps/agent/tests/test_chat_turn_runner.py` for event and error parity.
+- [x] T022 [US4] Extend normal, invalid-readiness block, handoff failure, cancellation, stale-fence ActionRequiredEvent/ActionHandoffEvent suppression, and exception cleanup assertions in `apps/agent/tests/test_chat_turn_runner.py` and `apps/agent/tests/test_stream_session_control.py` before moving lifecycle code.
+- [x] T023 [US4] Extract sequential TurnSessionCoordinator ownership within `apps/agent/src/agent/chat_turn/coordinator.py` with thin `runner.py` facade delegation, retaining session bootstrap, lease/fencing, snapshot load, persistence, one output-session flush/close, and background compaction.
+- [x] T024 [US4] Keep `apps/agent/src/agent/chat_turn/controller.py` and `apps/agent/src/agent/streaming/sse.py` integration signatures compatible; run `apps/agent/tests/test_sse_integration.py` and `apps/agent/tests/test_chat_turn_runner.py` for event and error parity.
 
 ## Phase 7: Polish and cross-cutting verification
 

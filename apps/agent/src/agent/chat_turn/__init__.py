@@ -27,7 +27,7 @@ from .resolver import (
     ToolResolution,
     ToolResultResolver,
 )
-from .runner import ChatTurnRunner
+from .runner import ChatTurnRunner, TurnSessionCoordinator
 
 __all__ = [
     "ActionHandoffEvent",
@@ -37,6 +37,7 @@ __all__ = [
     "ChatTurnCommand",
     "ChatTurnEvent",
     "ChatTurnRunner",
+    "TurnSessionCoordinator",
     "DoneEvent",
     "DonePayload",
     "ErrorEvent",

@@ -19,8 +19,10 @@ from agent.chat_turn import (
     ToolCallEvent,
     ToolResultEvent,
 )
-from agent.guardrails.base import ValidatedInput
+from agent.chat_turn.resolver import ToolResolution
+from agent.guardrails.base import AdmissionContext, ValidatedInput
 from agent.guardrails.gateway import GuardrailGateway
+from agent.trusted_search_snapshot import SnapshotOwner
 
 try:
     from agent.guardrails.base import OutputGuardrailBlockedError
@@ -2751,3 +2753,651 @@ async def test_runner_memory_context_blocked_cleanup() -> None:
         error_events[0].data.message == "Historical conversation context contains unsafe content."
     )
     mock_queue.release.assert_awaited_once_with("session-456", "req-blocked")
+
+
+# ---------------------------------------------------------------------------
+# T022 Turn Runner Lifecycle and Failure Cleanup Characterization Tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_t022_normal_turn_execution_lifecycle_ordering() -> None:
+    """Requirement 1: Normal Turn Execution Flow
+    - Distributed lease acquired via queue_manager.acquire(session_id, user_id=...).
+    - Active search snapshot loaded via TrustedSearchSnapshotLifecycle.
+    - Conversation context retrieved via ConversationMemory.get_context().
+    - Graph stream translated via GraphEventInterpreter and ToolResultResolver.
+    - Raw tokens chunk-buffered and analyzed by single per-turn OutputStreamSession.
+    - User + Agent batch persisted via _persist_response.
+    - Single output-session flush via pipeline.flush().
+    - Background compaction scheduled via ConversationMemory.schedule_compaction with totalMessageCount + 2 and GC-safe tracking in background_tasks.
+    - Session lease released via queue_manager.release(session_id, req_id).
+    """
+    call_order: list[str] = []
+
+    mock_queue = MagicMock()
+
+    async def tracked_acquire(session_id: str, user_id: str | None = None) -> str:
+        call_order.append("queue_acquire")
+        return "req-t022-normal"
+
+    mock_queue.acquire = AsyncMock(side_effect=tracked_acquire)
+    mock_queue.get_fence = MagicMock(return_value=42)
+    mock_queue.validate_active_fence = AsyncMock(return_value=True)
+
+    async def tracked_release(session_id: str, req_id: str) -> None:
+        call_order.append("queue_release")
+
+    mock_queue.release = AsyncMock(side_effect=tracked_release)
+
+    mock_memory = MagicMock(spec=ConversationMemory)
+
+    async def tracked_get_context(
+        session_id: str,
+        client: object,
+        admission_context: AdmissionContext,
+    ) -> ValidatedConversationContext:
+        call_order.append("get_context")
+        return ValidatedConversationContext(
+            history=[],
+            summary=None,
+            total_message_count=8,
+        )
+
+    mock_memory.get_context = AsyncMock(side_effect=tracked_get_context)
+
+    real_mem = ConversationMemory(window_size=20, token_budget=4000)
+
+    def tracked_schedule_compaction(
+        session_id: str,
+        client: object,
+        total_count: int | None = None,
+        background_tasks: set[asyncio.Task[object]] | set[asyncio.Task[None]] | None = None,
+        **kwargs: object,
+    ) -> asyncio.Task[None]:
+        call_order.append("schedule_compaction")
+        return real_mem.schedule_compaction(
+            session_id=session_id,
+            client=client,  # type: ignore[arg-type]
+            total_count=total_count,
+            background_tasks=background_tasks,
+        )
+
+    mock_memory.schedule_compaction = MagicMock(side_effect=tracked_schedule_compaction)
+
+    mock_client = MagicMock()
+    mock_client.set_fencing_token = MagicMock()
+    mock_client.get_memory = AsyncMock(
+        return_value={"recentMessages": [], "summary": None, "totalMessageCount": 8}
+    )
+
+    async def tracked_create_batch(
+        session_id: str,
+        messages: list[dict[str, object]],
+    ) -> dict[str, object]:
+        if any(m.get("sender") == "USER" for m in messages) and not any(
+            m.get("sender") == "AGENT" for m in messages
+        ):
+            call_order.append("user_pre_persist")
+        else:
+            call_order.append("persist_response")
+        return {"messages": [{"id": "msg-agent-t022", "sender": "AGENT"}]}
+
+    mock_client.create_message_batch = AsyncMock(side_effect=tracked_create_batch)
+
+    class TrackingOutputStreamSession:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            self.closed = False
+            self.flushed = False
+
+        async def process_token(self, token: str) -> AsyncIterator[str]:
+            call_order.append("process_token")
+            yield token
+
+        async def flush(self) -> AsyncIterator[str]:
+            call_order.append("pipeline_flush")
+            self.flushed = True
+            if False:
+                yield ""
+
+        async def aclose(self) -> None:
+            call_order.append("pipeline_aclose")
+            self.closed = True
+
+        def close(self) -> None:
+            call_order.append("pipeline_close")
+            self.closed = True
+
+    tracking_pipeline = TrackingOutputStreamSession()
+
+    mock_graph = MagicMock()
+
+    async def mock_astream_events(
+        *args: object, **kwargs: object
+    ) -> AsyncIterator[dict[str, object]]:
+        call_order.append("graph_astream_events")
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": MagicMock(content="Hello flight world!")},
+        }
+
+    mock_graph.astream_events = mock_astream_events
+
+    mock_redis = MagicMock()
+
+    async def tracked_load_active(owner: SnapshotOwner) -> None:
+        call_order.append("snapshot_load")
+        return None
+
+    with (
+        patch(
+            "agent.chat_turn.runner.TrustedSearchSnapshotLifecycle.load_active",
+            side_effect=tracked_load_active,
+        ),
+        patch(
+            "agent.chat_turn.runner.OutputStreamSession",
+            return_value=tracking_pipeline,
+        ),
+    ):
+        runner = ChatTurnRunner(
+            graph=mock_graph,
+            queue_manager=mock_queue,
+            client_factory=lambda **_kwargs: mock_client,
+            redis_client=mock_redis,
+            conversation_memory=mock_memory,
+        )
+
+        command = ChatTurnCommand(
+            user_id="user-t022",
+            session_id="session-t022",
+            message="Find flights to JFK",
+            token="jwt.token.val",
+            trace_id="trace-t022-normal",
+            correlation_id="corr-t022-normal",
+        )
+
+        events = [e async for e in runner.run(command)]
+
+    # 1. Distributed lease acquired via queue_manager.acquire(session_id, user_id=...)
+    mock_queue.acquire.assert_awaited_once_with("session-t022", user_id="user-t022")
+    mock_client.set_fencing_token.assert_called_once_with(42)
+
+    # 2. Conversation context retrieved via ConversationMemory.get_context()
+    mock_memory.get_context.assert_awaited_once()
+
+    # 3. Active search snapshot loaded via TrustedSearchSnapshotLifecycle
+    assert "snapshot_load" in call_order
+
+    # 4. Stream token processed through single OutputStreamSession
+    tokens = [e for e in events if isinstance(e, TokenEvent)]
+    assert len(tokens) == 1
+    assert tokens[0].data.content == "Hello flight world!"
+    assert "process_token" in call_order
+
+    # 5. Flush occurred on single output session
+    assert tracking_pipeline.flushed is True
+    assert "pipeline_flush" in call_order
+
+    # 6. Response persisted via create_message_batch
+    assert "persist_response" in call_order
+
+    # 7. Pipeline closed
+    assert tracking_pipeline.closed is True
+    assert "pipeline_aclose" in call_order
+
+    # 8. Session lease released via queue_manager.release(session_id, req_id)
+    mock_queue.release.assert_awaited_once_with("session-t022", "req-t022-normal")
+    assert "queue_release" in call_order
+
+    # 9. Terminal DoneEvent emitted
+    done_events = [e for e in events if isinstance(e, DoneEvent)]
+    assert len(done_events) == 1
+    assert done_events[0].data.messageId == "msg-agent-t022"
+    assert done_events[0].data.sessionId == "session-t022"
+
+    # 10. Background compaction scheduled via ConversationMemory.schedule_compaction
+    mock_memory.schedule_compaction.assert_called_once_with(
+        session_id="session-t022",
+        client=mock_client,
+        total_count=8,
+        background_tasks=background_tasks,
+    )
+    assert "schedule_compaction" in call_order
+
+    # Verify lifecycle sequential ordering invariants:
+    # acquire -> context -> snapshot -> stream -> process -> flush -> persist -> close -> release -> compaction
+    acquire_idx = call_order.index("queue_acquire")
+    ctx_idx = call_order.index("get_context")
+    snap_idx = call_order.index("snapshot_load")
+    process_idx = call_order.index("process_token")
+    flush_idx = call_order.index("pipeline_flush")
+    persist_idx = call_order.index("persist_response")
+    close_idx = call_order.index("pipeline_aclose")
+    release_idx = call_order.index("queue_release")
+    compact_idx = call_order.index("schedule_compaction")
+
+    assert (
+        acquire_idx
+        < ctx_idx
+        < snap_idx
+        < process_idx
+        < flush_idx
+        < persist_idx
+        < close_idx
+        < release_idx
+        <= compact_idx
+    )
+
+
+@pytest.mark.asyncio
+async def test_t022_invalid_readiness_block_cleanup_ordering() -> None:
+    """Requirement 2: Invalid-Readiness Block Cleanup
+    - ProjectionBlockedException(error_code="READINESS_RESPONSE_INVALID", error_message="Booking readiness projection failed.")
+    - Enforce 4-step causal failure cleanup: partial persist (if tokens emitted) -> pipeline close (non-flushing) -> lease release.
+    - Emits terminal ErrorEvent(READINESS_RESPONSE_INVALID).
+    - Strictly zero ActionRequiredEvent emitted.
+    """
+    call_order: list[str] = []
+
+    mock_queue = MagicMock()
+    mock_queue.acquire = AsyncMock(return_value="req-t022-readiness")
+    mock_queue.get_fence = MagicMock(return_value=12)
+    mock_queue.validate_active_fence = AsyncMock(return_value=True)
+
+    async def tracked_release(session_id: str, req_id: str) -> None:
+        call_order.append("queue_release")
+
+    mock_queue.release = AsyncMock(side_effect=tracked_release)
+
+    mock_client = MagicMock()
+    mock_client.set_fencing_token = MagicMock()
+    mock_client.get_memory = AsyncMock(
+        return_value={"recentMessages": [], "summary": None, "totalMessageCount": 0}
+    )
+
+    async def tracked_create_batch(
+        session_id: str,
+        messages: list[dict[str, object]],
+    ) -> dict[str, object]:
+        if any(m.get("sender") == "USER" for m in messages) and not any(
+            m.get("sender") == "AGENT" for m in messages
+        ):
+            call_order.append("user_pre_persist")
+        else:
+            call_order.append("partial_persist")
+        return {"messages": [{"id": "partial-readiness-id", "sender": "AGENT"}]}
+
+    mock_client.create_message_batch = AsyncMock(side_effect=tracked_create_batch)
+
+    class TrackingOutputStreamSession:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            self.closed = False
+            self.flushed = False
+
+        async def process_token(self, token: str) -> AsyncIterator[str]:
+            call_order.append("process_token")
+            yield token
+
+        async def flush(self) -> AsyncIterator[str]:
+            call_order.append("pipeline_flush")
+            self.flushed = True
+            if False:
+                yield ""
+
+        async def aclose(self) -> None:
+            call_order.append("pipeline_aclose")
+            self.closed = True
+
+        def close(self) -> None:
+            call_order.append("pipeline_close")
+            self.closed = True
+
+    tracking_pipeline = TrackingOutputStreamSession()
+
+    mock_graph = MagicMock()
+
+    async def mock_astream_events(
+        *args: object, **kwargs: object
+    ) -> AsyncIterator[dict[str, object]]:
+        # 1. Tokens emitted before failure
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": MagicMock(content="Checking booking readiness... ")},
+        }
+        # 2. Tool result chain end with invalid booking readiness data
+        yield {
+            "event": "on_chain_end",
+            "name": "tools",
+            "data": {
+                "output": {
+                    "messages": [
+                        ToolMessage(
+                            content=json.dumps({"invalid_field": "corrupted payload"}),
+                            name="check_booking_readiness",
+                            tool_call_id="call-readiness-1",
+                            additional_kwargs={"guardrail_validated": True},
+                        )
+                    ]
+                }
+            },
+        }
+
+    mock_graph.astream_events = mock_astream_events
+
+    with (
+        patch(
+            "agent.chat_turn.runner.OutputStreamSession",
+            return_value=tracking_pipeline,
+        ),
+        patch(
+            "agent.chat_turn.resolver.ToolResultResolver.resolve",
+            return_value=ToolResolution(
+                is_blocked=True,
+                error_code="READINESS_RESPONSE_INVALID",
+                error_message="Booking readiness projection failed.",
+            ),
+        ),
+    ):
+        runner = ChatTurnRunner(
+            graph=mock_graph,
+            queue_manager=mock_queue,
+            client_factory=lambda **_kwargs: mock_client,
+            redis_client=MagicMock(),
+        )
+
+        command = ChatTurnCommand(
+            user_id="user-t022",
+            session_id="session-t022-readiness",
+            message="Check readiness",
+            token="jwt.token.val",
+        )
+
+        events = [e async for e in runner.run(command)]
+
+    # Enforce 4-step causal failure cleanup:
+    # 1. partial persist (since tokens were emitted)
+    # 2. pipeline close (non-flushing)
+    # 3. lease release
+    # 4. terminal ErrorEvent
+    assert "partial_persist" in call_order
+    assert "pipeline_aclose" in call_order
+    assert "queue_release" in call_order
+    assert tracking_pipeline.flushed is False
+    assert "pipeline_flush" not in call_order
+
+    persist_idx = call_order.index("partial_persist")
+    close_idx = call_order.index("pipeline_aclose")
+    release_idx = call_order.index("queue_release")
+    assert persist_idx < close_idx < release_idx
+
+    mock_queue.release.assert_awaited_once_with("session-t022-readiness", "req-t022-readiness")
+
+    # Emits terminal ErrorEvent(READINESS_RESPONSE_INVALID)
+    errors = [e for e in events if isinstance(e, ErrorEvent)]
+    assert len(errors) == 1
+    assert errors[0].data.code == "READINESS_RESPONSE_INVALID"
+    assert errors[0].data.message == "Booking readiness projection failed."
+    assert errors[0].data.partialMessageId == "partial-readiness-id"
+
+    # Strictly zero ActionRequiredEvent emitted
+    action_events = [e for e in events if isinstance(e, ActionRequiredEvent)]
+    assert len(action_events) == 0
+
+    # Strictly zero DoneEvent emitted
+    done_events = [e for e in events if isinstance(e, DoneEvent)]
+    assert len(done_events) == 0
+
+
+@pytest.mark.asyncio
+async def test_t022_handoff_node_failure_cleanup_ordering() -> None:
+    """Requirement 3: Handoff Node Failure Cleanup
+    - ProjectionBlockedException(error_code="HANDOFF_FAILED", error_message="Handoff token creation failed.")
+    - Enforce 4-step causal failure cleanup with force_persist=True.
+    - Emits terminal ErrorEvent(HANDOFF_FAILED).
+    - Strictly zero ActionHandoffEvent emitted.
+    """
+    call_order: list[str] = []
+
+    mock_queue = MagicMock()
+    mock_queue.acquire = AsyncMock(return_value="req-t022-handoff")
+    mock_queue.get_fence = MagicMock(return_value=15)
+    mock_queue.validate_active_fence = AsyncMock(return_value=True)
+
+    async def tracked_release(session_id: str, req_id: str) -> None:
+        call_order.append("queue_release")
+
+    mock_queue.release = AsyncMock(side_effect=tracked_release)
+
+    mock_client = MagicMock()
+    mock_client.set_fencing_token = MagicMock()
+    mock_client.get_memory = AsyncMock(
+        return_value={"recentMessages": [], "summary": None, "totalMessageCount": 0}
+    )
+
+    async def tracked_create_batch(
+        session_id: str,
+        messages: list[dict[str, object]],
+    ) -> dict[str, object]:
+        if any(m.get("sender") == "USER" for m in messages) and not any(
+            m.get("sender") == "AGENT" for m in messages
+        ):
+            call_order.append("user_pre_persist")
+        else:
+            call_order.append("partial_persist")
+        return {"messages": [{"id": "partial-handoff-id", "sender": "AGENT"}]}
+
+    mock_client.create_message_batch = AsyncMock(side_effect=tracked_create_batch)
+
+    class TrackingOutputStreamSession:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            self.closed = False
+            self.flushed = False
+
+        async def process_token(self, token: str) -> AsyncIterator[str]:
+            call_order.append("process_token")
+            yield token
+
+        async def flush(self) -> AsyncIterator[str]:
+            call_order.append("pipeline_flush")
+            self.flushed = True
+            if False:
+                yield ""
+
+        async def aclose(self) -> None:
+            call_order.append("pipeline_aclose")
+            self.closed = True
+
+        def close(self) -> None:
+            call_order.append("pipeline_close")
+            self.closed = True
+
+    tracking_pipeline = TrackingOutputStreamSession()
+
+    mock_graph = MagicMock()
+
+    async def mock_astream_events(
+        *args: object, **kwargs: object
+    ) -> AsyncIterator[dict[str, object]]:
+        # Handoff node fails with error in action
+        yield {
+            "event": "on_chain_end",
+            "name": "create_handoff_token",
+            "data": {
+                "output": {
+                    "action": {
+                        "error": "Payment token authorization failed",
+                    }
+                }
+            },
+        }
+
+    mock_graph.astream_events = mock_astream_events
+
+    with patch(
+        "agent.chat_turn.runner.OutputStreamSession",
+        return_value=tracking_pipeline,
+    ):
+        runner = ChatTurnRunner(
+            graph=mock_graph,
+            queue_manager=mock_queue,
+            client_factory=lambda **_kwargs: mock_client,
+            redis_client=MagicMock(),
+        )
+
+        command = ChatTurnCommand(
+            user_id="user-t022",
+            session_id="session-t022-handoff",
+            message="Proceed to payment",
+            token="jwt.token.val",
+        )
+
+        events = [e async for e in runner.run(command)]
+
+    # Enforce 4-step causal failure cleanup with force_persist=True:
+    # 1. partial persist (enforced even if partial_response was empty)
+    # 2. pipeline close (non-flushing)
+    # 3. lease release
+    # 4. terminal ErrorEvent(HANDOFF_FAILED)
+    assert "partial_persist" in call_order
+    assert "pipeline_aclose" in call_order
+    assert "queue_release" in call_order
+    assert tracking_pipeline.flushed is False
+    assert "pipeline_flush" not in call_order
+
+    persist_idx = call_order.index("partial_persist")
+    close_idx = call_order.index("pipeline_aclose")
+    release_idx = call_order.index("queue_release")
+    assert persist_idx < close_idx < release_idx
+
+    mock_queue.release.assert_awaited_once_with("session-t022-handoff", "req-t022-handoff")
+
+    # Emits terminal ErrorEvent(HANDOFF_FAILED)
+    errors = [e for e in events if isinstance(e, ErrorEvent)]
+    assert len(errors) == 1
+    assert errors[0].data.code == "HANDOFF_FAILED"
+    assert errors[0].data.message == "Checkout handoff could not be created."
+    assert errors[0].data.partialMessageId == "partial-handoff-id"
+
+    # Strictly zero ActionHandoffEvent emitted
+    handoff_events = [e for e in events if isinstance(e, ActionHandoffEvent)]
+    assert len(handoff_events) == 0
+
+    # Strictly zero DoneEvent emitted
+    done_events = [e for e in events if isinstance(e, DoneEvent)]
+    assert len(done_events) == 0
+
+
+@pytest.mark.asyncio
+async def test_t022_causal_cleanup_ordering_on_exception() -> None:
+    """Requirement 6: Causal Cleanup Ordering on Exceptions
+    - Unhandled upstream exception strictly executes: partial_persist -> pipeline.close -> queue_manager.release -> terminal ErrorEvent.
+    """
+    call_order: list[str] = []
+
+    mock_queue = MagicMock()
+    mock_queue.acquire = AsyncMock(return_value="req-t022-exc")
+    mock_queue.get_fence = MagicMock(return_value=99)
+    mock_queue.validate_active_fence = AsyncMock(return_value=True)
+
+    async def tracked_release(session_id: str, req_id: str) -> None:
+        call_order.append("queue_release")
+
+    mock_queue.release = AsyncMock(side_effect=tracked_release)
+
+    mock_client = MagicMock()
+    mock_client.set_fencing_token = MagicMock()
+    mock_client.get_memory = AsyncMock(
+        return_value={"recentMessages": [], "summary": None, "totalMessageCount": 0}
+    )
+
+    async def tracked_create_batch(
+        session_id: str,
+        messages: list[dict[str, object]],
+    ) -> dict[str, object]:
+        if any(m.get("sender") == "USER" for m in messages) and not any(
+            m.get("sender") == "AGENT" for m in messages
+        ):
+            call_order.append("user_pre_persist")
+        else:
+            call_order.append("partial_persist")
+        return {"messages": [{"id": "partial-exc-msg-id", "sender": "AGENT"}]}
+
+    mock_client.create_message_batch = AsyncMock(side_effect=tracked_create_batch)
+
+    class TrackingOutputStreamSession:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            self.closed = False
+            self.flushed = False
+
+        async def process_token(self, token: str) -> AsyncIterator[str]:
+            call_order.append("process_token")
+            yield token
+
+        async def flush(self) -> AsyncIterator[str]:
+            call_order.append("pipeline_flush")
+            self.flushed = True
+            if False:
+                yield ""
+
+        async def aclose(self) -> None:
+            call_order.append("pipeline_aclose")
+            self.closed = True
+
+        def close(self) -> None:
+            call_order.append("pipeline_close")
+            self.closed = True
+
+    tracking_pipeline = TrackingOutputStreamSession()
+
+    mock_graph = MagicMock()
+
+    async def mock_astream_events(
+        *args: object, **kwargs: object
+    ) -> AsyncIterator[dict[str, object]]:
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": MagicMock(content="Emitted tokens before crash ")},
+        }
+        raise RuntimeError("Fatal upstream LLM provider connection failure")
+
+    mock_graph.astream_events = mock_astream_events
+
+    with patch(
+        "agent.chat_turn.runner.OutputStreamSession",
+        return_value=tracking_pipeline,
+    ):
+        runner = ChatTurnRunner(
+            graph=mock_graph,
+            queue_manager=mock_queue,
+            client_factory=lambda **_kwargs: mock_client,
+            redis_client=MagicMock(),
+        )
+
+        command = ChatTurnCommand(
+            user_id="user-t022",
+            session_id="session-t022-exc",
+            message="Search flights",
+            token="jwt.token.val",
+        )
+
+        events = [e async for e in runner.run(command)]
+
+    # Causal cleanup sequence: partial_persist -> pipeline.close (non-flushing) -> queue_manager.release -> terminal ErrorEvent
+    assert "partial_persist" in call_order
+    assert "pipeline_aclose" in call_order
+    assert "queue_release" in call_order
+    assert tracking_pipeline.flushed is False
+    assert "pipeline_flush" not in call_order
+
+    persist_idx = call_order.index("partial_persist")
+    close_idx = call_order.index("pipeline_aclose")
+    release_idx = call_order.index("queue_release")
+    assert persist_idx < close_idx < release_idx
+
+    mock_queue.release.assert_awaited_once_with("session-t022-exc", "req-t022-exc")
+
+    errors = [e for e in events if isinstance(e, ErrorEvent)]
+    assert len(errors) == 1
+    assert errors[0].data.code == "LLM_ERROR"
+    assert errors[0].data.message == "The AI model encountered an error. Please try again."
+    assert errors[0].data.partialMessageId == "partial-exc-msg-id"
