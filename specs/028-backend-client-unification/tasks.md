@@ -22,9 +22,9 @@
 **Goal**: Same dashboard outcomes with bounded transient GET recovery.
 **Independent test**: Fake backend recovers on second GET; invalid JSON/schema still maps to non-retryable INVALID_RESPONSE.
 
-- [ ] T008 [US1] Add dashboard tests for 502/503/504 recovery, 429 Retry-After, 500 no-retry, missing token, and invalid JSON/schema distinction in `apps/web/lib/server/dashboard.spec.ts`.
-- [ ] T009 [US1] Migrate `getDashboardSummary` in `apps/web/lib/server/dashboard.ts` to `backendClient.request` with DashboardSummarySchema and preserve existing outcome reason/message/retryable mapping.
-- [ ] T010 [US1] Run `apps/web/lib/server/backend-client.spec.ts` and `apps/web/lib/server/dashboard.spec.ts` using `specs/028-backend-client-unification/quickstart.md`; record parity in `specs/028-backend-client-unification/verification.md`.
+- [x] T008 [US1] Add dashboard tests for 502/503/504 recovery, 429 Retry-After, 500 no-retry, missing token, and invalid JSON/schema distinction in `apps/web/lib/server/dashboard.spec.ts`.
+- [x] T009 [US1] Migrate `getDashboardSummary` in `apps/web/lib/server/dashboard.ts` to `backendClient.request` with DashboardSummarySchema and preserve existing outcome reason/message/retryable mapping.
+- [x] T010 [US1] Run `apps/web/lib/server/backend-client.spec.ts` and `apps/web/lib/server/dashboard.spec.ts` using `specs/028-backend-client-unification/quickstart.md`; record parity in `specs/028-backend-client-unification/verification.md`.
 
 ## Phase 4: User Story 2 - Preserve flight outcomes (P2)
 

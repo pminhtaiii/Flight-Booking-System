@@ -58,7 +58,7 @@
   - Static censuses found no `format_sse` in `chat_turn/events.py`, no tool-name branching or guardrail/gateway construction in `chat_turn/interpreter.py`, and no `Any` in the extracted coordinator, runner, admission, interpreter, resolver, or conversation modules.
   - Full-package Ruff lint and format checks passed. The eight focused decomposition suites passed (184 passed, 1 skipped); the Phase 7 non-Redis regression gate excluding `test_security_performance` passed (1,272 passed, 11 skipped, 20 deselected). Exact commands, exit codes, and timings are in `specs/027-chat-turn-decomposition/verification.md`.
 
-## Feature 028 — Backend Client Unification (Phase 2 foundational client contract complete, 2026-09-26)
+## Feature 028 — Backend Client Unification (Phase 3 User Story 1 complete, 2026-09-26)
 
 - [Feature 028 specification](../specs/028-backend-client-unification/spec.md), [plan](../specs/028-backend-client-unification/plan.md), and [tasks](../specs/028-backend-client-unification/tasks.md) unify the three core web server transport consumers and six booking route response adapters. Dashboard `INVALID_RESPONSE`, booking error-body forwarding, and mutation single-send behavior remain contract requirements.
 - **Phase 1: Baseline Characterization (T001–T004 Complete)**: Locks current behavior in dashboard, flight-search, booking-management, and cancellation route specs. Covers 400/422 message forwarding and fallback, transient mutation single-send, response status/body/header mapping, and provider-ID stripping across 103 baseline tests.
@@ -71,6 +71,16 @@
   - Discriminated transport results: success with validated Zod payload, HTTP failure with status/body, and transport failure with strictly safe cause codes (`missing_token`, `network`, `timeout`, `invalid_json`, `invalid_payload`).
   - Supports bodyless 2xx handling via `responseMode: 'none'` returning `{ ok: true, data: undefined }` without reading response body.
   - Zero-credential privacy invariant: diagnostics log only fixed categorical causes; zero tokens, request bodies, URLs, or PII emitted.
+  - See [execution evidence](../specs/028-backend-client-unification/verification.md).
+- **Phase 3: User Story 1 — Resilient Dashboard Reads (T008–T010 Complete)**:
+  - Migrated `getDashboardSummary` in `apps/web/lib/server/dashboard.ts` to `backendClient.request('/api/dashboard/summary', DashboardSummarySchema)`.
+  - Added bounded transient GET recovery on 502/503/504 and 429 with `Retry-After` header within budget, recovering cleanly on second attempt.
+  - Preserved strict single attempt for deterministic 500 (zero retries) returning retryable `UPSTREAM_UNAVAILABLE`.
+  - Preserved unauthenticated session short-circuit before dispatching HTTP request.
+  - Strictly preserved 100% exact outcome contract parity: reasons (`UNAUTHENTICATED`, `FORBIDDEN`, `INVALID_RESPONSE`, `UPSTREAM_UNAVAILABLE`), exact user-facing error messages, and `retryable` booleans.
+  - Purged obsolete duplicated helpers (`apiUrl`, `getAccessToken`, `REQUEST_TIMEOUT_MS`, bespoke `AbortController`) from `dashboard.ts`.
+  - Zero credential, token, URL, DB error, or stack trace leakage in failure outcomes.
+  - Locked behavior with 24 passing unit tests in `apps/web/lib/server/dashboard.spec.ts` (42 passing across client + dashboard).
   - See [execution evidence](../specs/028-backend-client-unification/verification.md).
 
 ## Feature 026 — Agent Boundary Simplification (Complete - Tasks T001–T037)

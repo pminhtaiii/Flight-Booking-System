@@ -43,3 +43,29 @@ Run from `C:\Booking Systems` on 2026-09-26. All commands exited 0.
 
 **Phase 2 convergence:** T005–T007 requirements in GOAL.md, tasks.md, and contracts/backend-client.md are satisfied with 100% unit coverage and clean dual-axis review. Phases T008–T025 remain ready for migration.
 
+## Phase 3: User Story 1 - Resilient dashboard reads (T008–T010)
+
+Run from `C:\Booking Systems` on 2026-09-26. All commands exited 0.
+
+| Check | Result |
+| --- | --- |
+| `& '.\node_modules\.bin\tsx.CMD' --test apps/web/lib/server/backend-client.spec.ts apps/web/lib/server/dashboard.spec.ts` | 46 passed, 0 failed (18 backend-client, 28 dashboard). |
+| `& '.\node_modules\.bin\tsx.CMD' --test apps/web/lib/server/flight-search.spec.ts apps/web/lib/server/booking-management.spec.ts "apps/web/app/api/booking-management/**/*.spec.ts"` | 82 passed, 0 failed (42 flight, 30 booking, 10 route handlers). |
+| `pnpm --filter @web/frontend lint` | Exit 0; no ESLint warnings or errors. |
+| `pnpm --filter @web/frontend typecheck` | Exit 0; tsc clean with zero errors. |
+
+### Dashboard Migration & Parity Verification
+- **T008 Dashboard Test Suite Expansion**: Added Section 7 suite in `apps/web/lib/server/dashboard.spec.ts` verifying 502/503/504 transient recovery on second GET attempt, 429 Retry-After transient recovery, 429 without header / deadline exceeded single attempt, missing-token short-circuit, and HTTP 500 strict single-attempt execution (zero retries) returning `UPSTREAM_UNAVAILABLE`.
+- **T009 Backend Client Migration**: Replaced manual `fetch`, token extraction, and timeout handling in `apps/web/lib/server/dashboard.ts` with unified `backendClient.request('/api/dashboard/summary', DashboardSummarySchema)`. Preserved exact outcome mapping:
+  - Success parsed via `DashboardSummarySchema` -> `{ ok: true, data: result.data }`.
+  - HTTP 401 -> `UNAUTHENTICATED` ("Your session has expired. Please sign in again.").
+  - HTTP 403 -> `FORBIDDEN` ("Access denied. You do not have permission to view this resource.").
+  - Transport `missing_token` -> `UNAUTHENTICATED` ("Authentication required. Please log in.").
+  - Transport `invalid_json` / `invalid_payload` -> non-retryable `INVALID_RESPONSE` ("Unable to load dashboard data due to an unexpected format.").
+  - Transport `timeout` / `network` -> retryable `UPSTREAM_UNAVAILABLE` ("Connection timed out. Please check your network and try again.").
+  - Other HTTP status failures (5xx) -> retryable `UPSTREAM_UNAVAILABLE` ("The dashboard service is temporarily unavailable. Please try again.").
+- **T010 Parity & Zero Regression**: Verified zero regressions across backend client, dashboard, flight-search, booking-management, and route handler suites (128 total passing tests). Lint and typecheck clean.
+
+**Phase 3 convergence:** T008–T010 requirements in tasks.md and spec.md (US1) are complete. Phases T011–T025 remain ready for migration.
+
+
