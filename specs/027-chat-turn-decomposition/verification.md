@@ -812,7 +812,38 @@ All checks passed!
 | **Dynamic Dependency Resolution Compatibility** | `sse.py` / `QuotaService` | Verified | Thin dependency factories dynamically inspect `sys.modules[__name__]` and module-level attributes, guaranteeing full compatibility with existing test monkeypatches (`patch("agent.streaming.sse.ChatBudgetRepository")`, `patch("agent.streaming.sse.NestJSClient")`, etc.) and direct test function invocations. |
 | **Strict Zero `Any` Typing** | `apps/agent/src/agent/admission/`, `sse.py` | Verified | `git grep -n -w "Any"` yields 0 matches in admission services and modified streaming endpoints. |
 
+---
 
+# Verification Evidence: Phase 6 — User Story 4, Slice 2 (T023–T024)
+
+**Date:** 2026-09-26
+**Scope:** `TurnSessionCoordinator` extraction and controller/SSE integration parity. T022 characterization edits were already present in the working tree and remained intact. No controller, SSE, dependency, or schema change was needed.
+
+## Gates
+
+| Gate | Command / scope | Result |
+|---|---|---|
+| Coordinator focused | `test_chat_turn_runner.py`, `test_stream_session_control.py`, `test_turn_coordinator_cleanup.py` | 47 passed, 1 skipped; exit 0 |
+| Controller/SSE parity | `uv run --package agent pytest apps/agent/tests/test_chat_turn_runner.py apps/agent/tests/test_stream_session_control.py apps/agent/tests/test_sse_integration.py apps/agent/tests/test_chat_controller.py apps/agent/tests/test_chat_admission.py apps/agent/tests/test_sse.py -v` | 126 passed, 1 skipped; exit 0 |
+| Full agent regression | `uv run --package agent pytest apps/agent/tests -m "not redis_integration" -q` | 1,280 passed, 11 skipped, 12 deselected; exit 0 (138.17s) |
+| Ruff | `uv run --package agent ruff check` and `ruff format --check` on `coordinator.py`, `runner.py`, `chat_turn/__init__.py`, `test_turn_coordinator_cleanup.py` | Both exit 0; 4 files formatted |
+| Static | `rg -n '\bAny\b'` on coordinator/runner; `git diff --check` | Zero `Any` matches; diff check exit 0 |
+
+For pytest, `PYTHONPATH` was set to `tests/ci/python;apps/agent/src` and `UV_CACHE_DIR` to the repository's `.t093-uv-cache`. The first T024 attempt failed before collection because uv's default cache was inaccessible; the repository-cache rerun passed. Pytest emitted a cache-write warning, with no test failures.
+
+## Lifecycle and parity matrix
+
+| Requirement | Evidence | Status |
+|---|---|---|
+| Sequential ownership | `coordinator.py` owns bootstrap, correlation, fenced lease, snapshot, memory, graph interpretation, output, persistence, and compaction; `runner.py` forwards `run(command, validated_input)` | Verified |
+| Four-step failure cleanup | Approved partial persist → non-flushing output close → lease release → `ErrorEvent`; public runner tests cover blocked, exception, cancellation, timeout, and repeated cancellation | Verified |
+| No detached timed-out batch | New public runner regression confirms batch cancellation completes before pipeline close and lease release | Verified |
+| Stale-fence action suppression | T022 runner/session tests confirm `ActionRequiredEvent` and `ActionHandoffEvent` are not emitted on stale fences; `PERSISTENCE_ERROR` follows cleanup | Verified |
+| Single output session | All tokens use `pipeline.process_token`; one success `pipeline.flush`; error/cancel paths close without flushing | Verified |
+| Single input/context scan | Controller/SSE pass admitted input to runner; conversation memory remains the sole historical-context scan coordinator | Verified |
+| Controller/SSE compatibility | Existing controller stream signature and SSE disconnect `aclose()` chain unchanged; six-file parity suite passed | Verified |
+
+T023 review found a timed-out persistence race and a runner patch-point timing difference. Both were corrected before the final gates. T024 independent review found no controller/SSE change needed. Scoped convergence against T023–T024 and GOAL.md found no remaining action; Phase 7 polish tasks remain outside this slice.
 
 
 

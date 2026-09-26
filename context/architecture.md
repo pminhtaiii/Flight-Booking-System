@@ -1,6 +1,6 @@
 # Architecture
 
-## Feature 027 — Chat Turn Decomposition (In Progress — Phases 1, 2, 3, 4, 5 Complete)
+## Feature 027 — Chat Turn Decomposition (In Progress — Phases 1–5 and Phase 6 Slice 2 Complete)
 
 - [Feature 027 specification](../specs/027-chat-turn-decomposition/spec.md), [plan](../specs/027-chat-turn-decomposition/plan.md), and [tasks](../specs/027-chat-turn-decomposition/tasks.md) decompose Python chat turn event translation, domain projections, memory coordination, admission, and lifecycle while preserving SSE and security contracts.
 - **Phase 1: Event Transport Decoupling (Tasks T001–T003 Complete)**:
@@ -43,6 +43,12 @@
     - Zero-Redis PII short-circuit: Ingress messages with PII immediately return `ErrorEvent(GUARDRAIL_BLOCKED)` SSE stream before quota checks or Redis client initialization.
     - Single-scan guarantee: Validated admission decision forwarded directly through `ChatController.stream()` to runner without redundant re-scanning.
     - Transparent backward compatibility: Direct-call fallback and module-level monkeypatch compatibility for legacy tests.
+- **Phase 6: User Story 4 — Sequential Turn Lifecycle (Tasks T022–T024 Complete)**:
+  - `chat_turn/coordinator.py` owns session bootstrap, fenced lease and snapshot handling, memory retrieval, graph interpretation, one output stream session, persistence, and background compaction.
+  - `chat_turn/runner.py` remains a thin `ChatTurnRunner.run(command, validated_input)` facade; `chat_turn/__init__.py` exports `TurnSessionCoordinator`.
+  - Failure cleanup preserves partial persistence (shielded on cancellation), non-flushing output close, lease release, then terminal error construction. A timed-out partial batch is cancelled and joined before lease release; stale fences suppress action-required and handoff events.
+  - `ChatController.stream` and `streaming/sse.py` retain their existing validated-input and disconnect handling signatures; neither required a code change.
+  - Six-file controller/SSE parity: 126 passed, 1 skipped; full non-Redis agent suite: 1,280 passed, 11 skipped, 12 deselected. Ruff check and format pass for the extracted boundary.
 
 ## Feature 028 — Backend Client Unification (Planned, 2026-09-25)
 
@@ -496,7 +502,7 @@ Planning artifacts: [specification](../specs/024-event-driven-module-deepening/s
 │   │   └── test/                      → API E2E & characterization spec tests
 │   ├── agent/                         → Python/FastAPI agent service
 │   │   ├── src/agent/                 → FastAPI source code
-│   │   │   ├── chat_turn/             → ChatController (thin delegator), ChatTurnRunner (causal cleanup) & event models
+│   │   │   ├── chat_turn/             → ChatController, ChatTurnRunner facade, TurnSessionCoordinator (causal cleanup) & event models
 │   │   │   ├── guardrails/            → GuardrailGateway (direct production layer tuple ownership), OutputGuardrailPipeline, bounded PII scanning, pipeline decisions
 │   │   │   ├── middleware/            → BodyLimitMiddleware (raw ASGI 64 KiB ceiling), auth & rate limit middlewares
 │   │   │   ├── memory/                → MemoryManager (sliding window, lower-trust envelope, summary gateway validation)
@@ -744,7 +750,7 @@ flowchart TD
 
     subgraph AgentService["Python Agent Service (apps/agent:3002)"]
         ThinTransport["Thin SSE Transport Adapter\n(agent/streaming/sse.py)"]
-        TurnRunner["ChatTurnRunner\n(agent/chat_turn/runner.py)\n[Causal 4-Step Cleanup Order]"]
+        TurnRunner["ChatTurnRunner facade → TurnSessionCoordinator\n(agent/chat_turn/runner.py → coordinator.py)\n[Causal 4-Step Cleanup Order]"]
         EventModels["Authoritative Wire Events\n(agent/chat_turn/events.py)\nConfigDict(extra='forbid')"]
         SnapshotLifecycle["TrustedSearchSnapshotLifecycle\n(agent/trusted_search_snapshot/)"]
     end
@@ -925,10 +931,10 @@ The Python Agent (`apps/agent`) operates as a stateless conversational advisor w
      - `project_for_llm`: Generates contiguous 1-indexed results without provider UUIDs, Duffel IDs, or attestation signatures.
      - `project_for_browser`: Projects safe flight cards for frontend streaming.
 
-2. **Chat Turn Runner & Causal Cleanup (`apps/agent/src/agent/chat_turn/`)**:
-   - `ChatTurnRunner`: Transport-agnostic async generator producing authoritative `ChatTurnEvent` wire models (`ConfigDict(extra="forbid")`).
+2. **Chat Turn Coordinator & Causal Cleanup (`apps/agent/src/agent/chat_turn/`)**:
+   - `ChatTurnRunner` retains the transport-agnostic `run(command, validated_input)` entry point and delegates to `TurnSessionCoordinator`, which produces authoritative `ChatTurnEvent` wire models (`ConfigDict(extra="forbid")`).
    - **Deterministic 4-Step Causal Cleanup Order (`_finalize_cleanup`)**:
-     - **Step 1: Persist Safe Partial Turn**: If tokens were emitted and fence is valid, persists partial agent message via NestJS Chat API (`asyncio.shield` protected against cancellation, 1.0s fence check, 3.0s persistence timeout).
+     - **Step 1: Persist Safe Partial Turn**: If tokens were emitted and fence is valid, persists partial agent message via NestJS Chat API (`asyncio.shield` protected against cancellation, 1.0s fence check, 3.0s persistence timeout); timed-out work is cancelled and joined before close/release.
      - **Step 2: Finalize Output Guardrails**: Closes guardrail pipeline (`pipeline.aclose()`, 1.0s timeout).
      - **Step 3: Release Session Lease**: Releases Redis distributed lock (`queue_manager.release(session_id, req_id)`, 2.0s timeout).
      - **Step 4: Emit Terminal ErrorEvent**: Constructs typed `ErrorEvent` for client if caller is still attached.
