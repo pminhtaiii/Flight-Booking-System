@@ -74,6 +74,23 @@ it('sends an authenticated no-store request through the injected factory and val
   assert.equal(requestedInit?.cache, 'no-store');
 });
 
+it('sends one effective Content-Type value for a JSON POST', async (): Promise<void> => {
+  let contentType: string | null = null;
+  globalThis.fetch = mock.fn(async (_url: string | URL | Request, init?: RequestInit): Promise<Response> => {
+    contentType = new Headers(init?.headers).get('Content-Type');
+    return Response.json({ value: 'ok' });
+  }) as typeof fetch;
+
+  const result = await createBackendClient({ tokenProvider: async () => 'token' }).request(
+    '/api/example',
+    z.object({ value: z.string() }),
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+  );
+
+  assert.deepEqual(result, { ok: true, data: { value: 'ok' } });
+  assert.equal(contentType, 'application/json');
+});
+
 it('uses the default session token and URL precedence for each factory', async (): Promise<void> => {
   session = { accessToken: 'session-token' };
   process.env.API_URL = 'http://private.test/';

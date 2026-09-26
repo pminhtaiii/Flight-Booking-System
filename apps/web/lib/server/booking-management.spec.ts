@@ -845,10 +845,8 @@ describe('booking-management server domain module', () => {
         requestedUrl,
         /\/api\/bookings\/booking-uuid-001\/disruptions\/rev-uuid-001\/acknowledge$/,
       );
-      assert.strictEqual(
-        requestedInit?.body,
-        JSON.stringify({ revisionId: 'rev-uuid-001' }),
-      );
+      // User approved this correction on 2026-09-26: pre-unification acknowledge requests had no body.
+      assert.strictEqual(requestedInit?.body, undefined);
     });
 
     it('maps 409 conflict upstream to STALE_REVISION reason', async () => {
@@ -926,10 +924,8 @@ describe('booking-management server domain module', () => {
         requestedUrl,
         /\/api\/bookings\/booking-uuid-001\/disruptions\/rev-uuid-001\/accept$/,
       );
-      assert.strictEqual(
-        requestedInit?.body,
-        JSON.stringify({ revisionId: 'rev-uuid-001' }),
-      );
+      // User approved this correction on 2026-09-26: pre-unification accept requests had no body.
+      assert.strictEqual(requestedInit?.body, undefined);
     });
 
     it('maps 409 conflict upstream to STALE_REVISION reason on accept', async () => {
