@@ -105,12 +105,13 @@ describe('apps/web/app/api/booking-management/bookings/[bookingId]/cancellation/
       assert.equal(res.headers.get('Cache-Control'), 'private, no-store');
     });
 
-    it('maps outcome failures: UNAUTHENTICATED -> 401, FORBIDDEN -> 403, NOT_FOUND -> 404, INVALID_COMMAND -> 400, UPSTREAM_UNAVAILABLE -> 503', async () => {
+    it('maps outcome failures: INVALID_COMMAND -> 400, UNAUTHENTICATED -> 401, FORBIDDEN -> 403, NOT_FOUND -> 404, STALE_REVISION -> 409, UPSTREAM_UNAVAILABLE -> 503', async () => {
       const cases = [
+        { reason: 'INVALID_COMMAND' as const, status: 400, message: 'Invalid command' },
         { reason: 'UNAUTHENTICATED' as const, status: 401, message: 'Must be logged in' },
         { reason: 'FORBIDDEN' as const, status: 403, message: 'Access denied' },
         { reason: 'NOT_FOUND' as const, status: 404, message: 'Booking not found' },
-        { reason: 'INVALID_COMMAND' as const, status: 400, message: 'Invalid command' },
+        { reason: 'STALE_REVISION' as const, status: 409, message: 'Revision conflict' },
         { reason: 'UPSTREAM_UNAVAILABLE' as const, status: 503, message: 'Upstream unavailable' },
       ];
 

@@ -6,10 +6,10 @@
 
 ## Phase 1: Setup and baseline
 
-- [ ] T001 Characterize current dashboard 401/403, timeout, malformed JSON/schema, and success outcomes in `apps/web/lib/server/dashboard.spec.ts`.
-- [ ] T002 [P] Characterize flight search POST, offer GET, auth, status, and view mapping in `apps/web/lib/server/flight-search.spec.ts`.
-- [ ] T003 [P] Characterize all eight booking-management operations, 400/422 message forwarding, mutation send count, and status mapping in `apps/web/lib/server/booking-management.spec.ts`.
-- [ ] T004 [P] Characterize booking response status/body/header mapping in `apps/web/app/api/booking-management/bookings/[bookingId]/cancellation/route.spec.ts` and `apps/web/app/api/booking-management/bookings/[bookingId]/cancellation/quote/route.spec.ts`.
+- [x] T001 Characterize current dashboard 401/403, timeout, malformed JSON/schema, and success outcomes in `apps/web/lib/server/dashboard.spec.ts`.
+- [x] T002 [P] Characterize flight search POST, offer GET, auth, status, and view mapping in `apps/web/lib/server/flight-search.spec.ts`.
+- [x] T003 [P] Characterize all eight booking-management operations, 400/422 message forwarding, mutation send count, and status mapping in `apps/web/lib/server/booking-management.spec.ts`.
+- [x] T004 [P] Characterize booking response status/body/header mapping in `apps/web/app/api/booking-management/bookings/[bookingId]/cancellation/route.spec.ts` and `apps/web/app/api/booking-management/bookings/[bookingId]/cancellation/quote/route.spec.ts`.
 
 ## Phase 2: Foundational client contract
 
