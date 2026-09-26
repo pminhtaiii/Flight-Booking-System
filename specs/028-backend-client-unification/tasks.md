@@ -13,9 +13,9 @@
 
 ## Phase 2: Foundational client contract
 
-- [ ] T005 Write failing factory, default/injected token provider, URL precedence, missing-token, no-store, 10-second attempt timeout, JSON schema/none-mode success, malformed successful JSON versus malformed non-2xx status/body, and safe cause-code tests in `apps/web/lib/server/backend-client.spec.ts`.
-- [ ] T006 Extend `apps/web/lib/server/backend-client.spec.ts` with the exact GET retry matrix, three-attempt and 31-second total caps, 100 ms exponential base, delta/HTTP-date Retry-After including far-future header, 500 and other status no-retry, and all mutation methods single-attempt.
-- [ ] T007 Implement `createBackendClient`, default `backendClient`, inline TransportResult/RequestOpts, parsing/validation, safe diagnostics, and bounded retry in `apps/web/lib/server/backend-client.ts` until T005–T006 pass.
+- [x] T005 Write failing factory, default/injected token provider, URL precedence, missing-token, no-store, 10-second attempt timeout, JSON schema/none-mode success, malformed successful JSON versus malformed non-2xx status/body, and safe cause-code tests in `apps/web/lib/server/backend-client.spec.ts`.
+- [x] T006 Extend `apps/web/lib/server/backend-client.spec.ts` with the exact GET retry matrix, three-attempt and 31-second total caps, 100 ms exponential base, delta/HTTP-date Retry-After including far-future header, 500 and other status no-retry, and all mutation methods single-attempt.
+- [x] T007 Implement `createBackendClient`, default `backendClient`, inline TransportResult/RequestOpts, parsing/validation, safe diagnostics, and bounded retry in `apps/web/lib/server/backend-client.ts` until T005–T006 pass.
 
 ## Phase 3: User Story 1 - Resilient dashboard reads (P1)
 

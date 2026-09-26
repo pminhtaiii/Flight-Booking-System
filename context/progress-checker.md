@@ -1,5 +1,11 @@
 # Progress Tracker
 
+### Feature 028 — Backend Client Unification: Phase 2 Foundational Contract Complete (Tasks T005–T007 Verified) (2026-09-26)
+
+- **T005–T006 TDD Characterization & Unit Suites**: Created comprehensive unit tests in `apps/web/lib/server/backend-client.spec.ts` covering factory creation, default/injected token resolution, URL precedence (`baseUrl` -> `API_URL` -> `NEXT_PUBLIC_API_URL` -> `localhost:3001`), missing-token short-circuit, no-store headers, 10s per-attempt timeout, schema parsing, `responseMode: 'none'` bodyless 2xx handling, malformed response handling, safe transport causes (`missing_token`, `network`, `timeout`, `invalid_json`, `invalid_payload`), GET retry matrix (max 3 attempts, 100ms exponential base, 502/503/504 and 429 Retry-After), 31s total request deadline, and zero mutation replay (`POST`, `PUT`, `PATCH`, `DELETE` single-attempt).
+- **T007 Client Implementation**: Implemented `createBackendClient` and default `backendClient` in `apps/web/lib/server/backend-client.ts`. Enforced strict server-only boundary (`import 'server-only'`), zero client credentials, PII-free diagnostics, deduplicated JSON parsing race, and typed assertions with inline rationale comments.
+- **Dual-Axis Review & Verification Gates**: Dual-axis review passed with parallel subagents (Standards: APPROVED, Spec: APPROVED). Verification gates passed cleanly: `backend-client.spec.ts` (18/18), baseline characterization suites (103/103), web lint (0 warnings/errors), and web typecheck (0 errors).
+
 ### Feature 027 — Chat Turn Decomposition Complete (Phases 1–7, Tasks T001–T027 Verified) (2026-09-26)
 
 - **T025 boundary census**: `chat_turn/events.py` has no `format_sse`; `chat_turn/interpreter.py` has no tool-name branch or guardrail/gateway construction. Validated `tools` chain-end results reach `resolver.resolve`; `on_tool_end` records timing only. Extracted modules have zero `Any` matches.
