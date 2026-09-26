@@ -58,7 +58,7 @@
   - Static censuses found no `format_sse` in `chat_turn/events.py`, no tool-name branching or guardrail/gateway construction in `chat_turn/interpreter.py`, and no `Any` in the extracted coordinator, runner, admission, interpreter, resolver, or conversation modules.
   - Full-package Ruff lint and format checks passed. The eight focused decomposition suites passed (184 passed, 1 skipped); the Phase 7 non-Redis regression gate excluding `test_security_performance` passed (1,272 passed, 11 skipped, 20 deselected). Exact commands, exit codes, and timings are in `specs/027-chat-turn-decomposition/verification.md`.
 
-## Feature 028 — Backend Client Unification (Phase 5 User Story 3 complete, 2026-09-26)
+## Feature 028 — Backend Client Unification (Phases 1–7 complete, 2026-09-26)
 
 - [Feature 028 specification](../specs/028-backend-client-unification/spec.md), [plan](../specs/028-backend-client-unification/plan.md), and [tasks](../specs/028-backend-client-unification/tasks.md) unify the three core web server transport consumers and six booking route response adapters. Dashboard `INVALID_RESPONSE`, booking error-body forwarding, and mutation single-send behavior remain contract requirements.
 - **Phase 1: Baseline Characterization (T001–T004 Complete)**: Locks current behavior in dashboard, flight-search, booking-management, and cancellation route specs. Covers 400/422 message forwarding and fallback, transient mutation single-send, response status/body/header mapping, and provider-ID stripping across 103 baseline tests.
@@ -80,7 +80,7 @@
   - Strictly preserved 100% exact outcome contract parity: reasons (`UNAUTHENTICATED`, `FORBIDDEN`, `INVALID_RESPONSE`, `UPSTREAM_UNAVAILABLE`), exact user-facing error messages, and `retryable` booleans.
   - Purged obsolete duplicated helpers (`apiUrl`, `getAccessToken`, `REQUEST_TIMEOUT_MS`, bespoke `AbortController`) from `dashboard.ts`.
   - Zero credential, token, URL, DB error, or stack trace leakage in failure outcomes.
-  - Locked behavior with 24 passing unit tests in `apps/web/lib/server/dashboard.spec.ts` (42 passing across client + dashboard).
+  - Locked behavior with 28 passing unit tests in `apps/web/lib/server/dashboard.spec.ts` (46 passing across client + dashboard).
   - See [execution evidence](../specs/028-backend-client-unification/verification.md).
 - **Phase 4: User Story 2 — Preserve Flight Outcomes (T011–T013 Complete)**:
   - Migrated `searchFlights` and `selectFlightOffer` in `apps/web/lib/server/flight-search.ts` to `backendClient.request`.
@@ -95,13 +95,22 @@
 - **Phase 5: User Story 3 — Preserve Booking Outcomes (T014–T017 Complete)**:
   - Migrated all eight operations in `apps/web/lib/server/booking-management.ts` to `backendClient.request`.
   - Six JSON-consuming operations (`listBookings`, `getBookingDetail`, `getCancellationStatus`, `getCancellationQuote`, `cancelBooking`, `getItineraryRevisions`) use operation-specific raw response schemas with `.passthrough()`, followed by view mapping and domain view validation.
-  - Disruption mutations (`acknowledgeDisruption`, `acceptDisruption`) use `responseMode: 'none'` with `z.void()`, dispatching `body: JSON.stringify({ revisionId })` and returning `{ ok: true, data: { ok: true } }` on bodyless 200/204.
+  - Disruption mutations (`acknowledgeDisruption`, `acceptDisruption`) use `responseMode: 'none'` with `z.void()`, preserve the original bodyless POST request shape, and return `{ ok: true, data: { ok: true } }` on bodyless 200/204.
   - Preserved 100% exact outcome contract parity: status mapping (401 -> `UNAUTHENTICATED`, 403 -> `FORBIDDEN`, 404 -> `NOT_FOUND`, 409 -> `STALE_REVISION`, 400/422 -> `INVALID_COMMAND` with string message forwarding or default fallback), stripping provider Duffel IDs from view models.
   - Enforced zero automatic mutation replay (single-send) for `getCancellationQuote`, `cancelBooking`, `acknowledgeDisruption`, and `acceptDisruption` on any error/timeout.
   - Enforced bounded GET recovery (up to 3 attempts on 502/503/504) for `listBookings`, `getBookingDetail`, `getCancellationStatus`, and `getItineraryRevisions`.
   - Purged all orphaned transport helpers (`fetchWithRetry`, `apiUrl()`, `getAccessToken()`, `delay()`, `handleUpstreamStatus()`, retry/timeout constants, `NextAuth`, `authOptions`) from `booking-management.ts`.
   - Preserved exact original catch-block copies (`unavailableOutcomeFailure()`) and view safeParse failure messages.
   - Locked behavior with 50 passing unit tests in `apps/web/lib/server/booking-management.spec.ts` (68 passing across client + booking management).
+  - See [execution evidence](../specs/028-backend-client-unification/verification.md).
+- **Phase 6: User Story 4 — Shared Booking Response Mapping (T018–T022 Complete)**:
+  - `apps/web/lib/server/outcome-response.ts` is the sole `mapOutcomeToResponse` definition. All six booking-management route files import it; the seven HTTP operations preserve their methods and parameter validation.
+  - The adapter maps successful `BookingManagementOutcome<T>` values to HTTP 200 and known error reasons to 400, 401, 403, 404, 409, or 503, with a 500 fallback. Every response sets `Cache-Control: private, no-store`.
+  - See [execution evidence](../specs/028-backend-client-unification/verification.md).
+- **Phase 7: Polish and Cross-Cutting Verification (T023–T025 Complete)**:
+  - Censuses found no orphaned transport or parsing helpers in `dashboard.ts`, `flight-search.ts`, or `booking-management.ts`; `backend-client.ts` owns their transport behavior. `outcome-response.ts` has the only response mapper definition, imported by all six booking routes. Scoped TypeScript has zero `any` matches.
+  - All 226 focused tests passed. Web lint, typecheck, and production build exited 0. The feature diff leaves public/shared schemas, Prisma, dependencies, and environment/flag configuration unchanged.
+  - Final review restored bodyless disruption POST requests, removed duplicate `Content-Type` header values on JSON POSTs, and added an explicit client factory return type. The user approved correction of the two existing disruption request assertions.
   - See [execution evidence](../specs/028-backend-client-unification/verification.md).
 
 
@@ -946,7 +955,7 @@ To prevent architectural bloat and cyclic dependencies, the monolithic `BookingS
 
 3. **Cancellation Module (`CancellationModule`)**:
    - `CancellationService`: Dedicated cancellation lifecycle orchestrator:
-     - Cancellation status and quote generation (`POST /bookings/:bookingId/cancellation-quote`).
+     - Cancellation status and quote generation (`GET /bookings/:bookingId/cancellation`, `POST /bookings/:bookingId/cancellation/quote`).
      - Optimistic quote locking via `PENDING_QUOTE` state with expiration deadlines.
      - Supplier cancellation execution with retries (`confirmCancellationWithRetries`) via `DuffelService`.
      - Creation of `CancellationRefundObligation` in integer minor units.
@@ -998,16 +1007,18 @@ The web layer (`apps/web`) establishes a strict server boundary protecting backe
 
 1. **Server Domain Modules (`apps/web/lib/server/`)**:
    - Protected with the `import 'server-only'` sentinel.
-   - `flight-search.ts`: Acquires NextAuth session, resolves private `API_URL` (`API_URL || NEXT_PUBLIC_API_URL || 'http://localhost:3001'`), bounds requests with 10s timeout and 3-attempt exponential retry policy, validates responses with Zod, and normalizes into shared `FlightSearchOutcome`.
-   - `dashboard.ts`: Acquires the dashboard access token server-side, performs a single `cache: 'no-store'` summary fetch with a 10-second abort boundary, validates the payload with `DashboardSummarySchema`, and normalizes failures into a typed `DashboardOutcome` union without exposing transport details to client components.
-   - `booking-management.ts`: Acquires NextAuth session, resolves private `API_URL`, manages bounded retries (3 attempts on GET reads, fast-fail on POST mutations), validates responses with Zod, strips provider identifiers (Duffel IDs, Stripe IDs, raw snapshots), and normalizes into shared `BookingManagementOutcome`.
+   - `backend-client.ts`: The unified server-side fetch client obtains the NextAuth token, resolves `API_URL || NEXT_PUBLIC_API_URL || 'http://localhost:3001'`, and exits before fetch when the token is missing. It applies a 10-second timeout per attempt and a 31-second total deadline. GET may retry up to three times on network failure, timeout, 502/503/504, or 429 with a valid `Retry-After` that fits the deadline. POST, PUT, PATCH, and DELETE make one attempt. Results use safe transport causes (`missing_token`, `network`, `timeout`, `invalid_json`, `invalid_payload`); `responseMode: 'json'` validates with a caller-provided Zod schema, while `responseMode: 'none'` accepts bodyless 2xx without parsing.
+   - `dashboard.ts`: Calls the shared client for a resilient summary GET and preserves dashboard-specific outcomes, including `INVALID_RESPONSE` for malformed success payloads.
+   - `flight-search.ts`: Calls the shared client for a single-send search POST and bounded-retry offer-selection GET, then maps validated data into provider-free `FlightSearchOutcome` views.
+   - `booking-management.ts`: Calls the shared client for eight operations. Its four POST mutations are single-send; domain mapping strips Duffel and Stripe identifiers and raw snapshots from public `BookingManagementOutcome` views.
+   - `outcome-response.ts`: The sole booking outcome-to-`NextResponse` adapter maps success to 200, known errors to 400/401/403/404/409/503, and unknown errors to 500; every response sets `Cache-Control: private, no-store`.
 
 2. **Thin Same-Origin Route Handlers (`apps/web/app/api/booking-management/`)**:
-   - 7 thin route handlers for interactive polling and mutations:
+   - Six route files expose seven HTTP operations for interactive polling and mutations:
      - `GET /api/booking-management/bookings/[bookingId]`
-     - `POST /api/booking-management/bookings/[bookingId]/cancellation-quote`
-     - `GET /api/booking-management/bookings/[bookingId]/cancellation-status`
-     - `POST /api/booking-management/bookings/[bookingId]/cancel`
+     - `GET /api/booking-management/bookings/[bookingId]/cancellation`
+     - `POST /api/booking-management/bookings/[bookingId]/cancellation`
+     - `POST /api/booking-management/bookings/[bookingId]/cancellation/quote`
      - `POST /api/booking-management/bookings/[bookingId]/disruptions/acknowledge`
      - `POST /api/booking-management/bookings/[bookingId]/disruptions/accept`
      - `GET /api/booking-management/bookings/[bookingId]/revisions`
@@ -1550,19 +1561,19 @@ The whole-stack smoke and sanity test suite runs as a single `smoke-and-sanity` 
 
 ### Slice 5B — Flight Search Server Seam
 
-- `apps/web/lib/server/flight-search.ts` is the Flight Search server-only transport owner. It obtains the NextAuth session itself, resolves `API_URL || NEXT_PUBLIC_API_URL || http://localhost:3001` only on the server, injects the bearer credential, bounds requests with a timeout and three-attempt exponential retry policy, validates NestJS responses with Zod, and normalizes every result into the shared discriminated outcome contracts.
+- `apps/web/lib/server/flight-search.ts` is the Flight Search server-only domain module. It calls `backendClient.request` for a single-send search POST and bounded-retry offer-selection GET, then maps validated NestJS data into the shared discriminated outcome contracts. `backend-client.ts` owns session tokens, backend URL resolution, bearer headers, timeout, retry, and response parsing.
 - `apps/web/app/search/actions.ts` provides the colocated Next.js Server Actions. Search rendering calls the typed action boundary only; `SearchFormClient` receives and stores `FlightSearchOfferView` values containing an opaque local offer ID and display fields, never a JWT, backend URL, provider payload, Duffel identifier, or retry policy.
 - Offer selection revalidates the opaque offer server-to-server and returns the contractually specified encoded checkout path. The server module is protected with the `server-only` sentinel so it cannot be imported into the browser bundle.
 - Playwright uses a loopback Flight Search fixture through private `API_URL` for Server Action coverage. The scoped static characterization audit rejects credential, public transport, direct-fetch, provider/raw payload, and retry-policy markers in the search rendering tree.
 
 ### Slice 5C — Booking Management Server Seam & Client Token Removal
 
-- `apps/web/lib/server/booking-management.ts` is the Booking Management server domain module. It obtains the NextAuth session, resolves private `API_URL`, injects bearer credentials, manages bounded retry/timeout policies (3 bounded attempts on GET reads, fast-fail on POST mutations), validates upstream NestJS responses with Zod, maps typed error reasons (`UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `STALE_REVISION`, `INVALID_COMMAND`, `UPSTREAM_UNAVAILABLE`), and prepares views stripping Stripe IDs, Duffel order IDs, and raw snapshots while preserving owner-facing PNR, status, and itinerary facts. Protected with `import 'server-only'`.
-- `apps/web/app/api/booking-management/` provides 7 thin same-origin Route Handlers:
+- `apps/web/lib/server/booking-management.ts` is the Booking Management server domain module. It calls `backendClient.request` for four bounded-retry GET reads and four single-send POST mutations, maps typed error reasons (`UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `STALE_REVISION`, `INVALID_COMMAND`, `UPSTREAM_UNAVAILABLE`), and prepares views stripping Stripe IDs, Duffel order IDs, and raw snapshots while preserving owner-facing PNR, status, and itinerary facts. Protected with `import 'server-only'`.
+- `apps/web/app/api/booking-management/` provides six thin same-origin route files with seven HTTP operations:
   - `GET /api/booking-management/bookings/[bookingId]`
-  - `POST /api/booking-management/bookings/[bookingId]/cancellation-quote`
-  - `GET /api/booking-management/bookings/[bookingId]/cancellation-status`
-  - `POST /api/booking-management/bookings/[bookingId]/cancel`
+  - `GET /api/booking-management/bookings/[bookingId]/cancellation`
+  - `POST /api/booking-management/bookings/[bookingId]/cancellation`
+  - `POST /api/booking-management/bookings/[bookingId]/cancellation/quote`
   - `POST /api/booking-management/bookings/[bookingId]/disruptions/acknowledge`
   - `POST /api/booking-management/bookings/[bookingId]/disruptions/accept`
   - `GET /api/booking-management/bookings/[bookingId]/revisions`

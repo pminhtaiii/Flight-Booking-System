@@ -1,11 +1,19 @@
 # Progress Tracker
 
+### Feature 028 — Backend Client Unification: 100% Complete (Phases 1–7, Tasks T001–T025 Verified) (2026-09-26)
+
+- **Final gate:** 226/226 focused tests passed with zero failures or skips. The six domain/parity specs passed 216/216; the two literal `[bookingId]` route specs passed 7/7 and 3/3 when run directly. Web lint, typecheck, and production build each exited 0; the build generated 23/23 static pages.
+- **Architecture:** `backend-client.ts` exclusively owns server-side token, URL, timeout, retry, and response parsing behavior. GET may retry up to three times within a 31-second total budget; POST/PUT/PATCH/DELETE are single-send. The three domain modules preserve their exact outcomes and provider-safe projections. `outcome-response.ts` is the sole booking `BookingManagementOutcome` → `NextResponse` mapper; all six route files import it.
+- **Censuses and scope:** No orphaned transport/parsing helpers remain in the three consumers, no duplicated route mapper exists, and scoped TypeScript has zero `any` matches. The feature diff changes no public/shared schemas, Prisma files, dependencies, or environment/feature-flag configuration.
+- **Final review corrections:** Restored bodyless disruption POST requests with user-approved updates to two test assertions, prevented duplicate effective `Content-Type` values on JSON POSTs, and added an explicit client factory return type. The generated TypeScript build cache was restored to its pre-feature state.
+- **Evidence:** Full commands, counts, exit codes, and timing are in [verification](../specs/028-backend-client-unification/verification.md); all tasks are tracked in [tasks](../specs/028-backend-client-unification/tasks.md).
+
 ### Feature 028 — Backend Client Unification: Phase 6 / User Story 4 Complete (Tasks T018–T022 Verified) (2026-09-26)
 
 - Added booking-specific `apps/web/lib/server/outcome-response.ts` as the sole `BookingManagementOutcome` → `NextResponse` mapper; all six booking route files import it. The seven HTTP operations retain their methods, `dynamic` exports, parameter validation, signatures, status/body mapping, and `Cache-Control: private, no-store` headers.
 - Added table-driven adapter tests and route parity tests covering seven operations × eight success/error outcomes. The adapter tests were RED before extraction; after migration, the two new specs passed 64/64 and the parity plus existing cancellation route specs passed 66/66.
 - Server regression specs (`backend-client`, `dashboard`, `flight-search`, `booking-management`) passed 151/151. Web lint and typecheck passed with exit code 0. Static census found exactly one `function mapOutcomeToResponse`, in the shared adapter. Independent task and feature reviews found no remaining blocking issues.
-- Evidence is recorded in `specs/028-backend-client-unification/verification.md`; T018–T022 are checked in `tasks.md`. Phase 7 polish (T023–T025) remains planned.
+- Evidence from this Phase 6 checkpoint is recorded in `specs/028-backend-client-unification/verification.md`; T018–T022 were checked before Phase 7 began.
 
 ### Feature 028 — Backend Client Unification: Phase 5 / User Story 3 Complete (Tasks T014–T017 Verified) (2026-09-26)
 
@@ -19,7 +27,7 @@
 - **T015 & T016 Backend Client Migration**:
   - Migrated all eight operations in `apps/web/lib/server/booking-management.ts` to `backendClient.request`.
   - Six JSON operations use operation-specific raw response schemas (`RawBookingListResponseSchema`, `RawBookingDetailResponseSchema`, `RawCancellationStatusResponseSchema`, `RawCancellationQuoteResponseSchema`, `RawCancellationResultResponseSchema`, `RawItineraryRevisionsResponseSchema`) with `.passthrough()`.
-  - Disruption mutations (`acknowledgeDisruption`, `acceptDisruption`) use `z.void()`, `responseMode: 'none'`, and pass `body: JSON.stringify({ revisionId: revisionId.trim() })`.
+  - Disruption mutations (`acknowledgeDisruption`, `acceptDisruption`) use `z.void()`, `responseMode: 'none'`, and retain the original bodyless POST request shape.
   - Removed all orphaned transport helpers and constants: `fetchWithRetry`, `apiUrl()`, `getAccessToken()`, `delay()`, `handleUpstreamStatus()`, `MAX_READ_ATTEMPTS`, `RETRY_BASE_DELAY_MS`, `REQUEST_TIMEOUT_MS`, `FetchResult`, `NextAuth`, and `authOptions`.
   - Preserved raw custom header casing in `backend-client.ts` to support exact header contracts.
 - **T017 Verification Gates & Parity**: Executed full verification suite with zero errors and exit code 0 across all checks:
@@ -198,7 +206,7 @@
   - **T003: Verified Parity & Recorded Evidence**: All 112 focused tests passed (111 passed, 1 skipped). Static boundary census confirmed `def format_sse` exists only in `apps/agent/src/agent/streaming/sse.py`. Recorded execution metrics, commit hashes (`360ca39e`, `37fcf8db`), and exact parity confirmation in `specs/027-chat-turn-decomposition/verification.md`. Updated `specs/027-chat-turn-decomposition/tasks.md` marking T001–T003 complete.
 
 ### Feature 028 — Backend Client Unification: Phase 1 complete (T001–T004 verified, 2026-09-26)
-- [Spec](../specs/028-backend-client-unification/spec.md), [plan](../specs/028-backend-client-unification/plan.md), [tasks](../specs/028-backend-client-unification/tasks.md), and [verification](../specs/028-backend-client-unification/verification.md). Dashboard, flight search, all eight booking operations, and both cancellation route adapters have characterization baselines. Combined server specs passed 93/93; cancellation routes passed 7/7 and 3/3; web lint and typecheck passed. T005–T025 remain open; no production transport migration has begun.
+- [Spec](../specs/028-backend-client-unification/spec.md), [plan](../specs/028-backend-client-unification/plan.md), [tasks](../specs/028-backend-client-unification/tasks.md), and [verification](../specs/028-backend-client-unification/verification.md). At this Phase 1 checkpoint, dashboard, flight search, all eight booking operations, and both cancellation route adapters had characterization baselines. Combined server specs passed 93/93; cancellation routes passed 7/7 and 3/3; web lint and typecheck passed. T005–T025 were still open before production transport migration began.
  
 ### Feature 026 — Agent Boundary Simplification: Phase 5 Complete / Feature 100% Complete (Tasks T033–T037 Verified) (2026-09-24)
 
@@ -2669,9 +2677,10 @@ the current status.
 ### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 5C: Booking Management Server Seams & Client Token Removal
 
 - [x] Slice 5C / Booking Management Server Seams & Client Token Removal (2026-08-26):
+  - This is the historical Slice 5C checkpoint. Feature 028 later moved token, URL, timeout, retry, and parsing ownership to `backend-client.ts`; Feature 025 later normalized the cancellation route URLs.
   - **Server-Only Domain Module (`apps/web/lib/server/booking-management.ts`)**:
     - Implemented 8 authoritative operations: `listBookings`, `getBookingDetail`, `getCancellationStatus`, `getCancellationQuote`, `cancelBooking`, `acknowledgeDisruption`, `acceptDisruption`, and `getItineraryRevisions`.
-    - Owns NextAuth token resolution, private `API_URL` fallback, 10s request timeouts, bounded 3x retries on idempotent GET reads, fast-fail on POST mutations, upstream Zod validation, and typed error reason mapping (`UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `STALE_REVISION`, `INVALID_COMMAND`, `UPSTREAM_UNAVAILABLE`).
+    - At this checkpoint, it owned NextAuth token resolution, private `API_URL` fallback, 10s request timeouts, bounded 3x retries on idempotent GET reads, fast-fail on POST mutations, upstream Zod validation, and typed error reason mapping (`UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `STALE_REVISION`, `INVALID_COMMAND`, `UPSTREAM_UNAVAILABLE`).
     - Strips all internal provider IDs (Stripe IDs, Duffel order/quote IDs, internal raw payloads) while preserving owner-facing PNR, status, disruption, and itinerary facts.
     - Comprehensive unit test suite in `apps/web/lib/server/booking-management.spec.ts` (21/21 tests PASS).
   - **Same-Origin Route Handlers (`apps/web/app/api/booking-management/`)**:

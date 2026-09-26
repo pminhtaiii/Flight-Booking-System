@@ -9,6 +9,9 @@ export type TransportResult<T> =
   | { ok: false; kind: 'http'; status: number; body?: unknown }
   | { ok: false; kind: 'transport'; cause: 'missing_token' | 'network' | 'timeout' | 'invalid_json' | 'invalid_payload' };
 export type RequestOpts = RequestInit & { responseMode?: 'json' | 'none' };
+type BackendClient = {
+  request: <T>(path: string, schema: ZodType<T>, opts?: RequestOpts) => Promise<TransportResult<T>>;
+};
 type TransportCause = Extract<TransportResult<unknown>, { kind: 'transport' }>['cause'];
 const ATTEMPT_TIMEOUT_MS = 10_000;
 const TOTAL_TIMEOUT_MS = 31_000;
@@ -46,7 +49,7 @@ async function parseJsonWithTimeout(
   ]);
 }
 
-export function createBackendClient(config: { tokenProvider?: TokenProvider; baseUrl?: string } = {}) {
+export function createBackendClient(config: { tokenProvider?: TokenProvider; baseUrl?: string } = {}): BackendClient {
   return {
     async request<T>(path: string, schema: ZodType<T>, opts: RequestOpts = {}): Promise<TransportResult<T>> {
       const deadline = Date.now() + TOTAL_TIMEOUT_MS;
@@ -59,8 +62,9 @@ export function createBackendClient(config: { tokenProvider?: TokenProvider; bas
             (opts.headers as Record<string, string>)
           : {};
       const headers: Record<string, string> = {
-        ...Object.fromEntries(new Headers(opts.headers).entries()),
-        ...rawCustomHeaders,
+        ...(Object.keys(rawCustomHeaders).length > 0
+          ? rawCustomHeaders
+          : Object.fromEntries(new Headers(opts.headers).entries())),
         Authorization: `Bearer ${token}`,
         'Cache-Control': 'no-store',
       };

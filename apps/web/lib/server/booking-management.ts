@@ -471,7 +471,6 @@ export async function acknowledgeDisruption(
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ revisionId: revisionId.trim() }),
     },
   );
 
@@ -509,7 +508,6 @@ export async function acceptDisruption(
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ revisionId: revisionId.trim() }),
     },
   );
 

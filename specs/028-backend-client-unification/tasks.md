@@ -58,9 +58,9 @@
 
 ## Phase 7: Polish and cross-cutting verification
 
-- [ ] T023 Remove orphaned URL/token/retry/timeout/parsing helpers from `apps/web/lib/server/flight-search.ts`, `apps/web/lib/server/booking-management.ts`, and `apps/web/lib/server/dashboard.ts`; verify only `apps/web/lib/server/backend-client.ts` owns them.
-- [ ] T024 Run focused tests, web lint, typecheck, and build from `specs/028-backend-client-unification/quickstart.md`; record exit codes and no public/Prisma/dependency diff in `specs/028-backend-client-unification/verification.md`.
-- [ ] T025 Update `context/architecture.md` and `context/progress-checker.md` with implemented boundaries and verified task status; do not mark planned work complete before the gate passes.
+- [x] T023 Remove orphaned URL/token/retry/timeout/parsing helpers from `apps/web/lib/server/flight-search.ts`, `apps/web/lib/server/booking-management.ts`, and `apps/web/lib/server/dashboard.ts`; verify only `apps/web/lib/server/backend-client.ts` owns them.
+- [x] T024 Run focused tests, web lint, typecheck, and build from `specs/028-backend-client-unification/quickstart.md`; record exit codes and no public/Prisma/dependency diff in `specs/028-backend-client-unification/verification.md`.
+- [x] T025 Update `context/architecture.md` and `context/progress-checker.md` with implemented boundaries and verified task status; do not mark planned work complete before the gate passes.
 
 ## Dependencies
 
