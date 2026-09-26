@@ -1,5 +1,16 @@
 # Progress Tracker
 
+### Feature 028 — Backend Client Unification: Phase 3 / User Story 1 Complete (Tasks T008–T010 Verified) (2026-09-26)
+
+- **T008 Dashboard Characterization & Retry Policy Tests**: Extended `apps/web/lib/server/dashboard.spec.ts` with transient 502/503/504 recovery assertions (successful second attempt), 429 Retry-After handling, strict HTTP 500 single-attempt assertion (zero retries), missing token handling, and malformed payload schema rejection.
+- **T009 Backend Client Migration**: Migrated `getDashboardSummary` in `apps/web/lib/server/dashboard.ts` to `backendClient.request` using `DashboardSummarySchema`. Preserved exact dashboard outcome types, HTTP status mappings (401 -> `UNAUTHENTICATED`, 403 -> `FORBIDDEN`, 5xx -> `UPSTREAM_UNAVAILABLE`), transport cause mappings (`missing_token` -> `UNAUTHENTICATED`, `invalid_json`/`invalid_payload` -> `INVALID_RESPONSE`, `timeout` -> `UPSTREAM_UNAVAILABLE`), and zero PII/credential leakage.
+- **T010 Verification Gates & Parity**: Executed full verification suite with zero errors and exit code 0 across all checks:
+  - `backend-client.spec.ts` and `dashboard.spec.ts`: 42 passed, 0 failed.
+  - `flight-search.spec.ts`, `booking-management.spec.ts`, and booking API route tests: 82 passed, 0 failed.
+  - `@web/frontend` lint: 0 warnings, 0 errors.
+  - `@web/frontend` typecheck: clean (`tsc --noEmit`).
+  - Recorded verification evidence and marked T008–T010 complete in `specs/028-backend-client-unification/tasks.md` and `verification.md`.
+
 ### Feature 028 — Backend Client Unification: Phase 2 Foundational Contract Complete (Tasks T005–T007 Verified) (2026-09-26)
 
 - **T005–T006 TDD Characterization & Unit Suites**: Created comprehensive unit tests in `apps/web/lib/server/backend-client.spec.ts` covering factory creation, default/injected token resolution, URL precedence (`baseUrl` -> `API_URL` -> `NEXT_PUBLIC_API_URL` -> `localhost:3001`), missing-token short-circuit, no-store headers, 10s per-attempt timeout, schema parsing, `responseMode: 'none'` bodyless 2xx handling, malformed response handling, safe transport causes (`missing_token`, `network`, `timeout`, `invalid_json`, `invalid_payload`), GET retry matrix (max 3 attempts, 100ms exponential base, 502/503/504 and 429 Retry-After), 31s total request deadline, and zero mutation replay (`POST`, `PUT`, `PATCH`, `DELETE` single-attempt).

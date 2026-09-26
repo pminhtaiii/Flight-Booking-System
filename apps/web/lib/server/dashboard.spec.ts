@@ -657,4 +657,152 @@ describe('dashboard server loader (getDashboardSummary)', () => {
       }
     });
   });
+
+  describe('7. Transient Recovery and Retry Policy', () => {
+    it('recovers when first GET fails with 502, 503, or 504 and second GET returns 200 with valid summary data', async () => {
+      for (const status of [502, 503, 504]) {
+        let fetchCount = 0;
+        globalThis.fetch = async (): Promise<Response> => {
+          fetchCount += 1;
+          if (fetchCount === 1) {
+            return new Response(JSON.stringify({ message: `HTTP ${status}` }), { status });
+          }
+          return new Response(JSON.stringify(mockValidSummary), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        };
+
+        const outcome = await getDashboardSummary();
+
+        assert.deepEqual(outcome, { ok: true, data: mockValidSummary });
+        assert.strictEqual(fetchCount, 2, `expected 2 fetch calls for transient ${status} recovery`);
+      }
+    });
+
+    it("recovers when first GET fails with 429 with 'Retry-After: 0.1' and second GET returns 200 with valid summary data", async () => {
+      let fetchCount = 0;
+      globalThis.fetch = async (): Promise<Response> => {
+        fetchCount += 1;
+        if (fetchCount === 1) {
+          return new Response(JSON.stringify({ message: 'Too Many Requests' }), {
+            status: 429,
+            headers: { 'Retry-After': '0.1' },
+          });
+        }
+        return new Response(JSON.stringify(mockValidSummary), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      };
+
+      const outcome = await getDashboardSummary();
+
+      assert.deepEqual(outcome, { ok: true, data: mockValidSummary });
+      assert.strictEqual(fetchCount, 2);
+    });
+
+    it('verifies HTTP 500 makes strictly a single attempt (zero retries) and returns UPSTREAM_UNAVAILABLE failure', async () => {
+      let fetchCount = 0;
+      globalThis.fetch = async (): Promise<Response> => {
+        fetchCount += 1;
+        if (fetchCount === 1) {
+          return new Response(JSON.stringify({ message: 'Internal Server Error' }), { status: 500 });
+        }
+        return new Response(JSON.stringify(mockValidSummary), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      };
+
+      const outcome = await getDashboardSummary();
+
+      assert.deepEqual(outcome, {
+        ok: false,
+        reason: 'UPSTREAM_UNAVAILABLE',
+        retryable: true,
+        message: 'The dashboard service is temporarily unavailable. Please try again.',
+      });
+      assert.strictEqual(fetchCount, 1);
+    });
+
+    it('verifies HTTP 429 without Retry-After makes single attempt (zero retries) and returns UPSTREAM_UNAVAILABLE failure', async () => {
+      let fetchCount = 0;
+      globalThis.fetch = async (): Promise<Response> => {
+        fetchCount += 1;
+        return new Response(JSON.stringify({ message: 'Too Many Requests' }), { status: 429 });
+      };
+
+      const outcome = await getDashboardSummary();
+
+      assert.deepEqual(outcome, {
+        ok: false,
+        reason: 'UPSTREAM_UNAVAILABLE',
+        retryable: true,
+        message: 'The dashboard service is temporarily unavailable. Please try again.',
+      });
+      assert.strictEqual(fetchCount, 1);
+    });
+
+    it('verifies HTTP 429 with far-future Retry-After exceeding budget makes single attempt and returns UPSTREAM_UNAVAILABLE failure', async () => {
+      let fetchCount = 0;
+      globalThis.fetch = async (): Promise<Response> => {
+        fetchCount += 1;
+        return new Response(JSON.stringify({ message: 'Too Many Requests' }), {
+          status: 429,
+          headers: { 'Retry-After': '120' },
+        });
+      };
+
+      const outcome = await getDashboardSummary();
+
+      assert.deepEqual(outcome, {
+        ok: false,
+        reason: 'UPSTREAM_UNAVAILABLE',
+        retryable: true,
+        message: 'The dashboard service is temporarily unavailable. Please try again.',
+      });
+      assert.strictEqual(fetchCount, 1);
+    });
+
+    it('US1: verifies missing-token short-circuits immediately without calling fetch and returns UNAUTHENTICATED', async () => {
+      session = null;
+      let fetchCount = 0;
+      globalThis.fetch = async (): Promise<Response> => {
+        fetchCount += 1;
+        return new Response(JSON.stringify(mockValidSummary), { status: 200 });
+      };
+
+      const outcome = await getDashboardSummary();
+
+      assert.deepEqual(outcome, {
+        ok: false,
+        reason: 'UNAUTHENTICATED',
+        retryable: false,
+        message: 'Authentication required. Please log in.',
+      });
+      assert.strictEqual(fetchCount, 0, 'fetch must not be called when token is missing');
+    });
+
+    it('US1: verifies schema validation failure returns non-retryable INVALID_RESPONSE distinct from transport or auth failures', async () => {
+      let fetchCount = 0;
+      globalThis.fetch = async (): Promise<Response> => {
+        fetchCount += 1;
+        return new Response(JSON.stringify({ invalid: 'shape' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      };
+
+      const outcome = await getDashboardSummary();
+
+      assert.deepEqual(outcome, {
+        ok: false,
+        reason: 'INVALID_RESPONSE',
+        retryable: false,
+        message: 'Unable to load dashboard data due to an unexpected format.',
+      });
+      assert.strictEqual(fetchCount, 1, 'invalid payload schema failure must not retry');
+    });
+  });
 });

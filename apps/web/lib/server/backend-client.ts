@@ -53,9 +53,11 @@ export function createBackendClient(config: { tokenProvider?: TokenProvider; bas
       const token = await (config.tokenProvider ?? defaultTokenProvider)();
       if (!token?.trim()) return transportFailure('missing_token');
       const baseUrl = (config.baseUrl || process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001').replace(/\/+$/, '');
-      const headers = new Headers(opts.headers);
-      headers.set('Authorization', `Bearer ${token}`);
-      headers.set('Cache-Control', 'no-store');
+      const headers: Record<string, string> = {
+        ...Object.fromEntries(new Headers(opts.headers).entries()),
+        Authorization: `Bearer ${token}`,
+        'Cache-Control': 'no-store',
+      };
       const { responseMode, ...fetchOpts } = opts;
       const isGet = (opts.method ?? 'GET').toUpperCase() === 'GET';
       const maxAttempts = isGet ? MAX_GET_ATTEMPTS : 1;
@@ -71,10 +73,17 @@ export function createBackendClient(config: { tokenProvider?: TokenProvider; bas
           }, Math.min(ATTEMPT_TIMEOUT_MS, remaining));
         });
         const fetchResult = fetch(`${baseUrl}${path}`, {
-          ...fetchOpts, headers, cache: 'no-store', signal: controller.signal,
+          ...fetchOpts,
+          method: opts.method ?? 'GET',
+          headers,
+          cache: 'no-store',
+          signal: controller.signal,
         }).then(
           (response): { kind: 'response'; response: Response } => ({ kind: 'response', response }),
-          (): { kind: 'network' } => ({ kind: 'network' }),
+          (error: unknown): { kind: 'network' | 'timeout' } => {
+            const isAbort = controller.signal.aborted || isAbortOrTimeoutError(error);
+            return { kind: isAbort ? 'timeout' : 'network' };
+          },
         );
         const outcome = await Promise.race([fetchResult, timeoutResult]);
 
@@ -138,6 +147,16 @@ async function waitWithinDeadline(delayMs: number, deadline: number): Promise<bo
   if (delayMs >= deadline - Date.now()) return false;
   await new Promise<void>((resolve): void => { setTimeout(resolve, delayMs); });
   return Date.now() < deadline;
+}
+
+function isAbortOrTimeoutError(error: unknown): boolean {
+  if (error instanceof Error) {
+    return error.name === 'AbortError' || error.name === 'TimeoutError';
+  }
+  if (typeof error === 'object' && error !== null && 'name' in error) {
+    return error.name === 'AbortError' || error.name === 'TimeoutError';
+  }
+  return false;
 }
 
 export const backendClient = createBackendClient();
