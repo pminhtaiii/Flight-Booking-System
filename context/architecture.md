@@ -58,10 +58,20 @@
   - Static censuses found no `format_sse` in `chat_turn/events.py`, no tool-name branching or guardrail/gateway construction in `chat_turn/interpreter.py`, and no `Any` in the extracted coordinator, runner, admission, interpreter, resolver, or conversation modules.
   - Full-package Ruff lint and format checks passed. The eight focused decomposition suites passed (184 passed, 1 skipped); the Phase 7 non-Redis regression gate excluding `test_security_performance` passed (1,272 passed, 11 skipped, 20 deselected). Exact commands, exit codes, and timings are in `specs/027-chat-turn-decomposition/verification.md`.
 
-## Feature 028 — Backend Client Unification (Phase 1 baseline complete, 2026-09-26)
+## Feature 028 — Backend Client Unification (Phase 2 foundational client contract complete, 2026-09-26)
 
 - [Feature 028 specification](../specs/028-backend-client-unification/spec.md), [plan](../specs/028-backend-client-unification/plan.md), and [tasks](../specs/028-backend-client-unification/tasks.md) unify the three core web server transport consumers and six booking route response adapters. Dashboard `INVALID_RESPONSE`, booking error-body forwarding, and mutation single-send behavior remain contract requirements.
-- Phase 1 (T001–T004) locks current behavior in dashboard, flight-search, booking-management, and two cancellation route specs. All eight booking operations are represented; 400/422 message forwarding and fallback, transient mutation single-send, response status/body/header mapping, and provider-ID stripping are covered. This phase changes tests only; the shared client and route adapter remain planned. See [execution evidence](../specs/028-backend-client-unification/verification.md).
+- **Phase 1: Baseline Characterization (T001–T004 Complete)**: Locks current behavior in dashboard, flight-search, booking-management, and cancellation route specs. Covers 400/422 message forwarding and fallback, transient mutation single-send, response status/body/header mapping, and provider-ID stripping across 103 baseline tests.
+- **Phase 2: Foundational Client Contract (T005–T007 Complete)**:
+  - Extracted unified server-to-server client factory `createBackendClient` and default instance `backendClient` in `apps/web/lib/server/backend-client.ts`.
+  - Enforces `server-only` execution boundary, dynamic `API_URL` resolution precedence (`baseUrl` -> `API_URL` -> `NEXT_PUBLIC_API_URL` -> `localhost:3001`), missing-token short-circuit before fetch (`missing_token`), and mandatory `Cache-Control: no-store`.
+  - Enforces strict GET retry matrix (max 3 attempts, 100ms exponential base delay, 502/503/504 and 429 Retry-After support with delta-seconds/HTTP-date parsing; 500 and 4xx fail immediately).
+  - Fast-fails all mutations (`POST`, `PUT`, `PATCH`, `DELETE`) on any result with strictly 1 attempt (zero automatic mutation replay).
+  - Bounded request deadlines: 10s per attempt via `AbortController`, 31s total request deadline bounding all attempts and wait delays.
+  - Discriminated transport results: success with validated Zod payload, HTTP failure with status/body, and transport failure with strictly safe cause codes (`missing_token`, `network`, `timeout`, `invalid_json`, `invalid_payload`).
+  - Supports bodyless 2xx handling via `responseMode: 'none'` returning `{ ok: true, data: undefined }` without reading response body.
+  - Zero-credential privacy invariant: diagnostics log only fixed categorical causes; zero tokens, request bodies, URLs, or PII emitted.
+  - See [execution evidence](../specs/028-backend-client-unification/verification.md).
 
 ## Feature 026 — Agent Boundary Simplification (Complete - Tasks T001–T037)
 
