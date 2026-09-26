@@ -58,7 +58,7 @@
   - Static censuses found no `format_sse` in `chat_turn/events.py`, no tool-name branching or guardrail/gateway construction in `chat_turn/interpreter.py`, and no `Any` in the extracted coordinator, runner, admission, interpreter, resolver, or conversation modules.
   - Full-package Ruff lint and format checks passed. The eight focused decomposition suites passed (184 passed, 1 skipped); the Phase 7 non-Redis regression gate excluding `test_security_performance` passed (1,272 passed, 11 skipped, 20 deselected). Exact commands, exit codes, and timings are in `specs/027-chat-turn-decomposition/verification.md`.
 
-## Feature 028 — Backend Client Unification (Phase 3 User Story 1 complete, 2026-09-26)
+## Feature 028 — Backend Client Unification (Phase 4 User Story 2 complete, 2026-09-26)
 
 - [Feature 028 specification](../specs/028-backend-client-unification/spec.md), [plan](../specs/028-backend-client-unification/plan.md), and [tasks](../specs/028-backend-client-unification/tasks.md) unify the three core web server transport consumers and six booking route response adapters. Dashboard `INVALID_RESPONSE`, booking error-body forwarding, and mutation single-send behavior remain contract requirements.
 - **Phase 1: Baseline Characterization (T001–T004 Complete)**: Locks current behavior in dashboard, flight-search, booking-management, and cancellation route specs. Covers 400/422 message forwarding and fallback, transient mutation single-send, response status/body/header mapping, and provider-ID stripping across 103 baseline tests.
@@ -81,6 +81,16 @@
   - Purged obsolete duplicated helpers (`apiUrl`, `getAccessToken`, `REQUEST_TIMEOUT_MS`, bespoke `AbortController`) from `dashboard.ts`.
   - Zero credential, token, URL, DB error, or stack trace leakage in failure outcomes.
   - Locked behavior with 24 passing unit tests in `apps/web/lib/server/dashboard.spec.ts` (42 passing across client + dashboard).
+  - See [execution evidence](../specs/028-backend-client-unification/verification.md).
+- **Phase 4: User Story 2 — Preserve Flight Outcomes (T011–T013 Complete)**:
+  - Migrated `searchFlights` and `selectFlightOffer` in `apps/web/lib/server/flight-search.ts` to `backendClient.request`.
+  - Enforced single-send search POST: `backendClient.request('/api/flights/search', UpstreamSearchSchema, { method: 'POST', ... })` fast-fails with zero retries on 502/503/504, 429, timeout, or network failure.
+  - Enforced bounded retry offer GET: `backendClient.request('/api/flights/' + encodeURIComponent(id), UpstreamSelectionSchema, { method: 'GET' })` recovers on transient 502/503/504 or network timeout within budget.
+  - Preserved unauthenticated session short-circuit before dispatching HTTP request for both search and selection.
+  - Strictly preserved 100% exact outcome contract parity: reasons (`INVALID_SEARCH`, `UNAUTHENTICATED`, `RATE_LIMITED`, `OFFER_EXPIRED`, `OFFER_UNAVAILABLE`, `UPSTREAM_UNAVAILABLE`), exact user-facing error messages, and `retryable` booleans.
+  - Preserved provider identifier stripping (`LocalOfferIdSchema`, `mapOffer`) and checkout route contract (`/checkout?offerId=${encodeURIComponent(id)}`).
+  - Purged obsolete duplicated helpers (`apiUrl`, `getAccessToken`, `fetchWithRetry`, `delay`, timeout constants, NextAuth imports) from `flight-search.ts`.
+  - Locked behavior with 55 unit tests in `apps/web/lib/server/flight-search.spec.ts` (73 passing across client + flight search).
   - See [execution evidence](../specs/028-backend-client-unification/verification.md).
 
 ## Feature 026 — Agent Boundary Simplification (Complete - Tasks T001–T037)

@@ -1408,4 +1408,320 @@ describe('flight-search server seam', () => {
     assert.strictEqual(requestedInit?.method, 'GET');
     assert.strictEqual(requestedInit?.cache, 'no-store');
   });
+
+  describe('Phase 4: transport result mapping, single-send, and recovery invariants', (): void => {
+    describe('1. Search POST single-send', (): void => {
+      it('verifies flight search POST is dispatched exactly once on 502, 503, and 504 responses', async (): Promise<void> => {
+        for (const status of [502, 503, 504]) {
+          let attempts = 0;
+          globalThis.fetch = async (): Promise<Response> => {
+            attempts += 1;
+            return new Response(JSON.stringify({ message: `HTTP ${status}` }), { status });
+          };
+
+          const outcome = await searchFlights(validQuery);
+
+          assert.deepEqual(outcome, {
+            ok: false,
+            reason: 'UPSTREAM_UNAVAILABLE',
+            message: 'Flight search is temporarily unavailable. Please try again.',
+            retryable: true,
+          });
+          assert.strictEqual(attempts, 1, `expected 1 attempt for status ${status}`);
+        }
+      });
+
+      it('verifies flight search POST is dispatched exactly once on 429 response', async (): Promise<void> => {
+        let attempts = 0;
+        globalThis.fetch = async (): Promise<Response> => {
+          attempts += 1;
+          return new Response(JSON.stringify({ message: 'Rate limited' }), {
+            status: 429,
+            headers: { 'Retry-After': '5' },
+          });
+        };
+
+        const outcome = await searchFlights(validQuery);
+
+        assert.deepEqual(outcome, {
+          ok: false,
+          reason: 'RATE_LIMITED',
+          message: 'Flight search is busy. Please try again shortly.',
+          retryable: true,
+        });
+        assert.strictEqual(attempts, 1, 'expected 1 attempt for 429 response');
+      });
+
+      it('verifies flight search POST is dispatched exactly once on network error and AbortError timeout', async (): Promise<void> => {
+        let networkAttempts = 0;
+        globalThis.fetch = async (): Promise<Response> => {
+          networkAttempts += 1;
+          throw new TypeError('Network connection refused');
+        };
+
+        const networkOutcome = await searchFlights(validQuery);
+
+        assert.deepEqual(networkOutcome, {
+          ok: false,
+          reason: 'UPSTREAM_UNAVAILABLE',
+          message: 'Flight search is temporarily unavailable. Please try again.',
+          retryable: true,
+        });
+        assert.strictEqual(networkAttempts, 1, 'expected 1 attempt for network error');
+
+        let timeoutAttempts = 0;
+        globalThis.fetch = async (): Promise<Response> => {
+          timeoutAttempts += 1;
+          throw new DOMException('Operation timed out', 'AbortError');
+        };
+
+        const timeoutOutcome = await searchFlights(validQuery);
+
+        assert.deepEqual(timeoutOutcome, {
+          ok: false,
+          reason: 'UPSTREAM_UNAVAILABLE',
+          message: 'Flight search is temporarily unavailable. Please try again.',
+          retryable: true,
+        });
+        assert.strictEqual(timeoutAttempts, 1, 'expected 1 attempt for timeout');
+      });
+    });
+
+    describe('2. Offer selection GET bounded recovery', (): void => {
+      it('recovers when first attempt returns 502, 503, or 504 and second attempt succeeds', async (): Promise<void> => {
+        for (const status of [502, 503, 504]) {
+          let attempts = 0;
+          globalThis.fetch = async (): Promise<Response> => {
+            attempts += 1;
+            if (attempts === 1) {
+              return new Response(JSON.stringify({ message: `HTTP ${status}` }), { status });
+            }
+            return new Response(JSON.stringify({ id: 'opaque-offer' }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            });
+          };
+
+          const outcome = await selectFlightOffer('opaque-offer');
+
+          assert.deepEqual(outcome, {
+            ok: true,
+            checkoutPath: '/checkout?offerId=opaque-offer',
+          });
+          assert.strictEqual(attempts, 2, `expected 2 attempts for status ${status} recovery`);
+        }
+      });
+
+      it('recovers when first attempt encounters network timeout and second attempt succeeds', async (): Promise<void> => {
+        let attempts = 0;
+        globalThis.fetch = async (): Promise<Response> => {
+          attempts += 1;
+          if (attempts === 1) {
+            throw new DOMException('Request aborted due to timeout', 'AbortError');
+          }
+          return new Response(JSON.stringify({ id: 'opaque-offer' }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        };
+
+        const outcome = await selectFlightOffer('opaque-offer');
+
+        assert.deepEqual(outcome, {
+          ok: true,
+          checkoutPath: '/checkout?offerId=opaque-offer',
+        });
+        assert.strictEqual(attempts, 2, 'expected 2 attempts for timeout recovery');
+      });
+    });
+
+    describe('3. Transport failure mapping', (): void => {
+      it('maps malformed upstream JSON to UPSTREAM_UNAVAILABLE with retryable true', async (): Promise<void> => {
+        globalThis.fetch = async (): Promise<Response> => {
+          return new Response('<html>502 Bad Gateway</html>', {
+            status: 200,
+            headers: { 'Content-Type': 'text/html' },
+          });
+        };
+
+        const outcome = await searchFlights(validQuery);
+
+        assert.deepEqual(outcome, {
+          ok: false,
+          reason: 'UPSTREAM_UNAVAILABLE',
+          message: 'Flight search returned an invalid response. Please try again.',
+          retryable: true,
+        });
+      });
+
+      it('maps schema validation failure on upstream results to UPSTREAM_UNAVAILABLE with retryable true', async (): Promise<void> => {
+        globalThis.fetch = async (): Promise<Response> => {
+          return new Response(
+            JSON.stringify({
+              mode: 'RANKED',
+              results: [{ id: 'local-offer-001' }],
+              meta: validRankedMeta,
+            }),
+            {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            },
+          );
+        };
+
+        const outcome = await searchFlights(validQuery);
+
+        assert.deepEqual(outcome, {
+          ok: false,
+          reason: 'UPSTREAM_UNAVAILABLE',
+          message: 'Flight search returned an invalid response. Please try again.',
+          retryable: true,
+        });
+      });
+    });
+
+    describe('4. Missing token short-circuit', (): void => {
+      it('short-circuits searchFlights with UNAUTHENTICATED without calling fetch when session is null or lacks accessToken', async (): Promise<void> => {
+        const unauthenticatedSessions: TestSession[] = [null, {}];
+
+        for (const authSession of unauthenticatedSessions) {
+          session = authSession;
+          let fetchAttempts = 0;
+          globalThis.fetch = async (): Promise<Response> => {
+            fetchAttempts += 1;
+            return new Response(JSON.stringify({ ok: true }), { status: 200 });
+          };
+
+          const outcome = await searchFlights(validQuery);
+
+          assert.deepEqual(outcome, {
+            ok: false,
+            reason: 'UNAUTHENTICATED',
+            message: 'Please sign in to search for flights.',
+            retryable: false,
+          });
+          assert.strictEqual(fetchAttempts, 0, 'fetch must not be called when unauthenticated');
+        }
+      });
+
+      it('short-circuits selectFlightOffer with UNAUTHENTICATED without calling fetch when session is null or lacks accessToken', async (): Promise<void> => {
+        const unauthenticatedSessions: TestSession[] = [null, {}];
+
+        for (const authSession of unauthenticatedSessions) {
+          session = authSession;
+          let fetchAttempts = 0;
+          globalThis.fetch = async (): Promise<Response> => {
+            fetchAttempts += 1;
+            return new Response(JSON.stringify({ ok: true }), { status: 200 });
+          };
+
+          const outcome = await selectFlightOffer('opaque-offer');
+
+          assert.deepEqual(outcome, {
+            ok: false,
+            reason: 'UNAUTHENTICATED',
+            message: 'Please sign in to continue.',
+            retryable: false,
+          });
+          assert.strictEqual(fetchAttempts, 0, 'fetch must not be called when unauthenticated');
+        }
+      });
+    });
+
+    describe('5. HTTP status mapping parity', (): void => {
+      it('maps 401 and 403 to UNAUTHENTICATED with single send on search and offer selection', async (): Promise<void> => {
+        for (const status of [401, 403]) {
+          let searchAttempts = 0;
+          globalThis.fetch = async (): Promise<Response> => {
+            searchAttempts += 1;
+            return new Response(JSON.stringify({ message: 'Unauthorized' }), { status });
+          };
+
+          const searchOutcome = await searchFlights(validQuery);
+
+          assert.deepEqual(searchOutcome, {
+            ok: false,
+            reason: 'UNAUTHENTICATED',
+            message: 'Please sign in to search for flights.',
+            retryable: false,
+          });
+          assert.strictEqual(searchAttempts, 1, `search must dispatch exactly once on ${status}`);
+
+          let selectionAttempts = 0;
+          globalThis.fetch = async (): Promise<Response> => {
+            selectionAttempts += 1;
+            return new Response(JSON.stringify({ message: 'Unauthorized' }), { status });
+          };
+
+          const selectionOutcome = await selectFlightOffer('opaque-offer');
+
+          assert.deepEqual(selectionOutcome, {
+            ok: false,
+            reason: 'UNAUTHENTICATED',
+            message: 'Please sign in to continue.',
+            retryable: false,
+          });
+          assert.strictEqual(selectionAttempts, 1, `selection must dispatch exactly once on ${status}`);
+        }
+      });
+
+      it('maps 429 to RATE_LIMITED with single send on search', async (): Promise<void> => {
+        let attempts = 0;
+        globalThis.fetch = async (): Promise<Response> => {
+          attempts += 1;
+          return new Response(JSON.stringify({ message: 'Too Many Requests' }), { status: 429 });
+        };
+
+        const outcome = await searchFlights(validQuery);
+
+        assert.deepEqual(outcome, {
+          ok: false,
+          reason: 'RATE_LIMITED',
+          message: 'Flight search is busy. Please try again shortly.',
+          retryable: true,
+        });
+        assert.strictEqual(attempts, 1, 'search must dispatch exactly once on 429');
+      });
+
+      it('maps 400 and 422 to INVALID_SEARCH with single send on search', async (): Promise<void> => {
+        for (const status of [400, 422]) {
+          let attempts = 0;
+          globalThis.fetch = async (): Promise<Response> => {
+            attempts += 1;
+            return new Response(JSON.stringify({ message: 'Validation Error' }), { status });
+          };
+
+          const outcome = await searchFlights(validQuery);
+
+          assert.deepEqual(outcome, {
+            ok: false,
+            reason: 'INVALID_SEARCH',
+            message: 'Please check your search details and try again.',
+            retryable: false,
+          });
+          assert.strictEqual(attempts, 1, `search must dispatch exactly once on ${status}`);
+        }
+      });
+
+      it('maps 404 and 410 to OFFER_EXPIRED with single send on offer selection', async (): Promise<void> => {
+        for (const status of [404, 410]) {
+          let attempts = 0;
+          globalThis.fetch = async (): Promise<Response> => {
+            attempts += 1;
+            return new Response(JSON.stringify({ message: 'Offer Expired' }), { status });
+          };
+
+          const outcome = await selectFlightOffer('opaque-offer');
+
+          assert.deepEqual(outcome, {
+            ok: false,
+            reason: 'OFFER_EXPIRED',
+            message: 'This flight offer has expired. Please search again.',
+            retryable: false,
+          });
+          assert.strictEqual(attempts, 1, `selection must dispatch exactly once on ${status}`);
+        }
+      });
+    });
+  });
 });

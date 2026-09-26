@@ -68,4 +68,33 @@ Run from `C:\Booking Systems` on 2026-09-26. All commands exited 0.
 
 **Phase 3 convergence:** T008–T010 requirements in tasks.md and spec.md (US1) are complete. Phases T011–T025 remain ready for migration.
 
+## Phase 4: User Story 2 — Preserve flight outcomes (T011–T013)
+
+Run from `C:\Booking Systems` on 2026-09-26. All commands exited 0.
+
+| Check | Result |
+| --- | --- |
+| `& '.\node_modules\.bin\tsx.CMD' --test apps/web/lib/server/backend-client.spec.ts apps/web/lib/server/flight-search.spec.ts` | 73 passed, 0 failed (18 backend-client, 55 flight-search). |
+| `& '.\node_modules\.bin\tsx.CMD' --test apps/web/lib/server/dashboard.spec.ts apps/web/lib/server/booking-management.spec.ts "apps/web/app/api/booking-management/**/*.spec.ts"` | 68 passed, 0 failed (28 dashboard, 30 booking, 10 route handlers). |
+| `pnpm --filter @web/frontend lint` | Exit 0; no ESLint warnings or errors. |
+| `pnpm --filter @web/frontend typecheck` | Exit 0; tsc clean with zero errors. |
+
+### Flight Migration & Parity Verification
+- **T011 Flight Test Suite Expansion**: Added dedicated Phase 4 test suite in `apps/web/lib/server/flight-search.spec.ts` locking:
+  - Search POST single-send: exactly 1 attempt (zero retries) on 502, 503, 504, 429, network error, and timeout.
+  - Offer selection GET bounded recovery: recovers on 2nd attempt after 502/503/504 or network timeout.
+  - Transport failure mapping: malformed upstream JSON and schema validation failure map to `UPSTREAM_UNAVAILABLE` (`retryable: true`) with exact user-facing message (`'Flight search returned an invalid response. Please try again.'`).
+  - Missing token short-circuit: session `null` or lacking `accessToken` returns `UNAUTHENTICATED` (`retryable: false`) with 0 fetch attempts for both search and selection.
+  - HTTP status mapping parity: 401/403 -> `UNAUTHENTICATED` (single-send), 429 -> `RATE_LIMITED` (`retryable: true`, single-send), 400/422 -> `INVALID_SEARCH` (`retryable: false`, single-send), 404/410 on selection -> `OFFER_EXPIRED` (`retryable: false`, single-send).
+- **T012 Backend Client Migration**: Migrated `searchFlights` and `selectFlightOffer` in `apps/web/lib/server/flight-search.ts` to `backendClient.request`:
+  - Removed bespoke `fetchWithRetry`, `apiUrl()`, `getAccessToken()`, `delay()`, constants, and NextAuth module imports.
+  - Dispatched `searchFlights` via `backendClient.request('/api/flights/search', UpstreamSearchSchema, { method: 'POST', ... })`.
+  - Dispatched `selectFlightOffer` via `backendClient.request('/api/flights/' + encodeURIComponent(id), UpstreamSelectionSchema, { method: 'GET' })`.
+  - Retained all domain validation (`FlightSearchQuerySchema`, `LocalOfferIdSchema`), offer mapping (`mapOffer`), and view schema checks (`FlightSearchOfferViewSchema`).
+  - Preserved provider identifier stripping and exact checkout route: `/checkout?offerId=${encodeURIComponent(id)}`.
+- **T013 Parity & Zero Regression**: Verified zero regressions across client, flight-search, dashboard, booking-management, and route handler suites (141 total passing tests across suites).
+
+**Phase 4 convergence:** T011–T013 requirements in tasks.md, spec.md (US2), and GOAL.md are satisfied. Phases T014–T025 remain ready for migration.
+
+
 
