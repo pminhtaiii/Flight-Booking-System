@@ -40,10 +40,10 @@
 **Goal**: All eight booking operations share transport without changing domain results or replaying mutations.
 **Independent test**: Existing booking tests cover list/detail/status/quote/cancel/acknowledge/accept/revisions, including error-body forwarding and single-send mutations.
 
-- [ ] T014 [US3] Add tests for six JSON-consuming operation schemas, malformed 400/422 error-body fallback, invalid successful JSON, empty-body acknowledge/accept success, GET retry policy, and mutation send count in `apps/web/lib/server/booking-management.spec.ts`.
-- [ ] T015 [US3] Migrate `listBookings`, `getBookingDetail`, `getCancellationStatus`, and `getCancellationQuote` in `apps/web/lib/server/booking-management.ts` to the client with raw list/detail/cancellation-status/cancellation-quote schemas preserving current tolerated fields/defaults.
-- [ ] T016 [US3] Migrate `cancelBooking` and `getItineraryRevisions` in `apps/web/lib/server/booking-management.ts` using raw cancellation-result/revisions schemas, and migrate `acknowledgeDisruption` and `acceptDisruption` using explicit none mode; retain domain mapping and view validation.
-- [ ] T017 [US3] Run `apps/web/lib/server/booking-management.spec.ts` and `apps/web/lib/server/backend-client.spec.ts`; record eight-operation parity in `specs/028-backend-client-unification/verification.md`.
+- [x] T014 [US3] Add tests for six JSON-consuming operation schemas, malformed 400/422 error-body fallback, invalid successful JSON, empty-body acknowledge/accept success, GET retry policy, and mutation send count in `apps/web/lib/server/booking-management.spec.ts`.
+- [x] T015 [US3] Migrate `listBookings`, `getBookingDetail`, `getCancellationStatus`, and `getCancellationQuote` in `apps/web/lib/server/booking-management.ts` to the client with raw list/detail/cancellation-status/cancellation-quote schemas preserving current tolerated fields/defaults.
+- [x] T016 [US3] Migrate `cancelBooking` and `getItineraryRevisions` in `apps/web/lib/server/booking-management.ts` using raw cancellation-result/revisions schemas, and migrate `acknowledgeDisruption` and `acceptDisruption` using explicit none mode; retain domain mapping and view validation.
+- [x] T017 [US3] Run `apps/web/lib/server/booking-management.spec.ts` and `apps/web/lib/server/backend-client.spec.ts`; record eight-operation parity in `specs/028-backend-client-unification/verification.md`.
 
 ## Phase 6: User Story 4 - Share booking response mapping (P4)
 
