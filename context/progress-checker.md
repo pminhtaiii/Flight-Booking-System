@@ -132,8 +132,8 @@
   - **T002: Relocated `format_sse` to `apps/agent/src/agent/streaming/sse.py`**: Relocated `format_sse` into `streaming/sse.py` and exported in `__all__`. Purged all transport formatting logic from `apps/agent/src/agent/chat_turn/events.py`, ensuring `events.py` strictly holds domain models with standard library `typing` and `pydantic` imports. Updated bridges in `chat_turn/__init__.py`, `models/events.py`, and test imports.
   - **T003: Verified Parity & Recorded Evidence**: All 112 focused tests passed (111 passed, 1 skipped). Static boundary census confirmed `def format_sse` exists only in `apps/agent/src/agent/streaming/sse.py`. Recorded execution metrics, commit hashes (`360ca39e`, `37fcf8db`), and exact parity confirmation in `specs/027-chat-turn-decomposition/verification.md`. Updated `specs/027-chat-turn-decomposition/tasks.md` marking T001–T003 complete.
 
-### Feature 028 — Backend Client Unification: Planning complete; implementation not started (2026-09-25)
-- Feature 028 Backend Client Unification: [spec](../specs/028-backend-client-unification/spec.md), [plan](../specs/028-backend-client-unification/plan.md), [tasks](../specs/028-backend-client-unification/tasks.md). All implementation tasks remain unchecked.
+### Feature 028 — Backend Client Unification: Phase 1 complete (T001–T004 verified, 2026-09-26)
+- [Spec](../specs/028-backend-client-unification/spec.md), [plan](../specs/028-backend-client-unification/plan.md), [tasks](../specs/028-backend-client-unification/tasks.md), and [verification](../specs/028-backend-client-unification/verification.md). Dashboard, flight search, all eight booking operations, and both cancellation route adapters have characterization baselines. Combined server specs passed 93/93; cancellation routes passed 7/7 and 3/3; web lint and typecheck passed. T005–T025 remain open; no production transport migration has begun.
  
 ### Feature 026 — Agent Boundary Simplification: Phase 5 Complete / Feature 100% Complete (Tasks T033–T037 Verified) (2026-09-24)
 

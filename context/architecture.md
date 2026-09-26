@@ -58,9 +58,10 @@
   - Static censuses found no `format_sse` in `chat_turn/events.py`, no tool-name branching or guardrail/gateway construction in `chat_turn/interpreter.py`, and no `Any` in the extracted coordinator, runner, admission, interpreter, resolver, or conversation modules.
   - Full-package Ruff lint and format checks passed. The eight focused decomposition suites passed (184 passed, 1 skipped); the Phase 7 non-Redis regression gate excluding `test_security_performance` passed (1,272 passed, 11 skipped, 20 deselected). Exact commands, exit codes, and timings are in `specs/027-chat-turn-decomposition/verification.md`.
 
-## Feature 028 — Backend Client Unification (Planned, 2026-09-25)
+## Feature 028 — Backend Client Unification (Phase 1 baseline complete, 2026-09-26)
 
 - [Feature 028 specification](../specs/028-backend-client-unification/spec.md), [plan](../specs/028-backend-client-unification/plan.md), and [tasks](../specs/028-backend-client-unification/tasks.md) unify the three core web server transport consumers and six booking route response adapters. Dashboard `INVALID_RESPONSE`, booking error-body forwarding, and mutation single-send behavior remain contract requirements.
+- Phase 1 (T001–T004) locks current behavior in dashboard, flight-search, booking-management, and two cancellation route specs. All eight booking operations are represented; 400/422 message forwarding and fallback, transient mutation single-send, response status/body/header mapping, and provider-ID stripping are covered. This phase changes tests only; the shared client and route adapter remain planned. See [execution evidence](../specs/028-backend-client-unification/verification.md).
 
 ## Feature 026 — Agent Boundary Simplification (Complete - Tasks T001–T037)
 

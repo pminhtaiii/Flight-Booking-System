@@ -1249,6 +1249,25 @@ describe('flight-search server seam', () => {
     assert.strictEqual(requested, false);
   });
 
+  it('returns an unauthenticated selection outcome before making an upstream call', async (): Promise<void> => {
+    session = null;
+    let requested = false;
+    globalThis.fetch = async (): Promise<Response> => {
+      requested = true;
+      return new Response();
+    };
+
+    const outcome = await selectFlightOffer('opaque-offer');
+
+    assert.deepEqual(outcome, {
+      ok: false,
+      reason: 'UNAUTHENTICATED',
+      message: 'Please sign in to continue.',
+      retryable: false,
+    });
+    assert.strictEqual(requested, false);
+  });
+
   it('fails fast on 503 search response without repeating supplier-backed searches', async (): Promise<void> => {
     let attempts = 0;
     globalThis.fetch = async (): Promise<Response> => {
@@ -1279,6 +1298,26 @@ describe('flight-search server seam', () => {
 
     assert.strictEqual(outcome.ok, true);
     assert.strictEqual(attempts, 2);
+  });
+
+  it('maps expired selection responses without retrying them', async (): Promise<void> => {
+    for (const status of [404, 410]) {
+      let attempts = 0;
+      globalThis.fetch = async (): Promise<Response> => {
+        attempts += 1;
+        return new Response('Unavailable', { status });
+      };
+
+      const outcome = await selectFlightOffer('opaque-offer');
+
+      assert.deepEqual(outcome, {
+        ok: false,
+        reason: 'OFFER_EXPIRED',
+        message: 'This flight offer has expired. Please search again.',
+        retryable: false,
+      });
+      assert.strictEqual(attempts, 1);
+    }
   });
 
   it('normalizes upstream validation responses without retrying them', async (): Promise<void> => {
@@ -1353,10 +1392,12 @@ describe('flight-search server seam', () => {
     });
   });
 
-  it('verifies a selected offer and preserves the Slice 5B checkout path contract', async (): Promise<void> => {
+  it('uses a no-store GET to verify a selected offer and preserves the Slice 5B checkout path contract', async (): Promise<void> => {
     let requestedUrl = '';
-    globalThis.fetch = async (input: RequestInfo | URL): Promise<Response> => {
+    let requestedInit: RequestInit | undefined;
+    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
       requestedUrl = String(input);
+      requestedInit = init;
       return new Response(JSON.stringify({ id: 'opaque-offer' }), { status: 200 });
     };
 
@@ -1364,5 +1405,7 @@ describe('flight-search server seam', () => {
 
     assert.deepEqual(outcome, { ok: true, checkoutPath: '/checkout?offerId=opaque-offer' });
     assert.match(requestedUrl, /\/api\/flights\/opaque-offer$/);
+    assert.strictEqual(requestedInit?.method, 'GET');
+    assert.strictEqual(requestedInit?.cache, 'no-store');
   });
 });

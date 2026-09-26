@@ -298,11 +298,34 @@ describe('dashboard server loader (getDashboardSummary)', () => {
         message: 'Connection timed out. Please check your network and try again.',
       });
     });
+
+    it('maps rejected connections to retryable UPSTREAM_UNAVAILABLE without leaking transport details', async () => {
+      const connectionError = new Error(
+        'connect ECONNREFUSED http://private-api.example:3001/api/dashboard/summary?token=session-token-secret-123',
+      );
+      globalThis.fetch = async (): Promise<Response> => {
+        throw connectionError;
+      };
+
+      const outcome = await getDashboardSummary();
+
+      assert.deepEqual(outcome, {
+        ok: false,
+        reason: 'UPSTREAM_UNAVAILABLE',
+        retryable: true,
+        message: 'Connection timed out. Please check your network and try again.',
+      });
+      assert.strictEqual(JSON.stringify(outcome).includes(connectionError.message), false);
+      assert.strictEqual(JSON.stringify(outcome).includes('session-token-secret-123'), false);
+      assert.strictEqual(JSON.stringify(outcome).includes('private-api.example'), false);
+    });
   });
 
   describe('4. HTTP Status Mapping', () => {
     it('maps HTTP 401 Unauthorized to non-retryable UNAUTHENTICATED failure', async () => {
+      let fetchCount = 0;
       globalThis.fetch = async (): Promise<Response> => {
+        fetchCount += 1;
         return new Response(JSON.stringify({ message: 'Unauthorized' }), { status: 401 });
       };
 
@@ -314,10 +337,13 @@ describe('dashboard server loader (getDashboardSummary)', () => {
         retryable: false,
         message: 'Your session has expired. Please sign in again.',
       });
+      assert.strictEqual(fetchCount, 1);
     });
 
     it('maps HTTP 403 Forbidden to non-retryable FORBIDDEN failure', async () => {
+      let fetchCount = 0;
       globalThis.fetch = async (): Promise<Response> => {
+        fetchCount += 1;
         return new Response(JSON.stringify({ message: 'Forbidden' }), { status: 403 });
       };
 
@@ -329,6 +355,7 @@ describe('dashboard server loader (getDashboardSummary)', () => {
         retryable: false,
         message: 'Access denied. You do not have permission to view this resource.',
       });
+      assert.strictEqual(fetchCount, 1);
     });
 
     it('maps HTTP 500, 502, 503, and 504 server errors to retryable UPSTREAM_UNAVAILABLE failure', async () => {

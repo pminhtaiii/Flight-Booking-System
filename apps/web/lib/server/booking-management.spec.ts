@@ -640,20 +640,22 @@ describe('booking-management server domain module', () => {
       assert.strictEqual(serialized.includes('duffelOrderId'), false);
     });
 
-    it('fails fast on 500 error for quote creation (1 attempt)', async () => {
-      let attempts = 0;
-      globalThis.fetch = async (): Promise<Response> => {
-        attempts += 1;
-        return new Response('Internal Server Error', { status: 500 });
-      };
+    it('fails fast on 500 and 503 errors for quote creation', async () => {
+      for (const status of [500, 503]) {
+        let attempts = 0;
+        globalThis.fetch = async (): Promise<Response> => {
+          attempts += 1;
+          return new Response('Upstream unavailable', { status });
+        };
 
-      const outcome = await getCancellationQuote('booking-uuid-001');
+        const outcome = await getCancellationQuote('booking-uuid-001');
 
-      assert.strictEqual(outcome.ok, false);
-      if (!outcome.ok) {
-        assert.strictEqual(outcome.reason, 'UPSTREAM_UNAVAILABLE');
+        assert.strictEqual(outcome.ok, false);
+        if (!outcome.ok) {
+          assert.strictEqual(outcome.reason, 'UPSTREAM_UNAVAILABLE');
+        }
+        assert.strictEqual(attempts, 1);
       }
-      assert.strictEqual(attempts, 1);
     });
 
     it('handles upstream error status mapping for quote request', async () => {
@@ -665,7 +667,9 @@ describe('booking-management server domain module', () => {
       ] as const;
 
       for (const { status, expectedReason, retryable } of errorCases) {
+        let attempts = 0;
         globalThis.fetch = async (): Promise<Response> => {
+          attempts += 1;
           return new Response(JSON.stringify({ message: `Error ${status}` }), { status });
         };
 
@@ -675,6 +679,32 @@ describe('booking-management server domain module', () => {
         if (!outcome.ok) {
           assert.strictEqual(outcome.reason, expectedReason);
           assert.strictEqual(outcome.retryable, retryable);
+        }
+        assert.strictEqual(attempts, 1);
+      }
+    });
+
+    it('forwards 400/422 messages and falls back when the error body is unparseable', async () => {
+      for (const status of [400, 422]) {
+        for (const [body, expectedMessage] of [
+          [JSON.stringify({ message: `Quote rejected ${status}` }), `Quote rejected ${status}`],
+          ['not JSON', 'Invalid request. Please check your details and try again.'],
+        ]) {
+          let attempts = 0;
+          globalThis.fetch = async (): Promise<Response> => {
+            attempts += 1;
+            return new Response(body, { status });
+          };
+
+          const outcome = await getCancellationQuote('booking-uuid-001');
+
+          assert.deepEqual(outcome, {
+            ok: false,
+            reason: 'INVALID_COMMAND',
+            message: expectedMessage,
+            retryable: false,
+          });
+          assert.strictEqual(attempts, 1);
         }
       }
     });
@@ -728,20 +758,22 @@ describe('booking-management server domain module', () => {
       assert.strictEqual(serialized.includes('cquo_secret_123'), false);
     });
 
-    it('fails fast on 500 error for booking cancellation (1 attempt)', async () => {
-      let attempts = 0;
-      globalThis.fetch = async (): Promise<Response> => {
-        attempts += 1;
-        return new Response('Internal Server Error', { status: 500 });
-      };
+    it('fails fast on 500 and 503 errors for booking cancellation', async () => {
+      for (const status of [500, 503]) {
+        let attempts = 0;
+        globalThis.fetch = async (): Promise<Response> => {
+          attempts += 1;
+          return new Response('Upstream unavailable', { status });
+        };
 
-      const outcome = await cancelBooking('booking-uuid-001', 'quote-local-123');
+        const outcome = await cancelBooking('booking-uuid-001', 'quote-local-123');
 
-      assert.strictEqual(outcome.ok, false);
-      if (!outcome.ok) {
-        assert.strictEqual(outcome.reason, 'UPSTREAM_UNAVAILABLE');
+        assert.strictEqual(outcome.ok, false);
+        if (!outcome.ok) {
+          assert.strictEqual(outcome.reason, 'UPSTREAM_UNAVAILABLE');
+        }
+        assert.strictEqual(attempts, 1);
       }
-      assert.strictEqual(attempts, 1);
     });
 
     it('handles upstream error status mapping for cancelBooking (409, 400, 401, 403, 404)', async () => {
@@ -754,7 +786,9 @@ describe('booking-management server domain module', () => {
       ] as const;
 
       for (const { status, expectedReason, retryable } of errorCases) {
+        let attempts = 0;
         globalThis.fetch = async (): Promise<Response> => {
+          attempts += 1;
           return new Response(JSON.stringify({ message: `Error ${status}` }), { status });
         };
 
@@ -765,6 +799,7 @@ describe('booking-management server domain module', () => {
           assert.strictEqual(outcome.reason, expectedReason);
           assert.strictEqual(outcome.retryable, retryable);
         }
+        assert.strictEqual(attempts, 1);
       }
     });
 
@@ -808,7 +843,9 @@ describe('booking-management server domain module', () => {
     });
 
     it('maps 409 conflict upstream to STALE_REVISION reason', async () => {
+      let attempts = 0;
       globalThis.fetch = async (): Promise<Response> => {
+        attempts += 1;
         return new Response(
           JSON.stringify({
             code: 'STALE_DISRUPTION_REVISION',
@@ -825,6 +862,25 @@ describe('booking-management server domain module', () => {
         assert.strictEqual(outcome.reason, 'STALE_REVISION');
         assert.strictEqual(outcome.retryable, false);
       }
+      assert.strictEqual(attempts, 1);
+    });
+
+    it('fails fast on 503 for acknowledge disruption', async () => {
+      let attempts = 0;
+      globalThis.fetch = async (): Promise<Response> => {
+        attempts += 1;
+        return new Response('Unavailable', { status: 503 });
+      };
+
+      const outcome = await acknowledgeDisruption('booking-uuid-001', 'rev-uuid-001');
+
+      assert.deepEqual(outcome, {
+        ok: false,
+        reason: 'UPSTREAM_UNAVAILABLE',
+        message: 'Booking service is temporarily unavailable. Please try again.',
+        retryable: true,
+      });
+      assert.strictEqual(attempts, 1);
     });
   });
 
@@ -859,7 +915,9 @@ describe('booking-management server domain module', () => {
     });
 
     it('maps 409 conflict upstream to STALE_REVISION reason on accept', async () => {
+      let attempts = 0;
       globalThis.fetch = async (): Promise<Response> => {
+        attempts += 1;
         return new Response(
           JSON.stringify({
             code: 'STALE_DISRUPTION_REVISION',
@@ -876,6 +934,25 @@ describe('booking-management server domain module', () => {
         assert.strictEqual(outcome.reason, 'STALE_REVISION');
         assert.strictEqual(outcome.retryable, false);
       }
+      assert.strictEqual(attempts, 1);
+    });
+
+    it('fails fast on 503 for accept disruption', async () => {
+      let attempts = 0;
+      globalThis.fetch = async (): Promise<Response> => {
+        attempts += 1;
+        return new Response('Unavailable', { status: 503 });
+      };
+
+      const outcome = await acceptDisruption('booking-uuid-001', 'rev-uuid-001');
+
+      assert.deepEqual(outcome, {
+        ok: false,
+        reason: 'UPSTREAM_UNAVAILABLE',
+        message: 'Booking service is temporarily unavailable. Please try again.',
+        retryable: true,
+      });
+      assert.strictEqual(attempts, 1);
     });
   });
 
