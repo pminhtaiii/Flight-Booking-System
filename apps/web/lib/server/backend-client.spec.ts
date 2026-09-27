@@ -137,11 +137,58 @@ it('keeps the HTTP status when an error body is malformed', async (): Promise<vo
 });
 
 it('returns a safe cause for malformed successful JSON', async (): Promise<void> => {
-  globalThis.fetch = mock.fn(async (): Promise<Response> => new Response('{broken', { status: 200 })) as typeof fetch;
+  const sent = mock.fn(async (): Promise<Response> => new Response('{broken', { status: 200 }));
+  globalThis.fetch = sent as typeof fetch;
   const result = await createBackendClient({ tokenProvider: async () => 'token' }).request(
     '/item', z.object({ value: z.string() }),
   );
   assert.deepEqual(result, { ok: false, kind: 'transport', cause: 'invalid_json' });
+  assert.equal(sent.mock.callCount(), 1);
+});
+
+it('retries a GET after its successful response body stream rejects', async (): Promise<void> => {
+  let calls = 0;
+  const sent = mock.fn(async (): Promise<Response> => {
+    calls += 1;
+    if (calls > 1) return Response.json({ value: 'recovered' });
+    const response = Response.json({ value: 'unused' });
+    response.json = async (): Promise<unknown> => { throw new TypeError('private stream failure'); };
+    return response;
+  });
+  globalThis.fetch = sent as typeof fetch;
+  const result = await createBackendClient({ tokenProvider: async () => 'token' }).request(
+    '/item', z.object({ value: z.string() }),
+  );
+  assert.deepEqual(result, { ok: true, data: { value: 'recovered' } });
+  assert.equal(sent.mock.callCount(), 2);
+});
+
+it('returns a safe network cause without replaying a mutation after body stream failure', async (): Promise<void> => {
+  const sent = mock.fn(async (): Promise<Response> => {
+    const response = Response.json({ value: 'unused' });
+    response.json = async (): Promise<unknown> => { throw new TypeError('private stream failure'); };
+    return response;
+  });
+  globalThis.fetch = sent as typeof fetch;
+  const result = await createBackendClient({ tokenProvider: async () => 'token' }).request(
+    '/item', z.object({ value: z.string() }), { method: 'POST' },
+  );
+  assert.deepEqual(result, { ok: false, kind: 'transport', cause: 'network' });
+  assert.equal(sent.mock.callCount(), 1);
+});
+
+it('classifies an aborted successful body read as a timeout', async (): Promise<void> => {
+  const sent = mock.fn(async (): Promise<Response> => {
+    const response = Response.json({ value: 'unused' });
+    response.json = async (): Promise<unknown> => { throw new DOMException('private abort', 'AbortError'); };
+    return response;
+  });
+  globalThis.fetch = sent as typeof fetch;
+  const result = await createBackendClient({ tokenProvider: async () => 'token' }).request(
+    '/item', z.object({ value: z.string() }), { method: 'POST' },
+  );
+  assert.deepEqual(result, { ok: false, kind: 'transport', cause: 'timeout' });
+  assert.equal(sent.mock.callCount(), 1);
 });
 
 it('accepts a bodyless 2xx response in none mode without reading it', async (): Promise<void> => {
@@ -189,7 +236,8 @@ it('aborts a stalled mutation at the ten second attempt deadline', async (): Pro
   const pending = createBackendClient({ tokenProvider: async () => 'token' }).request(
     '/item', z.object({ value: z.string() }), { method: 'POST' },
   );
-  await Promise.resolve();
+  for (let step = 0; step < 20 && !signal; step += 1) await Promise.resolve();
+  assert.ok(signal);
   mock.timers.tick(10_000);
   assert.deepEqual(await pending, { ok: false, kind: 'transport', cause: 'timeout' });
   assert.equal(signal?.aborted, true);
@@ -317,7 +365,8 @@ it('retries timed-out GETs and keeps each attempt to ten seconds', async (): Pro
   const pending = createBackendClient({ tokenProvider: async () => 'token' }).request(
     '/item', z.object({ value: z.string() }),
   );
-  await Promise.resolve();
+  for (let step = 0; step < 20 && signals.length === 0; step += 1) await Promise.resolve();
+  assert.equal(signals.length, 1);
   mock.timers.tick(10_000);
   await Promise.resolve();
   await Promise.resolve();
@@ -360,9 +409,95 @@ it('bounds a stalled successful response body by the same ten second attempt dea
   const pending = createBackendClient({ tokenProvider: async () => 'token' }).request(
     '/item', z.object({ value: z.string() }), { method: 'POST' },
   );
-  for (let step = 0; step < 5; step += 1) await Promise.resolve();
+  for (let step = 0; step < 20; step += 1) await Promise.resolve();
   mock.timers.tick(10_000);
-  for (let step = 0; step < 5; step += 1) await Promise.resolve();
-  const result = await Promise.race([pending, Promise.resolve('pending')]);
+  const result = await pending;
   assert.deepEqual(result, { ok: false, kind: 'transport', cause: 'timeout' });
+});
+
+it('emits one structured, PII-safe JSON diagnostic for transport failures', async (): Promise<void> => {
+  const warning = mock.method(console, 'warn', (): void => {});
+  try {
+    globalThis.fetch = mock.fn(async (): Promise<Response> => {
+      throw new Error('passenger@example.test request-secret');
+    }) as typeof fetch;
+    await createBackendClient({ tokenProvider: async () => 'bearer-secret' }).request(
+      '/private-passenger-path', z.object({ value: z.string() }),
+      { method: 'POST', body: 'request-secret' },
+    );
+    assert.equal(warning.mock.callCount(), 1);
+    assert.equal(warning.mock.calls[0].arguments.length, 1);
+    const diagnostic: unknown = JSON.parse(String(warning.mock.calls[0].arguments[0]));
+    assert.deepEqual(Object.keys(diagnostic as object).sort(), [
+      'cause', 'correlation_id', 'level', 'message', 'service', 'timestamp', 'trace_id',
+    ]);
+    assert.deepEqual(diagnostic, {
+      timestamp: (diagnostic as { timestamp: string }).timestamp,
+      level: 'warn',
+      service: 'web.backend_client',
+      trace_id: null,
+      correlation_id: null,
+      message: 'Backend transport failure',
+      cause: 'network',
+    });
+    assert.ok(!Number.isNaN(Date.parse((diagnostic as { timestamp: string }).timestamp)));
+    const output = JSON.stringify(diagnostic);
+    for (const secret of ['bearer-secret', 'private-passenger-path', 'passenger@example.test', 'request-secret']) {
+      assert.equal(output.includes(secret), false);
+    }
+  } finally {
+    warning.mock.restore();
+  }
+});
+
+it('bounds token acquisition by the total deadline and never sends a request', async (): Promise<void> => {
+  mock.timers.enable({ apis: ['Date', 'setTimeout'] });
+  const sent = mock.fn(async (): Promise<Response> => Response.json({ value: 'unexpected' }));
+  globalThis.fetch = sent as typeof fetch;
+  const pending = createBackendClient({ tokenProvider: async () => new Promise<string>(() => {}) }).request(
+    '/item', z.object({ value: z.string() }),
+  );
+  await Promise.resolve();
+  mock.timers.tick(31_000);
+  assert.deepEqual(await pending, { ok: false, kind: 'transport', cause: 'timeout' });
+  assert.equal(sent.mock.callCount(), 0);
+});
+
+it('maps token provider rejection to a safe typed failure', async (): Promise<void> => {
+  const sent = mock.fn(async (): Promise<Response> => Response.json({ value: 'unexpected' }));
+  globalThis.fetch = sent as typeof fetch;
+  const result = await createBackendClient({ tokenProvider: async () => {
+    throw new Error('passenger@example.test');
+  } }).request('/item', z.object({ value: z.string() }));
+  assert.deepEqual(result, { ok: false, kind: 'transport', cause: 'network' });
+  assert.equal(sent.mock.callCount(), 0);
+});
+
+it('retries a timed-out successful GET body, but sends a mutation only once', async (): Promise<void> => {
+  for (const method of ['GET', 'POST']) {
+    mock.timers.enable({ apis: ['Date', 'setTimeout'] });
+    let calls = 0;
+    const sent = mock.fn(async (): Promise<Response> => {
+      calls += 1;
+      if (calls > 1) return Response.json({ value: 'recovered' });
+      const response = Response.json({ value: 'unused' });
+      response.json = async (): Promise<unknown> => new Promise<unknown>(() => {});
+      return response;
+    });
+    globalThis.fetch = sent as typeof fetch;
+    const pending = createBackendClient({ tokenProvider: async () => 'token' }).request(
+      '/item', z.object({ value: z.string() }), { method },
+    );
+    for (let step = 0; step < 20 && sent.mock.callCount() === 0; step += 1) await Promise.resolve();
+    assert.equal(sent.mock.callCount(), 1);
+    mock.timers.tick(10_000);
+    for (let step = 0; step < 20; step += 1) await Promise.resolve();
+    if (method === 'GET') mock.timers.tick(100);
+    const result = await pending;
+    assert.deepEqual(result, method === 'GET'
+      ? { ok: true, data: { value: 'recovered' } }
+      : { ok: false, kind: 'transport', cause: 'timeout' });
+    assert.equal(sent.mock.callCount(), method === 'GET' ? 2 : 1);
+    mock.timers.reset();
+  }
 });

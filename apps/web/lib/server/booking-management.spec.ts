@@ -292,6 +292,49 @@ describe('booking-management server domain module', () => {
       assert.strictEqual(requested, false);
     });
 
+    it('preserves the established message for an upstream HTTP 401', async () => {
+      globalThis.fetch = async (): Promise<Response> => new Response('{}', { status: 401 });
+
+      assert.deepEqual(await listBookings('upcoming', 1, 10), {
+        ok: false,
+        reason: 'UNAUTHENTICATED',
+        message: 'Please sign in to continue.',
+        retryable: false,
+      });
+    });
+
+    it('treats non-array bookings as an empty list, preserving the previous fallback', async () => {
+      for (const bookings of [null, 'invalid']) {
+        globalThis.fetch = async (): Promise<Response> =>
+          new Response(JSON.stringify({ bookings }), { status: 200 });
+
+        const outcome = await listBookings('upcoming', 1, 10);
+        assert.strictEqual(outcome.ok, true);
+        if (outcome.ok) {
+          assert.deepEqual(outcome.data.bookings, []);
+          assert.deepEqual(outcome.data.pagination, {
+            page: 1,
+            limit: 10,
+            total: 0,
+            totalPages: 0,
+          });
+        }
+      }
+    });
+
+    it('falls back from malformed pagination fields as the previous mapper did', async () => {
+      globalThis.fetch = async (): Promise<Response> =>
+        new Response(JSON.stringify({ bookings: [], pagination: { page: 'wrong', limit: null, total: 3 } }), {
+          status: 200,
+        });
+
+      const outcome = await listBookings('upcoming', 1, 10);
+      assert.strictEqual(outcome.ok, true);
+      if (outcome.ok) {
+        assert.deepEqual(outcome.data.pagination, { page: 1, limit: 10, total: 3, totalPages: 0 });
+      }
+    });
+
     it('returns INVALID_COMMAND if tab is invalid', async () => {
       let requested = false;
       globalThis.fetch = async (): Promise<Response> => {
@@ -1038,6 +1081,76 @@ describe('booking-management server domain module', () => {
   });
 
   describe('Phase 5: backendClient transport mapping and single-send invariants', () => {
+    it('preserves detail field defaults accepted by the previous mapper', async () => {
+      globalThis.fetch = async (): Promise<Response> =>
+        new Response(JSON.stringify({ ...mockUpstreamBookingListItem, totalAmount: {}, paymentStatus: false }));
+
+      const outcome = await getBookingDetail('booking-uuid-001');
+      assert.strictEqual(outcome.ok, true);
+      if (outcome.ok) {
+        assert.strictEqual(outcome.data.totalAmount, '0.00');
+        assert.strictEqual(outcome.data.paymentStatus, undefined);
+      }
+    });
+
+    it('preserves cancellation status coercions accepted by the previous mapper', async () => {
+      globalThis.fetch = async (): Promise<Response> =>
+        new Response(JSON.stringify({ bookingId: 123, bookingStatus: 456, airlineRefundAmount: 450, refundStatus: 7 }));
+
+      const outcome = await getCancellationStatus('booking-uuid-001');
+      assert.strictEqual(outcome.ok, true);
+      if (outcome.ok) {
+        assert.strictEqual(outcome.data.bookingId, '123');
+        assert.strictEqual(outcome.data.bookingStatus, '456');
+        assert.strictEqual(outcome.data.airlineRefundAmount, '450');
+        assert.strictEqual(outcome.data.refundStatus, '7');
+      }
+    });
+
+    it('preserves cancellation quote coercions accepted by the previous mapper', async () => {
+      globalThis.fetch = async (): Promise<Response> =>
+        new Response(JSON.stringify({ bookingId: 123, quoteId: 456, refundAmount: {}, currency: 'USD', expiresAt: timestamp, refundable: 1 }));
+
+      const outcome = await getCancellationQuote('booking-uuid-001');
+      assert.strictEqual(outcome.ok, true);
+      if (outcome.ok) {
+        assert.strictEqual(outcome.data.bookingId, '123');
+        assert.strictEqual(outcome.data.quoteId, '456');
+        assert.strictEqual(outcome.data.refundAmount, '0.00');
+        assert.strictEqual(outcome.data.refundable, true);
+      }
+    });
+
+    it('preserves cancellation result coercions accepted by the previous mapper', async () => {
+      globalThis.fetch = async (): Promise<Response> =>
+        new Response(JSON.stringify({ bookingId: 123, bookingStatus: 456, cancellationStatus: 7, refundStatus: 8, refundAmount: {} }));
+
+      const outcome = await cancelBooking('booking-uuid-001', 'quote-local-123');
+      assert.strictEqual(outcome.ok, true);
+      if (outcome.ok) {
+        assert.strictEqual(outcome.data.bookingId, '123');
+        assert.strictEqual(outcome.data.bookingStatus, '456');
+        assert.strictEqual(outcome.data.cancellationStatus, '7');
+        assert.strictEqual(outcome.data.refundStatus, '8');
+        assert.strictEqual(outcome.data.refundAmount, '0.00');
+      }
+    });
+
+    it('falls back from non-array revisions and malformed pagination as the previous mapper did', async () => {
+      globalThis.fetch = async (): Promise<Response> =>
+        new Response(JSON.stringify({ items: null, revisions: [], page: 'wrong', limit: null, total: 2 }));
+
+      const outcome = await getItineraryRevisions('booking-uuid-001', 1, 5);
+      assert.strictEqual(outcome.ok, true);
+      if (outcome.ok) {
+        assert.deepEqual(outcome.data.revisions, []);
+        assert.strictEqual(outcome.data.page, 1);
+        assert.strictEqual(outcome.data.limit, 5);
+        assert.strictEqual(outcome.data.total, 2);
+        assert.strictEqual(outcome.data.totalPages, 1);
+      }
+    });
+
     describe('1. Six JSON operation raw response schemas & optional field tolerance', () => {
       it('tolerates omitted bookings, omitted pagination, and sparse booking items while stripping provider IDs in listBookings', async () => {
         globalThis.fetch = async (): Promise<Response> => {
@@ -1756,4 +1869,3 @@ describe('booking-management server domain module', () => {
     });
   });
 });
-

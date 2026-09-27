@@ -74,3 +74,12 @@ T001–T004 baseline → T005–T007 client → US1 (T008–T010) → US2 (T011�
 ## Implementation strategy
 
 MVP is the client plus dashboard (US1): it proves the interface and delivers transient read recovery. Flight and booking migrations follow as independent working slices; route deduplication finishes the refactor. Run each focused gate before starting the next migration.
+
+## Phase 8: Convergence
+
+- [x] T026 Emit PII-safe transport diagnostics from `apps/web/lib/server/backend-client.ts` as structured JSON with the fields required by Constitution IV, and verify the diagnostic contract (contradicts).
+- [x] T027 Bound token-provider resolution within the 31-second total request budget in `apps/web/lib/server/backend-client.ts`; return a typed transport failure on provider rejection or timeout and cover both cases in `backend-client.spec.ts` per FR-002 and FR-005 (partial).
+- [x] T028 Retry an eligible GET when reading its successful JSON body reaches the 10-second attempt timeout, while keeping the three-attempt and 31-second caps; add a recovery regression test in `backend-client.spec.ts` per FR-005 (partial).
+- [x] T029 Restore the baseline `Please sign in to continue.` message for backend HTTP 401 across all booking operations while preserving operation-specific missing-token messages; add parity assertions in `booking-management.spec.ts` per FR-008 (contradicts).
+- [x] T030 Preserve the baseline booking-list fallback for non-array `bookings` values in the raw response schema, and add regression coverage in `booking-management.spec.ts` per FR-008 (contradicts).
+- [x] T031 Distinguish transient network/abort failures while reading a successful GET JSON body from malformed JSON, and retry eligible GETs within the existing caps; add regression coverage in `backend-client.spec.ts` per FR-005 (partial).

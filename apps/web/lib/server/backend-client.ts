@@ -34,16 +34,23 @@ async function defaultTokenProvider(): Promise<string | null> {
   }
 }
 
-type JsonRaceResult = { kind: 'data'; value: unknown } | { kind: 'invalid' } | { kind: 'timeout' };
+type JsonRaceResult =
+  | { kind: 'data'; value: unknown }
+  | { kind: 'invalid' }
+  | { kind: 'network' }
+  | { kind: 'timeout' };
 
 async function parseJsonWithTimeout(
   response: Response,
   timeoutPromise: Promise<{ kind: 'timeout' }>,
 ): Promise<JsonRaceResult> {
   return Promise.race([
-    response.json().then(
+    Promise.resolve().then((): Promise<unknown> => response.json()).then(
       (value: unknown): JsonRaceResult => ({ kind: 'data', value }),
-      (): JsonRaceResult => ({ kind: 'invalid' }),
+      (error: unknown): JsonRaceResult => {
+        if (error instanceof SyntaxError) return { kind: 'invalid' };
+        return { kind: isAbortOrTimeoutError(error) ? 'timeout' : 'network' };
+      },
     ),
     timeoutPromise,
   ]);
@@ -53,7 +60,22 @@ export function createBackendClient(config: { tokenProvider?: TokenProvider; bas
   return {
     async request<T>(path: string, schema: ZodType<T>, opts: RequestOpts = {}): Promise<TransportResult<T>> {
       const deadline = Date.now() + TOTAL_TIMEOUT_MS;
-      const token = await (config.tokenProvider ?? defaultTokenProvider)();
+      let tokenTimeout: ReturnType<typeof setTimeout> | undefined;
+      const tokenResult = await Promise.race([
+        Promise.resolve().then((): Promise<string | null> =>
+          (config.tokenProvider ?? defaultTokenProvider)(),
+        ).then(
+          (value): { kind: 'token'; value: string | null } => ({ kind: 'token', value }),
+          (): { kind: 'failure' } => ({ kind: 'failure' }),
+        ),
+        new Promise<{ kind: 'timeout' }>((resolve): void => {
+          tokenTimeout = setTimeout((): void => resolve({ kind: 'timeout' }), TOTAL_TIMEOUT_MS);
+        }),
+      ]);
+      clearTimeout(tokenTimeout);
+      if (tokenResult.kind === 'timeout') return transportFailure('timeout');
+      if (tokenResult.kind === 'failure') return transportFailure('network');
+      const token = tokenResult.value;
       if (!token?.trim()) return transportFailure('missing_token');
       const baseUrl = (config.baseUrl || process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001').replace(/\/+$/, '');
       const rawCustomHeaders: Record<string, string> =
@@ -124,7 +146,12 @@ export function createBackendClient(config: { tokenProvider?: TokenProvider; bas
         }
         const body = await parseJsonWithTimeout(response, timeoutResult);
         clearTimeout(timeout);
-        if (body.kind === 'timeout') return transportFailure('timeout');
+        if (body.kind === 'timeout' || body.kind === 'network') {
+          if (attempt === maxAttempts - 1 || !await waitWithinDeadline(100 * 2 ** attempt, deadline)) {
+            return transportFailure(body.kind);
+          }
+          continue;
+        }
         if (body.kind === 'invalid') return transportFailure('invalid_json');
         const parsed = schema.safeParse(body.value);
         return parsed.success ? { ok: true, data: parsed.data } : transportFailure('invalid_payload');
@@ -135,9 +162,17 @@ export function createBackendClient(config: { tokenProvider?: TokenProvider; bas
 }
 
 function transportFailure<T>(cause: TransportCause): TransportResult<T> {
-  // Diagnostic values are fixed categories; never include request or response data.
+  // Fixed categories and null tracing fields keep diagnostics independent of request data.
   // eslint-disable-next-line no-console
-  console.warn('backend_client transport failure', { cause });
+  console.warn(JSON.stringify({
+    timestamp: new Date().toISOString(),
+    level: 'warn',
+    service: 'web.backend_client',
+    trace_id: null,
+    correlation_id: null,
+    message: 'Backend transport failure',
+    cause,
+  }));
   return { ok: false, kind: 'transport', cause };
 }
 

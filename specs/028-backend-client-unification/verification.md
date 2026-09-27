@@ -185,3 +185,29 @@ node --import tsx 'apps/web/app/api/booking-management/bookings/[bookingId]/canc
 **Final dual-axis review:** Standards APPROVED (zero remaining hard violations or Fowler judgment calls); Spec APPROVED (zero remaining missing, partial, or unrequested requirements). The same reviewers rechecked the corrections against the full feature diff and Phase 7 working tree.
 
 **Phase 7 convergence:** The 13 functional requirements, six success criteria, seven phase task groups, and applicable constitution boundaries have no remaining implementation or documentation gaps. No convergence tasks were appended. ✅ Converged — the implementation satisfies the spec, plan, and tasks.
+
+## Phase 8: Convergence (T026–T031)
+
+Run from `C:\Booking Systems` on 2026-09-27. All commands exited 0.
+
+| Check | Result |
+| --- | --- |
+| `& '.\node_modules\.bin\tsx.CMD' --test apps/web/lib/server/backend-client.spec.ts apps/web/lib/server/dashboard.spec.ts apps/web/lib/server/flight-search.spec.ts apps/web/lib/server/booking-management.spec.ts apps/web/lib/server/outcome-response.spec.ts apps/web/app/api/booking-management/route-parity.spec.ts` | 231 passed, 0 failed across the six focused unit and parity specs (26 backend-client, 28 dashboard, 55 flight-search, 58 booking-management, 8 outcome-response, 56 route-parity). |
+| `& '.\node_modules\.bin\tsx.CMD' --test 'apps/web/app/api/booking-management/bookings/[[]bookingId]/cancellation/route.spec.ts' 'apps/web/app/api/booking-management/bookings/[[]bookingId]/cancellation/quote/route.spec.ts'` | 10 passed, 0 failed across the two cancellation route specs (7 cancellation, 3 quote). |
+| Helper census across `apps/web/lib/server` and `apps/web/app/api/booking-management` | Exactly one `function (apiUrl\|getAccessToken\|fetchWithRetry\|mapOutcomeToResponse)` match: `outcome-response.ts:5`. Exit 0. |
+| Scoped TypeScript `any` census | Zero `any` usages across all modified server and spec files. |
+| `pnpm --filter @web/frontend lint` | Exit 0; 0 warnings, 0 errors. |
+| `pnpm --filter @web/frontend typecheck` | Exit 0; strict `tsc --noEmit` clean. |
+| `pnpm --filter @web/frontend build` | Exit 0; 23/23 static pages generated successfully. |
+| `git diff --check` | Exit 0; clean without whitespace errors. |
+
+### Convergence Remediation & Review Verification
+- **T026 Structured Diagnostics**: Replaced ad-hoc `console.warn` logging in `backend-client.ts` with structured JSON output specifying `timestamp`, `level: 'warn'`, `service: 'web.backend_client'`, `trace_id: null`, `correlation_id: null`, `message`, and safe categorical `cause` conforming to Constitution IV.
+- **T027 Bounded Token Resolution**: Protected `config.tokenProvider ?? defaultTokenProvider` with a 31s total request budget timeout. Provider rejections map to typed `{ ok: false, kind: 'transport', cause: 'network' }` and provider timeouts map to `cause: 'timeout'`.
+- **T028 & T031 Body-Read Transient Retry**: Differentiated SyntaxError (`response.json()` parse failure -> `invalid_json`, no retry) from stream aborts and transient network failures (`isAbortOrTimeoutError(error) ? 'timeout' : 'network'`). Transient body-read failures on GET requests retry within the 3-attempt and 31-second budget; mutations (`POST`, `PUT`, `PATCH`, `DELETE`) strictly remain single-send on any error.
+- **T029 HTTP 401 Message Parity**: Standardized upstream HTTP 401 failure message to `'Please sign in to continue.'` across all booking operations in `booking-management.ts`, while preserving operation-specific messages for missing local session tokens.
+- **T030 Booking List Schema Tolerance**: Replaced rigid array expectation with `.transform((value) => (Array.isArray(value) ? value : [])).pipe(z.array(...))` and `.catch(undefined)` on pagination fields in `RawBookingListResponseSchema` to preserve baseline list fallback behavior on non-array upstream responses.
+- **Dual-Axis Code Review**: Completed independent dual-axis review. Standards: APPROVED; Spec: APPROVED.
+- **Build Artifact Hygiene**: Restored generated `apps/web/tsconfig.tsbuildinfo` to clean base state.
+
+**Phase 8 convergence:** All 31 tasks (T001–T031) verified complete. Implementation fully satisfies all functional requirements, success criteria, and safety invariants with zero regressions.
