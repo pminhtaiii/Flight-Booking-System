@@ -32,99 +32,101 @@ export type BookingTab = 'upcoming' | 'past';
 
 const RawBookingListResponseSchema = z
   .object({
-    bookings: z.array(z.record(z.string(), z.unknown())).optional().default([]),
+    bookings: z
+      .unknown()
+      .transform((value) => (Array.isArray(value) ? value : []))
+      .pipe(z.array(z.record(z.string(), z.unknown()))),
     pagination: z
       .object({
-        page: z.number().optional(),
-        limit: z.number().optional(),
-        total: z.number().optional(),
-        totalPages: z.number().optional(),
+        page: z.number().optional().catch(undefined),
+        limit: z.number().optional().catch(undefined),
+        total: z.number().optional().catch(undefined),
+        totalPages: z.number().optional().catch(undefined),
       })
       .passthrough()
-      .optional(),
+      .optional()
+      .catch(undefined),
   })
   .passthrough();
 
 const RawBookingDetailResponseSchema = z
   .object({
-    id: z.string().optional(),
-    status: z.string().optional(),
-    totalAmount: z.union([z.string(), z.number()]).optional(),
-    currency: z.string().optional(),
-    departureAt: z.string().nullable().optional(),
-    arrivalAt: z.string().nullable().optional(),
-    createdAt: z.string().optional(),
-    updatedAt: z.string().optional(),
-    flightSnapshot: z.record(z.string(), z.unknown()).optional(),
-    currentItinerary: z.record(z.string(), z.unknown()).optional(),
-    itinerary: z.record(z.string(), z.unknown()).optional(),
-    passengers: z.array(z.unknown()).optional(),
-    passengerSnapshot: z
-      .union([z.array(z.unknown()), z.record(z.string(), z.unknown())])
-      .optional(),
-    bookingIntent: z.record(z.string(), z.unknown()).optional(),
-    ancillarySummary: z.record(z.string(), z.unknown()).optional(),
-    cancellation: z.record(z.string(), z.unknown()).optional(),
-    cancellationDeadline: z.string().nullable().optional(),
-    cancellationRefundable: z.boolean().nullable().optional(),
-    airlineRefundAmount: z.union([z.string(), z.number()]).nullable().optional(),
-    customerRefundAmount: z.union([z.string(), z.number()]).nullable().optional(),
-    payment: z.record(z.string(), z.unknown()).optional(),
-    paymentStatus: z.string().nullable().optional(),
-    offerId: z.string().nullable().optional(),
-    pnrReference: z.string().nullable().optional(),
-    failureReason: z.string().nullable().optional(),
-    disruption: z.record(z.string(), z.unknown()).optional(),
+    id: z.unknown(),
+    status: z.unknown(),
+    totalAmount: z.unknown(),
+    currency: z.unknown(),
+    departureAt: z.unknown(),
+    arrivalAt: z.unknown(),
+    createdAt: z.unknown(),
+    updatedAt: z.unknown(),
+    flightSnapshot: z.unknown(),
+    currentItinerary: z.unknown(),
+    itinerary: z.unknown(),
+    passengers: z.unknown(),
+    passengerSnapshot: z.unknown(),
+    bookingIntent: z.unknown(),
+    ancillarySummary: z.unknown(),
+    cancellation: z.unknown(),
+    cancellationDeadline: z.unknown(),
+    cancellationRefundable: z.unknown(),
+    airlineRefundAmount: z.unknown(),
+    customerRefundAmount: z.unknown(),
+    payment: z.unknown(),
+    paymentStatus: z.unknown(),
+    offerId: z.unknown(),
+    pnrReference: z.unknown(),
+    failureReason: z.unknown(),
+    disruption: z.unknown(),
   })
   .passthrough();
 
 const RawCancellationStatusResponseSchema = z
   .object({
-    bookingId: z.string().optional(),
-    bookingStatus: z.string().optional(),
-    cancellationDeadline: z.string().nullable().optional(),
-    airlineRefundAmount: z.union([z.string(), z.number()]).nullable().optional(),
-    customerRefundAmount: z.union([z.string(), z.number()]).nullable().optional(),
-    refundStatus: z.string().nullable().optional(),
-    nextRetryAt: z.string().nullable().optional(),
-    escalationMessage: z.string().nullable().optional(),
+    bookingId: z.unknown(),
+    bookingStatus: z.unknown(),
+    cancellationDeadline: z.unknown(),
+    airlineRefundAmount: z.unknown(),
+    customerRefundAmount: z.unknown(),
+    refundStatus: z.unknown(),
+    nextRetryAt: z.unknown(),
+    escalationMessage: z.unknown(),
   })
   .passthrough();
 
 const RawCancellationQuoteResponseSchema = z
   .object({
-    bookingId: z.string().optional(),
-    quoteId: z.string().optional(),
-    refundAmount: z.union([z.string(), z.number()]).optional(),
-    currency: z.string().optional(),
-    expiresAt: z.string().optional(),
-    refundable: z.boolean().optional(),
-    cancellationDeadline: z.string().nullable().optional(),
-    refundTo: z.string().nullable().optional(),
-    nonRefundableAncillaryAmount: z.union([z.string(), z.number()]).nullable().optional(),
-    nonRefundableAncillaryCurrency: z.string().nullable().optional(),
+    bookingId: z.unknown(),
+    quoteId: z.unknown(),
+    refundAmount: z.unknown(),
+    currency: z.unknown(),
+    expiresAt: z.unknown(),
+    refundable: z.unknown(),
+    cancellationDeadline: z.unknown(),
+    refundTo: z.unknown(),
+    nonRefundableAncillaryAmount: z.unknown(),
+    nonRefundableAncillaryCurrency: z.unknown(),
   })
   .passthrough();
 
 const RawCancellationResultResponseSchema = z
   .object({
-    bookingId: z.string().optional(),
-    bookingStatus: z.string().optional(),
-    cancellationStatus: z.string().optional(),
-    refundStatus: z.string().optional(),
-    refundAmount: z.union([z.string(), z.number()]).optional(),
-    nextRetryAt: z.string().nullable().optional(),
+    bookingId: z.unknown(),
+    bookingStatus: z.unknown(),
+    cancellationStatus: z.unknown(),
+    refundStatus: z.unknown(),
+    refundAmount: z.unknown(),
+    nextRetryAt: z.unknown(),
   })
   .passthrough();
 
 const RawItineraryRevisionsResponseSchema = z
   .object({
-    items: z.array(z.record(z.string(), z.unknown())).optional(),
-    revisions: z.array(z.record(z.string(), z.unknown())).optional(),
-    page: z.number().optional(),
-    limit: z.number().optional(),
-    total: z.number().optional(),
-    totalPages: z.number().optional(),
+    items: z.unknown(),
+    revisions: z.unknown(),
+    page: z.unknown(),
+    limit: z.unknown(),
+    total: z.unknown(),
+    totalPages: z.unknown(),
   })
   .passthrough();
 
@@ -134,7 +136,7 @@ function handleTransportFailure<T>(
 ): BookingManagementOutcome<T> {
   if (result.kind === 'http') {
     if (result.status === 401) {
-      return outcomeFailure('UNAUTHENTICATED', operationSignInMessage, false);
+      return outcomeFailure('UNAUTHENTICATED', 'Please sign in to continue.', false);
     }
     if (result.status === 403) {
       return outcomeFailure('FORBIDDEN', 'You do not have access to this booking.', false);
@@ -196,25 +198,30 @@ export async function listBookings(
   }
 
   try {
-    const rawBookings = result.data.bookings ?? [];
+    // Zod infers the transform/pipe result as unknown here; the schema validates this shape.
+    const raw = result.data as {
+      bookings: Record<string, unknown>[];
+      pagination?: { page?: number; limit?: number; total?: number; totalPages?: number };
+    };
+    const rawBookings = raw.bookings;
     const mappedBookings = rawBookings.map(mapListItem);
 
     const pagination = {
       page:
-        typeof result.data.pagination?.page === 'number'
-          ? result.data.pagination.page
+        typeof raw.pagination?.page === 'number'
+          ? raw.pagination.page
           : validPage,
       limit:
-        typeof result.data.pagination?.limit === 'number'
-          ? result.data.pagination.limit
+        typeof raw.pagination?.limit === 'number'
+          ? raw.pagination.limit
           : validLimit,
       total:
-        typeof result.data.pagination?.total === 'number'
-          ? result.data.pagination.total
+        typeof raw.pagination?.total === 'number'
+          ? raw.pagination.total
           : mappedBookings.length,
       totalPages:
-        typeof result.data.pagination?.totalPages === 'number'
-          ? result.data.pagination.totalPages
+        typeof raw.pagination?.totalPages === 'number'
+          ? raw.pagination.totalPages
           : Math.ceil(mappedBookings.length / validLimit),
     };
 

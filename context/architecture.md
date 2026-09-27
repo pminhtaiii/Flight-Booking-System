@@ -58,7 +58,7 @@
   - Static censuses found no `format_sse` in `chat_turn/events.py`, no tool-name branching or guardrail/gateway construction in `chat_turn/interpreter.py`, and no `Any` in the extracted coordinator, runner, admission, interpreter, resolver, or conversation modules.
   - Full-package Ruff lint and format checks passed. The eight focused decomposition suites passed (184 passed, 1 skipped); the Phase 7 non-Redis regression gate excluding `test_security_performance` passed (1,272 passed, 11 skipped, 20 deselected). Exact commands, exit codes, and timings are in `specs/027-chat-turn-decomposition/verification.md`.
 
-## Feature 028 — Backend Client Unification (Phases 1–7 complete, 2026-09-26)
+## Feature 028 — Backend Client Unification (Complete — Phases 1–8, Tasks T001–T031 Verified, 2026-09-27)
 
 - [Feature 028 specification](../specs/028-backend-client-unification/spec.md), [plan](../specs/028-backend-client-unification/plan.md), and [tasks](../specs/028-backend-client-unification/tasks.md) unify the three core web server transport consumers and six booking route response adapters. Dashboard `INVALID_RESPONSE`, booking error-body forwarding, and mutation single-send behavior remain contract requirements.
 - **Phase 1: Baseline Characterization (T001–T004 Complete)**: Locks current behavior in dashboard, flight-search, booking-management, and cancellation route specs. Covers 400/422 message forwarding and fallback, transient mutation single-send, response status/body/header mapping, and provider-ID stripping across 103 baseline tests.
@@ -111,6 +111,14 @@
   - Censuses found no orphaned transport or parsing helpers in `dashboard.ts`, `flight-search.ts`, or `booking-management.ts`; `backend-client.ts` owns their transport behavior. `outcome-response.ts` has the only response mapper definition, imported by all six booking routes. Scoped TypeScript has zero `any` matches.
   - All 226 focused tests passed. Web lint, typecheck, and production build exited 0. The feature diff leaves public/shared schemas, Prisma, dependencies, and environment/flag configuration unchanged.
   - Final review restored bodyless disruption POST requests, removed duplicate `Content-Type` header values on JSON POSTs, and added an explicit client factory return type. The user approved correction of the two existing disruption request assertions.
+  - See [execution evidence](../specs/028-backend-client-unification/verification.md).
+- **Phase 8: Convergence Remediation & Verification Gate (T026–T031 Complete)**:
+  - Structured transport diagnostic logs conform to Constitution IV as JSON (`timestamp`, `level: 'warn'`, `service: 'web.backend_client'`, `trace_id: null`, `correlation_id: null`, `message`, `cause`).
+  - Token resolution bound within the 31-second total request budget, mapping timeouts to `cause: 'timeout'` and rejections to `cause: 'network'`.
+  - Transient body stream read failures on GET requests retry within the 3-attempt / 31-second budget; body parse SyntaxErrors fail immediately as `invalid_json`. Mutations remain strictly single-send under all conditions.
+  - Restored baseline `Please sign in to continue.` message across all booking operations on HTTP 401.
+  - Preserved list fallback on non-array raw `bookings` response payloads via schema transformation.
+  - Full gate verified: 241/241 unit and route tests passed, lint clean, typecheck clean, production build clean (23/23 static pages). Dual-axis review APPROVED.
   - See [execution evidence](../specs/028-backend-client-unification/verification.md).
 
 
