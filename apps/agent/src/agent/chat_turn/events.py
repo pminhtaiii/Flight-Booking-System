@@ -135,10 +135,6 @@ ChatTurnEvent = Annotated[
 ]
 
 
-def format_sse(event: ChatTurnEvent) -> str:
-    return f"event: {event.event}\ndata: {event.data.model_dump_json()}\n\n"
-
-
 __all__ = [
     "ActionHandoffEvent",
     "ActionHandoffPayload",
@@ -157,5 +153,4 @@ __all__ = [
     "ToolCallPayload",
     "ToolResultEvent",
     "ToolResultPayload",
-    "format_sse",
 ]

@@ -1,4 +1,212 @@
 # Progress Tracker
+
+### Feature 028 — Backend Client Unification: 100% Complete (Phases 1–8, Tasks T001–T031 Verified) (2026-09-27)
+
+- **Final gate:** 241/241 focused tests passed with zero failures or skips. The six domain/parity specs passed 231/231; the two literal `[bookingId]` route specs passed 10/10 (7/7 and 3/3) when run with escaped glob syntax. Web lint, typecheck, and production build each exited 0; the build generated 23/23 static pages.
+- **Architecture & Convergence:** `backend-client.ts` exclusively owns server-side token, URL, timeout, retry, and response parsing behavior. Structured diagnostics conform to Constitution IV as JSON. Token provider resolution is bounded within the 31s deadline. GET retries up to three times within a 31-second total budget (including on transient body stream read failure); body parse SyntaxErrors fail immediately as `invalid_json`. POST/PUT/PATCH/DELETE mutations are strictly single-send under all conditions. Booking HTTP 401 returns unified `Please sign in to continue.` message parity. `RawBookingListResponseSchema` tolerates non-array `bookings` payloads. `outcome-response.ts` is the sole booking `BookingManagementOutcome` → `NextResponse` mapper; all six route files import it.
+- **Censuses and scope:** Exactly 1 `mapOutcomeToResponse` match in `outcome-response.ts` (0 in other files), zero orphaned transport/parsing helpers in consumers, and scoped TypeScript has zero `any` matches. The feature diff changes no public/shared schemas, Prisma files, dependencies, or environment/feature-flag configuration.
+- **Review & Hygiene:** Dual-axis review passed with independent subagent verification (Standards: APPROVED, Spec: APPROVED). The generated TypeScript build cache `apps/web/tsconfig.tsbuildinfo` was restored to its pre-feature state.
+- **Evidence:** Full commands, counts, exit codes, and timing are in [verification](../specs/028-backend-client-unification/verification.md); all tasks are tracked in [tasks](../specs/028-backend-client-unification/tasks.md).
+
+### Feature 028 — Backend Client Unification: Phase 6 / User Story 4 Complete (Tasks T018–T022 Verified) (2026-09-26)
+
+- Added booking-specific `apps/web/lib/server/outcome-response.ts` as the sole `BookingManagementOutcome` → `NextResponse` mapper; all six booking route files import it. The seven HTTP operations retain their methods, `dynamic` exports, parameter validation, signatures, status/body mapping, and `Cache-Control: private, no-store` headers.
+- Added table-driven adapter tests and route parity tests covering seven operations × eight success/error outcomes. The adapter tests were RED before extraction; after migration, the two new specs passed 64/64 and the parity plus existing cancellation route specs passed 66/66.
+- Server regression specs (`backend-client`, `dashboard`, `flight-search`, `booking-management`) passed 151/151. Web lint and typecheck passed with exit code 0. Static census found exactly one `function mapOutcomeToResponse`, in the shared adapter. Independent task and feature reviews found no remaining blocking issues.
+- Evidence from this Phase 6 checkpoint is recorded in `specs/028-backend-client-unification/verification.md`; T018–T022 were checked before Phase 7 began.
+
+### Feature 028 — Backend Client Unification: Phase 5 / User Story 3 Complete (Tasks T014–T017 Verified) (2026-09-26)
+
+- **T014 Booking Transport Result Mapping & Mutation Safety Tests**: Extended `apps/web/lib/server/booking-management.spec.ts` with dedicated Phase 5 test suite:
+  - Six JSON-consuming operation raw schemas: verifies `listBookings`, `getBookingDetail`, `getCancellationStatus`, `getCancellationQuote`, `cancelBooking`, and `getItineraryRevisions` tolerate optional fields, normalize omitted inputs, and strip provider identifiers (`duffelOrderId`, `duffelSegmentId`, `duffelCancellationQuoteId`, `stripePaymentIntentId`, `passportNumber`, etc.).
+  - 400 and 422 error body forwarding and fallback: forwards `data.message` as `INVALID_COMMAND` across all 8 operations, falling back to `'Invalid request. Please check your details and try again.'` when unparseable or absent.
+  - Malformed successful JSON: maps unparseable 200 text and schema validation mismatches to `UPSTREAM_UNAVAILABLE` (`retryable: true`) across operations without throwing.
+  - Empty-body disruption acknowledge & accept success: 200 and 204 empty responses return `{ ok: true, data: { ok: true } }`.
+  - Mutation single-send guarantee: `getCancellationQuote`, `cancelBooking`, `acknowledgeDisruption`, and `acceptDisruption` POST requests are sent at most once (zero retries) on 502/503/504, 429 (with `Retry-After`), network error, and timeout abort error.
+  - GET retry policy: bounded retry up to 3 attempts on 502/503/504 and transient recovery on attempt 2 for `listBookings`, `getBookingDetail`, `getCancellationStatus`, and `getItineraryRevisions`; non-transient statuses (400, 401, 403, 404, 409, 422) dispatch once.
+- **T015 & T016 Backend Client Migration**:
+  - Migrated all eight operations in `apps/web/lib/server/booking-management.ts` to `backendClient.request`.
+  - Six JSON operations use operation-specific raw response schemas (`RawBookingListResponseSchema`, `RawBookingDetailResponseSchema`, `RawCancellationStatusResponseSchema`, `RawCancellationQuoteResponseSchema`, `RawCancellationResultResponseSchema`, `RawItineraryRevisionsResponseSchema`) with `.passthrough()`.
+  - Disruption mutations (`acknowledgeDisruption`, `acceptDisruption`) use `z.void()`, `responseMode: 'none'`, and retain the original bodyless POST request shape.
+  - Removed all orphaned transport helpers and constants: `fetchWithRetry`, `apiUrl()`, `getAccessToken()`, `delay()`, `handleUpstreamStatus()`, `MAX_READ_ATTEMPTS`, `RETRY_BASE_DELAY_MS`, `REQUEST_TIMEOUT_MS`, `FetchResult`, `NextAuth`, and `authOptions`.
+  - Preserved raw custom header casing in `backend-client.ts` to support exact header contracts.
+- **T017 Verification Gates & Parity**: Executed full verification suite with zero errors and exit code 0 across all checks:
+  - `backend-client.spec.ts` and `booking-management.spec.ts`: 68 passed, 0 failed.
+  - `dashboard.spec.ts`, `flight-search.spec.ts`, and booking API route tests: 93 passed, 0 failed.
+  - `@web/frontend` lint: 0 warnings, 0 errors.
+  - `@web/frontend` typecheck: clean (`tsc --noEmit`).
+  - Recorded verification evidence and marked T014–T017 complete in `specs/028-backend-client-unification/tasks.md` and `verification.md`.
+
+### Feature 028 — Backend Client Unification: Phase 4 / User Story 2 Complete (Tasks T011–T013 Verified) (2026-09-26)
+
+- **T011 Flight Characterization & Transport Invariant Tests**: Extended `apps/web/lib/server/flight-search.spec.ts` with dedicated Phase 4 test suite locking:
+  - Search POST single-send: exactly 1 attempt on 502/503/504, 429, network error, and timeout (zero mutation retries).
+  - Offer selection GET bounded recovery: recovers on 2nd attempt after 502/503/504 or network timeout.
+  - Transport failure mapping: malformed upstream JSON and schema validation failure map to `UPSTREAM_UNAVAILABLE` (`retryable: true`) with exact user-facing message (`'Flight search returned an invalid response. Please try again.'`).
+  - Missing token short-circuit: session `null` or lacking `accessToken` returns `UNAUTHENTICATED` (`retryable: false`) with 0 fetch attempts for both search and selection.
+  - HTTP status mapping parity: 401/403 -> `UNAUTHENTICATED` (single-send), 429 -> `RATE_LIMITED` (`retryable: true`, single-send), 400/422 -> `INVALID_SEARCH` (`retryable: false`, single-send), 404/410 on selection -> `OFFER_EXPIRED` (`retryable: false`, single-send).
+- **T012 Backend Client Migration**: Migrated `searchFlights` and `selectFlightOffer` in `apps/web/lib/server/flight-search.ts` to `backendClient.request`:
+  - Removed bespoke `fetchWithRetry`, `apiUrl()`, `getAccessToken()`, `delay()`, constants, and NextAuth module imports.
+  - Preserved upstream Zod schemas, `validateMatchedSearchCardinality`, offer mapping (`mapOffer`), and view schema checks (`FlightSearchOfferViewSchema`).
+  - Preserved provider identifier stripping and exact checkout route: `/checkout?offerId=${encodeURIComponent(id)}`.
+- **T013 Verification Gates & Parity**: Executed full verification suite with zero errors and exit code 0 across all checks:
+  - `backend-client.spec.ts` and `flight-search.spec.ts`: 73 passed, 0 failed.
+  - `dashboard.spec.ts`, `booking-management.spec.ts`, and booking API route tests: 68 passed, 0 failed.
+  - `@web/frontend` lint: 0 warnings, 0 errors.
+  - `@web/frontend` typecheck: clean (`tsc --noEmit`).
+  - Recorded verification evidence and marked T011–T013 complete in `specs/028-backend-client-unification/tasks.md` and `verification.md`.
+
+### Feature 028 — Backend Client Unification: Phase 3 / User Story 1 Complete (Tasks T008–T010 Verified) (2026-09-26)
+
+- **T008 Dashboard Characterization & Retry Policy Tests**: Extended `apps/web/lib/server/dashboard.spec.ts` with transient 502/503/504 recovery assertions (successful second attempt), 429 Retry-After handling, strict HTTP 500 single-attempt assertion (zero retries), missing token handling, and malformed payload schema rejection.
+- **T009 Backend Client Migration**: Migrated `getDashboardSummary` in `apps/web/lib/server/dashboard.ts` to `backendClient.request` using `DashboardSummarySchema`. Preserved exact dashboard outcome types, HTTP status mappings (401 -> `UNAUTHENTICATED`, 403 -> `FORBIDDEN`, 5xx -> `UPSTREAM_UNAVAILABLE`), transport cause mappings (`missing_token` -> `UNAUTHENTICATED`, `invalid_json`/`invalid_payload` -> `INVALID_RESPONSE`, `timeout` -> `UPSTREAM_UNAVAILABLE`), and zero PII/credential leakage.
+- **T010 Verification Gates & Parity**: Executed full verification suite with zero errors and exit code 0 across all checks:
+  - `backend-client.spec.ts` and `dashboard.spec.ts`: 42 passed, 0 failed.
+  - `flight-search.spec.ts`, `booking-management.spec.ts`, and booking API route tests: 82 passed, 0 failed.
+  - `@web/frontend` lint: 0 warnings, 0 errors.
+  - `@web/frontend` typecheck: clean (`tsc --noEmit`).
+  - Recorded verification evidence and marked T008–T010 complete in `specs/028-backend-client-unification/tasks.md` and `verification.md`.
+
+### Feature 028 — Backend Client Unification: Phase 2 Foundational Contract Complete (Tasks T005–T007 Verified) (2026-09-26)
+
+- **T005–T006 TDD Characterization & Unit Suites**: Created comprehensive unit tests in `apps/web/lib/server/backend-client.spec.ts` covering factory creation, default/injected token resolution, URL precedence (`baseUrl` -> `API_URL` -> `NEXT_PUBLIC_API_URL` -> `localhost:3001`), missing-token short-circuit, no-store headers, 10s per-attempt timeout, schema parsing, `responseMode: 'none'` bodyless 2xx handling, malformed response handling, safe transport causes (`missing_token`, `network`, `timeout`, `invalid_json`, `invalid_payload`), GET retry matrix (max 3 attempts, 100ms exponential base, 502/503/504 and 429 Retry-After), 31s total request deadline, and zero mutation replay (`POST`, `PUT`, `PATCH`, `DELETE` single-attempt).
+- **T007 Client Implementation**: Implemented `createBackendClient` and default `backendClient` in `apps/web/lib/server/backend-client.ts`. Enforced strict server-only boundary (`import 'server-only'`), zero client credentials, PII-free diagnostics, deduplicated JSON parsing race, and typed assertions with inline rationale comments.
+- **Dual-Axis Review & Verification Gates**: Dual-axis review passed with parallel subagents (Standards: APPROVED, Spec: APPROVED). Verification gates passed cleanly: `backend-client.spec.ts` (18/18), baseline characterization suites (103/103), web lint (0 warnings/errors), and web typecheck (0 errors).
+
+### Feature 027 — Chat Turn Decomposition Complete (Phases 1–7, Tasks T001–T027 Verified) (2026-09-26)
+
+- **T025 boundary census**: `chat_turn/events.py` has no `format_sse`; `chat_turn/interpreter.py` has no tool-name branch or guardrail/gateway construction. Validated `tools` chain-end results reach `resolver.resolve`; `on_tool_end` records timing only. Extracted modules have zero `Any` matches.
+- **T026 final gates**: Focused decomposition suites: 184 passed, 1 skipped (exit 0, 24.36s). Ruff check passed (exit 0); Ruff format checked 166 files (exit 0). Phase 7 non-Redis agent regression excluding `test_security_performance`: 1,272 passed, 11 skipped, 20 deselected (exit 0, 141.84s).
+- **T027 documentation**: Completed coordinator, runner, interpreter, resolver, memory, and admission boundaries are recorded in `context/architecture.md`. Gate commands, census results, exit codes, and timings are recorded in `specs/027-chat-turn-decomposition/verification.md`.
+
+### Feature 027 — Chat Turn Decomposition: Phase 6 / User Story 4 Complete (Tasks T022–T024 Verified) (2026-09-26)
+
+- **T022 lifecycle baseline**: Normal, blocked, handoff failure, stale-fence action suppression, cancellation, and exception cleanup were characterized before extraction in runner/session tests.
+- **T023 coordinator extraction**: Added `apps/agent/src/agent/chat_turn/coordinator.py` for session, lease, snapshot, memory, graph, output, persistence, and compaction lifecycle; `runner.py` is a backward-compatible facade and `chat_turn/__init__.py` re-exports `TurnSessionCoordinator`.
+- **Causal cleanup review fix**: Timed-out partial persistence is cancelled and joined before output-session close and lease release. Repeated cancellation during cleanup no longer skips release. Two public `ChatTurnRunner.run()` regression tests cover these paths. Runtime runner patch points remain resolvable at execution time.
+- **T024 controller/SSE parity**: Existing `ChatController.stream` and `streaming/sse.py` signatures and disconnect cleanup required no code changes. The six requested test files passed: 126 passed, 1 skipped, exit code 0.
+- **Final gate**: Full non-Redis agent suite passed: 1,280 passed, 11 skipped, 12 deselected, exit code 0. Focused runner/session/cleanup tests: 47 passed, 1 skipped. Ruff check and format passed for changed agent boundary files; `git diff --check` passed. Evidence is recorded in `specs/027-chat-turn-decomposition/verification.md`.
+
+### Feature 027 — Chat Turn Decomposition: Phase 5 / User Story 3 Complete (Tasks T016–T021 Verified) (2026-09-25)
+
+- **Phase 5 (User Story 3: Reuse Ordered Admission) Fully Completed (Tasks T016–T021)**:
+  - **T016: Characterization & Admission Invariant Tests**:
+    - Created `apps/agent/tests/test_chat_admission.py` asserting strict admission ordering (`auth` -> `length` -> `gateway_health` -> `input_scan` -> `quota` -> `runner`), zero-Redis PII short-circuit, single-scan guarantee end-to-end, and gateway outage fail-closed handling.
+  - **T017: Extracted `AuthService`**:
+    - Created `apps/agent/src/agent/admission/auth.py` extracting JWT decoding/ring verification, claim validation, correlation mapping, and NestJS user access verification into reusable `AuthService` returning typed `AuthenticatedUser`.
+  - **T018: Extracted `InputAdmissionService`**:
+    - Created `apps/agent/src/agent/admission/input_admission.py` encapsulating max-length checks, gateway availability/health validation, deterministic PII detection fallback, and input guardrail scanning into `InputAdmissionService` returning typed `InputAdmissionResult`.
+  - **T019: Extracted `QuotaService`**:
+    - Created `apps/agent/src/agent/admission/quota.py` encapsulating Redis client health, daily/burst budget checking, and telemetry emission into reusable `QuotaService`.
+  - **T020: Wired Thin FastAPI Dependencies in `sse.py`**:
+    - Replaced monolithic transport policy code in `apps/agent/src/agent/streaming/sse.py` with thin FastAPI dependency providers (`get_auth_service`, `get_authenticated_user`, `get_input_admission_service`, `get_admitted_input`, `get_quota_service`, `check_chat_quota`).
+    - Provided direct-call fallback handling and dynamic test patch resolution for existing unit tests.
+    - Forwarded validated admission decision directly through `ChatController.stream()` to preserve single-scan guarantee.
+  - **T021: Comprehensive US3 Verification Gate & Parity Recorded**:
+    - Ran focused admission and streaming suites: 90 passed in 27.68s (100% pass rate, exit code 0 across `test_chat_admission.py`, `test_sse.py`, `test_chat_controller.py`, `test_stream_auth_budget.py`, `test_sse_integration.py`).
+    - Ran full non-Redis regression suite: 1270 passed, 4 skipped, 20 deselected in 146.56s (100% pass rate, exit code 0).
+    - Ruff check & format check: 0 errors (exit code 0).
+    - Recorded complete verification evidence in `specs/027-chat-turn-decomposition/verification.md`.
+    - Checked off T016 and T021 in `specs/027-chat-turn-decomposition/tasks.md`.
+
+### Feature 027 — Chat Turn Decomposition: Phase 4 / User Story 2 Complete (Tasks T012–T015 Verified) (2026-09-25)
+
+- **Phase 4 (User Story 2: Coordinate Conversation Memory) Fully Completed (Tasks T012–T015)**:
+  - **T012–T013: Extracted `ConversationMemory` & Unit Tests**:
+    - Created `apps/agent/src/agent/memory/conversation.py` providing unified `ConversationMemory.get_context()` and `schedule_compaction()`.
+    - Handled historical message scanning, unsafe summary discarding, window size defaults, and error mapping (`SessionNotFoundException`, `MemoryPersistenceException`, `ContextBlockedException`).
+    - Added 20 focused tests in `apps/agent/tests/test_conversation_memory.py`.
+  - **T014: Wired `ConversationMemory` into `ChatTurnRunner`**:
+    - Replaced ~140 lines of inline memory fetch, scan, error handling, and compaction scheduling in `runner.py` with `ConversationMemory.get_context()` and `ConversationMemory.schedule_compaction()`.
+    - Preserved exact 4-step causal failure cleanup across `SessionNotFoundException`, `MemoryPersistenceException`, and `ContextBlockedException`.
+    - Preserved `AdmissionContext` verbatim forwarding with fallback when running without external admission context.
+    - Preserved post-turn `totalMessageCount + 2` compaction trigger and GC-safe `background_tasks` registration.
+  - **T015: Comprehensive US2 Verification Gate & Parity Recorded**:
+    - Ran focused memory and runner suites: 57 passed, 1 skipped in 10.47s (100% pass rate, exit code 0).
+    - Ran full non-Redis regression suite: 1236 passed, 4 skipped, 20 deselected in 110.82s (100% pass rate, exit code 0).
+    - Ruff check & format check: 0 errors (exit code 0).
+    - Recorded complete verification evidence in `specs/027-chat-turn-decomposition/verification.md`.
+    - Updated `specs/027-chat-turn-decomposition/tasks.md` checking off T014 and T015.
+
+### Feature 027 — Chat Turn Decomposition: Phase 3 / User Story 1 Complete (Tasks T010–T011 Verified) (2026-09-25)
+
+- **Phase 3 (User Story 1: Isolate Graph Event Translation) Fully Completed (Tasks T006–T011)**:
+  - **T010: Wired `GraphEventInterpreter` & `ToolResultResolver` into `runner.py`**:
+    - Replaced ~560 lines of complex inline graph stream interpretation, fallback handling, tool message extraction, and handoff token processing with delegation to `GraphEventInterpreter` and `ToolResultResolver`.
+    - Integrated tool call argument sanitization and input projection helper into resolver.
+    - Preserved 4-step causal failure cleanup when `ProjectionBlockedException` is caught from the interpreter, emitting static `ErrorEvent`.
+    - Maintained exact token streaming path through single per-turn `OutputStreamSession` and approved partial-response token accounting.
+  - **T011: Comprehensive US1 Verification Gate & Event Parity Recorded**:
+    - Executed all 7 focused test suites for User Story 1: `test_chat_turn_events.py`, `test_tool_result_resolver.py`, `test_chat_turn_interpreter.py`, `test_chat_turn_runner.py`, `test_sse_integration.py`, `test_sse_characterization.py`, `test_output_stream.py`.
+    - Result: 180 passed, 2 skipped, 0 failed in 17.94s (100% pass rate, exit code 0).
+    - Ruff check & format check: 0 errors across 92 files (exit code 0).
+    - Recorded complete verification evidence, git commit/HEAD status, and parity matrix in `specs/027-chat-turn-decomposition/verification.md`.
+    - Updated `specs/027-chat-turn-decomposition/tasks.md` checking off T010 and T011.
+
+### Feature 027 — Chat Turn Decomposition: Phase 3 / Slice 2 Complete (Tasks T008–T009 Verified) (2026-09-25)
+
+- **Phase 3 / Slice 2 (User Story 1: GraphEventInterpreter Extraction) Completed (Tasks T008–T009)**:
+  - **T008: Characterization & Isolated Tests for GraphEventInterpreter**: Implemented 29 comprehensive tests in `apps/agent/tests/test_chat_turn_interpreter.py` asserting:
+    - Tool-name agnostic invariant: Arbitrary tool names forwarded identically to `resolver.resolve()`.
+    - Accepted tool execution order: `ToolCallEvent` -> `resolver.resolve()` -> `ToolResultEvent` -> `follow_up_event`.
+    - Invalid readiness / blocked resolution: `is_blocked=True` raises `ProjectionBlockedException`; 0 `ToolResultEvent` emitted.
+    - Unvalidated tool output block: `tool_blocked=True` or missing/false `guardrail_validated` flag raises `ProjectionBlockedException(GUARDRAIL_TOOL_SCHEMA)` with 0 `ToolResultEvent`.
+    - Handoff node completions: Forwards to `resolver.resolve_handoff_node()`, yields `ActionHandoffEvent` on success, raises `ProjectionBlockedException(HANDOFF_FAILED)` on error.
+    - Model streaming, fallback & deduplication: Raw `TokenEvent` chunks; fallback to model end or node end; no duplicates when already streamed.
+    - Timing-only `on_tool_end`: Yields zero domain events.
+  - **T009: Implemented `GraphEventInterpreter` & `ProjectionBlockedException`**: Created `apps/agent/src/agent/chat_turn/interpreter.py` containing:
+    - `ProjectionBlockedException`: Typed exception carrying `error_code`, `error_message`, `error_detail`.
+    - `GraphEventInterpreter`: Pure stream interpreter translating LangGraph v2 events into `ChatTurnEvent` domain union.
+    - Strictly zero tool-name branching (`git grep -n -E "tool_name\s*(==|in)"` = 0).
+    - Strictly zero Redis, NestJS client, or guardrail imports/calls.
+    - Strictly zero `Any` typing.
+    - Exported in `chat_turn/__init__.py`.
+  - **Zero Runner Modifications**: `apps/agent/src/agent/chat_turn/runner.py` remains untouched (wiring deferred to Slice 3 / T010).
+  - **Verification**: 29 passed in `test_chat_turn_interpreter.py` (exit code 0); 50 passed, 1 skipped in regression suite (`test_tool_result_resolver.py`, `test_chat_turn_runner.py`) (exit code 0); `ruff check` and `ruff format` passed (exit code 0); dual-axis code review passed (Standards: PASS, Spec: PASS).
+
+### Feature 027 — Chat Turn Decomposition: Phase 3 / Slice 1 Complete (Tasks T006–T007 Verified) (2026-09-25)
+
+- **Phase 3 / Slice 1 (User Story 1: ToolResultResolver Extraction) Completed (Tasks T006–T007)**:
+  - **T006: Characterization & Isolated Tests for ToolResultResolver**: Implemented 22 comprehensive tests in `apps/agent/tests/test_tool_result_resolver.py` asserting:
+    - Generic tool fallback produces `ToolResultEvent` with stringified content without specialized events.
+    - Flight search projection retrieves search snapshot from active lifecycle manager or falls back cleanly to raw search results.
+    - Booking readiness sanitizes raw readiness summary into `ActionRequiredEvent` while omitting raw details.
+    - Invalid booking readiness schemas or upstream errors fail closed with typed block decisions (`READINESS_RESPONSE_INVALID`, `UPSTREAM_READINESS_ERROR`) and emit zero `ToolResultEvent`s.
+    - Handoff node outputs (`create_handoff_token`, `validate_handoff`) project into `ActionHandoffEvent` with `force_persist=True`.
+    - Handoff failure emits `ErrorEvent` with code `HANDOFF_FAILED` and `force_persist=True`.
+    - Unrecognized graph node outputs gracefully return empty resolution without errors.
+  - **T007: Implemented `ToolResultResolver` & Resolution Types**: Created `apps/agent/src/agent/chat_turn/resolver.py` containing:
+    - Dataclasses: `ToolResolution` (`events`, `block_decision`) and `HandoffResolution` (`events`, `block_decision`, `force_persist`).
+    - `ToolResultResolver`: Pure stateless domain projection engine with zero direct dependencies on `runner.py`, `interpreter.py`, Redis, or NestJS.
+    - Preserved exact sanitization rules, snapshot retrieval, and block decisions matching established characterization baselines.
+  - **Zero Runner & Interpreter Modifications**: Zero changes made to `apps/agent/src/agent/chat_turn/runner.py` or `apps/agent/src/agent/chat_turn/interpreter.py`. Runner remains untouched until interpreter wiring (T010).
+  - **Verification**: 22 passed in `test_tool_result_resolver.py` (exit code 0); 27 passed, 1 skipped in baseline `test_chat_turn_runner.py` (exit code 0); `ruff check` and `ruff format` passed (exit code 0).
+
+### Feature 027 — Chat Turn Decomposition: Phase 2 Complete (Tasks T004–T005 Verified) (2026-09-25)
+
+- **Phase 2 (Foundational Graph Behavior Baseline) Completed (Tasks T004–T005)**:
+  - **T004: Synthetic Graph Fixtures for Validated Tools, Timing Events & Readiness Ordering**: Added synthetic characterization tests to `apps/agent/tests/test_chat_turn_runner.py` verifying:
+    - `on_chain_end` for `tools` node delivering `ToolMessage` with `guardrail_validated: True` is the authoritative source; unvalidated messages fail closed with `GUARDRAIL_TOOL_SCHEMA`.
+    - `on_tool_end` events are strictly timing-only and emit zero wire domain events.
+    - Accepted `ToolResultEvent` strictly precedes specialized follow-up events (`FlightResultsEvent`, `ActionRequiredEvent`).
+    - Invalid booking readiness emits `ToolCallEvent` but NO `ToolResultEvent`, failing closed with `READINESS_RESPONSE_INVALID`.
+  - **T005: Model Stream, Model-End Fallback, Final-Node Fallback & Chunk Deduplication**: Added characterization tests in `apps/agent/tests/test_chat_turn_runner.py` verifying:
+    - Incremental tokens arriving via `on_chat_model_stream` emit `TokenEvent` chunks to client.
+    - Empty stream falls back to full message in `on_chat_model_end`.
+    - Empty stream and model-end falls back to final graph node message (`final_answer` node `on_chain_end`).
+    - Chunk deduplication prevents duplicate token emission when both stream chunks and model-end/final-node messages are present.
+    - All three model output paths (stream, model-end fallback, final-node fallback) route through the single per-turn `OutputStreamSession` facade before external emission or persistence.
+  - **Verification**: 27 passed, 1 skipped in `test_chat_turn_runner.py` (exit code 0); `ruff check` and `ruff format` passed (exit code 0); zero production code modified.
+
+### Feature 027 — Chat Turn Decomposition: Phase 1 Complete (Tasks T001–T003 Verified) (2026-09-25)
+
+- **Phase 1 (Setup and Event Transport Boundary) Completed (Tasks T001–T003)**:
+  - **T001: Characterized Exact Wire Bytes Across 8 Events**: Asserted byte-for-byte serialization in `apps/agent/tests/test_chat_turn_events.py` and `apps/agent/tests/characterization/test_sse_characterization.py` across `TokenEvent`, `ToolCallEvent`, `ToolResultEvent`, `FlightResultsEvent`, `ActionHandoffEvent`, `ActionRequiredEvent`, `DoneEvent`, `ErrorEvent`, strictly enforcing `\n\n` framing and `extra="forbid"`.
+  - **T002: Relocated `format_sse` to `apps/agent/src/agent/streaming/sse.py`**: Relocated `format_sse` into `streaming/sse.py` and exported in `__all__`. Purged all transport formatting logic from `apps/agent/src/agent/chat_turn/events.py`, ensuring `events.py` strictly holds domain models with standard library `typing` and `pydantic` imports. Updated bridges in `chat_turn/__init__.py`, `models/events.py`, and test imports.
+  - **T003: Verified Parity & Recorded Evidence**: All 112 focused tests passed (111 passed, 1 skipped). Static boundary census confirmed `def format_sse` exists only in `apps/agent/src/agent/streaming/sse.py`. Recorded execution metrics, commit hashes (`360ca39e`, `37fcf8db`), and exact parity confirmation in `specs/027-chat-turn-decomposition/verification.md`. Updated `specs/027-chat-turn-decomposition/tasks.md` marking T001–T003 complete.
+
+### Feature 028 — Backend Client Unification: Phase 1 complete (T001–T004 verified, 2026-09-26)
+- [Spec](../specs/028-backend-client-unification/spec.md), [plan](../specs/028-backend-client-unification/plan.md), [tasks](../specs/028-backend-client-unification/tasks.md), and [verification](../specs/028-backend-client-unification/verification.md). At this Phase 1 checkpoint, dashboard, flight search, all eight booking operations, and both cancellation route adapters had characterization baselines. Combined server specs passed 93/93; cancellation routes passed 7/7 and 3/3; web lint and typecheck passed. T005–T025 were still open before production transport migration began.
  
 ### Feature 026 — Agent Boundary Simplification: Phase 5 Complete / Feature 100% Complete (Tasks T033–T037 Verified) (2026-09-24)
 
@@ -2469,9 +2677,10 @@ the current status.
 ### [x] Feature: Deepen Codebase Architecture (Feature 019) — Slice 5C: Booking Management Server Seams & Client Token Removal
 
 - [x] Slice 5C / Booking Management Server Seams & Client Token Removal (2026-08-26):
+  - This is the historical Slice 5C checkpoint. Feature 028 later moved token, URL, timeout, retry, and parsing ownership to `backend-client.ts`; Feature 025 later normalized the cancellation route URLs.
   - **Server-Only Domain Module (`apps/web/lib/server/booking-management.ts`)**:
     - Implemented 8 authoritative operations: `listBookings`, `getBookingDetail`, `getCancellationStatus`, `getCancellationQuote`, `cancelBooking`, `acknowledgeDisruption`, `acceptDisruption`, and `getItineraryRevisions`.
-    - Owns NextAuth token resolution, private `API_URL` fallback, 10s request timeouts, bounded 3x retries on idempotent GET reads, fast-fail on POST mutations, upstream Zod validation, and typed error reason mapping (`UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `STALE_REVISION`, `INVALID_COMMAND`, `UPSTREAM_UNAVAILABLE`).
+    - At this checkpoint, it owned NextAuth token resolution, private `API_URL` fallback, 10s request timeouts, bounded 3x retries on idempotent GET reads, fast-fail on POST mutations, upstream Zod validation, and typed error reason mapping (`UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `STALE_REVISION`, `INVALID_COMMAND`, `UPSTREAM_UNAVAILABLE`).
     - Strips all internal provider IDs (Stripe IDs, Duffel order/quote IDs, internal raw payloads) while preserving owner-facing PNR, status, disruption, and itinerary facts.
     - Comprehensive unit test suite in `apps/web/lib/server/booking-management.spec.ts` (21/21 tests PASS).
   - **Same-Origin Route Handlers (`apps/web/app/api/booking-management/`)**:

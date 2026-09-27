@@ -298,11 +298,34 @@ describe('dashboard server loader (getDashboardSummary)', () => {
         message: 'Connection timed out. Please check your network and try again.',
       });
     });
+
+    it('maps rejected connections to retryable UPSTREAM_UNAVAILABLE without leaking transport details', async () => {
+      const connectionError = new Error(
+        'connect ECONNREFUSED http://private-api.example:3001/api/dashboard/summary?token=session-token-secret-123',
+      );
+      globalThis.fetch = async (): Promise<Response> => {
+        throw connectionError;
+      };
+
+      const outcome = await getDashboardSummary();
+
+      assert.deepEqual(outcome, {
+        ok: false,
+        reason: 'UPSTREAM_UNAVAILABLE',
+        retryable: true,
+        message: 'Connection timed out. Please check your network and try again.',
+      });
+      assert.strictEqual(JSON.stringify(outcome).includes(connectionError.message), false);
+      assert.strictEqual(JSON.stringify(outcome).includes('session-token-secret-123'), false);
+      assert.strictEqual(JSON.stringify(outcome).includes('private-api.example'), false);
+    });
   });
 
   describe('4. HTTP Status Mapping', () => {
     it('maps HTTP 401 Unauthorized to non-retryable UNAUTHENTICATED failure', async () => {
+      let fetchCount = 0;
       globalThis.fetch = async (): Promise<Response> => {
+        fetchCount += 1;
         return new Response(JSON.stringify({ message: 'Unauthorized' }), { status: 401 });
       };
 
@@ -314,10 +337,13 @@ describe('dashboard server loader (getDashboardSummary)', () => {
         retryable: false,
         message: 'Your session has expired. Please sign in again.',
       });
+      assert.strictEqual(fetchCount, 1);
     });
 
     it('maps HTTP 403 Forbidden to non-retryable FORBIDDEN failure', async () => {
+      let fetchCount = 0;
       globalThis.fetch = async (): Promise<Response> => {
+        fetchCount += 1;
         return new Response(JSON.stringify({ message: 'Forbidden' }), { status: 403 });
       };
 
@@ -329,6 +355,7 @@ describe('dashboard server loader (getDashboardSummary)', () => {
         retryable: false,
         message: 'Access denied. You do not have permission to view this resource.',
       });
+      assert.strictEqual(fetchCount, 1);
     });
 
     it('maps HTTP 500, 502, 503, and 504 server errors to retryable UPSTREAM_UNAVAILABLE failure', async () => {
@@ -628,6 +655,154 @@ describe('dashboard server loader (getDashboardSummary)', () => {
           'Outcome must not leak stack traces',
         );
       }
+    });
+  });
+
+  describe('7. Transient Recovery and Retry Policy', () => {
+    it('recovers when first GET fails with 502, 503, or 504 and second GET returns 200 with valid summary data', async () => {
+      for (const status of [502, 503, 504]) {
+        let fetchCount = 0;
+        globalThis.fetch = async (): Promise<Response> => {
+          fetchCount += 1;
+          if (fetchCount === 1) {
+            return new Response(JSON.stringify({ message: `HTTP ${status}` }), { status });
+          }
+          return new Response(JSON.stringify(mockValidSummary), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        };
+
+        const outcome = await getDashboardSummary();
+
+        assert.deepEqual(outcome, { ok: true, data: mockValidSummary });
+        assert.strictEqual(fetchCount, 2, `expected 2 fetch calls for transient ${status} recovery`);
+      }
+    });
+
+    it("recovers when first GET fails with 429 with 'Retry-After: 0.1' and second GET returns 200 with valid summary data", async () => {
+      let fetchCount = 0;
+      globalThis.fetch = async (): Promise<Response> => {
+        fetchCount += 1;
+        if (fetchCount === 1) {
+          return new Response(JSON.stringify({ message: 'Too Many Requests' }), {
+            status: 429,
+            headers: { 'Retry-After': '0.1' },
+          });
+        }
+        return new Response(JSON.stringify(mockValidSummary), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      };
+
+      const outcome = await getDashboardSummary();
+
+      assert.deepEqual(outcome, { ok: true, data: mockValidSummary });
+      assert.strictEqual(fetchCount, 2);
+    });
+
+    it('verifies HTTP 500 makes strictly a single attempt (zero retries) and returns UPSTREAM_UNAVAILABLE failure', async () => {
+      let fetchCount = 0;
+      globalThis.fetch = async (): Promise<Response> => {
+        fetchCount += 1;
+        if (fetchCount === 1) {
+          return new Response(JSON.stringify({ message: 'Internal Server Error' }), { status: 500 });
+        }
+        return new Response(JSON.stringify(mockValidSummary), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      };
+
+      const outcome = await getDashboardSummary();
+
+      assert.deepEqual(outcome, {
+        ok: false,
+        reason: 'UPSTREAM_UNAVAILABLE',
+        retryable: true,
+        message: 'The dashboard service is temporarily unavailable. Please try again.',
+      });
+      assert.strictEqual(fetchCount, 1);
+    });
+
+    it('verifies HTTP 429 without Retry-After makes single attempt (zero retries) and returns UPSTREAM_UNAVAILABLE failure', async () => {
+      let fetchCount = 0;
+      globalThis.fetch = async (): Promise<Response> => {
+        fetchCount += 1;
+        return new Response(JSON.stringify({ message: 'Too Many Requests' }), { status: 429 });
+      };
+
+      const outcome = await getDashboardSummary();
+
+      assert.deepEqual(outcome, {
+        ok: false,
+        reason: 'UPSTREAM_UNAVAILABLE',
+        retryable: true,
+        message: 'The dashboard service is temporarily unavailable. Please try again.',
+      });
+      assert.strictEqual(fetchCount, 1);
+    });
+
+    it('verifies HTTP 429 with far-future Retry-After exceeding budget makes single attempt and returns UPSTREAM_UNAVAILABLE failure', async () => {
+      let fetchCount = 0;
+      globalThis.fetch = async (): Promise<Response> => {
+        fetchCount += 1;
+        return new Response(JSON.stringify({ message: 'Too Many Requests' }), {
+          status: 429,
+          headers: { 'Retry-After': '120' },
+        });
+      };
+
+      const outcome = await getDashboardSummary();
+
+      assert.deepEqual(outcome, {
+        ok: false,
+        reason: 'UPSTREAM_UNAVAILABLE',
+        retryable: true,
+        message: 'The dashboard service is temporarily unavailable. Please try again.',
+      });
+      assert.strictEqual(fetchCount, 1);
+    });
+
+    it('US1: verifies missing-token short-circuits immediately without calling fetch and returns UNAUTHENTICATED', async () => {
+      session = null;
+      let fetchCount = 0;
+      globalThis.fetch = async (): Promise<Response> => {
+        fetchCount += 1;
+        return new Response(JSON.stringify(mockValidSummary), { status: 200 });
+      };
+
+      const outcome = await getDashboardSummary();
+
+      assert.deepEqual(outcome, {
+        ok: false,
+        reason: 'UNAUTHENTICATED',
+        retryable: false,
+        message: 'Authentication required. Please log in.',
+      });
+      assert.strictEqual(fetchCount, 0, 'fetch must not be called when token is missing');
+    });
+
+    it('US1: verifies schema validation failure returns non-retryable INVALID_RESPONSE distinct from transport or auth failures', async () => {
+      let fetchCount = 0;
+      globalThis.fetch = async (): Promise<Response> => {
+        fetchCount += 1;
+        return new Response(JSON.stringify({ invalid: 'shape' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      };
+
+      const outcome = await getDashboardSummary();
+
+      assert.deepEqual(outcome, {
+        ok: false,
+        reason: 'INVALID_RESPONSE',
+        retryable: false,
+        message: 'Unable to load dashboard data due to an unexpected format.',
+      });
+      assert.strictEqual(fetchCount, 1, 'invalid payload schema failure must not retry');
     });
   });
 });

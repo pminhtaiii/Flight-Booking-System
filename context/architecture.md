@@ -1,5 +1,127 @@
 # Architecture
 
+## Feature 027 — Chat Turn Decomposition (Complete — Phases 1–7, Tasks T001–T027 Verified)
+
+- [Feature 027 specification](../specs/027-chat-turn-decomposition/spec.md), [plan](../specs/027-chat-turn-decomposition/plan.md), and [tasks](../specs/027-chat-turn-decomposition/tasks.md) decompose Python chat turn event translation, domain projections, memory coordination, admission, and lifecycle while preserving SSE and security contracts.
+- **Phase 1: Event Transport Decoupling (Tasks T001–T003 Complete)**:
+  - Transport serialization `format_sse(event: ChatTurnEvent) -> str` relocated from domain definitions into `apps/agent/src/agent/streaming/sse.py`.
+  - Domain models in `apps/agent/src/agent/chat_turn/events.py` are strictly pure Pydantic models and discriminated unions with zero transport logic and imports limited to standard library `typing` and `pydantic`.
+  - Wire compatibility verified byte-for-byte across all 8 canonical events (`token`, `tool_call`, `tool_result`, `flight_results`, `ACTION_HANDOFF`, `ACTION_REQUIRED`, `done`, `error`).
+- **Phase 2: Foundational Graph Behavior Baseline (Tasks T004–T005 Complete)**:
+  - Authoritative synthetic graph event fixtures locked in `apps/agent/tests/test_chat_turn_runner.py` before extracting `GraphEventInterpreter` and `ToolResultResolver`.
+  - Established validated tool execution invariants: `on_chain_end` for `tools` is the sole source of validated tool messages; `on_tool_end` is strictly timing-only; `ToolResultEvent` strictly precedes specialized events (`FlightResultsEvent`, `ActionRequiredEvent`); invalid readiness fails closed with no `ToolResultEvent`.
+  - Established output streaming and fallback invariants: incremental token streaming via `on_chat_model_stream`; empty-stream fallback to `on_chat_model_end`; empty-model-end fallback to final-node message output; chunk deduplication preventing duplicate token emission; all output paths route through the single per-turn `OutputStreamSession`.
+- **Phase 3: User Story 1 — Isolate Graph Event Translation (Tasks T006–T011 Complete)**:
+  - **Slice 1: ToolResultResolver Extraction (Tasks T006–T007 Complete)**:
+    - Pure domain projection engine `ToolResultResolver` in `apps/agent/src/agent/chat_turn/resolver.py` maps validated tool results and handoff node completions to typed `ToolResolution` and `HandoffResolution`.
+    - Sanitizes booking readiness, loads active search snapshots, and handles handoff node outcomes fail-closed.
+  - **Slice 2: GraphEventInterpreter Extraction (Tasks T008–T009 Complete)**:
+    - Pure async generator stream translator `GraphEventInterpreter` in `apps/agent/src/agent/chat_turn/interpreter.py` translates LangGraph v2 event streams into domain `ChatTurnEvent` items.
+    - Completely tool-name agnostic: 0 tool name inspections (`git grep -n -E "tool_name\s*(==|in)"` = 0).
+    - Pure port isolation: strictly 0 imports or calls to Redis, NestJS client, or Guardrails.
+    - Raises typed `ProjectionBlockedException` fail-closed upon blocked tool or handoff node resolution, with zero `ToolResultEvent` emitted.
+    - Model streaming, model-end fallback, and node-end fallback deduplicated with raw `TokenEvent` emission.
+  - **Slice 3: Runner Wiring & Verification Gate (Tasks T010–T011 Complete)**:
+    - Wired `GraphEventInterpreter` and `ToolResultResolver` into `apps/agent/src/agent/chat_turn/runner.py`, eliminating ~560 lines of legacy inline translation.
+    - Preserved 4-step causal failure cleanup when `ProjectionBlockedException` occurs, emitting static `ErrorEvent`.
+    - Maintained single `OutputStreamSession` routing for all raw token chunks and approved partial response token accounting.
+    - Verified 100% pass across all 7 focused test suites (180 passed, 2 skipped, 0 failed; exit code 0).
+    - Ruff check & format check: 0 errors (exit code 0).
+- **Phase 4: User Story 2 — Coordinate Conversation Memory (Tasks T012–T015 Complete)**:
+  - Extracted `ConversationMemory` in `apps/agent/src/agent/memory/conversation.py` providing unified `get_context()` and `schedule_compaction()` interfaces.
+  - Encapsulated historical message guardrail scanning, unsafe summary discarding, window size defaults, and typed exception mapping (`SessionNotFoundException`, `MemoryPersistenceException`, `ContextBlockedException`).
+  - Preserved `totalMessageCount + 2` post-turn compaction accounting and GC-safe `background_tasks` registration.
+  - Wired into `apps/agent/src/agent/chat_turn/runner.py` with exact `AdmissionContext` policy/identity forwarding and preserved direct-call fallback behavior.
+- **Phase 5: User Story 3 — Reuse Ordered Admission (Tasks T016–T021 Complete)**:
+  - Extracted reusable modular admission package `apps/agent/src/agent/admission/`:
+    - `AuthService` (`auth.py`): Decodes and verifies JWT tokens against secret ring, extracts `sub`/`jti`/trace/correlation IDs, and enforces active account status via NestJS client `/access/check`, returning typed `AuthenticatedUser`.
+    - `InputAdmissionService` (`input_admission.py`): Enforces max message length, checks gateway health/availability, and validates input through `GuardrailGateway.validate_input()` with deterministic PII fallback, returning typed `InputAdmissionResult`.
+    - `QuotaService` (`quota.py`): Enforces Redis daily message limits and burst window rate limiting with structured telemetry, supporting dynamic repository class resolution for test compatibility.
+  - Thin FastAPI dependency wrappers in `apps/agent/src/agent/streaming/sse.py`:
+    - Implemented ordered dependency providers (`get_auth_service`, `get_authenticated_user`, `get_input_admission_service`, `get_admitted_input`, `get_quota_service`, `check_chat_quota`).
+    - Enforced strict ordered progression: `auth` -> `length` -> `gateway_health` -> `input_scan` -> `quota` -> `runner`.
+    - Zero-Redis PII short-circuit: Ingress messages with PII immediately return `ErrorEvent(GUARDRAIL_BLOCKED)` SSE stream before quota checks or Redis client initialization.
+    - Single-scan guarantee: Validated admission decision forwarded directly through `ChatController.stream()` to runner without redundant re-scanning.
+    - Transparent backward compatibility: Direct-call fallback and module-level monkeypatch compatibility for legacy tests.
+- **Phase 6: User Story 4 — Sequential Turn Lifecycle (Tasks T022–T024 Complete)**:
+  - `chat_turn/coordinator.py` owns session bootstrap, lease acquisition and active-fence checks, active search snapshot loading, conversation memory, graph interpretation, one `OutputStreamSession`, message persistence, one success-path flush, and the post-turn compaction trigger. Every model token passes through `pipeline.process_token(token)`.
+  - `chat_turn/runner.py` remains a thin `ChatTurnRunner.run(command, validated_input)` facade; `chat_turn/__init__.py` exports `TurnSessionCoordinator`.
+  - Failure cleanup is ordered: approved partial persistence (`asyncio.shield` on cancellation and forced persistence for `HANDOFF_FAILED`), non-flushing `pipeline.close()`/`aclose()`, lease release, then `ErrorEvent` construction. A timed-out partial batch is cancelled and joined before lease release; stale fences suppress `ActionRequiredEvent` and `ActionHandoffEvent` and route to `PERSISTENCE_ERROR`.
+  - `ChatController.stream` and `streaming/sse.py` retain their existing validated-input and disconnect handling signatures; neither required a code change.
+  - Six-file controller/SSE parity: 126 passed, 1 skipped; full non-Redis agent suite: 1,280 passed, 11 skipped, 12 deselected. Ruff check and format pass for the extracted boundary.
+- **Completed module boundaries**:
+  - `chat_turn/interpreter.py` translates LangGraph events without tool-name branching or guardrail/gateway construction. Validated `tools` chain-end messages reach `resolver.resolve`; `on_tool_end` records timing only.
+  - `chat_turn/resolver.py` owns `ToolResultResolver` domain projections, including search snapshots, booking readiness, and handoff node outcomes.
+  - `memory/conversation.py` owns `ConversationMemory` context selection, historical guardrail re-scan, and compaction delegation using the original per-turn admission context.
+  - `admission/` provides reusable `AuthService`, `InputAdmissionService`, and `QuotaService`; thin FastAPI `Depends` wrappers in `streaming/sse.py` preserve auth, length/health, input scan, then quota order. The validated input reaches the runner without a second scan.
+- **Phase 7: Polish and Cross-Cutting Verification (Tasks T025–T027 Complete)**:
+  - Static censuses found no `format_sse` in `chat_turn/events.py`, no tool-name branching or guardrail/gateway construction in `chat_turn/interpreter.py`, and no `Any` in the extracted coordinator, runner, admission, interpreter, resolver, or conversation modules.
+  - Full-package Ruff lint and format checks passed. The eight focused decomposition suites passed (184 passed, 1 skipped); the Phase 7 non-Redis regression gate excluding `test_security_performance` passed (1,272 passed, 11 skipped, 20 deselected). Exact commands, exit codes, and timings are in `specs/027-chat-turn-decomposition/verification.md`.
+
+## Feature 028 — Backend Client Unification (Complete — Phases 1–8, Tasks T001–T031 Verified, 2026-09-27)
+
+- [Feature 028 specification](../specs/028-backend-client-unification/spec.md), [plan](../specs/028-backend-client-unification/plan.md), and [tasks](../specs/028-backend-client-unification/tasks.md) unify the three core web server transport consumers and six booking route response adapters. Dashboard `INVALID_RESPONSE`, booking error-body forwarding, and mutation single-send behavior remain contract requirements.
+- **Phase 1: Baseline Characterization (T001–T004 Complete)**: Locks current behavior in dashboard, flight-search, booking-management, and cancellation route specs. Covers 400/422 message forwarding and fallback, transient mutation single-send, response status/body/header mapping, and provider-ID stripping across 103 baseline tests.
+- **Phase 2: Foundational Client Contract (T005–T007 Complete)**:
+  - Extracted unified server-to-server client factory `createBackendClient` and default instance `backendClient` in `apps/web/lib/server/backend-client.ts`.
+  - Enforces `server-only` execution boundary, dynamic `API_URL` resolution precedence (`baseUrl` -> `API_URL` -> `NEXT_PUBLIC_API_URL` -> `localhost:3001`), missing-token short-circuit before fetch (`missing_token`), and mandatory `Cache-Control: no-store`.
+  - Enforces strict GET retry matrix (max 3 attempts, 100ms exponential base delay, 502/503/504 and 429 Retry-After support with delta-seconds/HTTP-date parsing; 500 and 4xx fail immediately).
+  - Fast-fails all mutations (`POST`, `PUT`, `PATCH`, `DELETE`) on any result with strictly 1 attempt (zero automatic mutation replay).
+  - Bounded request deadlines: 10s per attempt via `AbortController`, 31s total request deadline bounding all attempts and wait delays.
+  - Discriminated transport results: success with validated Zod payload, HTTP failure with status/body, and transport failure with strictly safe cause codes (`missing_token`, `network`, `timeout`, `invalid_json`, `invalid_payload`).
+  - Supports bodyless 2xx handling via `responseMode: 'none'` returning `{ ok: true, data: undefined }` without reading response body.
+  - Zero-credential privacy invariant: diagnostics log only fixed categorical causes; zero tokens, request bodies, URLs, or PII emitted.
+  - See [execution evidence](../specs/028-backend-client-unification/verification.md).
+- **Phase 3: User Story 1 — Resilient Dashboard Reads (T008–T010 Complete)**:
+  - Migrated `getDashboardSummary` in `apps/web/lib/server/dashboard.ts` to `backendClient.request('/api/dashboard/summary', DashboardSummarySchema)`.
+  - Added bounded transient GET recovery on 502/503/504 and 429 with `Retry-After` header within budget, recovering cleanly on second attempt.
+  - Preserved strict single attempt for deterministic 500 (zero retries) returning retryable `UPSTREAM_UNAVAILABLE`.
+  - Preserved unauthenticated session short-circuit before dispatching HTTP request.
+  - Strictly preserved 100% exact outcome contract parity: reasons (`UNAUTHENTICATED`, `FORBIDDEN`, `INVALID_RESPONSE`, `UPSTREAM_UNAVAILABLE`), exact user-facing error messages, and `retryable` booleans.
+  - Purged obsolete duplicated helpers (`apiUrl`, `getAccessToken`, `REQUEST_TIMEOUT_MS`, bespoke `AbortController`) from `dashboard.ts`.
+  - Zero credential, token, URL, DB error, or stack trace leakage in failure outcomes.
+  - Locked behavior with 28 passing unit tests in `apps/web/lib/server/dashboard.spec.ts` (46 passing across client + dashboard).
+  - See [execution evidence](../specs/028-backend-client-unification/verification.md).
+- **Phase 4: User Story 2 — Preserve Flight Outcomes (T011–T013 Complete)**:
+  - Migrated `searchFlights` and `selectFlightOffer` in `apps/web/lib/server/flight-search.ts` to `backendClient.request`.
+  - Enforced single-send search POST: `backendClient.request('/api/flights/search', UpstreamSearchSchema, { method: 'POST', ... })` fast-fails with zero retries on 502/503/504, 429, timeout, or network failure.
+  - Enforced bounded retry offer GET: `backendClient.request('/api/flights/' + encodeURIComponent(id), UpstreamSelectionSchema, { method: 'GET' })` recovers on transient 502/503/504 or network timeout within budget.
+  - Preserved unauthenticated session short-circuit before dispatching HTTP request for both search and selection.
+  - Strictly preserved 100% exact outcome contract parity: reasons (`INVALID_SEARCH`, `UNAUTHENTICATED`, `RATE_LIMITED`, `OFFER_EXPIRED`, `OFFER_UNAVAILABLE`, `UPSTREAM_UNAVAILABLE`), exact user-facing error messages, and `retryable` booleans.
+  - Preserved provider identifier stripping (`LocalOfferIdSchema`, `mapOffer`) and checkout route contract (`/checkout?offerId=${encodeURIComponent(id)}`).
+  - Purged obsolete duplicated helpers (`apiUrl`, `getAccessToken`, `fetchWithRetry`, `delay`, timeout constants, NextAuth imports) from `flight-search.ts`.
+  - Locked behavior with 55 unit tests in `apps/web/lib/server/flight-search.spec.ts` (73 passing across client + flight search).
+  - See [execution evidence](../specs/028-backend-client-unification/verification.md).
+- **Phase 5: User Story 3 — Preserve Booking Outcomes (T014–T017 Complete)**:
+  - Migrated all eight operations in `apps/web/lib/server/booking-management.ts` to `backendClient.request`.
+  - Six JSON-consuming operations (`listBookings`, `getBookingDetail`, `getCancellationStatus`, `getCancellationQuote`, `cancelBooking`, `getItineraryRevisions`) use operation-specific raw response schemas with `.passthrough()`, followed by view mapping and domain view validation.
+  - Disruption mutations (`acknowledgeDisruption`, `acceptDisruption`) use `responseMode: 'none'` with `z.void()`, preserve the original bodyless POST request shape, and return `{ ok: true, data: { ok: true } }` on bodyless 200/204.
+  - Preserved 100% exact outcome contract parity: status mapping (401 -> `UNAUTHENTICATED`, 403 -> `FORBIDDEN`, 404 -> `NOT_FOUND`, 409 -> `STALE_REVISION`, 400/422 -> `INVALID_COMMAND` with string message forwarding or default fallback), stripping provider Duffel IDs from view models.
+  - Enforced zero automatic mutation replay (single-send) for `getCancellationQuote`, `cancelBooking`, `acknowledgeDisruption`, and `acceptDisruption` on any error/timeout.
+  - Enforced bounded GET recovery (up to 3 attempts on 502/503/504) for `listBookings`, `getBookingDetail`, `getCancellationStatus`, and `getItineraryRevisions`.
+  - Purged all orphaned transport helpers (`fetchWithRetry`, `apiUrl()`, `getAccessToken()`, `delay()`, `handleUpstreamStatus()`, retry/timeout constants, `NextAuth`, `authOptions`) from `booking-management.ts`.
+  - Preserved exact original catch-block copies (`unavailableOutcomeFailure()`) and view safeParse failure messages.
+  - Locked behavior with 50 passing unit tests in `apps/web/lib/server/booking-management.spec.ts` (68 passing across client + booking management).
+  - See [execution evidence](../specs/028-backend-client-unification/verification.md).
+- **Phase 6: User Story 4 — Shared Booking Response Mapping (T018–T022 Complete)**:
+  - `apps/web/lib/server/outcome-response.ts` is the sole `mapOutcomeToResponse` definition. All six booking-management route files import it; the seven HTTP operations preserve their methods and parameter validation.
+  - The adapter maps successful `BookingManagementOutcome<T>` values to HTTP 200 and known error reasons to 400, 401, 403, 404, 409, or 503, with a 500 fallback. Every response sets `Cache-Control: private, no-store`.
+  - See [execution evidence](../specs/028-backend-client-unification/verification.md).
+- **Phase 7: Polish and Cross-Cutting Verification (T023–T025 Complete)**:
+  - Censuses found no orphaned transport or parsing helpers in `dashboard.ts`, `flight-search.ts`, or `booking-management.ts`; `backend-client.ts` owns their transport behavior. `outcome-response.ts` has the only response mapper definition, imported by all six booking routes. Scoped TypeScript has zero `any` matches.
+  - All 226 focused tests passed. Web lint, typecheck, and production build exited 0. The feature diff leaves public/shared schemas, Prisma, dependencies, and environment/flag configuration unchanged.
+  - Final review restored bodyless disruption POST requests, removed duplicate `Content-Type` header values on JSON POSTs, and added an explicit client factory return type. The user approved correction of the two existing disruption request assertions.
+  - See [execution evidence](../specs/028-backend-client-unification/verification.md).
+- **Phase 8: Convergence Remediation & Verification Gate (T026–T031 Complete)**:
+  - Structured transport diagnostic logs conform to Constitution IV as JSON (`timestamp`, `level: 'warn'`, `service: 'web.backend_client'`, `trace_id: null`, `correlation_id: null`, `message`, `cause`).
+  - Token resolution bound within the 31-second total request budget, mapping timeouts to `cause: 'timeout'` and rejections to `cause: 'network'`.
+  - Transient body stream read failures on GET requests retry within the 3-attempt / 31-second budget; body parse SyntaxErrors fail immediately as `invalid_json`. Mutations remain strictly single-send under all conditions.
+  - Restored baseline `Please sign in to continue.` message across all booking operations on HTTP 401.
+  - Preserved list fallback on non-array raw `bookings` response payloads via schema transformation.
+  - Full gate verified: 241/241 unit and route tests passed, lint clean, typecheck clean, production build clean (23/23 static pages). Dual-axis review APPROVED.
+  - See [execution evidence](../specs/028-backend-client-unification/verification.md).
+
+
 ## Feature 026 — Agent Boundary Simplification (Complete - Tasks T001–T037)
 
 Planning artifacts: [specification](../specs/026-agent-boundary-simplification/spec.md), [plan](../specs/026-agent-boundary-simplification/plan.md), and [tasks](../specs/026-agent-boundary-simplification/tasks.md).
@@ -448,7 +570,7 @@ Planning artifacts: [specification](../specs/024-event-driven-module-deepening/s
 │   │   └── test/                      → API E2E & characterization spec tests
 │   ├── agent/                         → Python/FastAPI agent service
 │   │   ├── src/agent/                 → FastAPI source code
-│   │   │   ├── chat_turn/             → ChatController (thin delegator), ChatTurnRunner (causal cleanup) & event models
+│   │   │   ├── chat_turn/             → ChatController, ChatTurnRunner facade, TurnSessionCoordinator (causal cleanup) & event models
 │   │   │   ├── guardrails/            → GuardrailGateway (direct production layer tuple ownership), OutputGuardrailPipeline, bounded PII scanning, pipeline decisions
 │   │   │   ├── middleware/            → BodyLimitMiddleware (raw ASGI 64 KiB ceiling), auth & rate limit middlewares
 │   │   │   ├── memory/                → MemoryManager (sliding window, lower-trust envelope, summary gateway validation)
@@ -696,7 +818,7 @@ flowchart TD
 
     subgraph AgentService["Python Agent Service (apps/agent:3002)"]
         ThinTransport["Thin SSE Transport Adapter\n(agent/streaming/sse.py)"]
-        TurnRunner["ChatTurnRunner\n(agent/chat_turn/runner.py)\n[Causal 4-Step Cleanup Order]"]
+        TurnRunner["ChatTurnRunner facade → TurnSessionCoordinator\n(agent/chat_turn/runner.py → coordinator.py)\n[Causal 4-Step Cleanup Order]"]
         EventModels["Authoritative Wire Events\n(agent/chat_turn/events.py)\nConfigDict(extra='forbid')"]
         SnapshotLifecycle["TrustedSearchSnapshotLifecycle\n(agent/trusted_search_snapshot/)"]
     end
@@ -841,7 +963,7 @@ To prevent architectural bloat and cyclic dependencies, the monolithic `BookingS
 
 3. **Cancellation Module (`CancellationModule`)**:
    - `CancellationService`: Dedicated cancellation lifecycle orchestrator:
-     - Cancellation status and quote generation (`POST /bookings/:bookingId/cancellation-quote`).
+     - Cancellation status and quote generation (`GET /bookings/:bookingId/cancellation`, `POST /bookings/:bookingId/cancellation/quote`).
      - Optimistic quote locking via `PENDING_QUOTE` state with expiration deadlines.
      - Supplier cancellation execution with retries (`confirmCancellationWithRetries`) via `DuffelService`.
      - Creation of `CancellationRefundObligation` in integer minor units.
@@ -877,10 +999,10 @@ The Python Agent (`apps/agent`) operates as a stateless conversational advisor w
      - `project_for_llm`: Generates contiguous 1-indexed results without provider UUIDs, Duffel IDs, or attestation signatures.
      - `project_for_browser`: Projects safe flight cards for frontend streaming.
 
-2. **Chat Turn Runner & Causal Cleanup (`apps/agent/src/agent/chat_turn/`)**:
-   - `ChatTurnRunner`: Transport-agnostic async generator producing authoritative `ChatTurnEvent` wire models (`ConfigDict(extra="forbid")`).
+2. **Chat Turn Coordinator & Causal Cleanup (`apps/agent/src/agent/chat_turn/`)**:
+   - `ChatTurnRunner` retains the transport-agnostic `run(command, validated_input)` entry point and delegates to `TurnSessionCoordinator`, which produces authoritative `ChatTurnEvent` wire models (`ConfigDict(extra="forbid")`).
    - **Deterministic 4-Step Causal Cleanup Order (`_finalize_cleanup`)**:
-     - **Step 1: Persist Safe Partial Turn**: If tokens were emitted and fence is valid, persists partial agent message via NestJS Chat API (`asyncio.shield` protected against cancellation, 1.0s fence check, 3.0s persistence timeout).
+     - **Step 1: Persist Safe Partial Turn**: If tokens were emitted and fence is valid, persists partial agent message via NestJS Chat API (`asyncio.shield` protected against cancellation, 1.0s fence check, 3.0s persistence timeout); timed-out work is cancelled and joined before close/release.
      - **Step 2: Finalize Output Guardrails**: Closes guardrail pipeline (`pipeline.aclose()`, 1.0s timeout).
      - **Step 3: Release Session Lease**: Releases Redis distributed lock (`queue_manager.release(session_id, req_id)`, 2.0s timeout).
      - **Step 4: Emit Terminal ErrorEvent**: Constructs typed `ErrorEvent` for client if caller is still attached.
@@ -893,16 +1015,18 @@ The web layer (`apps/web`) establishes a strict server boundary protecting backe
 
 1. **Server Domain Modules (`apps/web/lib/server/`)**:
    - Protected with the `import 'server-only'` sentinel.
-   - `flight-search.ts`: Acquires NextAuth session, resolves private `API_URL` (`API_URL || NEXT_PUBLIC_API_URL || 'http://localhost:3001'`), bounds requests with 10s timeout and 3-attempt exponential retry policy, validates responses with Zod, and normalizes into shared `FlightSearchOutcome`.
-   - `dashboard.ts`: Acquires the dashboard access token server-side, performs a single `cache: 'no-store'` summary fetch with a 10-second abort boundary, validates the payload with `DashboardSummarySchema`, and normalizes failures into a typed `DashboardOutcome` union without exposing transport details to client components.
-   - `booking-management.ts`: Acquires NextAuth session, resolves private `API_URL`, manages bounded retries (3 attempts on GET reads, fast-fail on POST mutations), validates responses with Zod, strips provider identifiers (Duffel IDs, Stripe IDs, raw snapshots), and normalizes into shared `BookingManagementOutcome`.
+   - `backend-client.ts`: The unified server-side fetch client obtains the NextAuth token, resolves `API_URL || NEXT_PUBLIC_API_URL || 'http://localhost:3001'`, and exits before fetch when the token is missing. It applies a 10-second timeout per attempt and a 31-second total deadline. GET may retry up to three times on network failure, timeout, 502/503/504, or 429 with a valid `Retry-After` that fits the deadline. POST, PUT, PATCH, and DELETE make one attempt. Results use safe transport causes (`missing_token`, `network`, `timeout`, `invalid_json`, `invalid_payload`); `responseMode: 'json'` validates with a caller-provided Zod schema, while `responseMode: 'none'` accepts bodyless 2xx without parsing.
+   - `dashboard.ts`: Calls the shared client for a resilient summary GET and preserves dashboard-specific outcomes, including `INVALID_RESPONSE` for malformed success payloads.
+   - `flight-search.ts`: Calls the shared client for a single-send search POST and bounded-retry offer-selection GET, then maps validated data into provider-free `FlightSearchOutcome` views.
+   - `booking-management.ts`: Calls the shared client for eight operations. Its four POST mutations are single-send; domain mapping strips Duffel and Stripe identifiers and raw snapshots from public `BookingManagementOutcome` views.
+   - `outcome-response.ts`: The sole booking outcome-to-`NextResponse` adapter maps success to 200, known errors to 400/401/403/404/409/503, and unknown errors to 500; every response sets `Cache-Control: private, no-store`.
 
 2. **Thin Same-Origin Route Handlers (`apps/web/app/api/booking-management/`)**:
-   - 7 thin route handlers for interactive polling and mutations:
+   - Six route files expose seven HTTP operations for interactive polling and mutations:
      - `GET /api/booking-management/bookings/[bookingId]`
-     - `POST /api/booking-management/bookings/[bookingId]/cancellation-quote`
-     - `GET /api/booking-management/bookings/[bookingId]/cancellation-status`
-     - `POST /api/booking-management/bookings/[bookingId]/cancel`
+     - `GET /api/booking-management/bookings/[bookingId]/cancellation`
+     - `POST /api/booking-management/bookings/[bookingId]/cancellation`
+     - `POST /api/booking-management/bookings/[bookingId]/cancellation/quote`
      - `POST /api/booking-management/bookings/[bookingId]/disruptions/acknowledge`
      - `POST /api/booking-management/bookings/[bookingId]/disruptions/accept`
      - `GET /api/booking-management/bookings/[bookingId]/revisions`
@@ -1445,19 +1569,19 @@ The whole-stack smoke and sanity test suite runs as a single `smoke-and-sanity` 
 
 ### Slice 5B — Flight Search Server Seam
 
-- `apps/web/lib/server/flight-search.ts` is the Flight Search server-only transport owner. It obtains the NextAuth session itself, resolves `API_URL || NEXT_PUBLIC_API_URL || http://localhost:3001` only on the server, injects the bearer credential, bounds requests with a timeout and three-attempt exponential retry policy, validates NestJS responses with Zod, and normalizes every result into the shared discriminated outcome contracts.
+- `apps/web/lib/server/flight-search.ts` is the Flight Search server-only domain module. It calls `backendClient.request` for a single-send search POST and bounded-retry offer-selection GET, then maps validated NestJS data into the shared discriminated outcome contracts. `backend-client.ts` owns session tokens, backend URL resolution, bearer headers, timeout, retry, and response parsing.
 - `apps/web/app/search/actions.ts` provides the colocated Next.js Server Actions. Search rendering calls the typed action boundary only; `SearchFormClient` receives and stores `FlightSearchOfferView` values containing an opaque local offer ID and display fields, never a JWT, backend URL, provider payload, Duffel identifier, or retry policy.
 - Offer selection revalidates the opaque offer server-to-server and returns the contractually specified encoded checkout path. The server module is protected with the `server-only` sentinel so it cannot be imported into the browser bundle.
 - Playwright uses a loopback Flight Search fixture through private `API_URL` for Server Action coverage. The scoped static characterization audit rejects credential, public transport, direct-fetch, provider/raw payload, and retry-policy markers in the search rendering tree.
 
 ### Slice 5C — Booking Management Server Seam & Client Token Removal
 
-- `apps/web/lib/server/booking-management.ts` is the Booking Management server domain module. It obtains the NextAuth session, resolves private `API_URL`, injects bearer credentials, manages bounded retry/timeout policies (3 bounded attempts on GET reads, fast-fail on POST mutations), validates upstream NestJS responses with Zod, maps typed error reasons (`UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `STALE_REVISION`, `INVALID_COMMAND`, `UPSTREAM_UNAVAILABLE`), and prepares views stripping Stripe IDs, Duffel order IDs, and raw snapshots while preserving owner-facing PNR, status, and itinerary facts. Protected with `import 'server-only'`.
-- `apps/web/app/api/booking-management/` provides 7 thin same-origin Route Handlers:
+- `apps/web/lib/server/booking-management.ts` is the Booking Management server domain module. It calls `backendClient.request` for four bounded-retry GET reads and four single-send POST mutations, maps typed error reasons (`UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `STALE_REVISION`, `INVALID_COMMAND`, `UPSTREAM_UNAVAILABLE`), and prepares views stripping Stripe IDs, Duffel order IDs, and raw snapshots while preserving owner-facing PNR, status, and itinerary facts. Protected with `import 'server-only'`.
+- `apps/web/app/api/booking-management/` provides six thin same-origin route files with seven HTTP operations:
   - `GET /api/booking-management/bookings/[bookingId]`
-  - `POST /api/booking-management/bookings/[bookingId]/cancellation-quote`
-  - `GET /api/booking-management/bookings/[bookingId]/cancellation-status`
-  - `POST /api/booking-management/bookings/[bookingId]/cancel`
+  - `GET /api/booking-management/bookings/[bookingId]/cancellation`
+  - `POST /api/booking-management/bookings/[bookingId]/cancellation`
+  - `POST /api/booking-management/bookings/[bookingId]/cancellation/quote`
   - `POST /api/booking-management/bookings/[bookingId]/disruptions/acknowledge`
   - `POST /api/booking-management/bookings/[bookingId]/disruptions/accept`
   - `GET /api/booking-management/bookings/[bookingId]/revisions`

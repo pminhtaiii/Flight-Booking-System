@@ -1,12 +1,22 @@
 import asyncio
+import json
 import time
-from unittest.mock import AsyncMock, patch
+from typing import AsyncIterator
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import jwt
 import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
+from langchain_core.messages import ToolMessage
 
+from agent.chat_turn import (
+    ActionHandoffEvent,
+    ActionRequiredEvent,
+    ChatTurnCommand,
+    ChatTurnRunner,
+    ErrorEvent,
+)
 from agent.config import get_settings
 from agent.guardrails.gateway import GuardrailGateway
 from agent.middleware.auth import JWTAuthMiddleware
@@ -228,3 +238,340 @@ async def test_stale_fence_rejection_prevents_persistence():
 
     is_valid = await manager.validate_active_fence("sess-stale")
     assert is_valid is False
+
+
+# ---------------------------------------------------------------------------
+# 7. T022 Stale-Fence Action Suppression and Disconnect Cleanup Tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_t022_stale_fence_suppression_action_required() -> None:
+    """Requirement 4: Before yielding ActionRequiredEvent, coordinator validates active fence
+    via queue_manager.validate_active_fence(session_id). If false, suppresses
+    ActionRequiredEvent and routes to PERSISTENCE_ERROR / cleanup.
+    """
+    mock_queue = MagicMock()
+    mock_queue.acquire = AsyncMock(return_value="req-t022-stale-act")
+    mock_queue.get_fence = MagicMock(return_value=50)
+    # Stale fence detected before yielding ActionRequiredEvent
+    mock_queue.validate_active_fence = AsyncMock(return_value=False)
+    mock_queue.release = AsyncMock()
+
+    mock_client = MagicMock()
+    mock_client.set_fencing_token = MagicMock()
+    mock_client.get_memory = AsyncMock(
+        return_value={"recentMessages": [], "summary": None, "totalMessageCount": 0}
+    )
+    mock_client.create_message_batch = AsyncMock(return_value={"messages": []})
+
+    class TrackingOutputStreamSession:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            self.closed = False
+            self.flushed = False
+
+        async def process_token(self, token: str) -> AsyncIterator[str]:
+            yield token
+
+        async def flush(self) -> AsyncIterator[str]:
+            self.flushed = True
+            if False:
+                yield ""
+
+        async def aclose(self) -> None:
+            self.closed = True
+
+        def close(self) -> None:
+            self.closed = True
+
+    tracking_pipeline = TrackingOutputStreamSession()
+
+    mock_graph = MagicMock()
+
+    async def mock_astream_events(
+        *args: object, **kwargs: object
+    ) -> AsyncIterator[dict[str, object]]:
+        yield {
+            "event": "on_chain_end",
+            "name": "tools",
+            "data": {
+                "output": {
+                    "messages": [
+                        ToolMessage(
+                            content=json.dumps(
+                                {
+                                    "scope": "DOMESTIC",
+                                    "ready": False,
+                                    "nextAction": "COMPLETE_PROFILE",
+                                    "passengers": [],
+                                }
+                            ),
+                            tool_call_id="call-act-1",
+                            name="check_booking_readiness",
+                            additional_kwargs={"guardrail_validated": True},
+                        )
+                    ]
+                }
+            },
+        }
+
+    mock_graph.astream_events = mock_astream_events
+
+    with patch(
+        "agent.chat_turn.runner.OutputStreamSession",
+        return_value=tracking_pipeline,
+    ):
+        runner = ChatTurnRunner(
+            graph=mock_graph,
+            queue_manager=mock_queue,
+            client_factory=lambda **_kwargs: mock_client,
+            redis_client=MagicMock(),
+        )
+
+        command = ChatTurnCommand(
+            user_id="user-t022",
+            session_id="session-t022-stale-act",
+            message="Check readiness",
+            token="jwt.token.val",
+        )
+
+        events = [e async for e in runner.run(command)]
+
+    # Coordinator validates active fence before yielding ActionRequiredEvent
+    mock_queue.validate_active_fence.assert_awaited()
+
+    # ActionRequiredEvent is suppressed
+    action_events = [e for e in events if isinstance(e, ActionRequiredEvent)]
+    assert len(action_events) == 0
+
+    # Routes to terminal PERSISTENCE_ERROR
+    error_events = [e for e in events if isinstance(e, ErrorEvent)]
+    assert len(error_events) == 1
+    assert error_events[0].data.code == "PERSISTENCE_ERROR"
+    assert "session lease was lost" in error_events[0].data.message
+
+    # Pipeline closed and lease released
+    assert tracking_pipeline.closed is True
+    mock_queue.release.assert_awaited_once_with("session-t022-stale-act", "req-t022-stale-act")
+
+
+@pytest.mark.asyncio
+async def test_t022_stale_fence_suppression_action_handoff() -> None:
+    """Requirement 4: Before yielding ActionHandoffEvent, coordinator validates active fence
+    via queue_manager.validate_active_fence(session_id). If false, suppresses
+    ActionHandoffEvent and routes to PERSISTENCE_ERROR / cleanup.
+    """
+    mock_queue = MagicMock()
+    mock_queue.acquire = AsyncMock(return_value="req-t022-stale-handoff")
+    mock_queue.get_fence = MagicMock(return_value=51)
+    # Stale fence detected before yielding ActionHandoffEvent
+    mock_queue.validate_active_fence = AsyncMock(return_value=False)
+    mock_queue.release = AsyncMock()
+
+    mock_client = MagicMock()
+    mock_client.set_fencing_token = MagicMock()
+    mock_client.get_memory = AsyncMock(
+        return_value={"recentMessages": [], "summary": None, "totalMessageCount": 0}
+    )
+    mock_client.create_message_batch = AsyncMock(return_value={"messages": []})
+
+    class TrackingOutputStreamSession:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            self.closed = False
+            self.flushed = False
+
+        async def process_token(self, token: str) -> AsyncIterator[str]:
+            yield token
+
+        async def flush(self) -> AsyncIterator[str]:
+            self.flushed = True
+            if False:
+                yield ""
+
+        async def aclose(self) -> None:
+            self.closed = True
+
+        def close(self) -> None:
+            self.closed = True
+
+    tracking_pipeline = TrackingOutputStreamSession()
+
+    mock_graph = MagicMock()
+
+    async def mock_astream_events(
+        *args: object, **kwargs: object
+    ) -> AsyncIterator[dict[str, object]]:
+        yield {
+            "event": "on_chain_end",
+            "name": "create_handoff_token",
+            "data": {
+                "output": {
+                    "action": {
+                        "action": "begin_checkout",
+                        "handoffToken": "chk-tok-stale-1",
+                        "expiresAt": "2026-09-30T12:00:00Z",
+                        "display": {"price": "350"},
+                    }
+                }
+            },
+        }
+
+    mock_graph.astream_events = mock_astream_events
+
+    with patch(
+        "agent.chat_turn.runner.OutputStreamSession",
+        return_value=tracking_pipeline,
+    ):
+        runner = ChatTurnRunner(
+            graph=mock_graph,
+            queue_manager=mock_queue,
+            client_factory=lambda **_kwargs: mock_client,
+            redis_client=MagicMock(),
+        )
+
+        command = ChatTurnCommand(
+            user_id="user-t022",
+            session_id="session-t022-stale-handoff",
+            message="Proceed to checkout",
+            token="jwt.token.val",
+        )
+
+        events = [e async for e in runner.run(command)]
+
+    # Coordinator validates active fence before yielding ActionHandoffEvent
+    mock_queue.validate_active_fence.assert_awaited()
+
+    # ActionHandoffEvent is suppressed
+    handoff_events = [e for e in events if isinstance(e, ActionHandoffEvent)]
+    assert len(handoff_events) == 0
+
+    # Routes to terminal PERSISTENCE_ERROR
+    error_events = [e for e in events if isinstance(e, ErrorEvent)]
+    assert len(error_events) == 1
+    assert error_events[0].data.code == "PERSISTENCE_ERROR"
+    assert "session lease was lost" in error_events[0].data.message
+
+    # Pipeline closed and lease released
+    assert tracking_pipeline.closed is True
+    mock_queue.release.assert_awaited_once_with(
+        "session-t022-stale-handoff", "req-t022-stale-handoff"
+    )
+
+
+@pytest.mark.asyncio
+async def test_t022_cancellation_shielded_persistence_cleanup_sequence() -> None:
+    """Requirement 5: Turn Cancellation (Client Disconnect)
+    - asyncio.CancelledError handled gracefully.
+    - Partial response persisted using asyncio.shield if tokens were emitted.
+    - Pipeline closed without flushing (pipeline.aclose()).
+    - Session lease released cleanly.
+    """
+    call_order: list[str] = []
+
+    mock_queue = MagicMock()
+    mock_queue.acquire = AsyncMock(return_value="req-t022-cancel")
+    mock_queue.get_fence = MagicMock(return_value=77)
+    mock_queue.validate_active_fence = AsyncMock(return_value=True)
+
+    async def tracked_release(session_id: str, req_id: str) -> None:
+        call_order.append("queue_release")
+
+    mock_queue.release = AsyncMock(side_effect=tracked_release)
+
+    mock_client = MagicMock()
+    mock_client.set_fencing_token = MagicMock()
+    mock_client.get_memory = AsyncMock(
+        return_value={"recentMessages": [], "summary": None, "totalMessageCount": 0}
+    )
+
+    async def tracked_batch(
+        session_id: str, messages: list[dict[str, object]]
+    ) -> dict[str, object]:
+        if any(m.get("sender") == "USER" for m in messages) and not any(
+            m.get("sender") == "AGENT" for m in messages
+        ):
+            call_order.append("user_pre_persist")
+        else:
+            call_order.append("partial_persist_shielded")
+        return {"messages": [{"id": "cancel-msg-id", "sender": "AGENT"}]}
+
+    mock_client.create_message_batch = AsyncMock(side_effect=tracked_batch)
+
+    class TrackingOutputStreamSession:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            self.closed = False
+            self.flushed = False
+
+        async def process_token(self, token: str) -> AsyncIterator[str]:
+            call_order.append("process_token")
+            yield token
+
+        async def flush(self) -> AsyncIterator[str]:
+            call_order.append("pipeline_flush")
+            self.flushed = True
+            if False:
+                yield ""
+
+        async def aclose(self) -> None:
+            call_order.append("pipeline_aclose")
+            self.closed = True
+
+        def close(self) -> None:
+            call_order.append("pipeline_close")
+            self.closed = True
+
+    tracking_pipeline = TrackingOutputStreamSession()
+
+    mock_graph = MagicMock()
+
+    async def mock_astream_events(
+        *args: object, **kwargs: object
+    ) -> AsyncIterator[dict[str, object]]:
+        yield {
+            "event": "on_chat_model_stream",
+            "data": {"chunk": MagicMock(content="Emitted tokens before cancel")},
+        }
+        raise asyncio.CancelledError()
+
+    mock_graph.astream_events = mock_astream_events
+
+    with patch(
+        "agent.chat_turn.runner.OutputStreamSession",
+        return_value=tracking_pipeline,
+    ):
+        runner = ChatTurnRunner(
+            graph=mock_graph,
+            queue_manager=mock_queue,
+            client_factory=lambda **_kwargs: mock_client,
+            redis_client=MagicMock(),
+        )
+
+        command = ChatTurnCommand(
+            user_id="user-t022",
+            session_id="session-t022-cancel",
+            message="Cancel during streaming",
+            token="jwt.token.val",
+        )
+
+        with pytest.raises(asyncio.CancelledError):
+            async for _ in runner.run(command):
+                pass
+
+    # Partial response persisted using asyncio.shield
+    assert "partial_persist_shielded" in call_order
+
+    # Pipeline closed without flushing
+    assert tracking_pipeline.closed is True
+    assert "pipeline_aclose" in call_order
+    assert tracking_pipeline.flushed is False
+    assert "pipeline_flush" not in call_order
+
+    # Session lease released cleanly
+    assert "queue_release" in call_order
+    mock_queue.release.assert_awaited_once_with("session-t022-cancel", "req-t022-cancel")
+
+    # Causal cleanup sequence: partial_persist -> pipeline.aclose -> queue_release
+    persist_idx = call_order.index("partial_persist_shielded")
+    close_idx = call_order.index("pipeline_aclose")
+    release_idx = call_order.index("queue_release")
+    assert persist_idx < close_idx < release_idx

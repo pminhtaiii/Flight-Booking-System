@@ -1,5 +1,4 @@
 import 'server-only';
-import * as NextAuth from 'next-auth';
 import { z } from 'zod';
 import {
   BookingAirlineViewSchema,
@@ -27,15 +26,147 @@ import {
   type DisruptionAlertView,
   type ItineraryRevisionView,
 } from '@shared/types/booking-management.types';
-import { authOptions } from '../auth.ts';
+import { backendClient, type TransportResult } from './backend-client';
 
 export type BookingTab = 'upcoming' | 'past';
 
-const REQUEST_TIMEOUT_MS = 10_000;
-const MAX_READ_ATTEMPTS = 3;
-const RETRY_BASE_DELAY_MS = 100;
+const RawBookingListResponseSchema = z
+  .object({
+    bookings: z
+      .unknown()
+      .transform((value) => (Array.isArray(value) ? value : []))
+      .pipe(z.array(z.record(z.string(), z.unknown()))),
+    pagination: z
+      .object({
+        page: z.number().optional().catch(undefined),
+        limit: z.number().optional().catch(undefined),
+        total: z.number().optional().catch(undefined),
+        totalPages: z.number().optional().catch(undefined),
+      })
+      .passthrough()
+      .optional()
+      .catch(undefined),
+  })
+  .passthrough();
 
-type FetchResult = { ok: true; response: Response } | { ok: false };
+const RawBookingDetailResponseSchema = z
+  .object({
+    id: z.unknown(),
+    status: z.unknown(),
+    totalAmount: z.unknown(),
+    currency: z.unknown(),
+    departureAt: z.unknown(),
+    arrivalAt: z.unknown(),
+    createdAt: z.unknown(),
+    updatedAt: z.unknown(),
+    flightSnapshot: z.unknown(),
+    currentItinerary: z.unknown(),
+    itinerary: z.unknown(),
+    passengers: z.unknown(),
+    passengerSnapshot: z.unknown(),
+    bookingIntent: z.unknown(),
+    ancillarySummary: z.unknown(),
+    cancellation: z.unknown(),
+    cancellationDeadline: z.unknown(),
+    cancellationRefundable: z.unknown(),
+    airlineRefundAmount: z.unknown(),
+    customerRefundAmount: z.unknown(),
+    payment: z.unknown(),
+    paymentStatus: z.unknown(),
+    offerId: z.unknown(),
+    pnrReference: z.unknown(),
+    failureReason: z.unknown(),
+    disruption: z.unknown(),
+  })
+  .passthrough();
+
+const RawCancellationStatusResponseSchema = z
+  .object({
+    bookingId: z.unknown(),
+    bookingStatus: z.unknown(),
+    cancellationDeadline: z.unknown(),
+    airlineRefundAmount: z.unknown(),
+    customerRefundAmount: z.unknown(),
+    refundStatus: z.unknown(),
+    nextRetryAt: z.unknown(),
+    escalationMessage: z.unknown(),
+  })
+  .passthrough();
+
+const RawCancellationQuoteResponseSchema = z
+  .object({
+    bookingId: z.unknown(),
+    quoteId: z.unknown(),
+    refundAmount: z.unknown(),
+    currency: z.unknown(),
+    expiresAt: z.unknown(),
+    refundable: z.unknown(),
+    cancellationDeadline: z.unknown(),
+    refundTo: z.unknown(),
+    nonRefundableAncillaryAmount: z.unknown(),
+    nonRefundableAncillaryCurrency: z.unknown(),
+  })
+  .passthrough();
+
+const RawCancellationResultResponseSchema = z
+  .object({
+    bookingId: z.unknown(),
+    bookingStatus: z.unknown(),
+    cancellationStatus: z.unknown(),
+    refundStatus: z.unknown(),
+    refundAmount: z.unknown(),
+    nextRetryAt: z.unknown(),
+  })
+  .passthrough();
+
+const RawItineraryRevisionsResponseSchema = z
+  .object({
+    items: z.unknown(),
+    revisions: z.unknown(),
+    page: z.unknown(),
+    limit: z.unknown(),
+    total: z.unknown(),
+    totalPages: z.unknown(),
+  })
+  .passthrough();
+
+function handleTransportFailure<T>(
+  result: Exclude<TransportResult<unknown>, { ok: true }>,
+  operationSignInMessage: string,
+): BookingManagementOutcome<T> {
+  if (result.kind === 'http') {
+    if (result.status === 401) {
+      return outcomeFailure('UNAUTHENTICATED', 'Please sign in to continue.', false);
+    }
+    if (result.status === 403) {
+      return outcomeFailure('FORBIDDEN', 'You do not have access to this booking.', false);
+    }
+    if (result.status === 404) {
+      return outcomeFailure('NOT_FOUND', 'We could not find this booking.', false);
+    }
+    if (result.status === 409) {
+      return outcomeFailure('STALE_REVISION', 'A newer change exists and must be reviewed.', false);
+    }
+    if (result.status === 400 || result.status === 422) {
+      const extractedMessage: unknown =
+        typeof result.body === 'object' && result.body !== null
+          ? Reflect.get(result.body, 'message')
+          : undefined;
+      const message =
+        typeof extractedMessage === 'string'
+          ? extractedMessage
+          : 'Invalid request. Please check your details and try again.';
+      return outcomeFailure('INVALID_COMMAND', message, false);
+    }
+    return unavailableOutcomeFailure();
+  }
+
+  if (result.cause === 'missing_token') {
+    return outcomeFailure('UNAUTHENTICATED', operationSignInMessage, false);
+  }
+
+  return unavailableOutcomeFailure();
+}
 
 /**
  * Lists user bookings filtered by tab and paginated.
@@ -56,42 +187,38 @@ export async function listBookings(
   const validPage = Number.isInteger(page) && page >= 1 ? page : 1;
   const validLimit = Number.isInteger(limit) && limit >= 1 ? limit : 10;
 
-  const token = await getAccessToken();
-  if (!token) {
-    return outcomeFailure('UNAUTHENTICATED', 'Please sign in to view bookings.', false);
-  }
-
-  const upstream = await fetchWithRetry(
+  const result = await backendClient.request(
     `/api/bookings?tab=${encodeURIComponent(tab)}&page=${validPage}&limit=${validLimit}`,
-    {
-      method: 'GET',
-      headers: { Authorization: `Bearer ${token}` },
-      cache: 'no-store',
-    },
+    RawBookingListResponseSchema,
+    { method: 'GET' },
   );
 
-  if (!upstream.ok) return unavailableOutcomeFailure();
-  const statusOutcome = await handleUpstreamStatus(upstream.response);
-  if (statusOutcome) return statusOutcome;
+  if (!result.ok) {
+    return handleTransportFailure(result, 'Please sign in to view bookings.');
+  }
 
   try {
-    const payload: unknown = await upstream.response.json();
-    if (!payload || typeof payload !== 'object') {
-      return unavailableOutcomeFailure();
-    }
-
-    const raw = payload as {
-      bookings?: unknown[];
+    // Zod infers the transform/pipe result as unknown here; the schema validates this shape.
+    const raw = result.data as {
+      bookings: Record<string, unknown>[];
       pagination?: { page?: number; limit?: number; total?: number; totalPages?: number };
     };
-    const rawBookings = Array.isArray(raw.bookings) ? raw.bookings : [];
+    const rawBookings = raw.bookings;
     const mappedBookings = rawBookings.map(mapListItem);
 
     const pagination = {
-      page: typeof raw.pagination?.page === 'number' ? raw.pagination.page : validPage,
-      limit: typeof raw.pagination?.limit === 'number' ? raw.pagination.limit : validLimit,
+      page:
+        typeof raw.pagination?.page === 'number'
+          ? raw.pagination.page
+          : validPage,
+      limit:
+        typeof raw.pagination?.limit === 'number'
+          ? raw.pagination.limit
+          : validLimit,
       total:
-        typeof raw.pagination?.total === 'number' ? raw.pagination.total : mappedBookings.length,
+        typeof raw.pagination?.total === 'number'
+          ? raw.pagination.total
+          : mappedBookings.length,
       totalPages:
         typeof raw.pagination?.totalPages === 'number'
           ? raw.pagination.totalPages
@@ -128,28 +255,18 @@ export async function getBookingDetail(
     return outcomeFailure('INVALID_COMMAND', 'Booking ID is required.', false);
   }
 
-  const token = await getAccessToken();
-  if (!token) {
-    return outcomeFailure('UNAUTHENTICATED', 'Please sign in to view booking details.', false);
+  const result = await backendClient.request(
+    `/api/bookings/${encodeURIComponent(bookingId.trim())}`,
+    RawBookingDetailResponseSchema,
+    { method: 'GET' },
+  );
+
+  if (!result.ok) {
+    return handleTransportFailure(result, 'Please sign in to view booking details.');
   }
 
-  const upstream = await fetchWithRetry(`/api/bookings/${encodeURIComponent(bookingId.trim())}`, {
-    method: 'GET',
-    headers: { Authorization: `Bearer ${token}` },
-    cache: 'no-store',
-  });
-
-  if (!upstream.ok) return unavailableOutcomeFailure();
-  const statusOutcome = await handleUpstreamStatus(upstream.response);
-  if (statusOutcome) return statusOutcome;
-
   try {
-    const payload: unknown = await upstream.response.json();
-    if (!payload || typeof payload !== 'object') {
-      return unavailableOutcomeFailure();
-    }
-
-    const mapped = mapDetail(payload as Record<string, unknown>);
+    const mapped = mapDetail(result.data);
     const validated = BookingDetailViewSchema.safeParse(mapped);
 
     if (!validated.success) {
@@ -176,31 +293,18 @@ export async function getCancellationStatus(
     return outcomeFailure('INVALID_COMMAND', 'Booking ID is required.', false);
   }
 
-  const token = await getAccessToken();
-  if (!token) {
-    return outcomeFailure('UNAUTHENTICATED', 'Please sign in to view cancellation status.', false);
-  }
-
-  const upstream = await fetchWithRetry(
+  const result = await backendClient.request(
     `/api/bookings/${encodeURIComponent(bookingId.trim())}/cancellation`,
-    {
-      method: 'GET',
-      headers: { Authorization: `Bearer ${token}` },
-      cache: 'no-store',
-    },
+    RawCancellationStatusResponseSchema,
+    { method: 'GET' },
   );
 
-  if (!upstream.ok) return unavailableOutcomeFailure();
-  const statusOutcome = await handleUpstreamStatus(upstream.response);
-  if (statusOutcome) return statusOutcome;
+  if (!result.ok) {
+    return handleTransportFailure(result, 'Please sign in to view cancellation status.');
+  }
 
   try {
-    const payload: unknown = await upstream.response.json();
-    if (!payload || typeof payload !== 'object') {
-      return unavailableOutcomeFailure();
-    }
-
-    const raw = payload as Record<string, unknown>;
+    const raw = result.data;
     const mapped = {
       bookingId: String(raw.bookingId ?? bookingId),
       bookingStatus: String(raw.bookingStatus ?? ''),
@@ -239,38 +343,23 @@ export async function getCancellationQuote(
     return outcomeFailure('INVALID_COMMAND', 'Booking ID is required.', false);
   }
 
-  const token = await getAccessToken();
-  if (!token) {
-    return outcomeFailure(
-      'UNAUTHENTICATED',
-      'Please sign in to request a cancellation quote.',
-      false,
-    );
-  }
-
-  const upstream = await fetchWithRetry(
+  const result = await backendClient.request(
     `/api/bookings/${encodeURIComponent(bookingId.trim())}/cancellation/quote`,
+    RawCancellationQuoteResponseSchema,
     {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      cache: 'no-store',
     },
   );
 
-  if (!upstream.ok) return unavailableOutcomeFailure();
-  const statusOutcome = await handleUpstreamStatus(upstream.response);
-  if (statusOutcome) return statusOutcome;
+  if (!result.ok) {
+    return handleTransportFailure(result, 'Please sign in to request a cancellation quote.');
+  }
 
   try {
-    const payload: unknown = await upstream.response.json();
-    if (!payload || typeof payload !== 'object') {
-      return unavailableOutcomeFailure();
-    }
-
-    const raw = payload as Record<string, unknown>;
+    const raw = result.data;
     const mapped = {
       bookingId: String(raw.bookingId ?? bookingId),
       quoteId: String(raw.quoteId ?? ''),
@@ -323,35 +412,24 @@ export async function cancelBooking(
     return outcomeFailure('INVALID_COMMAND', 'Booking ID and quote ID are required.', false);
   }
 
-  const token = await getAccessToken();
-  if (!token) {
-    return outcomeFailure('UNAUTHENTICATED', 'Please sign in to cancel your booking.', false);
-  }
-
-  const upstream = await fetchWithRetry(
+  const result = await backendClient.request(
     `/api/bookings/${encodeURIComponent(bookingId.trim())}/cancellation`,
+    RawCancellationResultResponseSchema,
     {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ quoteId: quoteId.trim() }),
-      cache: 'no-store',
     },
   );
 
-  if (!upstream.ok) return unavailableOutcomeFailure();
-  const statusOutcome = await handleUpstreamStatus(upstream.response);
-  if (statusOutcome) return statusOutcome;
+  if (!result.ok) {
+    return handleTransportFailure(result, 'Please sign in to cancel your booking.');
+  }
 
   try {
-    const payload: unknown = await upstream.response.json();
-    if (!payload || typeof payload !== 'object') {
-      return unavailableOutcomeFailure();
-    }
-
-    const raw = payload as Record<string, unknown>;
+    const raw = result.data;
     const mapped = {
       bookingId: String(raw.bookingId ?? bookingId),
       bookingStatus: String(raw.bookingStatus ?? ''),
@@ -391,26 +469,21 @@ export async function acknowledgeDisruption(
     return outcomeFailure('INVALID_COMMAND', 'Revision ID is required.', false);
   }
 
-  const token = await getAccessToken();
-  if (!token) {
-    return outcomeFailure('UNAUTHENTICATED', 'Please sign in to acknowledge disruption.', false);
-  }
-
-  const upstream = await fetchWithRetry(
+  const result = await backendClient.request(
     `/api/bookings/${encodeURIComponent(bookingId.trim())}/disruptions/${encodeURIComponent(revisionId.trim())}/acknowledge`,
+    z.void(),
     {
       method: 'POST',
+      responseMode: 'none',
       headers: {
-        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      cache: 'no-store',
     },
   );
 
-  if (!upstream.ok) return unavailableOutcomeFailure();
-  const statusOutcome = await handleUpstreamStatus(upstream.response);
-  if (statusOutcome) return statusOutcome;
+  if (!result.ok) {
+    return handleTransportFailure(result, 'Please sign in to acknowledge disruption.');
+  }
 
   return { ok: true, data: { ok: true } };
 }
@@ -433,26 +506,21 @@ export async function acceptDisruption(
     return outcomeFailure('INVALID_COMMAND', 'Booking ID and revision ID are required.', false);
   }
 
-  const token = await getAccessToken();
-  if (!token) {
-    return outcomeFailure('UNAUTHENTICATED', 'Please sign in to accept disruption.', false);
-  }
-
-  const upstream = await fetchWithRetry(
+  const result = await backendClient.request(
     `/api/bookings/${encodeURIComponent(bookingId.trim())}/disruptions/${encodeURIComponent(revisionId.trim())}/accept`,
+    z.void(),
     {
       method: 'POST',
+      responseMode: 'none',
       headers: {
-        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      cache: 'no-store',
     },
   );
 
-  if (!upstream.ok) return unavailableOutcomeFailure();
-  const statusOutcome = await handleUpstreamStatus(upstream.response);
-  if (statusOutcome) return statusOutcome;
+  if (!result.ok) {
+    return handleTransportFailure(result, 'Please sign in to accept disruption.');
+  }
 
   return { ok: true, data: { ok: true } };
 }
@@ -480,38 +548,18 @@ export async function getItineraryRevisions(
   const validPage = typeof page === 'number' && page >= 1 ? page : 1;
   const validLimit = typeof limit === 'number' && limit >= 1 ? limit : 5;
 
-  const token = await getAccessToken();
-  if (!token) {
-    return outcomeFailure('UNAUTHENTICATED', 'Please sign in to view itinerary history.', false);
-  }
-
-  const upstream = await fetchWithRetry(
+  const result = await backendClient.request(
     `/api/bookings/${encodeURIComponent(bookingId.trim())}/disruptions?page=${validPage}&limit=${validLimit}`,
-    {
-      method: 'GET',
-      headers: { Authorization: `Bearer ${token}` },
-      cache: 'no-store',
-    },
+    RawItineraryRevisionsResponseSchema,
+    { method: 'GET' },
   );
 
-  if (!upstream.ok) return unavailableOutcomeFailure();
-  const statusOutcome = await handleUpstreamStatus(upstream.response);
-  if (statusOutcome) return statusOutcome;
+  if (!result.ok) {
+    return handleTransportFailure(result, 'Please sign in to view itinerary history.');
+  }
 
   try {
-    const payload: unknown = await upstream.response.json();
-    if (!payload || typeof payload !== 'object') {
-      return unavailableOutcomeFailure();
-    }
-
-    const raw = payload as {
-      items?: unknown[];
-      revisions?: unknown[];
-      page?: number;
-      limit?: number;
-      total?: number;
-      totalPages?: number;
-    };
+    const raw = result.data;
     const rawItems = Array.isArray(raw.items)
       ? raw.items
       : Array.isArray(raw.revisions)
@@ -519,7 +567,7 @@ export async function getItineraryRevisions(
         : [];
 
     const mappedRevisions = rawItems.map((item) => {
-      const it = item as Record<string, unknown>;
+      const it = item;
       const rawSegs = Array.isArray(it.segments) ? it.segments : [];
       return {
         revisionId: String(it.revisionId ?? it.id ?? ''),
@@ -568,63 +616,6 @@ export async function getItineraryRevisions(
 // Helpers & Internal Mapping
 // ---------------------------------------------------------------------------
 
-async function getAccessToken(): Promise<string | null> {
-  try {
-    const sessionFn =
-      typeof NextAuth.getServerSession === 'function'
-        ? NextAuth.getServerSession
-        : (
-            NextAuth as unknown as {
-              default?: { getServerSession: typeof NextAuth.getServerSession };
-            }
-          ).default?.getServerSession;
-    if (!sessionFn) return null;
-    const session: unknown = await sessionFn(authOptions);
-    if (!session || typeof session !== 'object' || !('accessToken' in session)) return null;
-    const token = (session as { accessToken?: unknown }).accessToken;
-    return typeof token === 'string' && token.length > 0 ? token : null;
-  } catch {
-    return null;
-  }
-}
-
-async function fetchWithRetry(pathname: string, init: RequestInit): Promise<FetchResult> {
-  const isIdempotentRead = !init.method || init.method.toUpperCase() === 'GET';
-  const maxAttempts = isIdempotentRead ? MAX_READ_ATTEMPTS : 1;
-
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-    try {
-      const response = await fetch(`${apiUrl()}${pathname}`, {
-        ...init,
-        signal: controller.signal,
-      });
-      if (response.status < 500 || attempt === maxAttempts - 1) {
-        return { ok: true, response };
-      }
-    } catch {
-      if (attempt === maxAttempts - 1) return { ok: false };
-    } finally {
-      clearTimeout(timeout);
-    }
-
-    await delay(RETRY_BASE_DELAY_MS * 2 ** attempt);
-  }
-
-  return { ok: false };
-}
-
-function apiUrl(): string {
-  const configuredUrl =
-    process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-  return configuredUrl.replace(/\/+$/, '');
-}
-
-function delay(milliseconds: number): Promise<void> {
-  return new Promise((resolve: () => void) => setTimeout(resolve, milliseconds));
-}
-
 function outcomeFailure<T = never>(
   reason: Extract<BookingManagementOutcome<T>, { ok: false }>['reason'],
   message: string,
@@ -639,33 +630,6 @@ function unavailableOutcomeFailure<T = never>(): BookingManagementOutcome<T> {
     'Booking service is temporarily unavailable. Please try again.',
     true,
   );
-}
-
-async function handleUpstreamStatus(
-  response: Response,
-): Promise<BookingManagementOutcome<never> | null> {
-  if (response.ok) return null;
-  if (response.status === 401) {
-    return outcomeFailure('UNAUTHENTICATED', 'Please sign in to continue.', false);
-  }
-  if (response.status === 403) {
-    return outcomeFailure('FORBIDDEN', 'You do not have access to this booking.', false);
-  }
-  if (response.status === 404) {
-    return outcomeFailure('NOT_FOUND', 'We could not find this booking.', false);
-  }
-  if (response.status === 409) {
-    return outcomeFailure('STALE_REVISION', 'A newer change exists and must be reviewed.', false);
-  }
-  if (response.status === 400 || response.status === 422) {
-    const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
-    const msg =
-      typeof data?.message === 'string'
-        ? data.message
-        : 'Invalid request. Please check your details and try again.';
-    return outcomeFailure('INVALID_COMMAND', msg, false);
-  }
-  return unavailableOutcomeFailure();
 }
 
 function formatMoneyAmount(value: unknown): string {

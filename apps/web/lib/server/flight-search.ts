@@ -1,5 +1,4 @@
 import 'server-only';
-import * as NextAuth from 'next-auth';
 import { z } from 'zod';
 import {
   FlightMatchResultSchema,
@@ -15,11 +14,7 @@ import {
   type FlightSearchSliceView,
   type FlightSelectionOutcome,
 } from '@shared/types/flight-search.types';
-import { authOptions } from '../auth.ts';
-
-const REQUEST_TIMEOUT_MS = 10_000;
-const MAX_ATTEMPTS = 3;
-const RETRY_BASE_DELAY_MS = 100;
+import { backendClient } from './backend-client';
 
 const CabinClassSchema = z.enum(['economy', 'premium_economy', 'business', 'first']);
 const LocalOfferIdSchema = z
@@ -132,8 +127,6 @@ type UpstreamOffer =
   | z.infer<typeof UpstreamRankedOfferSchema>;
 type UpstreamSegment = z.infer<typeof UpstreamSegmentSchema>;
 
-type FetchResult = { ok: true; response: Response } | { ok: false };
-
 function validateMatchedSearchCardinality(
   response: z.infer<typeof UpstreamSearchBaseSchema>,
   context: z.RefinementCtx,
@@ -203,48 +196,14 @@ export async function searchFlights(query: FlightSearchQuery): Promise<FlightSea
     );
   }
 
-  const token = await getAccessToken();
-  if (!token)
-    return searchFailure('UNAUTHENTICATED', 'Please sign in to search for flights.', false);
-
-  const upstream = await fetchWithRetry('/api/flights/search', {
+  const result = await backendClient.request('/api/flights/search', UpstreamSearchSchema, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(parsedQuery.data),
-    cache: 'no-store',
   });
 
-  if (!upstream.ok) return unavailableSearchFailure();
-  if (upstream.response.status === 401 || upstream.response.status === 403) {
-    return searchFailure('UNAUTHENTICATED', 'Please sign in to search for flights.', false);
-  }
-  if (upstream.response.status === 429) {
-    return searchFailure('RATE_LIMITED', 'Flight search is busy. Please try again shortly.', true);
-  }
-  if (upstream.response.status === 400 || upstream.response.status === 422) {
-    return searchFailure(
-      'INVALID_SEARCH',
-      'Please check your search details and try again.',
-      false,
-    );
-  }
-  if (!upstream.response.ok) return unavailableSearchFailure();
-
-  try {
-    const payload: unknown = await upstream.response.json();
-    const parsedPayload = UpstreamSearchSchema.safeParse(payload);
-    if (!parsedPayload.success) {
-      return searchFailure(
-        'UPSTREAM_UNAVAILABLE',
-        'Flight search returned an invalid response. Please try again.',
-        true,
-      );
-    }
-
-    const offers = parsedPayload.data.results.map(
+  if (result.ok) {
+    const offers = result.data.results.map(
       (offer: UpstreamOffer): FlightSearchOfferView => mapOffer(offer),
     );
     const validatedOffers = z.array(FlightSearchOfferViewSchema).safeParse(offers);
@@ -258,17 +217,44 @@ export async function searchFlights(query: FlightSearchQuery): Promise<FlightSea
 
     return {
       ok: true,
-      mode: parsedPayload.data.mode,
+      mode: result.data.mode,
       offers: validatedOffers.data,
-      meta: createSearchMeta(validatedOffers.data, parsedPayload.data.meta),
+      meta: createSearchMeta(validatedOffers.data, result.data.meta),
     };
-  } catch {
-    return searchFailure(
-      'UPSTREAM_UNAVAILABLE',
-      'Flight search returned an invalid response. Please try again.',
-      true,
-    );
   }
+
+  if (result.kind === 'http') {
+    if (result.status === 401 || result.status === 403) {
+      return searchFailure('UNAUTHENTICATED', 'Please sign in to search for flights.', false);
+    }
+    if (result.status === 429) {
+      return searchFailure('RATE_LIMITED', 'Flight search is busy. Please try again shortly.', true);
+    }
+    if (result.status === 400 || result.status === 422) {
+      return searchFailure(
+        'INVALID_SEARCH',
+        'Please check your search details and try again.',
+        false,
+      );
+    }
+    return unavailableSearchFailure();
+  }
+
+  if (result.kind === 'transport') {
+    if (result.cause === 'missing_token') {
+      return searchFailure('UNAUTHENTICATED', 'Please sign in to search for flights.', false);
+    }
+    if (result.cause === 'invalid_json' || result.cause === 'invalid_payload') {
+      return searchFailure(
+        'UPSTREAM_UNAVAILABLE',
+        'Flight search returned an invalid response. Please try again.',
+        true,
+      );
+    }
+    return unavailableSearchFailure();
+  }
+
+  return unavailableSearchFailure();
 }
 
 export async function selectFlightOffer(offerId: string): Promise<FlightSelectionOutcome> {
@@ -281,92 +267,44 @@ export async function selectFlightOffer(offerId: string): Promise<FlightSelectio
     );
   }
 
-  const token = await getAccessToken();
-  if (!token) return selectionFailure('UNAUTHENTICATED', 'Please sign in to continue.', false);
+  const result = await backendClient.request(
+    `/api/flights/${encodeURIComponent(parsedOfferId.data)}`,
+    UpstreamSelectionSchema,
+    { method: 'GET' },
+  );
 
-  const upstream = await fetchWithRetry(`/api/flights/${encodeURIComponent(parsedOfferId.data)}`, {
-    method: 'GET',
-    headers: { Authorization: `Bearer ${token}` },
-    cache: 'no-store',
-  });
-
-  if (!upstream.ok) return unavailableSelectionFailure();
-  if (upstream.response.status === 401 || upstream.response.status === 403) {
-    return selectionFailure('UNAUTHENTICATED', 'Please sign in to continue.', false);
-  }
-  if (upstream.response.status === 404 || upstream.response.status === 410) {
-    return selectionFailure(
-      'OFFER_EXPIRED',
-      'This flight offer has expired. Please search again.',
-      false,
-    );
-  }
-  if (!upstream.response.ok) return unavailableSelectionFailure();
-
-  try {
-    const payload: unknown = await upstream.response.json();
-    const parsedPayload = UpstreamSelectionSchema.safeParse(payload);
-    if (!parsedPayload.success || parsedPayload.data.id !== parsedOfferId.data)
+  if (result.ok) {
+    if (result.data.id !== parsedOfferId.data) {
       return unavailableSelectionFailure();
-  } catch {
+    }
+    return {
+      ok: true,
+      checkoutPath: `/checkout?offerId=${encodeURIComponent(parsedOfferId.data)}`,
+    };
+  }
+
+  if (result.kind === 'http') {
+    if (result.status === 401 || result.status === 403) {
+      return selectionFailure('UNAUTHENTICATED', 'Please sign in to continue.', false);
+    }
+    if (result.status === 404 || result.status === 410) {
+      return selectionFailure(
+        'OFFER_EXPIRED',
+        'This flight offer has expired. Please search again.',
+        false,
+      );
+    }
     return unavailableSelectionFailure();
   }
 
-  // Slice 5B explicitly contracts this offer-selection URL; passenger details are collected after navigation.
-  return { ok: true, checkoutPath: `/checkout?offerId=${encodeURIComponent(parsedOfferId.data)}` };
-}
-
-async function getAccessToken(): Promise<string | null> {
-  try {
-    // Handle both ESM and CJS NextAuth module exports depending on runtime bundler environment
-    const sessionFn =
-      typeof NextAuth.getServerSession === 'function'
-        ? NextAuth.getServerSession
-        : (
-            NextAuth as unknown as {
-              default?: { getServerSession: typeof NextAuth.getServerSession };
-            }
-          ).default?.getServerSession;
-    if (!sessionFn) return null;
-    const session: unknown = await sessionFn(authOptions);
-    if (!session || typeof session !== 'object' || !('accessToken' in session)) return null;
-    // Extract custom accessToken property from authenticated session object
-    const token = (session as { accessToken?: unknown }).accessToken;
-    return typeof token === 'string' && token.length > 0 ? token : null;
-  } catch {
-    return null;
-  }
-}
-
-async function fetchWithRetry(pathname: string, init: RequestInit): Promise<FetchResult> {
-  const isIdempotentRead = !init.method || init.method.toUpperCase() === 'GET';
-  const maxAttempts = isIdempotentRead ? MAX_ATTEMPTS : 1;
-
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const controller = new AbortController();
-    const timeout = setTimeout((): void => controller.abort(), REQUEST_TIMEOUT_MS);
-    try {
-      const response = await fetch(`${apiUrl()}${pathname}`, {
-        ...init,
-        signal: controller.signal,
-      });
-      if (response.status < 500 || attempt === maxAttempts - 1) return { ok: true, response };
-    } catch {
-      if (attempt === maxAttempts - 1) return { ok: false };
-    } finally {
-      clearTimeout(timeout);
+  if (result.kind === 'transport') {
+    if (result.cause === 'missing_token') {
+      return selectionFailure('UNAUTHENTICATED', 'Please sign in to continue.', false);
     }
-
-    await delay(RETRY_BASE_DELAY_MS * 2 ** attempt);
+    return unavailableSelectionFailure();
   }
 
-  return { ok: false };
-}
-
-function apiUrl(): string {
-  const configuredUrl =
-    process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-  return configuredUrl.replace(/\/+$/, '');
+  return unavailableSelectionFailure();
 }
 
 function mapOffer(offer: UpstreamOffer): FlightSearchOfferView {
@@ -468,12 +406,6 @@ function duration(minutes: number): string {
   const hours = Math.floor(minutes / 60);
   const remainingMinutes = minutes % 60;
   return `PT${hours > 0 ? `${hours}H` : ''}${remainingMinutes > 0 ? `${remainingMinutes}M` : '0M'}`;
-}
-
-function delay(milliseconds: number): Promise<void> {
-  return new Promise((resolve: () => void): void => {
-    setTimeout(resolve, milliseconds);
-  });
 }
 
 function searchFailure(
