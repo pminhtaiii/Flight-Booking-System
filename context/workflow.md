@@ -7,7 +7,7 @@ The mandatory workflow that all AI agents must follow when building features in 
 ## Workflow Pipeline
 
 ```
-speckit-plan → plan-review-convergence → speckit-tasks → brainstorming → writing-plans → speckit-implement (with TDD) → speckit-converge → code-review
+speckit-plan → plan-review-convergence → speckit-tasks → brainstorming → writing-plans → speckit-implement (with TDD) → speckit-converge → code-review → ci-feedback-loop
 ```
 
 ```mermaid
@@ -19,9 +19,10 @@ flowchart LR
     E --> F["speckit-implement\n(with TDD)"]
     F --> G["speckit-converge"]
     G --> H["code-review\n(Standards & Spec)"]
+    H --> I["ci-feedback-loop\n(PR / CI Verification)"]
 ```
 
-> **Pipeline Stages**: Plan Quality Gate (`plan-review-convergence`) → Design Refinement & Task Planning (`brainstorming`, `writing-plans`) → TDD Implementation (`speckit-implement`) → Post-Implementation Convergence (`speckit-converge`) → Dual-Axis Quality Sign-Off (`code-review`).
+> **Pipeline Stages**: Plan Quality Gate (`plan-review-convergence`) → Design Refinement & Task Planning (`brainstorming`, `writing-plans`) → TDD Implementation (`speckit-implement`) → Post-Implementation Convergence (`speckit-converge`) → Dual-Axis Quality Sign-Off (`code-review`) → PR / CI Convergence (`ci-feedback-loop`).
 
 ---
 
@@ -148,6 +149,8 @@ E2E tests are required when the feature:
 
 If any of these conditions are met, the agent MUST write E2E tests before marking the feature complete.
 
+> For E2E test runner setup, T093 script, Playwright integration guidelines, and the pre-PR validation gate matrix, see `context/testing.md`.
+
 ---
 
 ## Step 7: Converge (`/speckit-converge`)
@@ -181,6 +184,21 @@ The agent must:
    - Fix all blocking findings (P0/P1/critical issues) before final completion.
 
 **Gate**: Zero blocking findings across both Standards and Spec axes before PR creation and feature completion.
+
+---
+
+## Step 9: PR / CI Verification & Convergence (`/ci-feedback-loop`)
+
+**Purpose**: Verify remote GitHub Actions CI pipeline passes clean on the opened PR, triaging failures and applying fixes until green.
+
+The agent must:
+
+1. **Verify Local Gates**: Ensure the pre-PR local gate validation matrix passes (`context/testing.md`).
+2. **Push & Inspect**: Open or update the PR branch and monitor CI execution using `node .agents/skills/ci-feedback-loop/scripts/inspect-ci.mjs --head --watch`.
+3. **Harvest & Converge**: If any CI job or step fails, activate the `ci-feedback-loop` skill ([`ci-feedback-loop`](../.agents/skills/ci-feedback-loop/SKILL.md)) to harvest errors, remediate locally, push fixes, and verify remote convergence.
+4. **Circuit Breaker**: Stop after 1 failed retry if the exact same issue persists, and ask the user for guidance.
+
+**Gate**: Remote GitHub Actions CI reaches `Verdict: CI PASSED ✔` (`ci-status` conclusion is `success`) before merge.
 
 ---
 
@@ -245,3 +263,5 @@ If any test fails, the task remains `[ ]` and the agent continues working on it.
 | speckit-implement (TDD) | All tests pass for every task       | Automatic (tests)            |
 | speckit-converge        | "✅ Converged" reported             | Automatic (convergence)      |
 | code-review             | Zero blocking findings (both axes)  | User / Dual-Axis Sub-agents  |
+| ci-feedback-loop        | Remote CI green (Verdict: CI PASSED)| Automatic (GitHub Actions)   |
+

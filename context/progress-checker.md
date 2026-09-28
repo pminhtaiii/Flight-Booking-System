@@ -1,5 +1,13 @@
 # Progress Tracker
 
+### CI Feedback Loop Skill & AGENTS.md Lean Refactoring Complete (2026-09-28)
+
+- **Skill & Inspector Tool**: Created `.agents/skills/ci-feedback-loop/scripts/inspect-ci.mjs` providing ESM-based remote CI workflow, job, and failing step inspection, HEAD / commit SHA / run-ID matching, formatted status output, and `--watch` / `--poll` polling modes with clean error handling and Windows libuv safety.
+- **Skill Specification**: Created `.agents/skills/ci-feedback-loop/SKILL.md` strictly aligned with `writing-great-skills` guidelines with front-loaded leading words (*Poll*, *Harvest*, *Triage*, *Remediate*, *Converge*), checkable completion criteria, local gate mapping, and circuit breaker rule (1 persistent failure limit).
+- **AGENTS.md Refactor**: Pruned deprecated runner inspection block from `AGENTS.md` (lines 73–102) to keep core agent instructions lean and single-source.
+- **Documentation Updates**: Updated `context/testing.md` and `context/workflow.md` (Step 9 + Checkpoint Summary) referencing the `ci-feedback-loop` skill.
+- **Verification**: Executed `node .agents/skills/ci-feedback-loop/scripts/inspect-ci.mjs` (exit code 0) and contract test `node --test tests/ci/ci-workflow.contract.test.mjs` (23 passed, exit code 0).
+
 ### Feature 028 — Backend Client Unification: 100% Complete (Phases 1–8, Tasks T001–T031 Verified) (2026-09-27)
 
 - **Final gate:** 241/241 focused tests passed with zero failures or skips. The six domain/parity specs passed 231/231; the two literal `[bookingId]` route specs passed 10/10 (7/7 and 3/3) when run with escaped glob syntax. Web lint, typecheck, and production build each exited 0; the build generated 23/23 static pages.
