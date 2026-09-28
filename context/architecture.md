@@ -615,6 +615,7 @@ Planning artifacts: [specification](../specs/024-event-driven-module-deepening/s
 │   ├── library-docs.md                → Usage guide for third-party libraries
 │   ├── progress-checker.md            → Detailed progress status tracker
 │   ├── project-overview.md            → High-level system requirements and flow
+│   ├── testing.md                     → E2E testing instructions and validation gates
 │   └── workflow.md                    → The step-by-step development process
 │
 ├── research/
