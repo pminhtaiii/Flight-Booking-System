@@ -2,13 +2,14 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { CacheModule } from '@/cache/cache.module';
 import { PrismaModule } from '@/prisma/prisma.module';
+import { DuffelCoreModule } from '@/supplier/core/duffel-core.module';
 import { FULFILLMENT_GATEWAY_PORT } from '@/payment-fulfillment/ports';
 import { DuffelService } from './duffel.service';
 import { DuffelCleanupService } from './duffel-cleanup.service';
 import { DuffelFulfillmentAdapter } from './duffel-fulfillment.adapter';
 
 @Module({
-  imports: [ConfigModule, CacheModule, PrismaModule],
+  imports: [ConfigModule, CacheModule, PrismaModule, DuffelCoreModule],
   providers: [
     DuffelService,
     DuffelCleanupService,

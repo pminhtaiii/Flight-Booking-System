@@ -196,8 +196,11 @@ describe('Agent Gateway Polish (E2E)', () => {
       await cacheService.set(cacheKey, JSON.stringify(mockCachedResults), 900);
       // An exhausted budget makes a cache miss fail before any supplier request.
       const now = new Date();
-      const budgetKey = `budget:duffel:${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-      await cacheService.set(budgetKey, '2000');
+      const yyyy = now.getUTCFullYear();
+      const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(now.getUTCDate()).padStart(2, '0');
+      const budgetKey = `budget:duffel:daily:agent:${yyyy}-${mm}-${dd}`;
+      await cacheService.set(budgetKey, '500');
 
       // Make search request
       const res = await request(app.getHttpServer())
@@ -251,18 +254,19 @@ describe('Agent Gateway Polish (E2E)', () => {
         personalized.body.results.map((result: { flightNumber: string }) => result.flightNumber),
       ).toEqual(['NH858', 'VN310']);
       expect(personalized.body.results[0].matchResult).not.toBeNull();
-      expect(await cacheService.get(budgetKey)).toBe('2000');
+      expect(await cacheService.get(budgetKey)).toBe('500');
       expect(JSON.parse((await cacheService.get(cacheKey))!)).toEqual(mockCachedResults);
     });
 
     it('should enforce budget limit and return 429 RATE_LIMIT_EXCEEDED if monthly budget is exceeded', async () => {
       const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const budgetKey = `budget:duffel:${year}-${month}`;
+      const yyyy = now.getUTCFullYear();
+      const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(now.getUTCDate()).padStart(2, '0');
+      const budgetKey = `budget:duffel:daily:agent:${yyyy}-${mm}-${dd}`;
 
-      // Seed budget key with 1200 (which is the limit for agent, so any next increment exceeds it)
-      await cacheService.set(budgetKey, '1200');
+      // Seed budget key with 500 (which is the limit for agent, so any next increment exceeds it)
+      await cacheService.set(budgetKey, '500');
 
       // Make search request
       const res = await request(app.getHttpServer())

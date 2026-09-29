@@ -1,7 +1,10 @@
 const mockGetOrder = jest.fn();
 const mockConfirmCancellation = jest.fn();
+const mockCreateCancellation = jest.fn();
 const mockOffersGet = jest.fn();
+const mockOffersGetPriced = jest.fn();
 const mockOfferRequestsCreate = jest.fn();
+const mockSeatMapsGet = jest.fn();
 
 jest.mock('@duffel/api', () => ({
   Duffel: jest.fn().mockImplementation(() => ({
@@ -9,13 +12,18 @@ jest.mock('@duffel/api', () => ({
       get: mockGetOrder,
     },
     orderCancellations: {
+      create: mockCreateCancellation,
       confirm: mockConfirmCancellation,
     },
     offers: {
       get: mockOffersGet,
+      getPriced: mockOffersGetPriced,
     },
     offerRequests: {
       create: mockOfferRequestsCreate,
+    },
+    seatMaps: {
+      get: mockSeatMapsGet,
     },
   })),
 }));
@@ -26,14 +34,44 @@ import { Duffel } from '@duffel/api';
 import * as crypto from 'crypto';
 import { DuffelService, DuffelTimeoutError } from './duffel.service';
 import { DuffelOfferRequest } from './duffel.types';
+import {
+  DuffelRateBudgetService,
+  BudgetReservationResult,
+} from '@/supplier/core/duffel-rate-budget.service';
+
+type MockRateBudgetService = {
+  reserveAttempt: jest.Mock<
+    Promise<BudgetReservationResult>,
+    [extraConstraint?: { key: string; limit: number }]
+  >;
+};
+
+const createMockRateBudgetService = (): MockRateBudgetService => ({
+  reserveAttempt: jest
+    .fn<Promise<BudgetReservationResult>, [extraConstraint?: { key: string; limit: number }]>()
+    .mockResolvedValue({ ok: true }),
+});
+
+const getUtcDateString = (): string => {
+  const now = new Date();
+  const yyyy = now.getUTCFullYear();
+  const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(now.getUTCDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
 
 describe('DuffelService cancellation recovery adapter', () => {
   let service: DuffelService;
+  let mockRateBudget: MockRateBudgetService;
 
   beforeEach(() => {
     mockGetOrder.mockReset();
     mockConfirmCancellation.mockReset();
-    service = new DuffelService({} as CacheService);
+    mockRateBudget = createMockRateBudgetService();
+    service = new DuffelService(
+      {} as CacheService,
+      mockRateBudget as unknown as DuffelRateBudgetService,
+    );
   });
 
   it('retrieves an order and normalizes a remotely confirmed cancellation', async () => {
@@ -52,6 +90,7 @@ describe('DuffelService cancellation recovery adapter', () => {
       cancelled_at: '2026-07-22T10:00:00.000Z',
       cancellation_id: 'oc_123',
     });
+    expect(mockRateBudget.reserveAttempt).toHaveBeenCalledTimes(1);
     expect(mockGetOrder).toHaveBeenCalledWith('ord_123');
   });
 
@@ -69,6 +108,25 @@ describe('DuffelService cancellation recovery adapter', () => {
       cancelled_at: null,
       cancellation_id: null,
     });
+    expect(mockRateBudget.reserveAttempt).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects retrieveOrder with 429 RATE_LIMIT_EXCEEDED when rate budget is exhausted', async () => {
+    mockRateBudget.reserveAttempt.mockResolvedValueOnce({
+      ok: false,
+      error: 'EXHAUSTED',
+      retryAfterSeconds: 60,
+      resetAt: '2026-09-30T00:00:00.000Z',
+    });
+
+    await expect(service.retrieveOrder('ord_123')).rejects.toMatchObject({
+      status: HttpStatus.TOO_MANY_REQUESTS,
+      response: {
+        code: 'RATE_LIMIT_EXCEEDED',
+        message: 'Daily Duffel API rate limit exceeded',
+      },
+    });
+    expect(mockGetOrder).not.toHaveBeenCalled();
   });
 
   it('confirms the supplied cancellation quote without creating another quote', async () => {
@@ -91,7 +149,26 @@ describe('DuffelService cancellation recovery adapter', () => {
       refundable: true,
       confirmed_at: '2026-07-22T10:00:00.000Z',
     });
+    expect(mockRateBudget.reserveAttempt).toHaveBeenCalledTimes(1);
     expect(mockConfirmCancellation).toHaveBeenCalledWith('oc_123');
+  });
+
+  it('rejects confirmCancellationQuote with 429 RATE_LIMIT_EXCEEDED when rate budget is exhausted', async () => {
+    mockRateBudget.reserveAttempt.mockResolvedValueOnce({
+      ok: false,
+      error: 'EXHAUSTED',
+      retryAfterSeconds: 60,
+      resetAt: '2026-09-30T00:00:00.000Z',
+    });
+
+    await expect(service.confirmCancellationQuote('oc_123')).rejects.toMatchObject({
+      status: HttpStatus.TOO_MANY_REQUESTS,
+      response: {
+        code: 'RATE_LIMIT_EXCEEDED',
+        message: 'Daily Duffel API rate limit exceeded',
+      },
+    });
+    expect(mockConfirmCancellation).not.toHaveBeenCalled();
   });
 
   it('translates upstream order retrieval failures into a PII-safe gateway error', async () => {
@@ -190,7 +267,105 @@ describe('DuffelService cancellation recovery adapter', () => {
 
       const result = await service.retrieveCompleteOrder('ord_complete_123');
       expect(result).toEqual(mockOrderPayload);
+      expect(mockRateBudget.reserveAttempt).toHaveBeenCalledTimes(1);
       expect(mockGetOrder).toHaveBeenCalledWith('ord_complete_123');
+    });
+
+    it('rejects retrieveCompleteOrder with 429 RATE_LIMIT_EXCEEDED when rate budget is exhausted', async () => {
+      mockRateBudget.reserveAttempt.mockResolvedValueOnce({
+        ok: false,
+        error: 'EXHAUSTED',
+        retryAfterSeconds: 60,
+        resetAt: '2026-09-30T00:00:00.000Z',
+      });
+
+      await expect(service.retrieveCompleteOrder('ord_complete_123')).rejects.toMatchObject({
+        status: HttpStatus.TOO_MANY_REQUESTS,
+        response: {
+          code: 'RATE_LIMIT_EXCEEDED',
+          message: 'Daily Duffel API rate limit exceeded',
+          retryAfterSeconds: 60,
+          resetAt: '2026-09-30T00:00:00.000Z',
+        },
+      });
+      expect(mockGetOrder).not.toHaveBeenCalled();
+    });
+
+    it('rejects retrieveCompleteOrder with 429 BUDGET_UNAVAILABLE when budget store is unavailable', async () => {
+      mockRateBudget.reserveAttempt.mockResolvedValueOnce({
+        ok: false,
+        error: 'UNAVAILABLE',
+        retryAfterSeconds: 30,
+      });
+
+      await expect(service.retrieveCompleteOrder('ord_complete_123')).rejects.toMatchObject({
+        status: HttpStatus.TOO_MANY_REQUESTS,
+        response: {
+          code: 'BUDGET_UNAVAILABLE',
+          message: 'Duffel rate budget store temporarily unavailable',
+          retryAfterSeconds: 30,
+        },
+      });
+      expect(mockGetOrder).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('cancelOrder', () => {
+    beforeEach(() => {
+      mockCreateCancellation.mockReset();
+      mockConfirmCancellation.mockReset();
+    });
+
+    it('meters 2 reservations and cancels order successfully', async () => {
+      mockCreateCancellation.mockResolvedValue({ data: { id: 'oc_quote_1' } });
+      mockConfirmCancellation.mockResolvedValue({ data: { id: 'oc_quote_1', status: 'confirmed' } });
+
+      const result = await service.cancelOrder('ord_to_cancel');
+      expect(result).toEqual({ id: 'oc_quote_1', status: 'confirmed' });
+      expect(mockRateBudget.reserveAttempt).toHaveBeenCalledTimes(2);
+      expect(mockCreateCancellation).toHaveBeenCalledWith({ order_id: 'ord_to_cancel' });
+      expect(mockConfirmCancellation).toHaveBeenCalledWith('oc_quote_1');
+    });
+
+    it('rejects cancelOrder if initial quote reservation is denied', async () => {
+      mockRateBudget.reserveAttempt.mockResolvedValueOnce({
+        ok: false,
+        error: 'EXHAUSTED',
+        retryAfterSeconds: 60,
+        resetAt: '2026-09-30T00:00:00.000Z',
+      });
+
+      await expect(service.cancelOrder('ord_to_cancel')).rejects.toMatchObject({
+        status: HttpStatus.TOO_MANY_REQUESTS,
+        response: {
+          code: 'RATE_LIMIT_EXCEEDED',
+          message: 'Daily Duffel API rate limit exceeded',
+        },
+      });
+      expect(mockCreateCancellation).not.toHaveBeenCalled();
+      expect(mockConfirmCancellation).not.toHaveBeenCalled();
+    });
+
+    it('rejects cancelOrder if confirmation reservation is denied after quote created', async () => {
+      mockCreateCancellation.mockResolvedValue({ data: { id: 'oc_quote_1' } });
+      mockRateBudget.reserveAttempt
+        .mockResolvedValueOnce({ ok: true })
+        .mockResolvedValueOnce({
+          ok: false,
+          error: 'EXHAUSTED',
+          retryAfterSeconds: 60,
+          resetAt: '2026-09-30T00:00:00.000Z',
+        });
+
+      await expect(service.cancelOrder('ord_to_cancel')).rejects.toMatchObject({
+        status: HttpStatus.TOO_MANY_REQUESTS,
+        response: {
+          code: 'RATE_LIMIT_EXCEEDED',
+          message: 'Daily Duffel API rate limit exceeded',
+        },
+      });
+      expect(mockCreateCancellation).toHaveBeenCalledTimes(1);
+      expect(mockConfirmCancellation).not.toHaveBeenCalled();
     });
   });
 
@@ -223,7 +398,10 @@ describe('DuffelService cancellation recovery adapter', () => {
 
     it('initializes Duffel SDK with default basePath when DUFFEL_API_URL is undefined', () => {
       delete process.env.DUFFEL_API_URL;
-      new DuffelService({} as CacheService);
+      new DuffelService(
+        {} as CacheService,
+        mockRateBudget as unknown as DuffelRateBudgetService,
+      );
       expect(Duffel).toHaveBeenCalledWith(
         expect.objectContaining({
           basePath: 'https://api.duffel.com',
@@ -231,9 +409,31 @@ describe('DuffelService cancellation recovery adapter', () => {
       );
     });
 
+    it('uses injectedDuffel if provided in constructor', async () => {
+      const customOrdersGet = jest.fn().mockResolvedValue({
+        data: { id: 'ord_injected', cancelled_at: null, cancellation: null },
+      });
+      const customDuffel = {
+        orders: { get: customOrdersGet },
+      } as unknown as Duffel;
+
+      const customService = new DuffelService(
+        {} as CacheService,
+        mockRateBudget as unknown as DuffelRateBudgetService,
+        customDuffel,
+      );
+
+      await customService.retrieveOrder('ord_injected');
+      expect(customOrdersGet).toHaveBeenCalledWith('ord_injected');
+      expect(mockGetOrder).not.toHaveBeenCalled();
+    });
+
     it('initializes Duffel SDK and creates order with valid loopback override', async () => {
       process.env.DUFFEL_API_URL = 'http://127.0.0.1:4010';
-      const overrideService = new DuffelService({} as CacheService);
+      const overrideService = new DuffelService(
+        {} as CacheService,
+        mockRateBudget as unknown as DuffelRateBudgetService,
+      );
 
       expect(Duffel).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -272,11 +472,15 @@ describe('DuffelService cancellation recovery adapter', () => {
           method: 'POST',
         }),
       );
+      expect(mockRateBudget.reserveAttempt).toHaveBeenCalledTimes(2);
     });
 
     it('normalizes trailing slashes for DUFFEL_API_URL', () => {
       process.env.DUFFEL_API_URL = 'http://127.0.0.1:4010/';
-      new DuffelService({} as CacheService);
+      new DuffelService(
+        {} as CacheService,
+        mockRateBudget as unknown as DuffelRateBudgetService,
+      );
 
       expect(Duffel).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -287,12 +491,24 @@ describe('DuffelService cancellation recovery adapter', () => {
 
     it('rejects invalid URL syntax during initialization', () => {
       process.env.DUFFEL_API_URL = 'not-a-valid-url';
-      expect(() => new DuffelService({} as CacheService)).toThrow();
+      expect(
+        () =>
+          new DuffelService(
+            {} as CacheService,
+            mockRateBudget as unknown as DuffelRateBudgetService,
+          ),
+      ).toThrow();
     });
 
     it('rejects unsupported protocols during initialization', () => {
       process.env.DUFFEL_API_URL = 'ftp://127.0.0.1:4010';
-      expect(() => new DuffelService({} as CacheService)).toThrow();
+      expect(
+        () =>
+          new DuffelService(
+            {} as CacheService,
+            mockRateBudget as unknown as DuffelRateBudgetService,
+          ),
+      ).toThrow();
     });
   });
 
@@ -308,6 +524,7 @@ describe('DuffelService cancellation recovery adapter', () => {
 
     let searchService: DuffelService;
     let mockCache: MockCacheService;
+    let searchRateBudget: MockRateBudgetService;
 
     const createMockOfferRequest = (id = 'or_test_123'): DuffelOfferRequest => ({
       id,
@@ -316,7 +533,12 @@ describe('DuffelService cancellation recovery adapter', () => {
           id: 'sli_1',
           duration: 'PT2H10M',
           origin: { id: 'HAN', name: 'Noi Bai Airport', iata_code: 'HAN', type: 'airport' },
-          destination: { id: 'SGN', name: 'Tan Son Nhat Airport', iata_code: 'SGN', type: 'airport' },
+          destination: {
+            id: 'SGN',
+            name: 'Tan Son Nhat Airport',
+            iata_code: 'SGN',
+            type: 'airport',
+          },
           segments: [
             {
               id: 'seg_1',
@@ -324,7 +546,12 @@ describe('DuffelService cancellation recovery adapter', () => {
               departing_at: '2026-10-01T08:00:00',
               arriving_at: '2026-10-01T10:10:00',
               origin: { id: 'HAN', name: 'Noi Bai Airport', iata_code: 'HAN', type: 'airport' },
-              destination: { id: 'SGN', name: 'Tan Son Nhat Airport', iata_code: 'SGN', type: 'airport' },
+              destination: {
+                id: 'SGN',
+                name: 'Tan Son Nhat Airport',
+                iata_code: 'SGN',
+                type: 'airport',
+              },
               marketing_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
               operating_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
               marketing_carrier_flight_number: '123',
@@ -386,10 +613,14 @@ describe('DuffelService cancellation recovery adapter', () => {
         getTtl: jest.fn<Promise<number>, [string]>().mockResolvedValue(-1),
         del: jest.fn<Promise<void>, [string]>().mockResolvedValue(undefined),
       };
-      searchService = new DuffelService(mockCache as unknown as CacheService);
+      searchRateBudget = createMockRateBudgetService();
+      searchService = new DuffelService(
+        mockCache as unknown as CacheService,
+        searchRateBudget as unknown as DuffelRateBudgetService,
+      );
     });
 
-    it('executes raw search for user caller on cache miss, reserving budget and caching result with 900s TTL', async () => {
+    it('executes raw search for user caller on cache miss, reserving budget with user sub-limit (1000) and caching result with 900s TTL', async () => {
       const query = {
         origin: 'HAN',
         destination: 'SGN',
@@ -410,11 +641,12 @@ describe('DuffelService cancellation recovery adapter', () => {
       expect(result.offerRequest).toEqual(mockOfferRequest);
 
       expect(mockCache.get).toHaveBeenCalledWith(`flights:raw:${expectedHash}`);
-      expect(mockCache.get).toHaveBeenCalledWith(expect.stringMatching(/^budget:duffel:\d{4}-\d{2}$/));
-      expect(mockCache.incr).toHaveBeenCalledWith(
-        expect.stringMatching(/^budget:duffel:\d{4}-\d{2}$/),
-        expect.any(Number),
-      );
+      expect(searchRateBudget.reserveAttempt).toHaveBeenCalledTimes(1);
+      expect(searchRateBudget.reserveAttempt).toHaveBeenCalledWith({
+        key: `budget:duffel:daily:user:${getUtcDateString()}`,
+        limit: 1000,
+      });
+      expect(mockCache.incr).not.toHaveBeenCalled();
       expect(mockOfferRequestsCreate).toHaveBeenCalledTimes(1);
       expect(mockOfferRequestsCreate).toHaveBeenCalledWith({
         slices: [
@@ -436,7 +668,7 @@ describe('DuffelService cancellation recovery adapter', () => {
       );
     });
 
-    it('executes raw search for agent caller on cache miss with round-trip and multi-passenger mapping', async () => {
+    it('executes raw search for agent caller on cache miss with agent sub-limit (500), round-trip and multi-passenger mapping', async () => {
       const query = {
         origin: 'SGN',
         destination: 'HAN',
@@ -455,6 +687,12 @@ describe('DuffelService cancellation recovery adapter', () => {
 
       expect(result.cached).toBe(false);
       expect(result.searchHash).toBe(expectedHash);
+      expect(searchRateBudget.reserveAttempt).toHaveBeenCalledTimes(1);
+      expect(searchRateBudget.reserveAttempt).toHaveBeenCalledWith({
+        key: `budget:duffel:daily:agent:${getUtcDateString()}`,
+        limit: 500,
+      });
+      expect(mockCache.incr).not.toHaveBeenCalled();
       expect(mockOfferRequestsCreate).toHaveBeenCalledWith({
         slices: [
           {
@@ -482,7 +720,7 @@ describe('DuffelService cancellation recovery adapter', () => {
       });
     });
 
-    it('returns cached search result for user caller with 0 upstream Duffel calls and 0 budget increments', async () => {
+    it('returns cached search result for user caller with 0 upstream Duffel calls and 0 budget reservations', async () => {
       const query = {
         origin: 'HAN',
         destination: 'SGN',
@@ -505,10 +743,11 @@ describe('DuffelService cancellation recovery adapter', () => {
       expect(result.searchHash).toBe(expectedHash);
       expect(result.offerRequest).toEqual(cachedOfferRequest);
       expect(mockOfferRequestsCreate).not.toHaveBeenCalled();
+      expect(searchRateBudget.reserveAttempt).not.toHaveBeenCalled();
       expect(mockCache.incr).not.toHaveBeenCalled();
     });
 
-    it('returns cached search result for agent caller with 0 upstream Duffel calls and 0 budget increments', async () => {
+    it('returns cached search result for agent caller with 0 upstream Duffel calls and 0 budget reservations', async () => {
       const query = {
         origin: 'SGN',
         destination: 'HAN',
@@ -532,10 +771,11 @@ describe('DuffelService cancellation recovery adapter', () => {
       expect(result.searchHash).toBe(expectedHash);
       expect(result.offerRequest).toEqual(cachedOfferRequest);
       expect(mockOfferRequestsCreate).not.toHaveBeenCalled();
+      expect(searchRateBudget.reserveAttempt).not.toHaveBeenCalled();
       expect(mockCache.incr).not.toHaveBeenCalled();
     });
 
-    it('enforces caller budget limit for user caller (1800) and throws RATE_LIMIT_EXCEEDED 429 without calling Duffel', async () => {
+    it('enforces caller budget limit for user caller and throws RATE_LIMIT_EXCEEDED 429 without calling Duffel', async () => {
       const query = {
         origin: 'HAN',
         destination: 'SGN',
@@ -543,172 +783,58 @@ describe('DuffelService cancellation recovery adapter', () => {
         adults: 1,
       };
 
-      mockCache.get.mockImplementation(async (key: string) => {
-        if (key.startsWith('budget:duffel:')) {
-          return '1800';
-        }
-        return null;
+      searchRateBudget.reserveAttempt.mockResolvedValueOnce({
+        ok: false,
+        error: 'EXHAUSTED',
+        retryAfterSeconds: 3600,
+        resetAt: '2026-09-30T00:00:00.000Z',
       });
 
       await expect(searchService.searchFlights(query, 'user')).rejects.toMatchObject({
         status: HttpStatus.TOO_MANY_REQUESTS,
         response: {
           code: 'RATE_LIMIT_EXCEEDED',
+          message: 'Daily Duffel API rate limit exceeded',
         },
       });
 
+      expect(searchRateBudget.reserveAttempt).toHaveBeenCalledWith({
+        key: `budget:duffel:daily:user:${getUtcDateString()}`,
+        limit: 1000,
+      });
       expect(mockOfferRequestsCreate).not.toHaveBeenCalled();
       expect(mockCache.incr).not.toHaveBeenCalled();
     });
 
-    it('enforces caller budget limit for agent caller (1200) while permitting user search below user limit (1800)', async () => {
-      const agentQuery = {
+    it('enforces caller budget limit for agent caller and throws RATE_LIMIT_EXCEEDED 429 without calling Duffel', async () => {
+      const query = {
         origin: 'SGN',
         destination: 'HAN',
         departureDate: '2026-10-05',
         adults: 1,
       };
-      const userQuery = {
-        origin: 'HAN',
-        destination: 'SGN',
-        departureDate: '2026-10-01',
-        adults: 1,
-      };
 
-      mockCache.get.mockImplementation(async (key: string) => {
-        if (key.startsWith('budget:duffel:')) {
-          return '1200';
-        }
-        return null;
-      });
-
-      await expect(searchService.searchFlights(agentQuery, 'agent')).rejects.toMatchObject({
-        status: HttpStatus.TOO_MANY_REQUESTS,
-        response: {
-          code: 'RATE_LIMIT_EXCEEDED',
-        },
-      });
-      expect(mockOfferRequestsCreate).not.toHaveBeenCalled();
-
-      const mockOfferRequest = createMockOfferRequest('or_user_below_limit');
-      mockOfferRequestsCreate.mockResolvedValueOnce({ data: mockOfferRequest });
-
-      const userResult = await searchService.searchFlights(userQuery, 'user');
-      expect(userResult.cached).toBe(false);
-      expect(mockOfferRequestsCreate).toHaveBeenCalledTimes(1);
-    });
-
-    it('enforces total budget limit (2000) and throws RATE_LIMIT_EXCEEDED 429 for all callers', async () => {
-      const query = {
-        origin: 'HAN',
-        destination: 'SGN',
-        departureDate: '2026-10-01',
-        adults: 1,
-      };
-
-      mockCache.get.mockImplementation(async (key: string) => {
-        if (key.startsWith('budget:duffel:')) {
-          return '2000';
-        }
-        return null;
-      });
-
-      await expect(searchService.searchFlights(query, 'user')).rejects.toMatchObject({
-        status: HttpStatus.TOO_MANY_REQUESTS,
-        response: {
-          code: 'RATE_LIMIT_EXCEEDED',
-        },
+      searchRateBudget.reserveAttempt.mockResolvedValueOnce({
+        ok: false,
+        error: 'EXHAUSTED',
+        retryAfterSeconds: 3600,
+        resetAt: '2026-09-30T00:00:00.000Z',
       });
 
       await expect(searchService.searchFlights(query, 'agent')).rejects.toMatchObject({
         status: HttpStatus.TOO_MANY_REQUESTS,
         response: {
           code: 'RATE_LIMIT_EXCEEDED',
+          message: 'Daily Duffel API rate limit exceeded',
         },
       });
 
+      expect(searchRateBudget.reserveAttempt).toHaveBeenCalledWith({
+        key: `budget:duffel:daily:agent:${getUtcDateString()}`,
+        limit: 500,
+      });
       expect(mockOfferRequestsCreate).not.toHaveBeenCalled();
-    });
-
-    it('permits raw search when increment reaches exactly the caller limit (boundary test)', async () => {
-      const query = {
-        origin: 'HAN',
-        destination: 'SGN',
-        departureDate: '2026-10-01',
-        adults: 1,
-      };
-
-      mockCache.get.mockImplementation(async (key: string) => {
-        if (key.startsWith('budget:duffel:')) {
-          return '1799';
-        }
-        return null;
-      });
-      mockCache.incr.mockResolvedValueOnce(1800);
-
-      const mockOfferRequest = createMockOfferRequest('or_exact_limit');
-      mockOfferRequestsCreate.mockResolvedValueOnce({ data: mockOfferRequest });
-
-      const result = await searchService.searchFlights(query, 'user');
-      expect(result.cached).toBe(false);
-      expect(mockOfferRequestsCreate).toHaveBeenCalledTimes(1);
-      expect(mockCache.decr).not.toHaveBeenCalled();
-    });
-
-    it('compensates and decrements budget when concurrent check-and-increment overshoots caller limit', async () => {
-      const query = {
-        origin: 'HAN',
-        destination: 'SGN',
-        departureDate: '2026-10-01',
-        adults: 1,
-      };
-
-      mockCache.get.mockImplementation(async (key: string) => {
-        if (key.startsWith('budget:duffel:')) {
-          return '1799';
-        }
-        return null;
-      });
-      mockCache.incr.mockResolvedValueOnce(1801);
-
-      await expect(searchService.searchFlights(query, 'user')).rejects.toMatchObject({
-        status: HttpStatus.TOO_MANY_REQUESTS,
-        response: {
-          code: 'RATE_LIMIT_EXCEEDED',
-        },
-      });
-
-      expect(mockCache.decr).toHaveBeenCalledWith(expect.stringMatching(/^budget:duffel:\d{4}-\d{2}$/));
-      expect(mockOfferRequestsCreate).not.toHaveBeenCalled();
-    });
-
-    it('compensates and decrements budget when concurrent check-and-increment overshoots total limit', async () => {
-      const query = {
-        origin: 'HAN',
-        destination: 'SGN',
-        departureDate: '2026-10-01',
-        adults: 1,
-      };
-
-      // 1799 passes both user limit (1800) and total limit (2000) at pre-check
-      mockCache.get.mockImplementation(async (key: string) => {
-        if (key.startsWith('budget:duffel:')) {
-          return '1799';
-        }
-        return null;
-      });
-      // Concurrent bursts cause incr to return 2001, exceeding total limit (2000)
-      mockCache.incr.mockResolvedValueOnce(2001);
-
-      await expect(searchService.searchFlights(query, 'user')).rejects.toMatchObject({
-        status: HttpStatus.TOO_MANY_REQUESTS,
-        response: {
-          code: 'RATE_LIMIT_EXCEEDED',
-        },
-      });
-
-      expect(mockCache.decr).toHaveBeenCalledWith(expect.stringMatching(/^budget:duffel:\d{4}-\d{2}$/));
-      expect(mockOfferRequestsCreate).not.toHaveBeenCalled();
+      expect(mockCache.incr).not.toHaveBeenCalled();
     });
 
     it('maps upstream failure to 502 UPSTREAM_UNAVAILABLE when Duffel API throws generic error', async () => {
@@ -732,13 +858,18 @@ describe('DuffelService cancellation recovery adapter', () => {
 
   describe('getOfferById live offer detail characterization (T001)', () => {
     let detailService: DuffelService;
+    let detailRateBudget: MockRateBudgetService;
 
     beforeEach(() => {
       mockOffersGet.mockReset();
-      detailService = new DuffelService({} as CacheService);
+      detailRateBudget = createMockRateBudgetService();
+      detailService = new DuffelService(
+        {} as CacheService,
+        detailRateBudget as unknown as DuffelRateBudgetService,
+      );
     });
 
-    it('successfully retrieves live offer details by ID', async () => {
+    it('successfully retrieves live offer details by ID and meters 1 reservation', async () => {
       const mockPayload = {
         id: 'off_detail_1',
         total_amount: '220.00',
@@ -749,7 +880,26 @@ describe('DuffelService cancellation recovery adapter', () => {
       const result = await detailService.getOfferById('off_detail_1');
 
       expect(result).toEqual(mockPayload);
+      expect(detailRateBudget.reserveAttempt).toHaveBeenCalledTimes(1);
       expect(mockOffersGet).toHaveBeenCalledWith('off_detail_1');
+    });
+
+    it('rejects getOfferById with 429 RATE_LIMIT_EXCEEDED when rate budget is exhausted', async () => {
+      detailRateBudget.reserveAttempt.mockResolvedValueOnce({
+        ok: false,
+        error: 'EXHAUSTED',
+        retryAfterSeconds: 60,
+        resetAt: '2026-09-30T00:00:00.000Z',
+      });
+
+      await expect(detailService.getOfferById('off_detail_1')).rejects.toMatchObject({
+        status: HttpStatus.TOO_MANY_REQUESTS,
+        response: {
+          code: 'RATE_LIMIT_EXCEEDED',
+          message: 'Daily Duffel API rate limit exceeded',
+        },
+      });
+      expect(mockOffersGet).not.toHaveBeenCalled();
     });
 
     it('propagates upstream 404 error when offer is not found', async () => {
@@ -776,11 +926,223 @@ describe('DuffelService cancellation recovery adapter', () => {
       );
 
       try {
-        await expect(detailService.getOfferById('off_slow', 15)).rejects.toThrow(DuffelTimeoutError);
+        await expect(detailService.getOfferById('off_slow', 15)).rejects.toThrow(
+          DuffelTimeoutError,
+        );
       } finally {
         clearTimeout(timer!);
       }
     });
   });
-});
 
+  describe('metered remote upstream attempts', () => {
+    let testService: DuffelService;
+    let mockCache: {
+      get: jest.Mock<Promise<string | null>, [string]>;
+      set: jest.Mock<Promise<void>, [string, string, number?]>;
+      getTtl: jest.Mock<Promise<number>, [string]>;
+    };
+    let testRateBudget: MockRateBudgetService;
+
+    beforeEach(() => {
+      mockOffersGet.mockReset();
+      mockOffersGetPriced.mockReset();
+      mockSeatMapsGet.mockReset();
+      mockCreateCancellation.mockReset();
+      mockConfirmCancellation.mockReset();
+
+      mockCache = {
+        get: jest.fn().mockResolvedValue(null),
+        set: jest.fn().mockResolvedValue(undefined),
+        getTtl: jest.fn().mockResolvedValue(-1),
+      };
+      testRateBudget = createMockRateBudgetService();
+      testService = new DuffelService(
+        mockCache as unknown as CacheService,
+        testRateBudget as unknown as DuffelRateBudgetService,
+      );
+    });
+
+    it('meters both seatMaps.get and offers.get separately in getSeatMapsAndServices', async () => {
+      mockSeatMapsGet.mockResolvedValue({ data: [] });
+      mockOffersGet.mockResolvedValue({
+        data: { slices: [], available_services: [] },
+      });
+
+      const catalog = await testService.getSeatMapsAndServices('off_seatmap_test', true);
+
+      expect(catalog).toBeDefined();
+      expect(testRateBudget.reserveAttempt).toHaveBeenCalledTimes(2);
+      expect(mockSeatMapsGet).toHaveBeenCalledWith({ offer_id: 'off_seatmap_test' });
+      expect(mockOffersGet).toHaveBeenCalledWith('off_seatmap_test', {
+        return_available_services: true,
+      });
+    });
+
+    it('rejects getSeatMapsAndServices with 429 RATE_LIMIT_EXCEEDED when budget is exhausted', async () => {
+      testRateBudget.reserveAttempt.mockResolvedValue({
+        ok: false,
+        error: 'EXHAUSTED',
+        retryAfterSeconds: 60,
+        resetAt: '2026-09-30T00:00:00.000Z',
+      });
+
+      await expect(
+        testService.getSeatMapsAndServices('off_seatmap_test', true),
+      ).rejects.toMatchObject({
+        status: HttpStatus.TOO_MANY_REQUESTS,
+        response: {
+          code: 'RATE_LIMIT_EXCEEDED',
+          message: 'Daily Duffel API rate limit exceeded',
+        },
+      });
+      expect(mockSeatMapsGet).not.toHaveBeenCalled();
+      expect(mockOffersGet).not.toHaveBeenCalled();
+    });
+
+    it('aborts getSeatMapsAndServices before making any Duffel SDK calls when second reservation is exhausted', async () => {
+      testRateBudget.reserveAttempt
+        .mockResolvedValueOnce({ ok: true })
+        .mockResolvedValueOnce({
+          ok: false,
+          error: 'EXHAUSTED',
+          retryAfterSeconds: 60,
+          resetAt: '2026-09-30T00:00:00.000Z',
+        });
+
+      await expect(
+        testService.getSeatMapsAndServices('off_seatmap_test', true),
+      ).rejects.toMatchObject({
+        status: HttpStatus.TOO_MANY_REQUESTS,
+        response: {
+          code: 'RATE_LIMIT_EXCEEDED',
+          message: 'Daily Duffel API rate limit exceeded',
+        },
+      });
+      expect(mockSeatMapsGet).not.toHaveBeenCalled();
+      expect(mockOffersGet).not.toHaveBeenCalled();
+    });
+
+    it('meters 1 reservation in repriceOffer before offers.getPriced', async () => {
+      mockOffersGetPriced.mockResolvedValue({
+        data: {
+          total_amount: '100.00',
+          base_amount: '80.00',
+          total_currency: 'USD',
+          service_lines: [],
+        },
+      });
+
+      const result = await testService.repriceOffer('off_reprice_test', [
+        { serviceId: 'srv_1', quantity: 1 },
+      ]);
+
+      expect(result).toBeDefined();
+      expect(testRateBudget.reserveAttempt).toHaveBeenCalledTimes(1);
+      expect(mockOffersGetPriced).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects repriceOffer with 429 RATE_LIMIT_EXCEEDED when budget is exhausted', async () => {
+      testRateBudget.reserveAttempt.mockResolvedValueOnce({
+        ok: false,
+        error: 'EXHAUSTED',
+        retryAfterSeconds: 60,
+        resetAt: '2026-09-30T00:00:00.000Z',
+      });
+
+      await expect(
+        testService.repriceOffer('off_reprice_test', [{ serviceId: 'srv_1', quantity: 1 }]),
+      ).rejects.toMatchObject({
+        status: HttpStatus.TOO_MANY_REQUESTS,
+        response: {
+          code: 'RATE_LIMIT_EXCEEDED',
+          message: 'Daily Duffel API rate limit exceeded',
+        },
+      });
+      expect(mockOffersGetPriced).not.toHaveBeenCalled();
+    });
+
+    it('meters 1 reservation before orderCancellations.create in createCancellationQuote when not mocked', async () => {
+      const prevJest = process.env.JEST_WORKER_ID;
+      const prevNodeEnv = process.env.NODE_ENV;
+      const prevToken = process.env.DUFFEL_ACCESS_TOKEN;
+
+      try {
+        delete process.env.JEST_WORKER_ID;
+        process.env.NODE_ENV = 'production';
+        process.env.DUFFEL_ACCESS_TOKEN = 'real-duffel-token';
+
+        mockCreateCancellation.mockResolvedValue({
+          data: { id: 'oc_unmocked_1' },
+        });
+
+        const unmockedService = new DuffelService(
+          mockCache as unknown as CacheService,
+          testRateBudget as unknown as DuffelRateBudgetService,
+        );
+
+        const quote = await unmockedService.createCancellationQuote('ord_unmocked');
+        expect(quote).toEqual({ id: 'oc_unmocked_1' });
+        expect(testRateBudget.reserveAttempt).toHaveBeenCalledTimes(1);
+        expect(mockCreateCancellation).toHaveBeenCalledWith({ order_id: 'ord_unmocked' });
+      } finally {
+        if (prevJest !== undefined) {
+          process.env.JEST_WORKER_ID = prevJest;
+        } else {
+          delete process.env.JEST_WORKER_ID;
+        }
+        process.env.NODE_ENV = prevNodeEnv;
+        if (prevToken !== undefined) {
+          process.env.DUFFEL_ACCESS_TOKEN = prevToken;
+        } else {
+          delete process.env.DUFFEL_ACCESS_TOKEN;
+        }
+      }
+    });
+
+    it('rejects createCancellationQuote with 429 RATE_LIMIT_EXCEEDED when not mocked and budget is exhausted', async () => {
+      const prevJest = process.env.JEST_WORKER_ID;
+      const prevNodeEnv = process.env.NODE_ENV;
+      const prevToken = process.env.DUFFEL_ACCESS_TOKEN;
+
+      try {
+        delete process.env.JEST_WORKER_ID;
+        process.env.NODE_ENV = 'production';
+        process.env.DUFFEL_ACCESS_TOKEN = 'real-duffel-token';
+
+        testRateBudget.reserveAttempt.mockResolvedValueOnce({
+          ok: false,
+          error: 'EXHAUSTED',
+          retryAfterSeconds: 60,
+          resetAt: '2026-09-30T00:00:00.000Z',
+        });
+
+        const unmockedService = new DuffelService(
+          mockCache as unknown as CacheService,
+          testRateBudget as unknown as DuffelRateBudgetService,
+        );
+
+        await expect(unmockedService.createCancellationQuote('ord_unmocked')).rejects.toMatchObject({
+          status: HttpStatus.TOO_MANY_REQUESTS,
+          response: {
+            code: 'RATE_LIMIT_EXCEEDED',
+            message: 'Daily Duffel API rate limit exceeded',
+          },
+        });
+        expect(mockCreateCancellation).not.toHaveBeenCalled();
+      } finally {
+        if (prevJest !== undefined) {
+          process.env.JEST_WORKER_ID = prevJest;
+        } else {
+          delete process.env.JEST_WORKER_ID;
+        }
+        process.env.NODE_ENV = prevNodeEnv;
+        if (prevToken !== undefined) {
+          process.env.DUFFEL_ACCESS_TOKEN = prevToken;
+        } else {
+          delete process.env.DUFFEL_ACCESS_TOKEN;
+        }
+      }
+    });
+  });
+});

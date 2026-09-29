@@ -591,9 +591,11 @@ describe('Flights Search (E2E)', () => {
       expect(rawCached).toBeDefined();
 
       // Get budget key value
-      const year = new Date().getFullYear();
-      const month = String(new Date().getMonth() + 1).padStart(2, '0');
-      const budgetKey = `budget:duffel:${year}-${month}`;
+      const now = new Date();
+      const yyyy = now.getUTCFullYear();
+      const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(now.getUTCDate()).padStart(2, '0');
+      const budgetKey = `budget:duffel:daily:user:${yyyy}-${mm}-${dd}`;
       const budgetValBefore = await cacheService.get(budgetKey);
 
       // Clear spy
@@ -642,11 +644,13 @@ describe('Flights Search (E2E)', () => {
     });
 
     it('should return 429 TOO MANY REQUESTS when the search budget is exhausted', async () => {
-      // Exhaust the budget key in Redis (Default limit is 1800 for user caller)
-      const year = new Date().getFullYear();
-      const month = String(new Date().getMonth() + 1).padStart(2, '0');
-      const budgetKey = `budget:duffel:${year}-${month}`;
-      await cacheService.set(budgetKey, '1800');
+      // Exhaust the budget key in Redis (Default limit is 1000 for user caller)
+      const now = new Date();
+      const yyyy = now.getUTCFullYear();
+      const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(now.getUTCDate()).padStart(2, '0');
+      const budgetKey = `budget:duffel:daily:user:${yyyy}-${mm}-${dd}`;
+      await cacheService.set(budgetKey, '1000');
 
       const res = await request(app.getHttpServer())
         .post('/api/flights/search')

@@ -1,6 +1,27 @@
 # Progress Tracker
 
-### Feature 029 — Narrow the Duffel Supplier Boundary: Phase 2 Slice 1 Core Foundation & Shared Rate Budget Complete (Tasks T005–T009 Verified) (2026-09-29)
+### Feature 029 — Narrow the Duffel Supplier Boundary: Phase 2 Slice 2 Consumer Wiring & Shared Budget Migration Complete (Tasks T010–T012 Verified) (2026-09-29)
+
+- **T010 DuffelService Core Attempt Metering & Caller Sub-limits**:
+  - Injected `DuffelRateBudgetService` and `@Optional() @Inject(DUFFEL_SDK)` into `apps/api/src/duffel/duffel.service.ts`.
+  - Replaced monthly Redis budget logic in `searchFlights` with daily UTC attempt reservation through `DuffelRateBudgetService`, enforcing 1,000 daily limit for user caller and 500 for agent caller (`budget:duffel:daily:{caller}:{YYYY-MM-DD}`).
+  - Added reservation checks before every remote upstream call: `getOfferById`, `getSeatMapsAndServices` (metering parallel `seatMaps.get` and `offers.get`), `repriceOffer`, unmocked `createOrder`, `createCancellationQuote`, `confirmCancellationQuote`, `retrieveOrder`, `retrieveCompleteOrder`, and `cancelOrder`.
+  - Ensured cache hits bypass budget reservation.
+  - Maintained contract parity by throwing 429 `RATE_LIMIT_EXCEEDED` on budget exhaustion and preserving existing error structures.
+  - Updated `apps/api/src/duffel/duffel.service.spec.ts` with mocks and unit tests covering all new budget paths and zero monthly key usages.
+- **T011 Remove Monthly Reconciliation Precharge/Decrement**:
+  - Refactored `apps/api/src/disruption/sync/reconciliation.service.ts` to remove monthly budget keys (`budget:duffel:${year}-${month}`), pre-checks, and speculative increment/decrement cycles.
+  - Updated reconciliation loop to directly invoke `supplierSyncService.syncBooking` and cleanly catch budget denial (429 / `RATE_LIMIT_EXCEEDED`), logging warning `budget_blocked`, incrementing `budgetBlocked` metric, and deferring sync without treating it as an unexpected failure or triggering exponential backoff.
+  - Ensured skipped syncs (`SKIPPED_LOCKED`, `SKIPPED_INELIGIBLE`) consume zero budget.
+  - Updated `apps/api/src/disruption/sync/reconciliation.service.spec.ts` with test cases verifying budget denial handling and zero budget interaction on skipped syncs.
+- **T012 Wire DuffelCoreModule & Foundation Checkpoint**:
+  - Imported `DuffelCoreModule` in `apps/api/src/duffel/duffel.module.ts`.
+  - Executed Phase 2 foundation checkpoint:
+    - 6 Jest test suites (133/133 tests passed, exit code 0).
+    - TypeScript compilation (`tsc -p tsconfig.json --noEmit`) clean with 0 errors.
+    - Static census confirmed 0 usages of obsolete monthly budget keys across `apps/api/src/`.
+  - Marked Tasks T010, T011, and T012 complete in `specs/029-duffel-provider-narrowing/tasks.md` and recorded evidence in `specs/029-duffel-provider-narrowing/verification.md`.
+
 
 - **T005 Core SDK Provider & Module Unit Tests**: Created `apps/api/src/supplier/core/duffel-core.module.spec.ts` locking singleton SDK instantiation (`DUFFEL_SDK`), startup token validation (rejection of missing, empty, or whitespace-only tokens), mock URL override (`DUFFEL_API_URL` basePath normalization), and malformed URL / invalid protocol fast-fail.
 - **T006 Rate Budget & Atomic Cache Operations Unit Tests**: Extended `apps/api/src/cache/cache.service.spec.ts` with unit tests for dual-counter atomic check and increment, fail-closed store error handling, and in-memory fallback. Created `apps/api/src/supplier/core/duffel-rate-budget.service.spec.ts` covering daily limit (1,500 default), secondary constraint propagation, UTC midnight TTL expiry, typed `EXHAUSTED` and `UNAVAILABLE` errors, concurrency safety, and attempted-call semantics.
