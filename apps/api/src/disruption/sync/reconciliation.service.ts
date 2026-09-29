@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '@/prisma/prisma.service';
 import { SupplierSyncService } from './supplier-sync.service';
@@ -116,58 +116,13 @@ export class ReconciliationService {
     let deferred = 0;
     let budgetBlocked = 0;
 
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const budgetKey = `budget:duffel:${year}-${month}`;
-    const totalLimit = Number(process.env.DUFFEL_BUDGET_LIMIT_TOTAL || 2000);
-
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-    const ttlSeconds = Math.max(0, Math.ceil((endOfMonth.getTime() - Date.now()) / 1000));
-
     this.logger.log(`Selected ${selected} bookings for reconciliation.`);
 
     for (const booking of eligibleBookings) {
-      // Budget Check
-      const currentBudgetStr = await this.cacheService.get(budgetKey);
-      const currentBudget = currentBudgetStr ? parseInt(currentBudgetStr, 10) : 0;
-
-      if (currentBudget >= totalLimit) {
-        this.logger.warn(
-          JSON.stringify({
-            message: 'Duffel budget capacity reached. Deferring reconciliation.',
-            bookingId: booking.id,
-            currentBudget,
-            limit: totalLimit,
-            metric: 'budget_blocked',
-          }),
-        );
-        budgetBlocked++;
-        continue;
-      }
-
-      // Increment budget before claim & process
-      const newBudget = await this.cacheService.incr(budgetKey, ttlSeconds);
-      if (newBudget > totalLimit) {
-        this.logger.warn(
-          JSON.stringify({
-            message: 'Duffel budget capacity reached after increment. Deferring reconciliation.',
-            bookingId: booking.id,
-            newBudget,
-            limit: totalLimit,
-            metric: 'budget_blocked',
-          }),
-        );
-        await this.cacheService.decr(budgetKey);
-        budgetBlocked++;
-        continue;
-      }
-
       try {
         const result = await this.supplierSyncService.syncBooking(booking.id, 'RECONCILIATION');
 
         if (result.status === 'SKIPPED_LOCKED' || result.status === 'SKIPPED_INELIGIBLE') {
-          // No API call was made, decrement budget
-          await this.cacheService.decr(budgetKey);
           deferred++;
         } else {
           if (result.status === 'REVISION_CREATED') {
@@ -190,6 +145,18 @@ export class ReconciliationService {
           }),
         );
       } catch (error: unknown) {
+        if (this.isBudgetBlockedError(error)) {
+          this.logger.warn(
+            JSON.stringify({
+              message: 'Duffel budget capacity reached. Deferring reconciliation.',
+              bookingId: booking.id,
+              metric: 'budget_blocked',
+            }),
+          );
+          budgetBlocked++;
+          continue;
+        }
+
         failed++;
         const err = error instanceof Error ? error : new Error(String(error));
 
@@ -238,5 +205,34 @@ export class ReconciliationService {
     };
     this.logger.log(`Reconciliation run summary: ${JSON.stringify(summary)}`);
     return summary;
+  }
+
+  private isBudgetBlockedError(error: unknown): boolean {
+    const rateLimitCodes = new Set(['RATE_LIMIT_EXCEEDED', 'UPSTREAM_RATE_LIMITED', 'BUDGET_EXHAUSTED']);
+
+    if (error instanceof HttpException) {
+      if (error.getStatus() === HttpStatus.TOO_MANY_REQUESTS) {
+        return true;
+      }
+      const response = error.getResponse();
+      if (typeof response === 'object' && response !== null && 'code' in response) {
+        return rateLimitCodes.has(String((response as Record<string, unknown>).code));
+      }
+    }
+
+    if (typeof error === 'object' && error !== null) {
+      const err = error as Record<string, unknown>;
+      if (err.status === 429 || err.statusCode === 429) {
+        return true;
+      }
+      if (typeof err.code === 'string' && rateLimitCodes.has(err.code)) {
+        return true;
+      }
+      if (typeof err.response === 'object' && err.response !== null && 'code' in err.response) {
+        return rateLimitCodes.has(String((err.response as Record<string, unknown>).code));
+      }
+    }
+
+    return false;
   }
 }

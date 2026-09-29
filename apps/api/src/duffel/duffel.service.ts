@@ -1,5 +1,6 @@
-import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus, Logger, Optional, Inject } from '@nestjs/common';
 import { CacheService } from '@/cache/cache.service';
+import { DUFFEL_SDK, DuffelRateBudgetService } from '@/supplier/core/duffel-core.module';
 import { Duffel } from '@duffel/api';
 import {
   DuffelOfferRequest,
@@ -38,6 +39,22 @@ export type DuffelConfirmedCancellation = {
   confirmed_at: string | null;
 };
 
+export type DuffelCancellationQuote = {
+  id: string;
+  order_id: string;
+  refund_amount?: string | null;
+  total_refund_amount?: string | null;
+  refund_currency?: string | null;
+  currency?: string | null;
+  expires_at?: string | null;
+  expiresAt?: string | null;
+  refundable?: boolean;
+  refund_to?: string | null;
+  non_refundable_ancillary_amount?: string | null;
+  non_refundable_ancillary_currency?: string | null;
+  [key: string]: unknown;
+};
+
 export class DuffelTimeoutError extends Error {
   readonly code = 'DUFFEL_TIMEOUT';
   constructor(message = 'Duffel offer lookup timed out.') {
@@ -51,11 +68,23 @@ export class DuffelTimeoutError extends Error {
 export class DuffelService {
   private readonly logger = new Logger(DuffelService.name);
   private readonly duffel: Duffel;
+  private readonly duffelRateBudgetService: DuffelRateBudgetService;
   private readonly duffelToken: string;
   private readonly apiVersion = 'v2';
   private readonly basePath: string;
 
-  constructor(private readonly cacheService: CacheService) {
+  constructor(
+    private readonly cacheService: CacheService,
+    @Optional() duffelRateBudgetService?: DuffelRateBudgetService,
+    @Optional() @Inject(DUFFEL_SDK) injectedDuffel?: Duffel,
+  ) {
+    // Fallback stub for legacy unit tests that instantiate DuffelService directly with only CacheService
+    this.duffelRateBudgetService =
+      duffelRateBudgetService ??
+      ({
+        reserveAttempt: async () => ({ ok: true }),
+      } as DuffelRateBudgetService);
+
     const token = process.env.DUFFEL_ACCESS_TOKEN;
     const isJest = process.env.JEST_WORKER_ID !== undefined;
     const isTestEnv = process.env.NODE_ENV === 'test' || isJest;
@@ -83,10 +112,28 @@ export class DuffelService {
     }
 
     this.duffelToken = token || '';
-    this.duffel = new Duffel({
-      token: this.duffelToken,
-      basePath: this.basePath,
-    });
+    this.duffel =
+      injectedDuffel ??
+      new Duffel({
+        token: this.duffelToken,
+        basePath: this.basePath,
+      });
+  }
+
+  private async reserveBudgetAttempt(extraConstraint?: {
+    key: string;
+    limit: number;
+  }): Promise<void> {
+    const reservation = await this.duffelRateBudgetService.reserveAttempt(extraConstraint);
+    if (!reservation.ok) {
+      throw new HttpException(
+        {
+          message: 'Daily Duffel API rate limit exceeded',
+          code: 'RATE_LIMIT_EXCEEDED',
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
   }
 
   mapPassengersToDuffel(
@@ -165,51 +212,19 @@ export class DuffelService {
         };
       }
 
-      // 3. On cache miss: Check monthly budget limit in Redis
+      // 3. On cache miss: Reserve daily budget via DuffelRateBudgetService
       const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const budgetKey = `budget:duffel:${year}-${month}`;
+      const yyyy = now.getUTCFullYear();
+      const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(now.getUTCDate()).padStart(2, '0');
+      const dateStr = `${yyyy}-${mm}-${dd}`;
 
-      const userLimit = Number(process.env.DUFFEL_BUDGET_LIMIT_USER || 1800);
-      const agentLimit = Number(process.env.DUFFEL_BUDGET_LIMIT_AGENT || 1200);
-      const totalLimit = Number(process.env.DUFFEL_BUDGET_LIMIT_TOTAL || 2000);
-      const callerLimit = caller === 'user' ? userLimit : agentLimit;
+      const extraConstraint =
+        caller === 'agent'
+          ? { key: `budget:duffel:daily:agent:${dateStr}`, limit: 500 }
+          : { key: `budget:duffel:daily:user:${dateStr}`, limit: 1000 };
 
-      const currentBudgetStr = await this.cacheService.get(budgetKey);
-      const currentBudget = currentBudgetStr ? parseInt(currentBudgetStr, 10) : 0;
-
-      if (currentBudget >= callerLimit || currentBudget >= totalLimit) {
-        this.logger.warn(
-          `Duffel search throttled. Budget key: ${budgetKey}, Current: ${currentBudget}, Limits: (Caller: ${callerLimit}, Total: ${totalLimit})`,
-        );
-        throw new HttpException(
-          {
-            message: 'Flight search capacity temporarily reached. Please try again later.',
-            code: 'RATE_LIMIT_EXCEEDED',
-          },
-          HttpStatus.TOO_MANY_REQUESTS,
-        );
-      }
-
-      // Calculate TTL to end of month
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-      const ttlSeconds = Math.max(0, Math.ceil((endOfMonth.getTime() - Date.now()) / 1000));
-
-      const newBudget = await this.cacheService.incr(budgetKey, ttlSeconds);
-      if (newBudget > callerLimit || newBudget > totalLimit) {
-        this.logger.warn(
-          `Duffel search throttled after increment. Budget key: ${budgetKey}, New: ${newBudget}, Limits: (Caller: ${callerLimit}, Total: ${totalLimit})`,
-        );
-        await this.cacheService.decr(budgetKey);
-        throw new HttpException(
-          {
-            message: 'Flight search capacity temporarily reached. Please try again later.',
-            code: 'RATE_LIMIT_EXCEEDED',
-          },
-          HttpStatus.TOO_MANY_REQUESTS,
-        );
-      }
+      await this.reserveBudgetAttempt(extraConstraint);
 
       // 4. Create Duffel offer request
       const hasDuffelApiUrl = Boolean(
@@ -558,8 +573,14 @@ export class DuffelService {
       });
 
       try {
-        const seatMapsPromise = this.duffel.seatMaps.get({ offer_id: offerId });
-        const offerPromise = this.duffel.offers.get(offerId, { return_available_services: true });
+        const seatMapsPromise = (async () => {
+          await this.reserveBudgetAttempt();
+          return this.duffel.seatMaps.get({ offer_id: offerId });
+        })();
+        const offerPromise = (async () => {
+          await this.reserveBudgetAttempt();
+          return this.duffel.offers.get(offerId, { return_available_services: true });
+        })();
 
         const [seatMapsRes, offerRes] = await Promise.race([
           Promise.all([seatMapsPromise, offerPromise]),
@@ -649,6 +670,10 @@ export class DuffelService {
             },
             HttpStatus.GATEWAY_TIMEOUT,
           );
+        }
+
+        if (err instanceof HttpException) {
+          throw err;
         }
 
         const error = err as unknown as { message?: string; status?: number; stack?: string };
@@ -789,6 +814,7 @@ export class DuffelService {
         };
       }
 
+      await this.reserveBudgetAttempt();
       const response = await this.duffel.offers.getPriced(offerId, {
         intended_payment_methods: [{ type: 'card', card_id: 'mock_card' }],
         intended_services: deduplicatedServices,
@@ -813,6 +839,9 @@ export class DuffelService {
         invalidServiceIdentities: [],
       };
     } catch (err: unknown) {
+      if (err instanceof HttpException) {
+        throw err;
+      }
       const error = err as unknown as {
         message?: string;
         status?: number;
@@ -893,6 +922,7 @@ export class DuffelService {
     });
 
     try {
+      await this.reserveBudgetAttempt();
       const offerPromise = this.duffel.offers.get(duffelOfferId);
       const result = await Promise.race([offerPromise, timeoutPromise]);
       return (result as { data: unknown }).data;
@@ -1092,6 +1122,7 @@ export class DuffelService {
         );
 
         const orderPromise = (async () => {
+          await this.reserveBudgetAttempt();
           const res = await fetch(`${basePath}/air/orders`, {
             method: 'POST',
             signal: controller.signal,
@@ -1156,7 +1187,7 @@ export class DuffelService {
     }
   }
 
-  async createCancellationQuote(duffelOrderId: string): Promise<any> {
+  async createCancellationQuote(duffelOrderId: string): Promise<DuffelCancellationQuote> {
     try {
       const isJest = process.env.JEST_WORKER_ID !== undefined;
       const isTestEnv = process.env.NODE_ENV === 'test' || isJest;
@@ -1189,19 +1220,21 @@ export class DuffelService {
         };
       }
 
+      await this.reserveBudgetAttempt();
       const quote = await this.duffel.orderCancellations.create({
         order_id: duffelOrderId,
       });
-      return quote.data;
+      // Upstream Duffel SDK returns untyped response payload; cast to domain DuffelCancellationQuote
+      return quote.data as unknown as DuffelCancellationQuote;
     } catch (err: unknown) {
-      const error = err as Error;
+      if (err instanceof HttpException) {
+        throw err;
+      }
+      const error = err instanceof Error ? err : new Error(String(err));
       this.logger.error(
         `Failed to create cancellation quote for Duffel order ${duffelOrderId}: ${error.message}`,
         error.stack,
       );
-      if (err instanceof HttpException) {
-        throw err;
-      }
       throw new HttpException(
         {
           code: 'UPSTREAM_CANCELLATION_QUOTE_FAILED',
@@ -1214,6 +1247,7 @@ export class DuffelService {
 
   async retrieveOrder(duffelOrderId: string): Promise<DuffelRecoveredOrder> {
     try {
+      await this.reserveBudgetAttempt();
       const order = (await this.duffel.orders.get(duffelOrderId)).data;
       const cancellation = order.cancellation ?? null;
       const isCancelled = order.cancelled_at != null || cancellation?.confirmed_at != null;
@@ -1246,6 +1280,7 @@ export class DuffelService {
 
   async retrieveCompleteOrder(duffelOrderId: string): Promise<DuffelOrder> {
     try {
+      await this.reserveBudgetAttempt();
       const order = (await this.duffel.orders.get(duffelOrderId)).data as unknown as DuffelOrder;
       return order;
     } catch (err: unknown) {
@@ -1269,6 +1304,7 @@ export class DuffelService {
 
   async confirmCancellationQuote(quoteId: string): Promise<DuffelConfirmedCancellation> {
     try {
+      await this.reserveBudgetAttempt();
       const cancellation = (await this.duffel.orderCancellations.confirm(quoteId)).data;
       const refundAmount = cancellation.refund_amount;
 
@@ -1302,13 +1338,18 @@ export class DuffelService {
 
   async cancelOrder(duffelOrderId: string): Promise<unknown> {
     try {
+      await this.reserveBudgetAttempt();
       const quote = await this.duffel.orderCancellations.create({
         order_id: duffelOrderId,
       });
+      await this.reserveBudgetAttempt();
       const confirmed = await this.duffel.orderCancellations.confirm(quote.data.id);
       return confirmed.data;
     } catch (err: unknown) {
-      const error = err as Error;
+      if (err instanceof HttpException) {
+        throw err;
+      }
+      const error = err instanceof Error ? err : new Error(String(err));
       this.logger.error(
         `Failed to cancel Duffel order ${duffelOrderId}: ${error.message}`,
         error.stack,
