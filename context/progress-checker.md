@@ -1,5 +1,18 @@
 # Progress Tracker
 
+### Feature 029 — Narrow the Duffel Supplier Boundary: Phase 1 Setup & Behavior Baseline Complete (Tasks T001–T004 Verified) (2026-09-29)
+
+- **T001 Search & Offer Detail Baseline Characterization**: Characterized raw vs cached flight searches (user and agent scopes), deterministic UUID generation and result ordering based on search hash and rank, rate budget enforcement, and upstream 404/410 expired offer behavior, database row purge, and recovery metadata in `apps/api/src/duffel/duffel.service.spec.ts` and `apps/api/src/flights/flights.service.spec.ts`.
+- **T002 Ancillary Catalog & Repricing Baseline Characterization**: Characterized seat-map caching, TTLs, and missing-map fallbacks in `duffel-ancillary.service.spec.ts`, service quarantine for invalid or missing seat/baggage records, and priced-offer validation, passenger-scope checks, and amount/currency reconciliation in `ancillary-payment-validation.service.spec.ts`.
+- **T003 Fulfillment Adapter & Payment Saga Baseline Characterization**: Characterized create/retrieve/cancel operations, order idempotency, and semaphore concurrency gating in `duffel-fulfillment.adapter.spec.ts`, PII redaction in persisted order snapshots and payment logs, and compensation and replay paths, unconfirmed cancellation handling, and fencing in `payment-fulfillment.saga.spec.ts`.
+- **T004 Seal Private SDK Access & Baseline Verification**:
+  - Replaced private bracket escape hatch `this.duffelService['duffel'].offers.get(flightOffer.duffelOfferId)` in `apps/api/src/flights/flights.service.ts` with public method `getOfferById(flightOffer.duffelOfferId)`.
+  - Updated mock typing and flight detail characterization tests in `apps/api/src/flights/flights.service.spec.ts` to mock and assert `duffelService.getOfferById`, including `DuffelTimeoutError` handling and BAD_GATEWAY upstream mapping.
+  - Verified 0 occurrences of `duffelService['duffel']` or `['duffel']` across `apps/api/src`.
+  - Verified TypeScript compiler clean pass (`tsc --noEmit`).
+  - Ran full 7-suite Phase 1 Jest test matrix (260 tests passed, 0 failures).
+  - Documented evidence in `specs/029-duffel-provider-narrowing/verification.md` and marked Tasks T001–T004 complete in `specs/029-duffel-provider-narrowing/tasks.md`.
+
 ### CI Feedback Loop Skill & AGENTS.md Lean Refactoring Complete (2026-09-28)
 
 - **Skill & Inspector Tool**: Created `.agents/skills/ci-feedback-loop/scripts/inspect-ci.mjs` providing ESM-based remote CI workflow, job, and failing step inspection, HEAD / commit SHA / run-ID matching, formatted status output, and `--watch` / `--poll` polling modes with clean error handling and Windows libuv safety.

@@ -498,10 +498,9 @@ export class FlightsService {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         liveOffer = flightOffer.rawOffer as Record<string, any>;
       } else {
-        const duffelResponse = await this.duffelService['duffel'].offers.get(
+        liveOffer = (await this.duffelService.getOfferById(
           flightOffer.duffelOfferId,
-        );
-        liveOffer = duffelResponse.data;
+        )) as Record<string, unknown>;
       }
     } catch (err: unknown) {
       const errorObj = err as {

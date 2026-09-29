@@ -4,7 +4,7 @@ import { FlightsService } from './flights.service';
 import { FlightSearchOrchestratorService } from './flight-search-orchestrator.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CacheService } from '@/cache/cache.service';
-import { DuffelService } from '@/duffel/duffel.service';
+import { DuffelService, DuffelTimeoutError } from '@/duffel/duffel.service';
 import { AuditService } from '@/audit/audit.service';
 import { DuffelOffer } from '@/duffel/duffel.types';
 import { FlightMatchResult } from '@/flight-match/flight-match.types';
@@ -25,13 +25,8 @@ describe('FlightsService (T036)', () => {
   let cacheService: { get: jest.Mock; set: jest.Mock };
   let duffelService: {
     searchFlights: jest.Mock;
-    duffel?: {
-      offers: {
-        get: jest.Mock;
-      };
-    };
+    getOfferById: jest.Mock;
   };
-  let mockOffersGet: jest.Mock;
   let auditService: { createLog: jest.Mock };
   let orchestratorService: { orchestrateSearch: jest.Mock };
 
@@ -110,7 +105,6 @@ describe('FlightsService (T036)', () => {
   });
 
   beforeEach(async () => {
-    mockOffersGet = jest.fn();
     prisma = {
       airport: {
         findUnique: jest.fn().mockImplementation(({ where }: { where: { iataCode: string } }) => {
@@ -146,11 +140,7 @@ describe('FlightsService (T036)', () => {
 
     duffelService = {
       searchFlights: jest.fn(),
-      duffel: {
-        offers: {
-          get: mockOffersGet,
-        },
-      },
+      getOfferById: jest.fn(),
     };
 
     auditService = {
@@ -1461,9 +1451,9 @@ describe('FlightsService (T036)', () => {
       prisma.flightOffer.findUnique.mockResolvedValue(
         createMockStoredFlightOffer(offerId, '150.00', 'off_stored_123'),
       );
-      mockOffersGet.mockResolvedValue({
-        data: createMockLiveOffer('off_stored_123', '150.00'),
-      });
+      duffelService.getOfferById.mockResolvedValue(
+        createMockLiveOffer('off_stored_123', '150.00'),
+      );
 
       const detail = await service.getFlightDetail(offerId, userId);
 
@@ -1474,7 +1464,7 @@ describe('FlightsService (T036)', () => {
       expect(detail.airline).toBe('Vietnam Airlines');
       expect(detail.conditions.refundable).toBe(true);
       expect(detail.conditions.changeable).toBe(false);
-      expect(mockOffersGet).toHaveBeenCalledWith('off_stored_123');
+      expect(duffelService.getOfferById).toHaveBeenCalledWith('off_stored_123');
 
       expect(auditService.createLog).toHaveBeenCalledWith(
         prisma,
@@ -1498,9 +1488,9 @@ describe('FlightsService (T036)', () => {
       prisma.flightOffer.findUnique.mockResolvedValue(
         createMockStoredFlightOffer(offerId, '150.00', 'off_stored_123'),
       );
-      mockOffersGet.mockResolvedValue({
-        data: createMockLiveOffer('off_stored_123', '175.50'),
-      });
+      duffelService.getOfferById.mockResolvedValue(
+        createMockLiveOffer('off_stored_123', '175.50'),
+      );
 
       const detail = await service.getFlightDetail(offerId, userId);
 
@@ -1524,7 +1514,7 @@ describe('FlightsService (T036)', () => {
       prisma.flightOffer.findUnique.mockResolvedValue(
         createMockStoredFlightOffer(offerId, '150.00', 'off_stored_123'),
       );
-      mockOffersGet.mockRejectedValue({ status: 404, message: 'Offer not found' });
+      duffelService.getOfferById.mockRejectedValue({ status: 404, message: 'Offer not found' });
 
       await expect(service.getFlightDetail(offerId, userId)).rejects.toMatchObject({
         status: HttpStatus.GONE,
@@ -1547,7 +1537,7 @@ describe('FlightsService (T036)', () => {
       prisma.flightOffer.findUnique.mockResolvedValue(
         createMockStoredFlightOffer(offerId, '150.00', 'off_stored_123'),
       );
-      mockOffersGet.mockRejectedValue({ status: 410, message: 'Offer expired' });
+      duffelService.getOfferById.mockRejectedValue({ status: 410, message: 'Offer expired' });
 
       await expect(service.getFlightDetail(offerId, userId)).rejects.toMatchObject({
         status: HttpStatus.GONE,
@@ -1565,7 +1555,7 @@ describe('FlightsService (T036)', () => {
       prisma.flightOffer.findUnique.mockResolvedValue(
         createMockStoredFlightOffer(offerId, '150.00', 'off_stored_123'),
       );
-      mockOffersGet.mockRejectedValue({ status: 404, message: 'Offer not found' });
+      duffelService.getOfferById.mockRejectedValue({ status: 404, message: 'Offer not found' });
       prisma.flightOffer.delete.mockRejectedValue(new Error('DB disconnect during purge'));
 
       await expect(service.getFlightDetail(offerId, userId)).rejects.toMatchObject({
@@ -1584,7 +1574,23 @@ describe('FlightsService (T036)', () => {
       prisma.flightOffer.findUnique.mockResolvedValue(
         createMockStoredFlightOffer(offerId, '150.00', 'off_stored_123'),
       );
-      mockOffersGet.mockRejectedValue(new Error('Duffel API failure'));
+      duffelService.getOfferById.mockRejectedValue(new Error('Duffel API failure'));
+
+      await expect(service.getFlightDetail(offerId, userId)).rejects.toMatchObject({
+        status: HttpStatus.BAD_GATEWAY,
+        response: {
+          code: 'UPSTREAM_UNAVAILABLE',
+        },
+      });
+
+      expect(prisma.flightOffer.delete).not.toHaveBeenCalled();
+    });
+
+    it('translates DuffelTimeoutError from getOfferById into BAD_GATEWAY without DB purge', async () => {
+      prisma.flightOffer.findUnique.mockResolvedValue(
+        createMockStoredFlightOffer(offerId, '150.00', 'off_stored_123'),
+      );
+      duffelService.getOfferById.mockRejectedValue(new DuffelTimeoutError());
 
       await expect(service.getFlightDetail(offerId, userId)).rejects.toMatchObject({
         status: HttpStatus.BAD_GATEWAY,
