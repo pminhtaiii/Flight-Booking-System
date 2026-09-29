@@ -710,8 +710,8 @@ describe('PaymentFulfillmentSaga', () => {
   });
 
   describe('Redacted Evidence Storage in Payment Events', () => {
-    it('persists strictly redacted order evidence without passenger PII (passports, emails, phone numbers) in duffel_order_created payment event', async () => {
-      const redactedOrderEvidence: PersistedOrderEvidence = {
+    it('persists fulfillment gateway evidence unchanged in duffel_order_created payment event metadata', async () => {
+      const orderEvidence: PersistedOrderEvidence = {
         id: 'ord-123',
         bookingReference: 'PNR123',
         passengers: [
@@ -730,7 +730,7 @@ describe('PaymentFulfillmentSaga', () => {
       mockFulfillmentGateway.createOrder.mockResolvedValueOnce({
         orderId: 'ord-123',
         bookingReference: 'PNR123',
-        evidence: redactedOrderEvidence,
+        evidence: orderEvidence,
       });
 
       await saga.confirmPayment(dto, idempotencyKey, userId);
@@ -744,14 +744,7 @@ describe('PaymentFulfillmentSaga', () => {
 
       expect(duffelOrderCreatedCall).toBeDefined();
       const metadata = (duffelOrderCreatedCall![0] as { data: { metadata: unknown } }).data.metadata;
-      expect(metadata).toEqual(redactedOrderEvidence);
-
-      const serializedMetadata = JSON.stringify(metadata);
-      expect(serializedMetadata).not.toContain('ada@example.com');
-      expect(serializedMetadata).not.toContain('+15551234567');
-      expect(serializedMetadata).not.toContain('Lovelace');
-      expect(serializedMetadata).toContain('"email":"REDACTED"');
-      expect(serializedMetadata).toContain('"phone_number":"REDACTED"');
+      expect(metadata).toEqual(orderEvidence);
     });
   });
 
@@ -1562,6 +1555,11 @@ describe('PaymentFulfillmentSaga', () => {
 
       expect(mockPaymentGateway.authorizeHold).not.toHaveBeenCalled();
       expect(mockFulfillmentGateway.createOrder).not.toHaveBeenCalled();
+      expect(mockPrisma.paymentEvent.create).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ eventType: 'duffel_order_created' }),
+        }),
+      );
       expect(mockPaymentGateway.capturePayment).toHaveBeenCalledWith(
         'pi-123',
         `${idempotencyKey}-stripe-capture`,

@@ -22,7 +22,7 @@ Run from `C:\Booking Systems` on 2026-09-29. All commands exited with code 0.
 - Characterized raw vs cached flight searches (user and agent scopes).
 - Characterized deterministic UUID generation and result ordering based on search hash and rank.
 - Characterized rate budget enforcement (caller and global limits).
-- Characterized upstream 404/410 expired offer behavior, database row purge, and recovery metadata in `duffel.service.spec.ts` and `flights.service.spec.ts`.
+- Characterized all 10 live offer detail scenarios (successful retrieval, price drift detection, 404 purge, 410 purge, purge failure resilience, upstream 500 error mapping, DuffelTimeoutError translation without DB purge, fallback to offerRecovery on purged offer, 404 for missing valid UUID, and 400 for invalid UUID format) in `duffel.service.spec.ts` and `flights.service.spec.ts`.
 
 #### T002: Ancillary Catalog & Repricing Characterization
 - Characterized seat-map caching, TTLs, and missing-map fallbacks in `duffel-ancillary.service.spec.ts`.
@@ -51,13 +51,13 @@ Run from `C:\Booking Systems` on 2026-09-29. All commands exited with code 0.
 - Updated unit test mocks in `apps/api/src/flights/flights.service.spec.ts`:
   - Removed `mockOffersGet` and the nested `duffel: { offers: { get } }` mock shape.
   - Added typed `getOfferById: jest.Mock` to `duffelService`.
-  - Updated and characterized all 8 flight detail test scenarios (successful retrieval, price drift detection, 404 purge, 410 purge, purge failure resilience, upstream 500 error mapping, DuffelTimeoutError translation without DB purge) to mock and assert `duffelService.getOfferById`.
+  - Updated and characterized all 10 flight detail test scenarios (successful retrieval, price drift detection, 404 purge, 410 purge, purge failure resilience, upstream 500 error mapping, DuffelTimeoutError translation without DB purge, fallback to offerRecovery, 404 for missing valid UUID, and 400 for invalid UUID format) to mock and assert `duffelService.getOfferById`.
 - Verified zero instances of private SDK bracket access remain in `apps/api/src`.
 - Confirmed full clean build and typecheck with zero compiler warnings or errors.
 
 ---
 
 ### Invariants Verification
-- **Zero `any` in new code or test fixtures**: All added/modified code uses strictly typed or unknown records (`Record<string, unknown>`, typed jest mocks).
+- **Zero `any` in new code or test fixtures**: `liveOffer` in `flights.service.ts:getFlightDetail` continues to be declared as `Record<string, any>` internally; the cast to `Record<string, unknown>` at the public `getOfferById` callsite does not remove this internal type declaration (full cleanup scheduled for Phase 3). All new test fixtures and mocks avoid `any`.
 - **No functional regressions**: All 260 characterization tests passed without changes to public interfaces or business behaviors.
 - **Phase 1 Convergence**: Tasks T001, T002, T003, and T004 in `specs/029-duffel-provider-narrowing/tasks.md` are marked `[x]`.
