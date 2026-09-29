@@ -6,8 +6,10 @@ import {
 import {
   CreateOrderInput,
   FULFILLMENT_GATEWAY_PORT,
+  FulfillmentGatewayPort,
   PassengerEnrichmentInput,
   PersistedOrderEvidence,
+  PersistedOrderPassenger,
   PortInvocationControl,
 } from '@/payment-fulfillment/ports';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -21,6 +23,94 @@ describe('DuffelFulfillmentAdapter', () => {
   let adapter: DuffelFulfillmentAdapter;
   let mockDuffelService: jest.Mocked<Partial<DuffelService>>;
   let mockControl: PortInvocationControl;
+
+  const validCreateOrderInput: CreateOrderInput = {
+    offerId: 'off_test_123',
+    passengers: [
+      {
+        id: 'pas_test_1',
+        givenName: 'John',
+        familyName: 'Doe',
+        email: 'john.doe@example.com',
+        phoneNumber: '+1234567890',
+        bornOn: '1990-01-01',
+        type: 'adult',
+      },
+    ],
+    services: [{ serviceId: 'srv_bag_123', quantity: 2 }],
+    metadata: {
+      bookingIntentId: 'intent_123',
+      paymentId: 'pay_123',
+    },
+    idempotencyKey: 'idem_key_123',
+  };
+
+  const rawDuffelOrder = {
+    id: 'ord_duffel_123',
+    booking_reference: 'ABCDEF',
+    slices: [
+      {
+        duration: 'PT2H',
+        segments: [
+          {
+            id: 'seg_1',
+            departing_at: '2026-10-01T10:00:00Z',
+            arriving_at: '2026-10-01T12:00:00Z',
+          },
+        ],
+      },
+    ],
+    passengers: [
+      {
+        id: 'pas_test_1',
+        given_name: 'John',
+        family_name: 'Doe',
+        born_on: '1990-01-01',
+        email: 'john.doe@example.com',
+        phone_number: '+1234567890',
+        type: 'adult',
+      },
+    ],
+  };
+
+  const fallbackEvidence: PersistedOrderEvidence = {
+    id: 'ord_fallback_123',
+    bookingReference: 'REF123',
+    passengers: [
+      {
+        id: 'pas_1',
+        given_name: 'REDACTED',
+        family_name: 'REDACTED',
+        born_on: 'REDACTED',
+        email: 'REDACTED',
+        phone_number: 'REDACTED',
+        type: 'adult',
+      },
+    ],
+    slices: [
+      {
+        duration: 'PT2H',
+        segments: [
+          {
+            id: 'seg_1',
+            departing_at: '2026-10-01T10:00:00Z',
+            arriving_at: '2026-10-01T12:00:00Z',
+          },
+        ],
+      },
+    ],
+  };
+
+  const passengerEnrichment: PassengerEnrichmentInput[] = [
+    {
+      id: 'pas_1',
+      firstName: 'Jane',
+      lastName: 'Smith',
+      dateOfBirth: '1985-05-20',
+      email: 'jane@example.com',
+      phoneNumber: '+1987654321',
+    },
+  ];
 
   beforeEach(() => {
     mockDuffelService = {
@@ -95,55 +185,6 @@ describe('DuffelFulfillmentAdapter', () => {
   });
 
   describe('createOrder', () => {
-    const validCreateOrderInput: CreateOrderInput = {
-      offerId: 'off_test_123',
-      passengers: [
-        {
-          id: 'pas_test_1',
-          givenName: 'John',
-          familyName: 'Doe',
-          email: 'john.doe@example.com',
-          phoneNumber: '+1234567890',
-          bornOn: '1990-01-01',
-          type: 'adult',
-        },
-      ],
-      services: [{ serviceId: 'srv_bag_123', quantity: 2 }],
-      metadata: {
-        bookingIntentId: 'intent_123',
-        paymentId: 'pay_123',
-      },
-      idempotencyKey: 'idem_key_123',
-    };
-
-    const rawDuffelOrder = {
-      id: 'ord_duffel_123',
-      booking_reference: 'ABCDEF',
-      slices: [
-        {
-          duration: 'PT2H',
-          segments: [
-            {
-              id: 'seg_1',
-              departing_at: '2026-10-01T10:00:00Z',
-              arriving_at: '2026-10-01T12:00:00Z',
-            },
-          ],
-        },
-      ],
-      passengers: [
-        {
-          id: 'pas_test_1',
-          given_name: 'John',
-          family_name: 'Doe',
-          born_on: '1990-01-01',
-          email: 'john.doe@example.com',
-          phone_number: '+1234567890',
-          type: 'adult',
-        },
-      ],
-    };
-
     it('maps serviceId to id, passes metadata and idempotencyKey, calls beforeInvoke before SDK, and redacts PII', async () => {
       const callOrder: string[] = [];
       mockControl.beforeInvoke = jest.fn().mockImplementation(async () => {
@@ -219,6 +260,48 @@ describe('DuffelFulfillmentAdapter', () => {
       expect(mockDuffelService.createOrder).not.toHaveBeenCalled();
       expect(adapter.semaphore.activeCount).toBe(0);
     });
+
+    it('releases permit and propagates upstream error when duffelService.createOrder throws', async () => {
+      (mockDuffelService.createOrder as jest.Mock).mockRejectedValue(
+        new Error('Upstream Duffel error on createOrder'),
+      );
+
+      await expect(adapter.createOrder(validCreateOrderInput, mockControl)).rejects.toThrow(
+        'Upstream Duffel error on createOrder',
+      );
+
+      expect(mockControl.beforeInvoke).toHaveBeenCalled();
+      expect(adapter.semaphore.activeCount).toBe(0);
+    });
+
+    it('persists redacted evidence without leaking passenger passports, emails, or phone numbers', async () => {
+      const duffelOrderWithSensitivePii = {
+        ...rawDuffelOrder,
+        passengers: [
+          {
+            id: 'pas_test_1',
+            given_name: 'John',
+            family_name: 'Doe',
+            born_on: '1990-01-01',
+            email: 'john.doe@example.com',
+            phone_number: '+1234567890',
+            passport_number: 'US-PASS-999888',
+            identity_documents: [{ unique_identifier: 'US-PASS-999888' }],
+          },
+        ],
+      };
+
+      (mockDuffelService.createOrder as jest.Mock).mockResolvedValue(duffelOrderWithSensitivePii);
+
+      const outcome = await adapter.createOrder(validCreateOrderInput, mockControl);
+
+      const serializedEvidence = JSON.stringify(outcome.evidence);
+      expect(serializedEvidence).not.toContain('US-PASS-999888');
+      expect(serializedEvidence).not.toContain('john.doe@example.com');
+      expect(serializedEvidence).not.toContain('+1234567890');
+      expect(serializedEvidence).toContain('"email":"REDACTED"');
+      expect(serializedEvidence).toContain('"phone_number":"REDACTED"');
+    });
   });
 
   describe('cancelOrder', () => {
@@ -254,48 +337,22 @@ describe('DuffelFulfillmentAdapter', () => {
       expect(mockDuffelService.cancelOrder).not.toHaveBeenCalled();
       expect(adapter.semaphore.activeCount).toBe(0);
     });
+
+    it('releases permit and propagates upstream error when duffelService.cancelOrder throws', async () => {
+      (mockDuffelService.cancelOrder as jest.Mock).mockRejectedValue(
+        new Error('Upstream Duffel cancellation rejected'),
+      );
+
+      await expect(adapter.cancelOrder('ord_123', mockControl)).rejects.toThrow(
+        'Upstream Duffel cancellation rejected',
+      );
+
+      expect(mockControl.beforeInvoke).toHaveBeenCalled();
+      expect(adapter.semaphore.activeCount).toBe(0);
+    });
   });
 
   describe('retrieveOrderSnapshot', () => {
-    const fallbackEvidence: PersistedOrderEvidence = {
-      id: 'ord_fallback_123',
-      bookingReference: 'REF123',
-      passengers: [
-        {
-          id: 'pas_1',
-          given_name: 'REDACTED',
-          family_name: 'REDACTED',
-          born_on: 'REDACTED',
-          email: 'REDACTED',
-          phone_number: 'REDACTED',
-          type: 'adult',
-        },
-      ],
-      slices: [
-        {
-          duration: 'PT2H',
-          segments: [
-            {
-              id: 'seg_1',
-              departing_at: '2026-10-01T10:00:00Z',
-              arriving_at: '2026-10-01T12:00:00Z',
-            },
-          ],
-        },
-      ],
-    };
-
-    const passengerEnrichment: PassengerEnrichmentInput[] = [
-      {
-        id: 'pas_1',
-        firstName: 'Jane',
-        lastName: 'Smith',
-        dateOfBirth: '1985-05-20',
-        email: 'jane@example.com',
-        phoneNumber: '+1987654321',
-      },
-    ];
-
     const mockSnapshots = {
       flightSnapshot: {
         segments: [
@@ -389,6 +446,28 @@ describe('DuffelFulfillmentAdapter', () => {
 
       expect(mockDuffelService.retrieveCompleteOrder).not.toHaveBeenCalled();
       expect(mockDuffelService.mapDuffelOrderToSnapshots).not.toHaveBeenCalled();
+      expect(adapter.semaphore.activeCount).toBe(0);
+    });
+
+    it('releases permit and propagates error when both retrieveCompleteOrder and mapDuffelOrderToSnapshots fail', async () => {
+      (mockDuffelService.retrieveCompleteOrder as jest.Mock).mockRejectedValue(
+        new Error('Duffel API network failure'),
+      );
+      (mockDuffelService.mapDuffelOrderToSnapshots as jest.Mock).mockImplementation(() => {
+        throw new Error('Fallback mapping failed');
+      });
+
+      await expect(
+        adapter.retrieveOrderSnapshot(
+          'ord_123',
+          fallbackEvidence,
+          passengerEnrichment,
+          'contact@example.com',
+          mockControl,
+        ),
+      ).rejects.toThrow('Fallback mapping failed');
+
+      expect(mockControl.beforeInvoke).toHaveBeenCalled();
       expect(adapter.semaphore.activeCount).toBe(0);
     });
   });
@@ -576,6 +655,171 @@ describe('DuffelFulfillmentAdapter', () => {
       expect(enriched.passengers[1].family_name).toBe('Builder');
       expect(enriched.passengers[1].born_on).toBe('1988-08-08');
       expect(enriched.passengers[1].phone_number).toBe('+4445556666');
+    });
+
+    it('redactDuffelOrder strictly strips identity documents, passports, and non-allowlisted PII fields while redacting emails and phone numbers', () => {
+      const orderWithSensitivePii: Record<string, unknown> = {
+        id: 'ord_privacy_passport_123',
+        booking_reference: 'XYZ987',
+        passengers: [
+          {
+            id: 'pas_1',
+            given_name: 'John',
+            family_name: 'Doe',
+            born_on: '1990-01-01',
+            email: 'john@example.com',
+            phone_number: '+1234567890',
+            passport_number: 'AB1234567',
+            passport_expiry: '2030-01-01',
+            identity_documents: [
+              {
+                unique_identifier: 'AB1234567',
+                type: 'passport',
+                issuing_country_code: 'US',
+                expires_on: '2030-01-01',
+              },
+            ],
+            emergency_contact: {
+              name: 'Jane Doe',
+              phone_number: '+1987654321',
+            },
+            loyalty_programme_accounts: [
+              {
+                airline_iata_code: 'BA',
+                account_number: 'BA987654',
+              },
+            ],
+          },
+        ],
+        slices: [
+          {
+            duration: 'PT2H',
+            segments: [
+              {
+                id: 'seg_1',
+                departing_at: '2026-10-01T10:00:00Z',
+                arriving_at: '2026-10-01T12:00:00Z',
+                operating_carrier: { iata_code: 'BA', name: 'British Airways' },
+                marketing_carrier: { iata_code: 'BA', name: 'British Airways' },
+                marketing_carrier_flight_number: '123',
+                passengers: [
+                  {
+                    cabin_class: 'economy',
+                    seat_number: '12A',
+                    passenger_id: 'pas_1',
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+
+      const redacted = adapter.redactDuffelOrder(orderWithSensitivePii);
+
+      expect(redacted.id).toBe('ord_privacy_passport_123');
+      expect(redacted.bookingReference).toBe('XYZ987');
+      expect(redacted.booking_reference).toBe('XYZ987');
+
+      const passengers = redacted.passengers as readonly PersistedOrderPassenger[];
+      expect(passengers).toHaveLength(1);
+      const p1 = passengers[0];
+
+      // Assert PII is strictly redacted
+      expect(p1.id).toBe('pas_1');
+      expect(p1.email).toBe('REDACTED');
+      expect(p1.phone_number).toBe('REDACTED');
+      expect(p1.born_on).toBe('REDACTED');
+      expect(p1.given_name).toBe('REDACTED');
+      expect(p1.family_name).toBe('REDACTED');
+
+      // Assert non-allowlisted PII fields (passports, emergency contacts, loyalty) are completely absent
+      const passengerRecord = p1 as unknown as Record<string, unknown>;
+      expect(passengerRecord.passport_number).toBeUndefined();
+      expect(passengerRecord.passport_expiry).toBeUndefined();
+      expect(passengerRecord.identity_documents).toBeUndefined();
+      expect(passengerRecord.emergency_contact).toBeUndefined();
+      expect(passengerRecord.loyalty_programme_accounts).toBeUndefined();
+
+      // Assert segment passenger data only keeps cabin_class and strips seat/passenger PII
+      const segmentPassenger = redacted.slices?.[0]?.segments?.[0]?.passengers?.[0] as
+        | Record<string, unknown>
+        | undefined;
+      expect(segmentPassenger?.cabin_class).toBe('economy');
+      expect(segmentPassenger?.seat_number).toBeUndefined();
+      expect(segmentPassenger?.passenger_id).toBeUndefined();
+
+      // JSON serialization does not contain sensitive raw strings anywhere
+      const serialized = JSON.stringify(redacted);
+      expect(serialized).not.toContain('AB1234567');
+      expect(serialized).not.toContain('john@example.com');
+      expect(serialized).not.toContain('+1234567890');
+      expect(serialized).not.toContain('+1987654321');
+    });
+
+    it('redactDuffelOrder preserves null fields when optional PII values are explicitly null', () => {
+      const orderWithNullPii = {
+        id: 'ord_privacy_null_123',
+        booking_reference: 'XYZ987',
+        passengers: [
+          {
+            id: 'pas_null',
+            given_name: null,
+            family_name: null,
+            born_on: null,
+            email: null,
+            phone_number: null,
+          },
+        ],
+      };
+
+      const redacted = adapter.redactDuffelOrder(orderWithNullPii);
+      const p = redacted.passengers?.[0];
+      expect(p?.email).toBeNull();
+      expect(p?.phone_number).toBeNull();
+      expect(p?.given_name).toBeNull();
+      expect(p?.family_name).toBeNull();
+      expect(p?.born_on).toBeNull();
+    });
+  });
+
+  describe('FULFILLMENT_GATEWAY_PORT contract conformance', () => {
+    it('implements FulfillmentGatewayPort interface with createOrder, cancelOrder, and retrieveOrderSnapshot', () => {
+      const port: FulfillmentGatewayPort = adapter;
+      expect(typeof port.createOrder).toBe('function');
+      expect(typeof port.cancelOrder).toBe('function');
+      expect(typeof port.retrieveOrderSnapshot).toBe('function');
+    });
+
+    it('characterizes that cancellation quote generation is handled outside the fulfillment port', () => {
+      // The port is intentionally narrow (governs execution and retrieval).
+      // Cancellation quotes are generated by cancellation domain services rather than the fulfillment gateway port.
+      const portRecord = adapter as unknown as Record<string, unknown>;
+      expect(portRecord.createCancellationQuote).toBeUndefined();
+    });
+
+    it('requires PortInvocationControl with beforeInvoke for all port operations', async () => {
+      const rejectControl: PortInvocationControl = {
+        beforeInvoke: jest.fn().mockRejectedValue(new Error('Fencing token rejected')),
+      };
+
+      await expect(adapter.createOrder(validCreateOrderInput, rejectControl)).rejects.toThrow(
+        'Fencing token rejected',
+      );
+      await expect(adapter.cancelOrder('ord_123', rejectControl)).rejects.toThrow(
+        'Fencing token rejected',
+      );
+      await expect(
+        adapter.retrieveOrderSnapshot(
+          'ord_123',
+          fallbackEvidence,
+          passengerEnrichment,
+          'contact@example.com',
+          rejectControl,
+        ),
+      ).rejects.toThrow('Fencing token rejected');
+
+      expect(adapter.semaphore.activeCount).toBe(0);
     });
   });
 
