@@ -1,5 +1,14 @@
 # Architecture
 
+## Feature 029 — Narrow the Duffel Supplier Boundary (Phase 2 Slice 1 Complete)
+
+- [Feature 029 specification](../specs/029-duffel-provider-narrowing/spec.md), [plan](../specs/029-duffel-provider-narrowing/plan.md), [supplier boundary contracts](../specs/029-duffel-provider-narrowing/contracts/supplier-boundaries.md), and [tasks](../specs/029-duffel-provider-narrowing/tasks.md) define the isolation of Duffel integration into search, ancillary, and order capabilities over a single internal SDK/config/budget owner.
+- **Phase 2 Slice 1: Core Foundation & Shared Rate Budget (Tasks T005–T009 Complete)**:
+  - **`duffel-sdk.provider.ts`**: Single provider of the `@duffel/api` SDK singleton (`DUFFEL_SDK` injection token). Enforces startup presence and validation of `DUFFEL_ACCESS_TOKEN`, validates `DUFFEL_API_URL` protocol (`http:` or `https:`) and structure, and normalizes base path (defaulting to `https://api.duffel.com`).
+  - **`duffel-core.module.ts`**: Internal NestJS module importing `CacheModule` and exporting `DUFFEL_SDK` and `DuffelRateBudgetService`. Only supplier capability modules (`SupplierSearchModule`, `SupplierAncillaryModule`, `SupplierOrderModule`) may import it.
+  - **Atomic Check-and-Increment in `CacheService` (`cache.service.ts`)**: Evaluates primary and optional secondary counter limits in a single round-trip Redis Lua script. Atomically sets TTL on key creation, rejects both counters if either limit would be exceeded, and fails closed (`storeError: true`) on Redis connection loss or execution errors, with in-memory fallback.
+  - **`duffel-rate-budget.service.ts`**: Implements global daily rate budget enforcement under key `budget:duffel:daily:YYYY-MM-DD` (default 1,500 attempts) expiring at next UTC midnight (`00:00:00Z`). Supports optional caller sub-allocation constraints (`extraConstraint: { key, limit }`), returns typed results (`{ ok: true }`, `{ ok: false, error: 'EXHAUSTED' }`, `{ ok: false, error: 'UNAVAILABLE' }`), and enforces attempted-call semantics (zero refund/decrement methods).
+
 ## Feature 027 — Chat Turn Decomposition (Complete — Phases 1–7, Tasks T001–T027 Verified)
 
 - [Feature 027 specification](../specs/027-chat-turn-decomposition/spec.md), [plan](../specs/027-chat-turn-decomposition/plan.md), and [tasks](../specs/027-chat-turn-decomposition/tasks.md) decompose Python chat turn event translation, domain projections, memory coordination, admission, and lifecycle while preserving SSE and security contracts.

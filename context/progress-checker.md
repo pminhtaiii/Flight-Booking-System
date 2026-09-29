@@ -1,5 +1,14 @@
 # Progress Tracker
 
+### Feature 029 — Narrow the Duffel Supplier Boundary: Phase 2 Slice 1 Core Foundation & Shared Rate Budget Complete (Tasks T005–T009 Verified) (2026-09-29)
+
+- **T005 Core SDK Provider & Module Unit Tests**: Created `apps/api/src/supplier/core/duffel-core.module.spec.ts` locking singleton SDK instantiation (`DUFFEL_SDK`), startup token validation (rejection of missing, empty, or whitespace-only tokens), mock URL override (`DUFFEL_API_URL` basePath normalization), and malformed URL / invalid protocol fast-fail.
+- **T006 Rate Budget & Atomic Cache Operations Unit Tests**: Extended `apps/api/src/cache/cache.service.spec.ts` with unit tests for dual-counter atomic check and increment, fail-closed store error handling, and in-memory fallback. Created `apps/api/src/supplier/core/duffel-rate-budget.service.spec.ts` covering daily limit (1,500 default), secondary constraint propagation, UTC midnight TTL expiry, typed `EXHAUSTED` and `UNAVAILABLE` errors, concurrency safety, and attempted-call semantics.
+- **T007 CacheService Atomic `checkAndIncrement`**: Implemented atomic dual-counter evaluation in `apps/api/src/cache/cache.service.ts` using a Redis Lua script (`eval`) to atomically verify primary and secondary limits, increment and set TTL on new keys, and fail closed (`storeError: true`) on Redis errors, with full in-memory fallback.
+- **T008 Duffel SDK Provider & Core Module**: Implemented `apps/api/src/supplier/core/duffel-sdk.provider.ts` and `apps/api/src/supplier/core/duffel-core.module.ts` exporting `DUFFEL_SDK` singleton factory provider and `DuffelRateBudgetService`.
+- **T009 DuffelRateBudgetService Implementation**: Implemented `apps/api/src/supplier/core/duffel-rate-budget.service.ts` enforcing the daily budget under key `budget:duffel:daily:YYYY-MM-DD` with UTC midnight reset calculation, caller sub-allocation pass-through, and zero refund/decrement semantics.
+- **Verification Gates**: All 51 core/budget/cache tests passed; regression baseline specs (57 tests) passed cleanly; TypeScript compilation (`tsc --noEmit`) and ESLint reported 0 errors; marked Tasks T005–T009 complete in `specs/029-duffel-provider-narrowing/tasks.md`.
+
 ### Feature 029 — Narrow the Duffel Supplier Boundary: Phase 1 Setup & Behavior Baseline Complete (Tasks T001–T004 Verified) (2026-09-29)
 
 - **T001 Search & Offer Detail Baseline Characterization**: Characterized raw vs cached flight searches (user and agent scopes), deterministic UUID generation and result ordering based on search hash and rank, rate budget enforcement, and upstream 404/410 expired offer behavior, database row purge, and recovery metadata in `apps/api/src/duffel/duffel.service.spec.ts` and `apps/api/src/flights/flights.service.spec.ts`.

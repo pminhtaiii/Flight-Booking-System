@@ -433,5 +433,191 @@ describe('CacheService', () => {
       expect(fallbackReleaseAgain).toBe(false);
     });
   });
+
+  describe('checkAndIncrement', () => {
+    describe('in-memory fallback store', () => {
+      it('primary limit: increments count if below limit, sets TTL on first key (count === 1), returns { allowed: true, current: 1 }', async () => {
+        (service as unknown as { redisClient: unknown }).redisClient = null;
+
+        const res1 = await service.checkAndIncrement({
+          key: 'budget:test:primary',
+          limit: 3,
+          ttlSeconds: 60,
+        });
+
+        expect(res1).toEqual({ allowed: true, current: 1 });
+        const ttl = await service.getTtl('budget:test:primary');
+        expect(ttl).toBeGreaterThan(0);
+        expect(ttl).toBeLessThanOrEqual(60);
+
+        const res2 = await service.checkAndIncrement({
+          key: 'budget:test:primary',
+          limit: 3,
+          ttlSeconds: 60,
+        });
+        expect(res2).toEqual({ allowed: true, current: 2 });
+      });
+
+      it('primary limit exceeded: when count >= limit, returns { allowed: false, current: limit } without incrementing', async () => {
+        (service as unknown as { redisClient: unknown }).redisClient = null;
+
+        await service.checkAndIncrement({
+          key: 'budget:test:limit',
+          limit: 2,
+          ttlSeconds: 60,
+        });
+        await service.checkAndIncrement({
+          key: 'budget:test:limit',
+          limit: 2,
+          ttlSeconds: 60,
+        });
+
+        // Counter is at 2 (the limit). Third attempt must be rejected without incrementing.
+        const rejected = await service.checkAndIncrement({
+          key: 'budget:test:limit',
+          limit: 2,
+          ttlSeconds: 60,
+        });
+
+        expect(rejected).toEqual({ allowed: false, current: 2 });
+        const val = await service.get('budget:test:limit');
+        expect(val).toBe('2');
+      });
+
+      it('primary + secondary: increments both when both are under limit', async () => {
+        (service as unknown as { redisClient: unknown }).redisClient = null;
+
+        const res = await service.checkAndIncrement(
+          { key: 'budget:p_both', limit: 1500, ttlSeconds: 86400 },
+          { key: 'budget:s_both', limit: 1000, ttlSeconds: 86400 },
+        );
+
+        expect(res).toEqual({ allowed: true, current: 1 });
+        expect(await service.get('budget:p_both')).toBe('1');
+        expect(await service.get('budget:s_both')).toBe('1');
+      });
+
+      it('secondary limit exceeded: if secondary count >= limit, neither counter is incremented, returns { allowed: false, current: primaryCount }', async () => {
+        (service as unknown as { redisClient: unknown }).redisClient = null;
+
+        await service.checkAndIncrement(
+          { key: 'budget:p_sec', limit: 5, ttlSeconds: 60 },
+          { key: 'budget:s_sec', limit: 2, ttlSeconds: 60 },
+        );
+        await service.checkAndIncrement(
+          { key: 'budget:p_sec', limit: 5, ttlSeconds: 60 },
+          { key: 'budget:s_sec', limit: 2, ttlSeconds: 60 },
+        );
+
+        // At this point: primary = 2, secondary = 2 (which is secondary limit).
+        // Next attempt must fail because secondary limit is reached.
+        const rejected = await service.checkAndIncrement(
+          { key: 'budget:p_sec', limit: 5, ttlSeconds: 60 },
+          { key: 'budget:s_sec', limit: 2, ttlSeconds: 60 },
+        );
+
+        expect(rejected).toEqual({ allowed: false, current: 2 });
+        // Neither counter incremented
+        expect(await service.get('budget:p_sec')).toBe('2');
+        expect(await service.get('budget:s_sec')).toBe('2');
+      });
+
+      it('in-memory fallback works when Redis is down/null', async () => {
+        (service as unknown as { redisClient: unknown }).redisClient = null;
+
+        const res = await service.checkAndIncrement({
+          key: 'budget:in_memory:solo',
+          limit: 10,
+          ttlSeconds: 300,
+        });
+
+        expect(res).toEqual({ allowed: true, current: 1 });
+        expect(await service.get('budget:in_memory:solo')).toBe('1');
+      });
+    });
+
+    describe('Redis delegation and fail-closed behavior', () => {
+      it('store unavailable fail-closed: when Redis throws an error or rejects, returns { allowed: false, current: 0, storeError: true }', async () => {
+        const brokenClient = {
+          eval: jest.fn().mockRejectedValue(new Error('Redis connection failure')),
+          quit: jest.fn().mockResolvedValue('OK'),
+        };
+        (service as unknown as { redisClient: unknown }).redisClient = brokenClient;
+
+        const result = await service.checkAndIncrement({
+          key: 'budget:broken:store',
+          limit: 10,
+          ttlSeconds: 60,
+        });
+
+        expect(result).toEqual({ allowed: false, current: 0, storeError: true });
+      });
+
+      it('primary limit via Redis: increments count if below limit, returns { allowed: true, current: 1 }', async () => {
+        const mockEval = jest.fn().mockResolvedValue([1, 1]);
+        (service as unknown as { redisClient: unknown }).redisClient = {
+          eval: mockEval,
+          quit: jest.fn().mockResolvedValue('OK'),
+        };
+
+        const result = await service.checkAndIncrement({
+          key: 'budget:redis:primary',
+          limit: 1500,
+          ttlSeconds: 86400,
+        });
+
+        expect(result).toEqual({ allowed: true, current: 1 });
+        expect(mockEval).toHaveBeenCalledWith(
+          expect.stringContaining('redis.call'),
+          1,
+          'budget:redis:primary',
+          1500,
+          86400,
+        );
+      });
+
+      it('primary limit exceeded via Redis: returns { allowed: false, current: limit } without incrementing', async () => {
+        const mockEval = jest.fn().mockResolvedValue([0, 1500]);
+        (service as unknown as { redisClient: unknown }).redisClient = {
+          eval: mockEval,
+          quit: jest.fn().mockResolvedValue('OK'),
+        };
+
+        const result = await service.checkAndIncrement({
+          key: 'budget:redis:exhausted',
+          limit: 1500,
+          ttlSeconds: 86400,
+        });
+
+        expect(result).toEqual({ allowed: false, current: 1500 });
+      });
+
+      it('primary + secondary via Redis: delegates atomic check with two keys', async () => {
+        const mockEval = jest.fn().mockResolvedValue([1, 1]);
+        (service as unknown as { redisClient: unknown }).redisClient = {
+          eval: mockEval,
+          quit: jest.fn().mockResolvedValue('OK'),
+        };
+
+        const result = await service.checkAndIncrement(
+          { key: 'budget:redis:p', limit: 1500, ttlSeconds: 86400 },
+          { key: 'budget:redis:s', limit: 1000, ttlSeconds: 86400 },
+        );
+
+        expect(result).toEqual({ allowed: true, current: 1 });
+        expect(mockEval).toHaveBeenCalledWith(
+          expect.stringContaining('redis.call'),
+          2,
+          'budget:redis:p',
+          'budget:redis:s',
+          1500,
+          86400,
+          1000,
+          86400,
+        );
+      });
+    });
+  });
 });
+
 

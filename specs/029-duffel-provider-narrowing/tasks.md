@@ -19,11 +19,11 @@
 
 **Purpose**: Establish one SDK/config owner and atomic daily attempt accounting before capability extraction.
 
-- [ ] T005 [P] Add tests for one SDK instance, token/basePath validation, mock URL override, and malformed URL fast fail in `apps/api/src/supplier/core/duffel-core.module.spec.ts`.
-- [ ] T006 [P] Add concurrency, UTC expiry, cache-hit, attempted-call, and store-unavailable tests in `apps/api/src/supplier/core/duffel-rate-budget.service.spec.ts` and `apps/api/src/cache/cache.service.spec.ts`.
-- [ ] T007 Implement an atomic Redis check-and-increment operation with total plus optional extra counter/limit and fail-closed budget storage in `apps/api/src/cache/cache.service.ts`.
-- [ ] T008 Extract SDK token/basePath factory and singleton provider into `apps/api/src/supplier/core/duffel-sdk.provider.ts` and `apps/api/src/supplier/core/duffel-core.module.ts`.
-- [ ] T009 Implement total daily budget reservation and typed exhausted/unavailable errors with retry time in `apps/api/src/supplier/core/duffel-rate-budget.service.ts`; keep caller labels/limits in search policy, outside core.
+- [x] T005 [P] Add tests for one SDK instance, token/basePath validation, mock URL override, and malformed URL fast fail in `apps/api/src/supplier/core/duffel-core.module.spec.ts`.
+- [x] T006 [P] Add concurrency, UTC expiry, cache-hit, attempted-call, and store-unavailable tests in `apps/api/src/supplier/core/duffel-rate-budget.service.spec.ts` and `apps/api/src/cache/cache.service.spec.ts`.
+- [x] T007 Implement an atomic Redis check-and-increment operation with total plus optional extra counter/limit and fail-closed budget storage in `apps/api/src/cache/cache.service.ts`.
+- [x] T008 Extract SDK token/basePath factory and singleton provider into `apps/api/src/supplier/core/duffel-sdk.provider.ts` and `apps/api/src/supplier/core/duffel-core.module.ts`.
+- [x] T009 Implement total daily budget reservation and typed exhausted/unavailable errors with retry time in `apps/api/src/supplier/core/duffel-rate-budget.service.ts`; keep caller labels/limits in search policy, outside core.
 - [ ] T010 Route each current `DuffelService` SDK/manual HTTP attempt through core reservation, including parallel and retry attempts, in `apps/api/src/duffel/duffel.service.ts`; retain existing mock-server and error behavior.
 - [ ] T011 Remove monthly search charging in `apps/api/src/duffel/duffel.service.ts` and monthly reconciliation precharge/decrement in `apps/api/src/disruption/sync/reconciliation.service.ts`; catch typed budget denial there, preserve `budgetBlocked` and defer without charging skipped syncs; update `apps/api/src/disruption/sync/reconciliation.service.spec.ts`.
 - [ ] T012 Wire `DuffelCoreModule` through the temporary `apps/api/src/duffel/duffel.module.ts`; run core and API typecheck checkpoint from `specs/029-duffel-provider-narrowing/quickstart.md`.
