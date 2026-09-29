@@ -39,6 +39,9 @@
     "seed": "npx tsx apps/api/prisma/seed.ts"
   },
   "pnpm": {
+    "overrides": {
+      "fast-uri": "^3.1.8"
+    },
     "auditConfig": {
       "ignoreGhas": [
         "GHSA-23c5-xmqv-rm74",

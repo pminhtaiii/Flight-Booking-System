@@ -8,10 +8,10 @@
 
 **Purpose**: Pin current behavior and remove private SDK access before extraction.
 
-- [ ] T001 [P] Characterize raw/cached user and agent search, deterministic offer IDs/order, budget, and 404/410 detail behavior in `apps/api/src/duffel/duffel.service.spec.ts` and `apps/api/src/flights/flights.service.spec.ts`.
-- [ ] T002 [P] Characterize seat-map cache/missing-map and priced-offer validation in `apps/api/src/duffel/duffel-ancillary.service.spec.ts` and `apps/api/src/payment/ancillary-payment-validation.service.spec.ts`.
-- [ ] T003 [P] Characterize create/cancel/retrieve, fencing, redacted evidence, and compensation/replay in `apps/api/src/duffel/duffel-fulfillment.adapter.spec.ts` and `apps/api/src/payment-fulfillment/payment-fulfillment.saga.spec.ts`.
-- [ ] T004 Replace the private `this.duffelService['duffel']` lookup with `getOfferById()` in `apps/api/src/flights/flights.service.ts`; update `apps/api/src/flights/flights.service.spec.ts` and run the baseline commands in `specs/029-duffel-provider-narrowing/quickstart.md`.
+- [x] T001 [P] Characterize raw/cached user and agent search, deterministic offer IDs/order, budget, and 404/410 detail behavior in `apps/api/src/duffel/duffel.service.spec.ts` and `apps/api/src/flights/flights.service.spec.ts`.
+- [x] T002 [P] Characterize seat-map cache/missing-map and priced-offer validation in `apps/api/src/duffel/duffel-ancillary.service.spec.ts` and `apps/api/src/payment/ancillary-payment-validation.service.spec.ts`.
+- [x] T003 [P] Characterize create/cancel/retrieve, fencing, redacted evidence, and compensation/replay in `apps/api/src/duffel/duffel-fulfillment.adapter.spec.ts` and `apps/api/src/payment-fulfillment/payment-fulfillment.saga.spec.ts`.
+- [x] T004 Replace the private `this.duffelService['duffel']` lookup with `getOfferById()` in `apps/api/src/flights/flights.service.ts`; update `apps/api/src/flights/flights.service.spec.ts` and run the baseline commands in `specs/029-duffel-provider-narrowing/quickstart.md`.
 
 ---
 
