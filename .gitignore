@@ -15,7 +15,7 @@ coverage/
 __pycache__/
 .pytest_cache/
 .tiktoken_cache/
-.t093-uv-cache/
+.uv-cache/
 *.pyc
 *.pyo
 *.pyd
@@ -40,9 +40,6 @@ artifacts/
 
 # Smoke test diagnostics and process logs
 .smoke-diagnostics/
-
-# Graphify
-graphify-out/
 
 # Package manager local store
 .pnpm-store/
