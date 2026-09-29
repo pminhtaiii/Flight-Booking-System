@@ -2,6 +2,7 @@ process.env.ENCRYPTION_KEY = 'a'.repeat(64);
 process.env.STRIPE_SECRET_KEY = 'sk_test_fake';
 process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test_fake';
 
+import { HttpException, HttpStatus } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppModule } from '@/app.module';
 
@@ -1062,6 +1063,36 @@ describe('SupplierSyncService unit/integration tests', () => {
 
       const bookingIneligible = await prisma.booking.findUnique({ where: { id: bookingId } });
       expect(bookingIneligible?.version).toBe(1);
+    });
+
+    it('should release claim lock and rethrow without backoff on budget blocked error', async () => {
+      const releaseClaimSpy = jest.spyOn(syncClaimService, 'releaseClaim');
+      const budgetBlockedError = new HttpException(
+        {
+          message: 'Daily Duffel API rate limit exceeded',
+          code: 'RATE_LIMIT_EXCEEDED',
+          retryAfterSeconds: 60,
+          resetAt: '2026-09-30T00:00:00.000Z',
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+
+      mockDuffelService.retrieveCompleteOrder.mockRejectedValue(budgetBlockedError);
+
+      await expect(
+        supplierSyncService.syncBooking(bookingId, 'RECONCILIATION'),
+      ).rejects.toThrow(budgetBlockedError);
+
+      expect(releaseClaimSpy).toHaveBeenCalledWith(bookingId, expect.any(String));
+      expect(mockPublisher.publish).not.toHaveBeenCalled();
+
+      const bookingAfterErr = await prisma.booking.findUnique({ where: { id: bookingId } });
+      expect(bookingAfterErr?.version).toBe(1);
+      expect(bookingAfterErr?.nextDuffelSyncAt).toBeNull();
+      expect(bookingAfterErr?.syncLockedAt).toBeNull();
+      expect(bookingAfterErr?.syncLockToken).toBeNull();
+
+      releaseClaimSpy.mockRestore();
     });
 
     it('should discard events and not publish if transaction rolls back', async () => {

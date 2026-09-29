@@ -284,6 +284,26 @@ describe('DuffelService cancellation recovery adapter', () => {
         response: {
           code: 'RATE_LIMIT_EXCEEDED',
           message: 'Daily Duffel API rate limit exceeded',
+          retryAfterSeconds: 60,
+          resetAt: '2026-09-30T00:00:00.000Z',
+        },
+      });
+      expect(mockGetOrder).not.toHaveBeenCalled();
+    });
+
+    it('rejects retrieveCompleteOrder with 429 BUDGET_UNAVAILABLE when budget store is unavailable', async () => {
+      mockRateBudget.reserveAttempt.mockResolvedValueOnce({
+        ok: false,
+        error: 'UNAVAILABLE',
+        retryAfterSeconds: 30,
+      });
+
+      await expect(service.retrieveCompleteOrder('ord_complete_123')).rejects.toMatchObject({
+        status: HttpStatus.TOO_MANY_REQUESTS,
+        response: {
+          code: 'BUDGET_UNAVAILABLE',
+          message: 'Duffel rate budget store temporarily unavailable',
+          retryAfterSeconds: 30,
         },
       });
       expect(mockGetOrder).not.toHaveBeenCalled();
@@ -976,6 +996,31 @@ describe('DuffelService cancellation recovery adapter', () => {
           message: 'Daily Duffel API rate limit exceeded',
         },
       });
+      expect(mockSeatMapsGet).not.toHaveBeenCalled();
+      expect(mockOffersGet).not.toHaveBeenCalled();
+    });
+
+    it('aborts getSeatMapsAndServices before making any Duffel SDK calls when second reservation is exhausted', async () => {
+      testRateBudget.reserveAttempt
+        .mockResolvedValueOnce({ ok: true })
+        .mockResolvedValueOnce({
+          ok: false,
+          error: 'EXHAUSTED',
+          retryAfterSeconds: 60,
+          resetAt: '2026-09-30T00:00:00.000Z',
+        });
+
+      await expect(
+        testService.getSeatMapsAndServices('off_seatmap_test', true),
+      ).rejects.toMatchObject({
+        status: HttpStatus.TOO_MANY_REQUESTS,
+        response: {
+          code: 'RATE_LIMIT_EXCEEDED',
+          message: 'Daily Duffel API rate limit exceeded',
+        },
+      });
+      expect(mockSeatMapsGet).not.toHaveBeenCalled();
+      expect(mockOffersGet).not.toHaveBeenCalled();
     });
 
     it('meters 1 reservation in repriceOffer before offers.getPriced', async () => {

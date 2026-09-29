@@ -176,6 +176,7 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/flight_booking?schema=public
       REDIS_URL: redis://127.0.0.1:6379/0
       NODE_ENV: test
+      DUFFEL_ACCESS_TOKEN: duffel_test_ci_not_a_secret
       STRIPE_SECRET_KEY: sk_test_ci_not_a_secret
       STRIPE_WEBHOOK_SECRET: whsec_ci_not_a_secret
       JWT_SECRET: ci-not-a-secret-jwt
@@ -241,6 +242,7 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/flight_booking?schema=public
       REDIS_URL: redis://127.0.0.1:6379/0
       NODE_ENV: test
+      DUFFEL_ACCESS_TOKEN: duffel_test_ci_not_a_secret
       STRIPE_SECRET_KEY: sk_test_ci_not_a_secret
       STRIPE_WEBHOOK_SECRET: whsec_ci_not_a_secret
       JWT_SECRET: ci-not-a-secret-jwt

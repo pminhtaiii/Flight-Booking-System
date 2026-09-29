@@ -146,6 +146,10 @@ export class ReconciliationService {
         );
       } catch (error: unknown) {
         if (this.isBudgetBlockedError(error)) {
+          await this.prisma.booking.updateMany({
+            where: { id: booking.id },
+            data: { syncLockedAt: null, syncLockToken: null },
+          });
           this.logger.warn(
             JSON.stringify({
               message: 'Duffel budget capacity reached. Deferring reconciliation.',
@@ -208,7 +212,13 @@ export class ReconciliationService {
   }
 
   private isBudgetBlockedError(error: unknown): boolean {
-    const rateLimitCodes = new Set(['RATE_LIMIT_EXCEEDED', 'UPSTREAM_RATE_LIMITED', 'BUDGET_EXHAUSTED']);
+    const rateLimitCodes = new Set([
+      'RATE_LIMIT_EXCEEDED',
+      'UPSTREAM_RATE_LIMITED',
+      'BUDGET_EXHAUSTED',
+      'BUDGET_UNAVAILABLE',
+      'UPSTREAM_UNAVAILABLE',
+    ]);
 
     if (error instanceof HttpException) {
       if (error.getStatus() === HttpStatus.TOO_MANY_REQUESTS) {

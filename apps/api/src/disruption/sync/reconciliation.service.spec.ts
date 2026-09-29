@@ -165,7 +165,10 @@ describe('ReconciliationService & Booking Completion', () => {
       expect(mockCacheService.incr).not.toHaveBeenCalled();
       expect(mockCacheService.decr).not.toHaveBeenCalled();
       expect(mockCacheService.set).not.toHaveBeenCalled();
-      expect(mockPrisma.booking.updateMany).not.toHaveBeenCalled();
+      expect(mockPrisma.booking.updateMany).toHaveBeenCalledWith({
+        where: { id: 'b-1' },
+        data: { syncLockedAt: null, syncLockToken: null },
+      });
       expect(result.budgetBlocked).toBe(1);
       expect(result.failed).toBe(0);
       expect(result.processed).toBe(0);
@@ -186,7 +189,57 @@ describe('ReconciliationService & Booking Completion', () => {
       expect(mockCacheService.incr).not.toHaveBeenCalled();
       expect(mockCacheService.decr).not.toHaveBeenCalled();
       expect(mockCacheService.set).not.toHaveBeenCalled();
-      expect(mockPrisma.booking.updateMany).not.toHaveBeenCalled();
+      expect(mockPrisma.booking.updateMany).toHaveBeenCalledWith({
+        where: { id: 'b-1' },
+        data: { syncLockedAt: null, syncLockToken: null },
+      });
+      expect(result.budgetBlocked).toBe(1);
+      expect(result.failed).toBe(0);
+      expect(result.processed).toBe(0);
+    });
+
+    it('should defer processing and increment budgetBlocked when syncBooking rejects with BUDGET_UNAVAILABLE', async () => {
+      mockPrisma.booking.findMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ id: 'b-1', status: 'CONFIRMED', duffelOrderId: 'ord-1' }]);
+      mockSupplierSyncService.syncBooking.mockRejectedValue(
+        new HttpException(
+          {
+            message: 'Duffel rate budget store temporarily unavailable',
+            code: 'BUDGET_UNAVAILABLE',
+            retryAfterSeconds: 30,
+          },
+          HttpStatus.TOO_MANY_REQUESTS,
+        ),
+      );
+
+      const result = await reconciliationService.reconcile();
+
+      expect(mockSupplierSyncService.syncBooking).toHaveBeenCalledWith('b-1', 'RECONCILIATION');
+      expect(mockPrisma.booking.updateMany).toHaveBeenCalledWith({
+        where: { id: 'b-1' },
+        data: { syncLockedAt: null, syncLockToken: null },
+      });
+      expect(result.budgetBlocked).toBe(1);
+      expect(result.failed).toBe(0);
+      expect(result.processed).toBe(0);
+    });
+
+    it('should defer processing and increment budgetBlocked when syncBooking rejects with UPSTREAM_UNAVAILABLE', async () => {
+      mockPrisma.booking.findMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ id: 'b-1', status: 'CONFIRMED', duffelOrderId: 'ord-1' }]);
+      mockSupplierSyncService.syncBooking.mockRejectedValue({
+        code: 'UPSTREAM_UNAVAILABLE',
+      });
+
+      const result = await reconciliationService.reconcile();
+
+      expect(mockSupplierSyncService.syncBooking).toHaveBeenCalledWith('b-1', 'RECONCILIATION');
+      expect(mockPrisma.booking.updateMany).toHaveBeenCalledWith({
+        where: { id: 'b-1' },
+        data: { syncLockedAt: null, syncLockToken: null },
+      });
       expect(result.budgetBlocked).toBe(1);
       expect(result.failed).toBe(0);
       expect(result.processed).toBe(0);

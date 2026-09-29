@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { SyncClaimService } from './sync-claim.service';
@@ -554,6 +554,13 @@ export class SupplierSyncService {
         `Max transaction retry attempts reached for booking ${bookingId} due to version collisions.`,
       );
     } catch (error) {
+      if (this.isBudgetBlockedError(error)) {
+        if (token) {
+          await this.syncClaimService.releaseClaim(bookingId, token);
+        }
+        throw error;
+      }
+
       // Conditionally release claim lock on failure, set backoff, retain stale coverage
       const errMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(
@@ -581,5 +588,40 @@ export class SupplierSyncService {
       }
       throw error;
     }
+  }
+
+  isBudgetBlockedError(error: unknown): boolean {
+    const rateLimitCodes = new Set([
+      'RATE_LIMIT_EXCEEDED',
+      'UPSTREAM_RATE_LIMITED',
+      'BUDGET_EXHAUSTED',
+      'BUDGET_UNAVAILABLE',
+      'UPSTREAM_UNAVAILABLE',
+    ]);
+
+    if (error instanceof HttpException) {
+      if (error.getStatus() === HttpStatus.TOO_MANY_REQUESTS) {
+        return true;
+      }
+      const response = error.getResponse();
+      if (typeof response === 'object' && response !== null && 'code' in response) {
+        return rateLimitCodes.has(String((response as Record<string, unknown>).code));
+      }
+    }
+
+    if (typeof error === 'object' && error !== null) {
+      const err = error as Record<string, unknown>;
+      if (err.status === 429 || err.statusCode === 429) {
+        return true;
+      }
+      if (typeof err.code === 'string' && rateLimitCodes.has(err.code)) {
+        return true;
+      }
+      if (typeof err.response === 'object' && err.response !== null && 'code' in err.response) {
+        return rateLimitCodes.has(String((err.response as Record<string, unknown>).code));
+      }
+    }
+
+    return false;
   }
 }

@@ -126,10 +126,22 @@ export class DuffelService {
   }): Promise<void> {
     const reservation = await this.duffelRateBudgetService.reserveAttempt(extraConstraint);
     if (!reservation.ok) {
+      if (reservation.error === 'UNAVAILABLE') {
+        throw new HttpException(
+          {
+            message: 'Duffel rate budget store temporarily unavailable',
+            code: 'BUDGET_UNAVAILABLE',
+            retryAfterSeconds: reservation.retryAfterSeconds,
+          },
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
       throw new HttpException(
         {
           message: 'Daily Duffel API rate limit exceeded',
           code: 'RATE_LIMIT_EXCEEDED',
+          retryAfterSeconds: reservation.retryAfterSeconds,
+          resetAt: reservation.resetAt,
         },
         HttpStatus.TOO_MANY_REQUESTS,
       );
@@ -573,14 +585,11 @@ export class DuffelService {
       });
 
       try {
-        const seatMapsPromise = (async () => {
-          await this.reserveBudgetAttempt();
-          return this.duffel.seatMaps.get({ offer_id: offerId });
-        })();
-        const offerPromise = (async () => {
-          await this.reserveBudgetAttempt();
-          return this.duffel.offers.get(offerId, { return_available_services: true });
-        })();
+        await this.reserveBudgetAttempt();
+        await this.reserveBudgetAttempt();
+
+        const seatMapsPromise = this.duffel.seatMaps.get({ offer_id: offerId });
+        const offerPromise = this.duffel.offers.get(offerId, { return_available_services: true });
 
         const [seatMapsRes, offerRes] = await Promise.race([
           Promise.all([seatMapsPromise, offerPromise]),
