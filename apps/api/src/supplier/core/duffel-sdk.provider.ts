@@ -3,6 +3,14 @@ import { Duffel } from '@duffel/api';
 
 export const DUFFEL_SDK = Symbol('DUFFEL_SDK');
 
+/**
+ * Creates a Duffel SDK client from DUFFEL_ACCESS_TOKEN and optional DUFFEL_API_URL.
+ * Uses the default Duffel endpoint when the URL is unset or blank; overrides
+ * retain the origin and path with trailing slashes removed.
+ *
+ * @returns A new client configured with the trimmed access token and base URL.
+ * @throws If the token is missing or blank, or the URL is invalid or not HTTP(S).
+ */
 export function createDuffelSdk(): Duffel {
   const token = process.env.DUFFEL_ACCESS_TOKEN;
   if (!token || token.trim() === '') {
