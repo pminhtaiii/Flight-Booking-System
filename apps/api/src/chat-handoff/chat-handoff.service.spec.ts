@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { ServiceUnavailableException, GoneException, NotFoundException } from '@nestjs/common';
+import { ServiceUnavailableException, GoneException } from '@nestjs/common';
 import {
   ChatHandoffService,
   ResolvedChatHandoff,

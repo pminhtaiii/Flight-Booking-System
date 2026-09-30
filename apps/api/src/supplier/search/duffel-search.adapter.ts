@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { FlightSearchCriteria } from './flight-search.port';
 
 @Injectable()
 export class DuffelSearchAdapter {

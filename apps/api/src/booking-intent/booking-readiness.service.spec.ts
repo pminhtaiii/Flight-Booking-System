@@ -1405,7 +1405,11 @@ describe('BookingReadinessService raw-reader replacement characterization (T015)
 
       // Characterize normalized facts extraction
       const facts = extractFactsFromNormalizedOffer(normalizedOffer);
+      const rawNormalized = service['normalizeStoredOffer'](rawOffer);
 
+      expect(facts.segments).toEqual(rawNormalized.segments);
+      expect(facts.airportCodes).toEqual(rawNormalized.airportCodes);
+      expect(facts.tripCompletionDate).toBe(rawNormalized.tripCompletionDate);
       expect(facts.segments).toEqual([
         {
           originCountryCode: 'SGN',
