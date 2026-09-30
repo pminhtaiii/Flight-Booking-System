@@ -10,6 +10,7 @@ import {
 } from './flight-search-orchestrator.service';
 import { FlightOffer, FlightSearchResult } from '@/supplier/search/flight-search.port';
 import { generateDeterministicUUID } from './flight-offer-normalizer';
+import * as rawOfferNormalizer from './flight-offer-normalizer';
 
 describe('FlightSearchOrchestratorService', () => {
   let service: FlightSearchOrchestratorService;
@@ -1215,9 +1216,15 @@ describe('FlightSearchOrchestratorService', () => {
       };
     };
 
-    it('asserts FlightSearchResult envelope compatibility with orchestrator cache and searchHash metadata', async () => {
+    it('consumes normalized FlightSearchResult offers and prices without raw-offer normalization', async () => {
       const rawOffer = createMockDuffelOffer('off_envelope_test');
-      const normalizedOffer = createMockNormalizedFlightOffer('off_envelope_test', rawOffer);
+      const fixture = createMockNormalizedFlightOffer('off_envelope_test', rawOffer);
+      const normalizedOffer: FlightOffer = {
+        ...fixture,
+        totalAmount: '275.00',
+        price: 275,
+        matchInput: { ...fixture.matchInput, price: 275 },
+      };
 
       const searchResult: FlightSearchResult = {
         offers: [normalizedOffer],
@@ -1225,20 +1232,36 @@ describe('FlightSearchOrchestratorService', () => {
         cached: true,
       };
 
-      const params: OrchestratorParams = {
-        rawOffers: [searchResult.offers[0].rawSupplierPayload as DuffelOffer],
+      const params = {
+        ...searchResult,
         query: defaultQuery,
         userId: 'usr_envelope',
-        searchHash: searchResult.searchHash,
-        cached: searchResult.cached,
       };
 
-      const response = await service.orchestrateSearch(params);
+      const normalizeRawOffers = jest
+        .spyOn(rawOfferNormalizer, 'normalizeFlightOffers')
+        .mockImplementation(() => {
+          throw new Error('Normalized search offers must bypass raw-offer normalization');
+        });
 
-      expect(response.meta.searchHash).toBe(searchResult.searchHash);
-      expect(response.meta.cached).toBe(true);
-      expect(response.results).toHaveLength(1);
-      expect(response.results[0].scoredOffer.offer.id).toBe(normalizedOffer.id);
+      try {
+        // T013 RED: T021 must add the normalized offers boundary (user-requested correction).
+        // @ts-expect-error OrchestratorParams still requires rawOffers until T021.
+        const response = await service.orchestrateSearch(params);
+
+        expect(normalizeRawOffers).not.toHaveBeenCalled();
+        expect(scorer.scoreAll).toHaveBeenCalledWith(
+          [normalizedOffer.matchInput],
+          expect.anything(),
+        );
+        expect(response.meta.searchHash).toBe(searchResult.searchHash);
+        expect(response.meta.cached).toBe(true);
+        expect(response.results).toHaveLength(1);
+        expect(response.results[0].scoredOffer.offer).toEqual(normalizedOffer.matchInput);
+        expect(response.results[0].scoredOffer.offer.price).toBe(275);
+      } finally {
+        normalizeRawOffers.mockRestore();
+      }
     });
 
     it('asserts FlightOffer matchInput satisfies FlightMatchScorer and CategoryRanker contracts without type coercion', () => {

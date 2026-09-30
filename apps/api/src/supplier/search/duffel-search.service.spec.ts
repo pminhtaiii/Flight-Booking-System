@@ -203,10 +203,16 @@ describe('DuffelSearchService Contract Tests (TDD RED)', () => {
         adults: 1,
       };
 
-      const hash1 = computeExpectedHash(criteria1);
-      const hash2 = computeExpectedHash(criteria2);
+      cacheService.get.mockResolvedValue(null);
+      searchAdapter.searchOffers.mockResolvedValue({ offers: [] });
 
-      expect(hash1).toBe(hash2);
+      await service.search(criteria1, 'user');
+      await service.search(criteria2, 'user');
+
+      expect(cacheService.get).toHaveBeenCalledTimes(2);
+      const firstKey = cacheService.get.mock.calls[0][0];
+      expect(firstKey).toMatch(/^flight:search:[a-f0-9]{64}$/);
+      expect(cacheService.get).toHaveBeenNthCalledWith(2, firstKey);
     });
 
     it('maps one-way search criteria (origin, destination, departureDate, cabinClass, adults) to Duffel query format', async () => {

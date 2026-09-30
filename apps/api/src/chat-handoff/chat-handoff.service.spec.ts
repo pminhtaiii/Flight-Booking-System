@@ -976,6 +976,9 @@ describe('ChatHandoffService', () => {
 
   describe('raw-reader replacement characterization (T015)', () => {
     beforeEach(() => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-09-29T12:00:00.000Z'));
+
       jest.spyOn(configService, 'get').mockImplementation((key: string) => {
         if (
           key === 'FEATURE_FLAG_CHAT_HANDOFF_ACCEPT' ||
@@ -985,6 +988,10 @@ describe('ChatHandoffService', () => {
         }
         return undefined;
       });
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
     });
 
     function buildTestSupplierOffer(
