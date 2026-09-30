@@ -8,6 +8,8 @@ import {
   OrchestratorParams,
   hasEffectivePreferences,
 } from './flight-search-orchestrator.service';
+import { FlightOffer, FlightSearchResult } from '@/supplier/search/flight-search.port';
+import { generateDeterministicUUID } from './flight-offer-normalizer';
 
 describe('FlightSearchOrchestratorService', () => {
   let service: FlightSearchOrchestratorService;
@@ -1146,4 +1148,136 @@ describe('FlightSearchOrchestratorService', () => {
       expect(response.meta.matchLevelCounts).toBeDefined();
     });
   });
+
+  describe('FlightSearchPort Compatibility with FlightSearchResult and FlightOffer (T013 [US1])', () => {
+    const createMockNormalizedFlightOffer = (
+      id: string,
+      rawDuffelOffer: DuffelOffer,
+      overrides: Partial<FlightOffer> = {},
+    ): FlightOffer => {
+      const deterministicId = generateDeterministicUUID(id);
+      return {
+        id: deterministicId,
+        supplierOfferId: id,
+        totalAmount: rawDuffelOffer.total_amount,
+        price: parseFloat(rawDuffelOffer.total_amount),
+        currency: rawDuffelOffer.total_currency,
+        offerExpiresAt: null,
+        passengers: [{ supplierPassengerId: 'pas_1', type: 'ADULT' }],
+        airline: 'British Airways',
+        flightNumber: 'BA100',
+        departureAirport: 'SFO',
+        arrivalAirport: 'JFK',
+        departureTime: '2026-09-01T08:00:00',
+        arrivalTime: '2026-09-01T10:00:00',
+        duration: 120,
+        stops: 0,
+        fareClass: 'Economy',
+        baggageAllowance: '1 checked bag(s)',
+        segments: [
+          {
+            supplierSegmentId: `seg_${id}`,
+            carrierCode: 'BA',
+            flightNumber: '100',
+            operatingCarrier: 'British Airways',
+            departureAirport: 'SFO',
+            departureTerminal: null,
+            departureTime: '2026-09-01T08:00:00',
+            arrivalAirport: 'JFK',
+            arrivalTerminal: null,
+            arrivalTime: '2026-09-01T10:00:00',
+            duration: 120,
+            aircraft: null,
+            cabinClass: 'economy',
+          },
+        ],
+        returnSegments: null,
+        conditions: {
+          refundable: false,
+          changeable: true,
+          changeBeforeDeparture: null,
+        },
+        matchInput: {
+          id: deterministicId,
+          price: parseFloat(rawDuffelOffer.total_amount),
+          currency: rawDuffelOffer.total_currency,
+          stops: 0,
+          duration: 120,
+          outboundDepartureHour: 8,
+          outboundArrivalHour: 10,
+          carrierCodes: ['BA'],
+          cabinClass: 'economy',
+          hasCheckedBaggage: true,
+          originalIndex: 0,
+        },
+        rawSupplierPayload: rawDuffelOffer,
+        ...overrides,
+      };
+    };
+
+    it('asserts FlightSearchResult envelope compatibility with orchestrator cache and searchHash metadata', async () => {
+      const rawOffer = createMockDuffelOffer('off_envelope_test');
+      const normalizedOffer = createMockNormalizedFlightOffer('off_envelope_test', rawOffer);
+
+      const searchResult: FlightSearchResult = {
+        offers: [normalizedOffer],
+        searchHash: 'sha256_port_envelope_hash',
+        cached: true,
+      };
+
+      const params: OrchestratorParams = {
+        rawOffers: [searchResult.offers[0].rawSupplierPayload as DuffelOffer],
+        query: defaultQuery,
+        userId: 'usr_envelope',
+        searchHash: searchResult.searchHash,
+        cached: searchResult.cached,
+      };
+
+      const response = await service.orchestrateSearch(params);
+
+      expect(response.meta.searchHash).toBe(searchResult.searchHash);
+      expect(response.meta.cached).toBe(true);
+      expect(response.results).toHaveLength(1);
+      expect(response.results[0].scoredOffer.offer.id).toBe(normalizedOffer.id);
+    });
+
+    it('asserts FlightOffer matchInput satisfies FlightMatchScorer and CategoryRanker contracts without type coercion', () => {
+      const rawOffer = createMockDuffelOffer('off_match_contract');
+      const flightOffer = createMockNormalizedFlightOffer('off_match_contract', rawOffer);
+
+      // Verify that matchInput from FlightOffer conforms directly to Scorer input shape
+      expect(flightOffer.matchInput).toHaveProperty('id', flightOffer.id);
+      expect(flightOffer.matchInput).toHaveProperty('price', flightOffer.price);
+      expect(flightOffer.matchInput).toHaveProperty('currency', flightOffer.currency);
+      expect(flightOffer.matchInput).toHaveProperty('stops', flightOffer.stops);
+      expect(flightOffer.matchInput).toHaveProperty('duration', flightOffer.duration);
+      expect(flightOffer.matchInput.carrierCodes).toEqual(['BA']);
+      expect(flightOffer.matchInput.hasCheckedBaggage).toBe(true);
+      expect(flightOffer.matchInput.originalIndex).toBe(0);
+    });
+
+    it('preserves supplier-neutral passenger and conditions structures for downstream readiness and handoff readers', () => {
+      const rawOffer = createMockDuffelOffer('off_neutral_fields');
+      const flightOffer = createMockNormalizedFlightOffer('off_neutral_fields', rawOffer, {
+        conditions: {
+          refundable: true,
+          changeable: false,
+          changeBeforeDeparture: {
+            allowed: true,
+            penaltyAmount: '50.00',
+            penaltyCurrency: 'USD',
+          },
+        },
+      });
+
+      expect(flightOffer.passengers[0].supplierPassengerId).toBe('pas_1');
+      expect(flightOffer.passengers[0].type).toBe('ADULT');
+      expect(flightOffer.conditions.refundable).toBe(true);
+      expect(flightOffer.conditions.changeable).toBe(false);
+      expect(flightOffer.conditions.changeBeforeDeparture?.allowed).toBe(true);
+      expect(flightOffer.conditions.changeBeforeDeparture?.penaltyAmount).toBe('50.00');
+      expect(flightOffer.conditions.changeBeforeDeparture?.penaltyCurrency).toBe('USD');
+    });
+  });
 });
+
