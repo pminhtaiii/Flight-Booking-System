@@ -52,26 +52,3 @@ export function normalizeFlightOffers(
 ): NormalizationResult {
   throw new Error('Not implemented: normalizeFlightOffers TDD RED stub');
 }
-
-export class FlightOfferNormalizer {
-  static generateDeterministicUUID(input: string): string {
-    return generateDeterministicUUID(input);
-  }
-
-  static normalizeDuffelOffer(
-    rawOffer: unknown,
-    originalIndex = 0,
-  ): FlightOffer | null {
-    return normalizeDuffelOffer(rawOffer, originalIndex);
-  }
-
-  static normalizeStoredOffer(rawOffer: unknown): FlightOffer | null {
-    return normalizeStoredOffer(rawOffer);
-  }
-
-  static normalizeFlightOffers(
-    rawOffers: readonly unknown[],
-  ): NormalizationResult {
-    return normalizeFlightOffers(rawOffers);
-  }
-}

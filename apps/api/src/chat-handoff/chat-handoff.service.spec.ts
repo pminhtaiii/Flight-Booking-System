@@ -1189,6 +1189,7 @@ describe('ChatHandoffService', () => {
     flightOffer: unknown,
     selectedOffer: AttestationOffer,
   ): ChatHandoffDisplayDto | undefined {
+    // Characterization parity test requires verifying private buildOfferDisplay formatting against normalized offer attributes before Slice 3 refactoring.
     const accessor = serviceInstance as unknown as {
       buildOfferDisplay: (
         fo: unknown,

@@ -1,6 +1,5 @@
 import {
   Injectable,
-  Optional,
   HttpException,
   HttpStatus,
   NotFoundException,
@@ -19,9 +18,9 @@ import {
 @Injectable()
 export class DuffelSearchService implements FlightSearchPort {
   constructor(
-    @Optional() private readonly cacheService?: CacheService,
-    @Optional() private readonly rateBudgetService?: DuffelRateBudgetService,
-    @Optional() private readonly searchAdapter?: DuffelSearchAdapter,
+    private readonly cacheService: CacheService,
+    private readonly rateBudgetService: DuffelRateBudgetService,
+    private readonly searchAdapter: DuffelSearchAdapter,
   ) {}
 
   async search(

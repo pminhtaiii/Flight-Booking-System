@@ -208,6 +208,79 @@ describe('DuffelSearchService Contract Tests (TDD RED)', () => {
 
       expect(hash1).toBe(hash2);
     });
+
+    it('maps one-way search criteria (origin, destination, departureDate, cabinClass, adults) to Duffel query format', async () => {
+      const criteria: FlightSearchCriteria = {
+        origin: 'sfo',
+        destination: 'jfk',
+        departureDate: '2026-10-01',
+        adults: 2,
+        cabinClass: 'economy',
+      };
+
+      cacheService.get.mockResolvedValueOnce(null);
+      searchAdapter.searchOffers.mockResolvedValueOnce({ offers: [] });
+
+      await service.search(criteria, 'user');
+
+      expect(searchAdapter.searchOffers).toHaveBeenCalledWith({
+        slices: [
+          {
+            origin: 'SFO',
+            destination: 'JFK',
+            departure_date: '2026-10-01',
+            arrival_time: null,
+            departure_time: null,
+          },
+        ],
+        passengers: [{ type: 'adult' }, { type: 'adult' }],
+        cabin_class: 'economy',
+      });
+    });
+
+    it('maps round-trip search criteria with multi-passenger (adults, children, infants) and cabinClass to Duffel query format', async () => {
+      const criteria: FlightSearchCriteria = {
+        origin: 'sfo',
+        destination: 'jfk',
+        departureDate: '2026-10-01',
+        returnDate: '2026-10-10',
+        adults: 1,
+        children: 2,
+        infants: 1,
+        cabinClass: 'business',
+      };
+
+      cacheService.get.mockResolvedValueOnce(null);
+      searchAdapter.searchOffers.mockResolvedValueOnce({ offers: [] });
+
+      await service.search(criteria, 'agent');
+
+      expect(searchAdapter.searchOffers).toHaveBeenCalledWith({
+        slices: [
+          {
+            origin: 'SFO',
+            destination: 'JFK',
+            departure_date: '2026-10-01',
+            arrival_time: null,
+            departure_time: null,
+          },
+          {
+            origin: 'JFK',
+            destination: 'SFO',
+            departure_date: '2026-10-10',
+            arrival_time: null,
+            departure_time: null,
+          },
+        ],
+        passengers: [
+          { type: 'adult' },
+          { type: 'child' },
+          { type: 'child' },
+          { type: 'infant_without_seat' },
+        ],
+        cabin_class: 'business',
+      });
+    });
   });
 
   describe('Cache Hit Contract', () => {
@@ -323,6 +396,68 @@ describe('DuffelSearchService Contract Tests (TDD RED)', () => {
         }),
       });
 
+      expect(rateBudgetService.reserveAttempt).toHaveBeenCalledWith({
+        key: 'budget:duffel:daily:user:2026-09-29',
+        limit: 1000,
+      });
+      expect(searchAdapter.searchOffers).not.toHaveBeenCalled();
+    });
+
+    it('throws HttpException 429 RATE_LIMIT_EXCEEDED when global 1,500 daily budget cap is exhausted and passes caller sub-allocation constraint', async () => {
+      cacheService.get.mockResolvedValueOnce(null);
+      // When global 1,500 daily cap is reached, core rate budget service returns { ok: false, error: 'EXHAUSTED' }
+      rateBudgetService.reserveAttempt.mockResolvedValueOnce({
+        ok: false,
+        error: 'EXHAUSTED',
+        retryAfterSeconds: 43200,
+        resetAt: '2026-09-30T00:00:00.000Z',
+      });
+
+      const searchPromise = service.search(defaultCriteria, 'user');
+
+      await expect(searchPromise).rejects.toThrow(HttpException);
+      await expect(searchPromise).rejects.toMatchObject({
+        status: HttpStatus.TOO_MANY_REQUESTS,
+        response: expect.objectContaining({
+          code: 'RATE_LIMIT_EXCEEDED',
+          retryAfterSeconds: 43200,
+          resetAt: '2026-09-30T00:00:00.000Z',
+        }),
+      });
+
+      // Asserts that search caller sub-allocation constraint is passed into reserveAttempt
+      expect(rateBudgetService.reserveAttempt).toHaveBeenCalledWith({
+        key: 'budget:duffel:daily:user:2026-09-29',
+        limit: 1000,
+      });
+      expect(searchAdapter.searchOffers).not.toHaveBeenCalled();
+    });
+
+    it('passes agent caller sub-allocation constraint and throws 429 RATE_LIMIT_EXCEEDED on budget exhaustion', async () => {
+      cacheService.get.mockResolvedValueOnce(null);
+      rateBudgetService.reserveAttempt.mockResolvedValueOnce({
+        ok: false,
+        error: 'EXHAUSTED',
+        retryAfterSeconds: 21600,
+        resetAt: '2026-09-30T00:00:00.000Z',
+      });
+
+      const searchPromise = service.search(defaultCriteria, 'agent');
+
+      await expect(searchPromise).rejects.toThrow(HttpException);
+      await expect(searchPromise).rejects.toMatchObject({
+        status: HttpStatus.TOO_MANY_REQUESTS,
+        response: expect.objectContaining({
+          code: 'RATE_LIMIT_EXCEEDED',
+          retryAfterSeconds: 21600,
+          resetAt: '2026-09-30T00:00:00.000Z',
+        }),
+      });
+
+      expect(rateBudgetService.reserveAttempt).toHaveBeenCalledWith({
+        key: 'budget:duffel:daily:agent:2026-09-29',
+        limit: 500,
+      });
       expect(searchAdapter.searchOffers).not.toHaveBeenCalled();
     });
 
@@ -345,6 +480,10 @@ describe('DuffelSearchService Contract Tests (TDD RED)', () => {
         }),
       });
 
+      expect(rateBudgetService.reserveAttempt).toHaveBeenCalledWith({
+        key: 'budget:duffel:daily:agent:2026-09-29',
+        limit: 500,
+      });
       expect(searchAdapter.searchOffers).not.toHaveBeenCalled();
     });
   });

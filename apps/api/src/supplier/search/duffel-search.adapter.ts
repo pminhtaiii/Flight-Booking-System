@@ -3,7 +3,7 @@ import { FlightSearchCriteria } from './flight-search.port';
 
 @Injectable()
 export class DuffelSearchAdapter {
-  async searchOffers(_criteria: FlightSearchCriteria): Promise<unknown> {
+  async searchOffers(_query: unknown): Promise<unknown> {
     throw new Error('Not implemented: DuffelSearchAdapter.searchOffers TDD RED stub');
   }
 

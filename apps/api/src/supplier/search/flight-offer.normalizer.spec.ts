@@ -9,7 +9,6 @@ import {
   normalizeDuffelOffer,
   normalizeStoredOffer,
   normalizeFlightOffers,
-  FlightOfferNormalizer,
 } from './flight-offer.normalizer';
 
 // Strongly typed fixtures for Duffel raw API payloads (zero `any`)
@@ -218,7 +217,7 @@ const createMockRawOffer = (overrides: Partial<RawDuffelOffer> = {}): RawDuffelO
   return { ...baseOffer, ...overrides };
 };
 
-describe('FlightOfferNormalizer (T014 Normalization Parity & Stored Snapshot Tests)', () => {
+describe('FlightOffer Normalization (T014 Normalization Parity & Stored Snapshot Tests)', () => {
   describe('Deterministic UUID Generation', () => {
     it('generates consistent RFC 4122 v4 UUID from upstream offer ID', () => {
       const offerId = 'off_test_consistent_123';
@@ -410,14 +409,6 @@ describe('FlightOfferNormalizer (T014 Normalization Parity & Stored Snapshot Tes
       });
     });
 
-    it('FlightOfferNormalizer class static method behaves identically to standalone function', () => {
-      const rawOffer = createMockRawOffer({ id: 'off_class_test' });
-
-      const fromFunction = normalizeDuffelOffer(rawOffer, 1);
-      const fromClass = FlightOfferNormalizer.normalizeDuffelOffer(rawOffer, 1);
-
-      expect(fromClass).toEqual(fromFunction);
-    });
   });
 
   describe('Batch Offer Normalization (normalizeFlightOffers)', () => {
@@ -458,14 +449,6 @@ describe('FlightOfferNormalizer (T014 Normalization Parity & Stored Snapshot Tes
       expect(result.rejectionCounts['MIXED_CURRENCY']).toBe(1);
     });
 
-    it('FlightOfferNormalizer.normalizeFlightOffers class method matches standalone function', () => {
-      const rawOffers = [createMockRawOffer({ id: 'off_batch_test' })];
-
-      const fromFunction = normalizeFlightOffers(rawOffers);
-      const fromClass = FlightOfferNormalizer.normalizeFlightOffers(rawOffers);
-
-      expect(fromClass).toEqual(fromFunction);
-    });
   });
 
   describe('Legacy Stored-Offer Normalization (normalizeStoredOffer)', () => {
@@ -493,15 +476,6 @@ describe('FlightOfferNormalizer (T014 Normalization Parity & Stored Snapshot Tes
         expect(offer.conditions.changeable).toBe(true);
         expect(offer.matchInput.originalIndex).toBe(0);
         expect(offer.rawSupplierPayload).toEqual(storedSnapshot);
-      });
-
-      it('FlightOfferNormalizer.normalizeStoredOffer class method matches standalone function', () => {
-        const storedSnapshot = createMockRawOffer({ id: 'off_stored_class_test' });
-
-        const fromFunction = normalizeStoredOffer(storedSnapshot);
-        const fromClass = FlightOfferNormalizer.normalizeStoredOffer(storedSnapshot);
-
-        expect(fromClass).toEqual(fromFunction);
       });
     });
 
