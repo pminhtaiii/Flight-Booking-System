@@ -13,7 +13,7 @@ import {
   FlightSegment,
 } from './flight-search.port';
 
-export interface DuffelOfferConditions {
+export type DuffelOfferConditions = {
   refund_before_departure?: {
     allowed: boolean;
     penalty_amount?: string | null;
@@ -24,17 +24,17 @@ export interface DuffelOfferConditions {
     penalty_amount?: string | null;
     penalty_currency?: string | null;
   } | null;
-}
+};
 
-export interface ExtendedDuffelSlice extends DuffelSlice {
+export type ExtendedDuffelSlice = DuffelSlice & {
   fare_brand_name?: string | null;
-}
+};
 
-export interface ExtendedDuffelOffer extends DuffelOffer {
+export type ExtendedDuffelOffer = DuffelOffer & {
   expires_at?: string | null;
   conditions?: DuffelOfferConditions | null;
   slices: ExtendedDuffelSlice[];
-}
+};
 
 export type OfferRejectionReason =
   | 'MALFORMED_OFFER'
@@ -579,10 +579,10 @@ export class FlightOfferNormalizer {
       }
     }
 
-    // 6. Check passengers is non-empty array
     if (!Array.isArray(candidate.passengers) || candidate.passengers.length === 0) {
       return null;
     }
+    const passengerIdSet = new Set<string>();
     for (const p of candidate.passengers) {
       if (p === null || p === undefined || typeof p !== 'object' || Array.isArray(p)) {
         return null;
@@ -591,6 +591,12 @@ export class FlightOfferNormalizer {
       if (typeof pObj.id !== 'string' || pObj.id.trim() === '') {
         return null;
       }
+      const pId = pObj.id.trim();
+      if (passengerIdSet.has(pId)) {
+        return null;
+      }
+      passengerIdSet.add(pId);
+
       if (typeof pObj.type !== 'string' || pObj.type.trim() === '') {
         return null;
       }

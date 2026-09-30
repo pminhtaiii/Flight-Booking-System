@@ -584,5 +584,18 @@ describe('FlightOfferNormalizer (T014)', () => {
       expect(normalizer.normalizeStoredOffer({ ...base, total_currency: '   ' })).toBeNull();
       expect(normalizer.normalizeStoredOffer({ ...base, total_currency: 123 })).toBeNull();
     });
+
+    it('returns null for stored offers with duplicate passenger ids', () => {
+      const base = createSampleDuffelOffer();
+      expect(
+        normalizer.normalizeStoredOffer({
+          ...base,
+          passengers: [
+            { id: 'pas_dup', type: 'adult' },
+            { id: 'pas_dup', type: 'child' },
+          ],
+        }),
+      ).toBeNull();
+    });
   });
 });
