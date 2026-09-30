@@ -5,7 +5,8 @@ import { ServiceUnavailableException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CacheService } from '@/cache/cache.service';
-import { DuffelService } from '@/duffel/duffel.service';
+import { FLIGHT_SEARCH_PORT, FlightSearchPort } from '@/supplier/search/flight-search.port';
+import { FlightOfferNormalizer } from '@/supplier/search/flight-offer.normalizer';
 import { DuffelOffer } from '@/duffel/duffel.types';
 import { AuditService } from '@/audit/audit.service';
 import { EncryptionService } from '@/common/encryption.service';
@@ -20,12 +21,6 @@ import { ChatHandoffTokenService } from '@/chat-handoff/chat-handoff-token.servi
 import { SelectionAttestationService } from '../selection-attestation.service';
 import { AgentToolAuditService } from '../audit/agent-tool-audit.service';
 import { AttestedFlightSearchService } from './attested-flight-search.service';
-
-type SupplierResult = {
-  offerRequest: { offers: Array<DuffelOffer & { expires_at: string }> };
-  cached: boolean;
-  searchHash: string;
-};
 
 function deferred(): { promise: Promise<void>; resolve: () => void } {
   let resolve!: () => void;
@@ -42,7 +37,7 @@ describe('Attested flight search persistence boundary', () => {
   let commit: ReturnType<typeof deferred>;
   let transactionStarted: ReturnType<typeof deferred>;
   let transaction: jest.Mock;
-  let duffelSearch: jest.Mock<Promise<SupplierResult>>;
+  let flightSearch: jest.Mock;
   let savedEncryptionKey: string | undefined;
   let savedChatEncryptionKey: string | undefined;
 
@@ -94,11 +89,25 @@ describe('Attested flight search persistence boundary', () => {
         },
       ],
     };
-    duffelSearch = jest.fn().mockResolvedValue({
-      offerRequest: { offers: [offer] },
-      cached: false,
-      searchHash: 'search-1',
+    const normalizer = new FlightOfferNormalizer();
+    let isCached = false;
+    flightSearch = jest.fn().mockImplementation(async (criteria) => {
+      const normalized = normalizer.normalizeOffer(
+        offer,
+        criteria.cabinClass || 'economy',
+        0,
+      );
+      return {
+        offers: [normalized],
+        searchHash: 'search-1',
+        cached: isCached,
+      };
     });
+    const flightSearchPort: FlightSearchPort = {
+      search: flightSearch,
+      getOfferById: jest.fn(),
+      normalizeStoredOffer: (raw) => normalizer.normalizeStoredOffer(raw),
+    };
     transaction = jest
       .fn()
       .mockImplementation(
@@ -151,7 +160,7 @@ describe('Attested flight search persistence boundary', () => {
           }),
         },
         { provide: CacheService, useValue: {} },
-        { provide: DuffelService, useValue: { searchFlights: duffelSearch } },
+        { provide: FLIGHT_SEARCH_PORT, useValue: flightSearchPort },
         {
           provide: PrismaService,
           useValue: {
@@ -197,8 +206,8 @@ describe('Attested flight search persistence boundary', () => {
   it.each([false, true])(
     'waits for commit before returning an immediately usable attestation (cached=%s)',
     async (cached) => {
-      const supplierResult = await duffelSearch();
-      duffelSearch.mockClear().mockResolvedValue({ ...supplierResult, cached });
+      const searchResult = await flightSearch({ cabinClass: 'economy' });
+      flightSearch.mockClear().mockResolvedValue({ ...searchResult, cached });
       let returned = false;
       const search = service.searchFlightsV2('user-1', request).then((result) => {
         returned = true;
@@ -220,7 +229,7 @@ describe('Attested flight search persistence boundary', () => {
           'user-1',
         ),
       ).resolves.toMatchObject({ token: expect.stringMatching(/^chk_handoff_/) });
-      expect(duffelSearch).toHaveBeenCalledTimes(1);
+      expect(flightSearch).toHaveBeenCalledTimes(1);
     },
   );
 
@@ -235,17 +244,16 @@ describe('Attested flight search persistence boundary', () => {
     commit.resolve();
     if (version === 'v1') await service.searchFlights('user-1', request.search);
     else await service.searchFlightsV2('user-1', request);
-    expect(duffelSearch).toHaveBeenCalledWith(expect.any(Object), 'agent');
+    expect(flightSearch).toHaveBeenCalledWith(expect.any(Object), 'agent');
   });
 
   it('preserves baggage allowance when the supplier provides only weight', async () => {
-    const supplierResult = await duffelSearch();
-    const passenger = supplierResult.offerRequest.offers[0].slices[0].segments[0].passengers?.[0];
+    const searchResult = await flightSearch({ cabinClass: 'economy' });
+    const passenger = (searchResult.offers[0].rawSupplierPayload as DuffelOffer).slices[0].segments[0].passengers?.[0];
     if (!passenger) throw new Error('Supplier fixture must include a segment passenger');
     passenger.baggages = [
       { type: 'checked', weight: 23, weight_unit: 'kg' },
     ];
-    duffelSearch.mockResolvedValue(supplierResult);
     commit.resolve();
     const result = await service.searchFlightsV2('user-1', request);
     expect(result.results[0].baggageAllowance).toBe('23kg checked');
