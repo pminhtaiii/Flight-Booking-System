@@ -1319,6 +1319,7 @@ describe('BookingReadinessService raw-reader replacement characterization (T015)
     });
 
     it('characterizes segment continuity, airport codes, and trip completion date extraction parity', () => {
+      const { service } = createServiceHarness();
       const rawOffer = {
         expires_at: '2030-12-31T23:59:59Z',
         passengers: [{ id: 'pas_001', type: 'adult' }],
@@ -1405,7 +1406,19 @@ describe('BookingReadinessService raw-reader replacement characterization (T015)
 
       // Characterize normalized facts extraction
       const facts = extractFactsFromNormalizedOffer(normalizedOffer);
-      const rawNormalized = service['normalizeStoredOffer'](rawOffer);
+      const rawNormalized = (
+        service as unknown as {
+          normalizeStoredOffer: (raw: unknown) => {
+            segments: Array<{
+              originCountryCode: string;
+              destinationCountryCode: string;
+              arrivalDate: string;
+            }>;
+            airportCodes: string[];
+            tripCompletionDate: string;
+          };
+        }
+      ).normalizeStoredOffer(rawOffer);
 
       expect(facts.segments).toEqual(rawNormalized.segments);
       expect(facts.airportCodes).toEqual(rawNormalized.airportCodes);
