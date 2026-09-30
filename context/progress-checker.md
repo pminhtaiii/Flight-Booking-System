@@ -1,5 +1,26 @@
 # Progress Tracker
 
+### Feature 029 — Narrow the Duffel Supplier Boundary: Phase 3 Slice 1 Search Contract & Parity Tests Complete (Tasks T013–T015 Verified) (2026-09-30)
+
+- **T013 Define Search Port Contract Types & Search Port Contract Tests**:
+  - Defined supplier-neutral contracts in `apps/api/src/supplier/search/flight-search.port.ts`: `FLIGHT_SEARCH_PORT` injection token, `FlightSearchPort`, `FlightSearchCriteria`, `FlightOffer`, `FlightSegment`, `FlightOfferPassenger`, `FlightOfferConditions`, and `FlightSearchResult` without leaking `@duffel/api` types.
+  - Added TDD RED contract tests in `apps/api/src/supplier/search/duffel-search.service.spec.ts` asserting criteria mapping, query hash calculation (`flight:search:${searchHash}`), cache-hit bypass (0 upstream calls, 0 budget reservation), user (1,000) and agent (500) caller sub-allocations, global 1,500 daily budget cap exhaustion (429 `RATE_LIMIT_EXCEEDED`), deterministic UUID generation, and live offer lookup / 404/410 handling.
+  - Extended `apps/api/src/flights/flight-search-orchestrator.service.spec.ts` asserting orchestrator compatibility with `FlightSearchResult` envelope and normalized `FlightOffer.matchInput` structure.
+- **T014 Add Stored-Offer Normalization Parity Tests**:
+  - Created comprehensive test suite in `apps/api/src/supplier/search/flight-offer.normalizer.spec.ts` testing live offer normalization parity (passengers, slices, segments, carrier codes, aircraft, cabin class, conditions, metadata, and intact write-only `rawSupplierPayload`).
+  - Added legacy stored-offer normalization parity tests for `normalizeStoredOffer` asserting fail-closed behavior returning `null` on malformed, truncated, missing slice/segment, non-ISO/invalid date, negative price, or mixed-currency snapshots.
+  - Provided clean, typed TDD RED normalizer stubs in `apps/api/src/supplier/search/flight-offer.normalizer.ts`.
+- **T015 Add Raw-Reader Replacement Characterization Test Cases**:
+  - Extended `apps/api/src/booking-intent/booking-readiness.service.spec.ts` with parameterized tests validating exact parity of passenger matching, expiry evaluation, segment continuity, and error outcomes (`OFFER_EXPIRED`, `PASSENGER_MAPPING_INVALID`) between raw JSON inspection and normalized `FlightOffer`.
+  - Extended `apps/api/src/agent-gateway/booking-readiness/agent-booking-readiness.service.spec.ts` with test cases verifying passenger ordinal resolution and response projection parity with normalized `FlightOffer.passengers`.
+  - Extended `apps/api/src/chat-handoff/chat-handoff.service.spec.ts` characterizing `buildOfferDisplay` carrier precedence and `resolveSafe` passenger/segment extraction with 100% structural parity.
+- **Verification Gates & Parity**:
+  - `flight-search-orchestrator.service.spec.ts`: 50 passed, 0 failed.
+  - Raw-reader suites (`booking-readiness`, `agent-booking-readiness`, `chat-handoff`): 85 passed, 0 failed.
+  - Normalizer & search service spec suites: established clean TDD RED test baselines for Slice 2.
+  - TypeScript compilation clean pass (`tsc -p tsconfig.json --noEmit` exit code 0).
+  - Marked Tasks T013–T015 complete in `specs/029-duffel-provider-narrowing/tasks.md`.
+
 ### Feature 029 — Narrow the Duffel Supplier Boundary: Phase 2 Slice 2 Consumer Wiring & Shared Budget Migration Complete (Tasks T010–T012 Verified) (2026-09-29)
 
 - **T010 DuffelService Core Attempt Metering & Caller Sub-limits**:

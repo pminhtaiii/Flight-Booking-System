@@ -13,6 +13,11 @@
     - User and agent flight search enforce daily sub-allocations (1,000 user, 500 agent) with 0 budget reservations on cache hits.
     - Completely removed obsolete monthly budget keys (`budget:duffel:${year}-${month}`) from search and background reconciliation.
     - Reconciliation cleanly catches 429 budget denials, bumps `budgetBlocked`, and defers without treating it as an unexpected failure or charging skipped syncs.
+- **Phase 3 Slice 1: Search Contract & Parity Baseline (Tasks T013–T015 Complete)**:
+  - **`flight-search.port.ts`**: Pure supplier-neutral boundary contract defining `FLIGHT_SEARCH_PORT`, `FlightSearchPort`, `FlightSearchCriteria`, `FlightOffer`, `FlightSegment`, `FlightOfferPassenger`, `FlightOfferConditions`, and `FlightSearchResult`. Completely hides `@duffel/api` upstream types and treats `rawSupplierPayload: unknown` strictly as write-only evidence.
+  - **`duffel-search.service.spec.ts`**: Contract test suite locking search criteria mapping, deterministic SHA-256 query hash calculation (`flight:search:${searchHash}`), cache hit bypass (0 upstream calls, 0 budget reservation), user (1,000) and agent (500) caller sub-allocation enforcement, global 1,500 daily budget cap exhaustion (429 `RATE_LIMIT_EXCEEDED`), deterministic UUID generation, and live offer lookup / 404/410 mapping.
+  - **`flight-offer.normalizer.spec.ts`**: Normalization parity test suite locking live Duffel offer transformation into `FlightOffer` and fail-closed legacy snapshot decoding (`normalizeStoredOffer`) returning `null` on malformed, truncated, or invalid payloads without throwing unhandled exceptions.
+  - **Raw-Reader Replacement Test Cases (`booking-readiness.service.spec.ts`, `agent-booking-readiness.service.spec.ts`, `chat-handoff.service.spec.ts`)**: Parameterized characterization tests proving 100% equivalence in domain decisions, passenger matching, and error codes between raw JSON inspection and normalized `FlightOffer` consumption.
 
 ## Feature 027 — Chat Turn Decomposition (Complete — Phases 1–7, Tasks T001–T027 Verified)
 
