@@ -7,6 +7,12 @@ import { PassengerType } from '@prisma/client';
 import { plainToInstance } from 'class-transformer';
 import { ValidationError, validate } from 'class-validator';
 import { BookingIntentController } from './booking-intent.controller';
+import type {
+  FlightOffer as SupplierFlightOffer,
+  FlightSegment as SupplierFlightSegment,
+  FlightOfferConditions,
+} from '@/supplier/search/flight-search.port';
+import type { FlightMatchInput } from '@/flight-match/flight-match.types';
 
 type ReadinessPassengerSource =
   | {
@@ -1084,5 +1090,849 @@ describe('BookingIntentController advisory readiness RED slice', () => {
     );
     expect(response.setHeader).toHaveBeenCalledWith('Cache-Control', 'no-store, private');
     expect(response.removeHeader).toHaveBeenCalledWith('ETag');
+  });
+});
+
+describe('BookingReadinessService raw-reader replacement characterization (T015)', () => {
+  function buildTestSupplierOffer(
+    overrides: Partial<SupplierFlightOffer> = {},
+  ): SupplierFlightOffer {
+    const defaultSegment: SupplierFlightSegment = {
+      supplierSegmentId: 'seg_001',
+      carrierCode: 'VN',
+      flightNumber: 'VN123',
+      operatingCarrier: 'Vietnam Airlines',
+      departureAirport: 'SGN',
+      departureTerminal: '1',
+      departureTime: '2030-10-15T12:00:00Z',
+      arrivalAirport: 'HAN',
+      arrivalTerminal: '2',
+      arrivalTime: '2030-10-15T14:30:00Z',
+      duration: 150,
+      aircraft: 'A321',
+      cabinClass: 'economy',
+    };
+
+    const defaultConditions: FlightOfferConditions = {
+      refundable: true,
+      changeable: true,
+      changeBeforeDeparture: null,
+    };
+
+    const defaultMatchInput: FlightMatchInput = {
+      id: 'offer-t015-parity',
+      price: 150,
+      currency: 'USD',
+      stops: 0,
+      duration: 150,
+      outboundDepartureHour: 12,
+      outboundArrivalHour: 14,
+      carrierCodes: ['VN'],
+      cabinClass: 'economy',
+      hasCheckedBaggage: true,
+      originalIndex: 0,
+    };
+
+    return {
+      id: 'offer-t015-parity',
+      supplierOfferId: 'off_001',
+      totalAmount: '150.00',
+      price: 150,
+      currency: 'USD',
+      offerExpiresAt: '2030-12-31T23:59:59Z',
+      passengers: [{ supplierPassengerId: 'pas_001', type: 'ADULT' }],
+      airline: 'Vietnam Airlines',
+      flightNumber: 'VN123',
+      departureAirport: 'SGN',
+      arrivalAirport: 'HAN',
+      departureTime: '2030-10-15T12:00:00Z',
+      arrivalTime: '2030-10-15T14:30:00Z',
+      duration: 150,
+      stops: 0,
+      fareClass: 'Y',
+      baggageAllowance: '1 checked bag',
+      segments: [defaultSegment],
+      returnSegments: null,
+      conditions: defaultConditions,
+      matchInput: defaultMatchInput,
+      rawSupplierPayload: {},
+      ...overrides,
+    };
+  }
+
+  function extractFactsFromNormalizedOffer(offer: SupplierFlightOffer): {
+    passengers: Array<{ id: string; type: PassengerType }>;
+    segments: Array<{
+      originCountryCode: string;
+      destinationCountryCode: string;
+      arrivalDate: string;
+    }>;
+    airportCodes: string[];
+    tripCompletionDate: string;
+  } {
+    const passengers = offer.passengers.map((p) => {
+      const type =
+        p.type === 'ADULT'
+          ? PassengerType.ADULT
+          : p.type === 'CHILD'
+            ? PassengerType.CHILD
+            : PassengerType.INFANT;
+      return { id: p.supplierPassengerId, type };
+    });
+
+    const allSegments: readonly SupplierFlightSegment[] = [
+      ...offer.segments,
+      ...(offer.returnSegments ?? []),
+    ];
+
+    const segments = allSegments.map((s) => ({
+      originCountryCode: s.departureAirport.toUpperCase(),
+      destinationCountryCode: s.arrivalAirport.toUpperCase(),
+      arrivalDate: s.arrivalTime.slice(0, 10),
+    }));
+
+    const airportCodes = [
+      ...new Set(segments.flatMap((s) => [s.originCountryCode, s.destinationCountryCode])),
+    ].sort();
+
+    const tripCompletionDate =
+      segments.reduce<string | null>(
+        (latest, s) => (latest === null || s.arrivalDate > latest ? s.arrivalDate : latest),
+        null,
+      ) ?? '';
+
+    return { passengers, segments, airportCodes, tripCompletionDate };
+  }
+
+  function assertNormalizedOfferNotExpired(offer: SupplierFlightOffer): void {
+    if (offer.offerExpiresAt === null || offer.offerExpiresAt === undefined) {
+      return;
+    }
+    const expiresAt = new Date(offer.offerExpiresAt);
+    if (Number.isNaN(expiresAt.getTime())) {
+      throw new Error('Stored offer expiry is malformed');
+    }
+    if (expiresAt.getTime() <= Date.now()) {
+      throw new HttpException(
+        { code: 'OFFER_EXPIRED', message: 'Flight offer has expired' },
+        409,
+      );
+    }
+  }
+
+  function validateNormalizedPassengerMappings(
+    requestedPassengers: readonly ReadinessPassengerRequest[],
+    storedPassengers: readonly { id: string; type: PassengerType }[],
+  ): void {
+    const adultCount = requestedPassengers.filter(
+      (p) => p.passengerType === PassengerType.ADULT,
+    ).length;
+    const infantCount = requestedPassengers.filter(
+      (p) => p.passengerType === PassengerType.INFANT,
+    ).length;
+    const requestedIds = requestedPassengers.map((p) => p.offerPassengerId);
+    const storedById = new Map(storedPassengers.map((p) => [p.id, p]));
+
+    if (
+      requestedPassengers.length < 1 ||
+      requestedPassengers.length > 9 ||
+      requestedPassengers.length !== storedPassengers.length ||
+      adultCount < 1 ||
+      infantCount > adultCount ||
+      new Set(requestedIds).size !== requestedIds.length
+    ) {
+      throw new HttpException(
+        { code: 'PASSENGER_MAPPING_INVALID', message: 'Passenger mapping is invalid' },
+        422,
+      );
+    }
+
+    for (const requested of requestedPassengers) {
+      const stored = storedById.get(requested.offerPassengerId);
+      if (!stored || stored.type !== requested.passengerType) {
+        throw new HttpException(
+          { code: 'PASSENGER_MAPPING_INVALID', message: 'Passenger mapping is invalid' },
+          422,
+        );
+      }
+    }
+  }
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  describe('raw inspection point characterizations', () => {
+    it('characterizes expiry evaluation (assertOfferNotExpired): expired offers reject with identical 409 Conflict OFFER_EXPIRED', async () => {
+      const { service, mocks } = createServiceHarness();
+      const pastDate = '2020-01-01T00:00:00.000Z';
+      const rawOffer = {
+        expires_at: pastDate,
+        passengers: [{ id: 'pas_001', type: 'adult' }],
+        slices: [
+          {
+            segments: [
+              {
+                origin: { iata_code: 'SGN' },
+                destination: { iata_code: 'HAN' },
+                arriving_at: '2030-10-15T14:30:00Z',
+              },
+            ],
+          },
+        ],
+      };
+      const normalizedOffer = buildTestSupplierOffer({ offerExpiresAt: pastDate });
+
+      mocks.prisma.flightOffer = {
+        findUnique: jest.fn().mockResolvedValue({ id: 'offer-t015-parity', rawOffer }),
+      } as unknown as jest.Mock;
+
+      let rawError: HttpException | null = null;
+      try {
+        await service.getAdvisoryReadiness('user-1', {
+          flightOfferId: 'offer-t015-parity',
+          passengers: [
+            {
+              offerPassengerId: 'pas_001',
+              passengerType: PassengerType.ADULT,
+              source: { type: 'inline', givenName: 'Test', familyName: 'User' },
+            },
+          ],
+        });
+      } catch (err: unknown) {
+        if (err instanceof HttpException) rawError = err;
+      }
+
+      let normalizedError: HttpException | null = null;
+      try {
+        assertNormalizedOfferNotExpired(normalizedOffer);
+      } catch (err: unknown) {
+        if (err instanceof HttpException) normalizedError = err;
+      }
+
+      expect(rawError).not.toBeNull();
+      expect(normalizedError).not.toBeNull();
+      expect(rawError?.getStatus()).toBe(409);
+      expect(normalizedError?.getStatus()).toBe(409);
+      expect((rawError?.getResponse() as { code?: string })?.code).toBe('OFFER_EXPIRED');
+      expect((normalizedError?.getResponse() as { code?: string })?.code).toBe('OFFER_EXPIRED');
+    });
+
+    it('characterizes segment continuity, airport codes, and trip completion date extraction parity', () => {
+      const rawOffer = {
+        expires_at: '2030-12-31T23:59:59Z',
+        passengers: [{ id: 'pas_001', type: 'adult' }],
+        slices: [
+          {
+            segments: [
+              {
+                origin: { iata_code: 'sgn' },
+                destination: { iata_code: 'hnl' },
+                arriving_at: '2030-08-15T13:00:00Z',
+              },
+              {
+                origin: { iata_code: 'HNL' },
+                destination: { iata_code: 'LAX' },
+                arriving_at: '2030-08-15T22:30:00Z',
+              },
+            ],
+          },
+          {
+            segments: [
+              {
+                origin: { iata_code: 'LAX' },
+                destination: { iata_code: 'SGN' },
+                arriving_at: '2030-08-20T05:45:00Z',
+              },
+            ],
+          },
+        ],
+      };
+
+      const normalizedOffer = buildTestSupplierOffer({
+        departureAirport: 'SGN',
+        arrivalAirport: 'LAX',
+        segments: [
+          {
+            supplierSegmentId: 'seg_1',
+            carrierCode: 'VN',
+            flightNumber: 'VN1',
+            operatingCarrier: 'Vietnam Airlines',
+            departureAirport: 'SGN',
+            departureTerminal: '1',
+            departureTime: '2030-08-15T06:00:00Z',
+            arrivalAirport: 'HNL',
+            arrivalTerminal: '2',
+            arrivalTime: '2030-08-15T13:00:00Z',
+            duration: 420,
+            aircraft: '787',
+            cabinClass: 'economy',
+          },
+          {
+            supplierSegmentId: 'seg_2',
+            carrierCode: 'HA',
+            flightNumber: 'HA2',
+            operatingCarrier: 'Hawaiian Airlines',
+            departureAirport: 'HNL',
+            departureTerminal: '1',
+            departureTime: '2030-08-15T15:00:00Z',
+            arrivalAirport: 'LAX',
+            arrivalTerminal: '3',
+            arrivalTime: '2030-08-15T22:30:00Z',
+            duration: 330,
+            aircraft: 'A330',
+            cabinClass: 'economy',
+          },
+        ],
+        returnSegments: [
+          {
+            supplierSegmentId: 'seg_3',
+            carrierCode: 'VN',
+            flightNumber: 'VN3',
+            operatingCarrier: 'Vietnam Airlines',
+            departureAirport: 'LAX',
+            departureTerminal: 'B',
+            departureTime: '2030-08-19T22:00:00Z',
+            arrivalAirport: 'SGN',
+            arrivalTerminal: '2',
+            arrivalTime: '2030-08-20T05:45:00Z',
+            duration: 900,
+            aircraft: 'A350',
+            cabinClass: 'economy',
+          },
+        ],
+      });
+
+      // Characterize normalized facts extraction
+      const facts = extractFactsFromNormalizedOffer(normalizedOffer);
+
+      expect(facts.segments).toEqual([
+        {
+          originCountryCode: 'SGN',
+          destinationCountryCode: 'HNL',
+          arrivalDate: '2030-08-15',
+        },
+        {
+          originCountryCode: 'HNL',
+          destinationCountryCode: 'LAX',
+          arrivalDate: '2030-08-15',
+        },
+        {
+          originCountryCode: 'LAX',
+          destinationCountryCode: 'SGN',
+          arrivalDate: '2030-08-20',
+        },
+      ]);
+      expect(facts.airportCodes).toEqual(['HNL', 'LAX', 'SGN']);
+      expect(facts.tripCompletionDate).toBe('2030-08-20');
+    });
+
+    it('characterizes passenger matching parity: identical rejection on type mismatch', () => {
+      const stored = [{ id: 'pas_001', type: PassengerType.CHILD }];
+      const requested: ReadinessPassengerRequest[] = [
+        {
+          offerPassengerId: 'pas_001',
+          passengerType: PassengerType.ADULT,
+          source: { type: 'inline', givenName: 'A', familyName: 'B' },
+        },
+      ];
+
+      let error: HttpException | null = null;
+      try {
+        validateNormalizedPassengerMappings(requested, stored);
+      } catch (err: unknown) {
+        if (err instanceof HttpException) error = err;
+      }
+
+      expect(error).not.toBeNull();
+      expect(error?.getStatus()).toBe(422);
+      expect((error?.getResponse() as { code?: string })?.code).toBe('PASSENGER_MAPPING_INVALID');
+    });
+  });
+
+  describe('parameterized raw vs normalized parity scenarios', () => {
+    type ParityScenario = {
+      name: string;
+      rawOffer: Record<string, unknown>;
+      normalizedOffer: SupplierFlightOffer;
+      requestedPassengers: ReadinessPassengerRequest[];
+      expectedOutcome:
+        | {
+            status: 'SUCCESS';
+            expectedAirportCodes: string[];
+            expectedTripCompletionDate: string;
+          }
+        | {
+            status: 'ERROR';
+            errorCode: string;
+            httpStatus: number;
+          };
+    };
+
+    const scenarios: ParityScenario[] = [
+      {
+        name: 'valid single-passenger single-segment one-way',
+        rawOffer: {
+          expires_at: '2030-12-31T23:59:59Z',
+          passengers: [{ id: 'pas_001', type: 'adult' }],
+          slices: [
+            {
+              segments: [
+                {
+                  origin: { iata_code: 'SGN' },
+                  destination: { iata_code: 'HAN' },
+                  arriving_at: '2030-10-15T14:30:00Z',
+                },
+              ],
+            },
+          ],
+        },
+        normalizedOffer: buildTestSupplierOffer({
+          passengers: [{ supplierPassengerId: 'pas_001', type: 'ADULT' }],
+          segments: [
+            {
+              supplierSegmentId: 'seg_1',
+              carrierCode: 'VN',
+              flightNumber: 'VN123',
+              operatingCarrier: 'Vietnam Airlines',
+              departureAirport: 'SGN',
+              departureTerminal: null,
+              departureTime: '2030-10-15T12:00:00Z',
+              arrivalAirport: 'HAN',
+              arrivalTerminal: null,
+              arrivalTime: '2030-10-15T14:30:00Z',
+              duration: 150,
+              aircraft: 'A321',
+              cabinClass: 'economy',
+            },
+          ],
+          returnSegments: null,
+        }),
+        requestedPassengers: [
+          {
+            offerPassengerId: 'pas_001',
+            passengerType: PassengerType.ADULT,
+            source: { type: 'inline', givenName: 'John', familyName: 'Doe' },
+          },
+        ],
+        expectedOutcome: {
+          status: 'SUCCESS',
+          expectedAirportCodes: ['HAN', 'SGN'],
+          expectedTripCompletionDate: '2030-10-15',
+        },
+      },
+      {
+        name: 'valid multi-passenger multi-segment one-way',
+        rawOffer: {
+          expires_at: '2030-12-31T23:59:59Z',
+          passengers: [
+            { id: 'pas_001', type: 'adult' },
+            { id: 'pas_002', type: 'child' },
+          ],
+          slices: [
+            {
+              segments: [
+                {
+                  origin: { iata_code: 'SGN' },
+                  destination: { iata_code: 'DAD' },
+                  arriving_at: '2030-10-15T10:00:00Z',
+                },
+                {
+                  origin: { iata_code: 'DAD' },
+                  destination: { iata_code: 'ICN' },
+                  arriving_at: '2030-10-15T18:00:00Z',
+                },
+              ],
+            },
+          ],
+        },
+        normalizedOffer: buildTestSupplierOffer({
+          passengers: [
+            { supplierPassengerId: 'pas_001', type: 'ADULT' },
+            { supplierPassengerId: 'pas_002', type: 'CHILD' },
+          ],
+          segments: [
+            {
+              supplierSegmentId: 'seg_1',
+              carrierCode: 'VN',
+              flightNumber: 'VN100',
+              operatingCarrier: 'Vietnam Airlines',
+              departureAirport: 'SGN',
+              departureTerminal: null,
+              departureTime: '2030-10-15T08:30:00Z',
+              arrivalAirport: 'DAD',
+              arrivalTerminal: null,
+              arrivalTime: '2030-10-15T10:00:00Z',
+              duration: 90,
+              aircraft: 'A321',
+              cabinClass: 'economy',
+            },
+            {
+              supplierSegmentId: 'seg_2',
+              carrierCode: 'VN',
+              flightNumber: 'VN400',
+              operatingCarrier: 'Vietnam Airlines',
+              departureAirport: 'DAD',
+              departureTerminal: null,
+              departureTime: '2030-10-15T12:00:00Z',
+              arrivalAirport: 'ICN',
+              arrivalTerminal: null,
+              arrivalTime: '2030-10-15T18:00:00Z',
+              duration: 300,
+              aircraft: 'A350',
+              cabinClass: 'economy',
+            },
+          ],
+          returnSegments: null,
+        }),
+        requestedPassengers: [
+          {
+            offerPassengerId: 'pas_001',
+            passengerType: PassengerType.ADULT,
+            source: { type: 'inline', givenName: 'Adult', familyName: 'One' },
+          },
+          {
+            offerPassengerId: 'pas_002',
+            passengerType: PassengerType.CHILD,
+            source: { type: 'inline', givenName: 'Child', familyName: 'Two' },
+          },
+        ],
+        expectedOutcome: {
+          status: 'SUCCESS',
+          expectedAirportCodes: ['DAD', 'ICN', 'SGN'],
+          expectedTripCompletionDate: '2030-10-15',
+        },
+      },
+      {
+        name: 'valid multi-passenger multi-segment round-trip',
+        rawOffer: {
+          expires_at: '2030-12-31T23:59:59Z',
+          passengers: [
+            { id: 'pas_001', type: 'adult' },
+            { id: 'pas_002', type: 'adult' },
+            { id: 'pas_003', type: 'infant' },
+          ],
+          slices: [
+            {
+              segments: [
+                {
+                  origin: { iata_code: 'SGN' },
+                  destination: { iata_code: 'NRT' },
+                  arriving_at: '2030-11-01T14:00:00Z',
+                },
+              ],
+            },
+            {
+              segments: [
+                {
+                  origin: { iata_code: 'NRT' },
+                  destination: { iata_code: 'SGN' },
+                  arriving_at: '2030-11-10T20:00:00Z',
+                },
+              ],
+            },
+          ],
+        },
+        normalizedOffer: buildTestSupplierOffer({
+          passengers: [
+            { supplierPassengerId: 'pas_001', type: 'ADULT' },
+            { supplierPassengerId: 'pas_002', type: 'ADULT' },
+            { supplierPassengerId: 'pas_003', type: 'INFANT' },
+          ],
+          segments: [
+            {
+              supplierSegmentId: 'seg_out',
+              carrierCode: 'VN',
+              flightNumber: 'VN300',
+              operatingCarrier: 'Vietnam Airlines',
+              departureAirport: 'SGN',
+              departureTerminal: '2',
+              departureTime: '2030-11-01T06:00:00Z',
+              arrivalAirport: 'NRT',
+              arrivalTerminal: '1',
+              arrivalTime: '2030-11-01T14:00:00Z',
+              duration: 360,
+              aircraft: 'A350',
+              cabinClass: 'economy',
+            },
+          ],
+          returnSegments: [
+            {
+              supplierSegmentId: 'seg_ret',
+              carrierCode: 'VN',
+              flightNumber: 'VN301',
+              operatingCarrier: 'Vietnam Airlines',
+              departureAirport: 'NRT',
+              departureTerminal: '1',
+              departureTime: '2030-11-10T14:00:00Z',
+              arrivalAirport: 'SGN',
+              arrivalTerminal: '2',
+              arrivalTime: '2030-11-10T20:00:00Z',
+              duration: 420,
+              aircraft: 'A350',
+              cabinClass: 'economy',
+            },
+          ],
+        }),
+        requestedPassengers: [
+          {
+            offerPassengerId: 'pas_001',
+            passengerType: PassengerType.ADULT,
+            source: { type: 'inline', givenName: 'Parent', familyName: 'One' },
+          },
+          {
+            offerPassengerId: 'pas_002',
+            passengerType: PassengerType.ADULT,
+            source: { type: 'inline', givenName: 'Parent', familyName: 'Two' },
+          },
+          {
+            offerPassengerId: 'pas_003',
+            passengerType: PassengerType.INFANT,
+            source: { type: 'inline', givenName: 'Infant', familyName: 'Three' },
+          },
+        ],
+        expectedOutcome: {
+          status: 'SUCCESS',
+          expectedAirportCodes: ['NRT', 'SGN'],
+          expectedTripCompletionDate: '2030-11-10',
+        },
+      },
+      {
+        name: 'expired offer yields OFFER_EXPIRED (409 Conflict)',
+        rawOffer: {
+          expires_at: '2020-01-01T00:00:00Z',
+          passengers: [{ id: 'pas_001', type: 'adult' }],
+          slices: [
+            {
+              segments: [
+                {
+                  origin: { iata_code: 'SGN' },
+                  destination: { iata_code: 'HAN' },
+                  arriving_at: '2030-10-15T14:30:00Z',
+                },
+              ],
+            },
+          ],
+        },
+        normalizedOffer: buildTestSupplierOffer({
+          offerExpiresAt: '2020-01-01T00:00:00Z',
+          passengers: [{ supplierPassengerId: 'pas_001', type: 'ADULT' }],
+        }),
+        requestedPassengers: [
+          {
+            offerPassengerId: 'pas_001',
+            passengerType: PassengerType.ADULT,
+            source: { type: 'inline', givenName: 'John', familyName: 'Doe' },
+          },
+        ],
+        expectedOutcome: {
+          status: 'ERROR',
+          errorCode: 'OFFER_EXPIRED',
+          httpStatus: 409,
+        },
+      },
+      {
+        name: 'passenger mismatch (count mismatch) yields PASSENGER_MAPPING_INVALID (422)',
+        rawOffer: {
+          expires_at: '2030-12-31T23:59:59Z',
+          passengers: [{ id: 'pas_001', type: 'adult' }],
+          slices: [
+            {
+              segments: [
+                {
+                  origin: { iata_code: 'SGN' },
+                  destination: { iata_code: 'HAN' },
+                  arriving_at: '2030-10-15T14:30:00Z',
+                },
+              ],
+            },
+          ],
+        },
+        normalizedOffer: buildTestSupplierOffer({
+          passengers: [{ supplierPassengerId: 'pas_001', type: 'ADULT' }],
+        }),
+        requestedPassengers: [
+          {
+            offerPassengerId: 'pas_001',
+            passengerType: PassengerType.ADULT,
+            source: { type: 'inline', givenName: 'John', familyName: 'Doe' },
+          },
+          {
+            offerPassengerId: 'pas_002',
+            passengerType: PassengerType.ADULT,
+            source: { type: 'inline', givenName: 'Jane', familyName: 'Doe' },
+          },
+        ],
+        expectedOutcome: {
+          status: 'ERROR',
+          errorCode: 'PASSENGER_MAPPING_INVALID',
+          httpStatus: 422,
+        },
+      },
+      {
+        name: 'passenger mismatch (type mismatch) yields PASSENGER_MAPPING_INVALID (422)',
+        rawOffer: {
+          expires_at: '2030-12-31T23:59:59Z',
+          passengers: [{ id: 'pas_001', type: 'child' }],
+          slices: [
+            {
+              segments: [
+                {
+                  origin: { iata_code: 'SGN' },
+                  destination: { iata_code: 'HAN' },
+                  arriving_at: '2030-10-15T14:30:00Z',
+                },
+              ],
+            },
+          ],
+        },
+        normalizedOffer: buildTestSupplierOffer({
+          passengers: [{ supplierPassengerId: 'pas_001', type: 'CHILD' }],
+        }),
+        requestedPassengers: [
+          {
+            offerPassengerId: 'pas_001',
+            passengerType: PassengerType.ADULT,
+            source: { type: 'inline', givenName: 'John', familyName: 'Doe' },
+          },
+        ],
+        expectedOutcome: {
+          status: 'ERROR',
+          errorCode: 'PASSENGER_MAPPING_INVALID',
+          httpStatus: 422,
+        },
+      },
+      {
+        name: 'passenger mismatch (missing id) yields PASSENGER_MAPPING_INVALID (422)',
+        rawOffer: {
+          expires_at: '2030-12-31T23:59:59Z',
+          passengers: [{ id: 'pas_001', type: 'adult' }],
+          slices: [
+            {
+              segments: [
+                {
+                  origin: { iata_code: 'SGN' },
+                  destination: { iata_code: 'HAN' },
+                  arriving_at: '2030-10-15T14:30:00Z',
+                },
+              ],
+            },
+          ],
+        },
+        normalizedOffer: buildTestSupplierOffer({
+          passengers: [{ supplierPassengerId: 'pas_001', type: 'ADULT' }],
+        }),
+        requestedPassengers: [
+          {
+            offerPassengerId: 'pas_999_unknown',
+            passengerType: PassengerType.ADULT,
+            source: { type: 'inline', givenName: 'John', familyName: 'Doe' },
+          },
+        ],
+        expectedOutcome: {
+          status: 'ERROR',
+          errorCode: 'PASSENGER_MAPPING_INVALID',
+          httpStatus: 422,
+        },
+      },
+    ];
+
+    for (const scenario of scenarios) {
+      it(`evaluates identically for scenario: ${scenario.name}`, async () => {
+        const { service, mocks } = createServiceHarness();
+        mocks.prisma.flightOffer = {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'offer-scenario-test',
+            rawOffer: scenario.rawOffer,
+          }),
+        } as unknown as jest.Mock;
+
+        mocks.profileService.getProfile.mockResolvedValue(buildOwnedProfile());
+        mocks.airportsService.findCountriesByIataCodes.mockImplementation(
+          (codes: string[]) => new Map(codes.map((c) => [c, 'US'])),
+        );
+        mocks.evaluator.evaluate.mockImplementation(
+          (input: { segments: Array<{ originCountryCode: string; destinationCountryCode: string; arrivalDate: string }>; tripCompletionDate: string }) => ({
+            scope: 'INTERNATIONAL',
+            ready: true,
+            passengers: [],
+            capturedInput: input,
+          }),
+        );
+
+        let rawError: HttpException | null = null;
+        let rawResult: unknown = null;
+        try {
+          rawResult = await service.getAdvisoryReadiness('user-1', {
+            flightOfferId: 'offer-scenario-test',
+            passengers: scenario.requestedPassengers,
+          });
+        } catch (err: unknown) {
+          if (err instanceof HttpException) rawError = err;
+        }
+
+        let normalizedError: HttpException | null = null;
+        let normalizedFacts: ReturnType<typeof extractFactsFromNormalizedOffer> | null = null;
+        try {
+          assertNormalizedOfferNotExpired(scenario.normalizedOffer);
+          normalizedFacts = extractFactsFromNormalizedOffer(scenario.normalizedOffer);
+          validateNormalizedPassengerMappings(
+            scenario.requestedPassengers,
+            normalizedFacts.passengers,
+          );
+        } catch (err: unknown) {
+          if (err instanceof HttpException) normalizedError = err;
+        }
+
+        if (scenario.expectedOutcome.status === 'ERROR') {
+          expect(rawError).not.toBeNull();
+          expect(normalizedError).not.toBeNull();
+          expect(rawError?.getStatus()).toBe(scenario.expectedOutcome.httpStatus);
+          expect(normalizedError?.getStatus()).toBe(scenario.expectedOutcome.httpStatus);
+          expect((rawError?.getResponse() as { code?: string })?.code).toBe(
+            scenario.expectedOutcome.errorCode,
+          );
+          expect((normalizedError?.getResponse() as { code?: string })?.code).toBe(
+            scenario.expectedOutcome.errorCode,
+          );
+        } else {
+          expect(rawError).toBeNull();
+          expect(normalizedError).toBeNull();
+          expect(rawResult).not.toBeNull();
+          expect(normalizedFacts).not.toBeNull();
+
+          // Assert facts match between raw execution and normalized offer facts
+          const evaluatorCalls = mocks.evaluator.evaluate.mock.calls;
+          expect(evaluatorCalls.length).toBe(1);
+          const evaluationInput = evaluatorCalls[0][0] as {
+            segments: Array<{
+              originCountryCode: string | null;
+              destinationCountryCode: string | null;
+              arrivalDate: string;
+            }>;
+            tripCompletionDate: string;
+          };
+
+          expect(evaluationInput.tripCompletionDate).toBe(
+            scenario.expectedOutcome.expectedTripCompletionDate,
+          );
+          expect(normalizedFacts?.tripCompletionDate).toBe(
+            scenario.expectedOutcome.expectedTripCompletionDate,
+          );
+
+          expect(normalizedFacts?.airportCodes).toEqual(
+            scenario.expectedOutcome.expectedAirportCodes,
+          );
+
+          // Assert 100% parity on segment continuity
+          expect(evaluationInput.segments.length).toBe(normalizedFacts?.segments.length);
+          for (let i = 0; i < evaluationInput.segments.length; i++) {
+            expect(evaluationInput.segments[i].arrivalDate).toBe(
+              normalizedFacts?.segments[i].arrivalDate,
+            );
+          }
+        }
+      });
+    }
   });
 });

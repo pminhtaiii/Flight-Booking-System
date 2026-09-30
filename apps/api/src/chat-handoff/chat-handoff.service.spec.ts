@@ -1,7 +1,18 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { ServiceUnavailableException } from '@nestjs/common';
-import { ChatHandoffService, ResolvedChatHandoff } from './chat-handoff.service';
+import { ServiceUnavailableException, GoneException, NotFoundException } from '@nestjs/common';
+import {
+  ChatHandoffService,
+  ResolvedChatHandoff,
+  AttestationOffer,
+  ChatHandoffSafeResolveResponse,
+} from './chat-handoff.service';
+import { ChatHandoffDisplayDto } from './dto/chat-handoff-response.dto';
+import type {
+  FlightOffer as SupplierFlightOffer,
+  FlightSegment as SupplierFlightSegment,
+  FlightOfferConditions,
+} from '@/supplier/search/flight-search.port';
 import { ChatHandoffTokenService } from './chat-handoff-token.service';
 import { SelectionAttestationService } from '@/agent-gateway/selection-attestation.service';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -962,4 +973,906 @@ describe('ChatHandoffService', () => {
       expect(internalService.activeClaimAttempts.get('user-1:token-hash-1')).toBe(inFlightPromise);
     });
   });
+
+  describe('raw-reader replacement characterization (T015)', () => {
+    beforeEach(() => {
+      jest.spyOn(configService, 'get').mockImplementation((key: string) => {
+        if (
+          key === 'FEATURE_FLAG_CHAT_HANDOFF_ACCEPT' ||
+          key === 'FEATURE_FLAG_CHAT_HANDOFF_ISSUE'
+        ) {
+          return 'true';
+        }
+        return undefined;
+      });
+    });
+
+    function buildTestSupplierOffer(
+    overrides: Partial<SupplierFlightOffer> = {},
+  ): SupplierFlightOffer {
+    const defaultSegment: SupplierFlightSegment = {
+      supplierSegmentId: 'seg_handoff_1',
+      carrierCode: 'VN',
+      flightNumber: 'VN123',
+      operatingCarrier: 'Vietnam Airlines',
+      departureAirport: 'SGN',
+      departureTerminal: '1',
+      departureTime: '2026-12-01T08:00:00.000Z',
+      arrivalAirport: 'HAN',
+      arrivalTerminal: '2',
+      arrivalTime: '2026-12-01T10:00:00.000Z',
+      duration: 120,
+      aircraft: 'A321',
+      cabinClass: 'economy',
+    };
+
+    const defaultConditions: FlightOfferConditions = {
+      refundable: true,
+      changeable: true,
+      changeBeforeDeparture: null,
+    };
+
+    return {
+      id: 'offer-handoff-t015',
+      supplierOfferId: 'off_supp_1',
+      totalAmount: '125.00',
+      price: 125,
+      currency: 'USD',
+      offerExpiresAt: '2026-12-31T23:59:59.000Z',
+      passengers: [{ supplierPassengerId: 'pas_handoff_1', type: 'ADULT' }],
+      airline: 'Vietnam Airlines',
+      flightNumber: 'VN123',
+      departureAirport: 'SGN',
+      arrivalAirport: 'HAN',
+      departureTime: '2026-12-01T08:00:00.000Z',
+      arrivalTime: '2026-12-01T10:00:00.000Z',
+      duration: 120,
+      stops: 0,
+      fareClass: 'Y',
+      baggageAllowance: '1 checked bag',
+      segments: [defaultSegment],
+      returnSegments: null,
+      conditions: defaultConditions,
+      matchInput: {
+        id: 'offer-handoff-t015',
+        price: 125,
+        currency: 'USD',
+        stops: 0,
+        duration: 120,
+        outboundDepartureHour: 8,
+        outboundArrivalHour: 10,
+        carrierCodes: ['VN'],
+        cabinClass: 'economy',
+        hasCheckedBaggage: true,
+        originalIndex: 0,
+      },
+      rawSupplierPayload: {},
+      ...overrides,
+    };
+  }
+
+  function buildOfferDisplayFromNormalized(
+    normalizedOffer: SupplierFlightOffer | null,
+    dbOffer: {
+      origin?: string;
+      destination?: string;
+      price?: string | number | Prisma.Decimal;
+      currency?: string;
+    } | null,
+    selectedOffer: AttestationOffer,
+  ): ChatHandoffDisplayDto | undefined {
+    const firstSegment = normalizedOffer?.segments[0];
+    const allSegments = normalizedOffer
+      ? [...normalizedOffer.segments, ...(normalizedOffer.returnSegments ?? [])]
+      : [];
+    const lastSegment =
+      allSegments.length > 0 ? allSegments[allSegments.length - 1] : undefined;
+
+    const airline =
+      (normalizedOffer ? normalizedOffer.airline : null) ??
+      (selectedOffer.airline && selectedOffer.airline.length > 0
+        ? selectedOffer.airline
+        : null) ??
+      'Unknown Airline';
+
+    const origin =
+      dbOffer?.origin ??
+      (normalizedOffer ? normalizedOffer.departureAirport : null) ??
+      (selectedOffer.origin && selectedOffer.origin.length > 0 ? selectedOffer.origin : null);
+
+    const destination =
+      dbOffer?.destination ??
+      (normalizedOffer ? normalizedOffer.arrivalAirport : null) ??
+      (selectedOffer.destination && selectedOffer.destination.length > 0
+        ? selectedOffer.destination
+        : null);
+
+    const departureAt =
+      firstSegment?.departureTime ??
+      (selectedOffer.departureAt && selectedOffer.departureAt.length > 0
+        ? selectedOffer.departureAt
+        : null);
+
+    const arrivalAt =
+      lastSegment?.arrivalTime ??
+      (selectedOffer.arrivalAt && selectedOffer.arrivalAt.length > 0
+        ? selectedOffer.arrivalAt
+        : null);
+
+    const price =
+      dbOffer !== null && dbOffer !== undefined
+        ? String(dbOffer.price)
+        : normalizedOffer
+          ? String(normalizedOffer.price)
+          : selectedOffer.price !== undefined
+            ? String(selectedOffer.price)
+            : undefined;
+
+    const currency =
+      dbOffer?.currency ??
+      normalizedOffer?.currency ??
+      (selectedOffer.currency && selectedOffer.currency.length > 0
+        ? selectedOffer.currency
+        : null);
+
+    if (!origin && !destination && !departureAt) {
+      return undefined;
+    }
+
+    return {
+      airline,
+      origin: origin ?? '',
+      destination: destination ?? '',
+      departureAt: departureAt ?? '',
+      arrivalAt: arrivalAt ?? '',
+      price: price ?? '',
+      currency: currency ?? '',
+    };
+  }
+
+  function buildResolveSafeOfferFromNormalized(
+    normalizedOffer: SupplierFlightOffer,
+    dbOffer: {
+      origin: string;
+      destination: string;
+      price: string | number | Prisma.Decimal;
+      currency: string;
+      adults: number;
+      children: number;
+      infants: number;
+    },
+  ): ChatHandoffSafeResolveResponse['offer'] {
+    const firstSegment = normalizedOffer.segments[0];
+    const allSegments = [
+      ...normalizedOffer.segments,
+      ...(normalizedOffer.returnSegments ?? []),
+    ];
+    const lastSegment = allSegments[allSegments.length - 1];
+
+    return {
+      airline: normalizedOffer.airline,
+      origin: dbOffer.origin,
+      destination: dbOffer.destination,
+      departureAt: firstSegment.departureTime,
+      arrivalAt: lastSegment.arrivalTime,
+      price: String(dbOffer.price),
+      currency: dbOffer.currency,
+      adults: dbOffer.adults,
+      children: dbOffer.children,
+      infants: dbOffer.infants,
+    };
+  }
+
+  function extractNormalizedPassengers(
+    normalizedOffer: SupplierFlightOffer,
+  ): Array<{ id: string; type: 'ADULT' | 'CHILD' | 'INFANT' }> {
+    return normalizedOffer.passengers.map((p) => ({
+      id: p.supplierPassengerId,
+      type: p.type,
+    }));
+  }
+
+  function assertNormalizedOfferNotStale(normalizedOffer: SupplierFlightOffer): void {
+    if (
+      !normalizedOffer.offerExpiresAt ||
+      new Date(normalizedOffer.offerExpiresAt).getTime() <= Date.now()
+    ) {
+      throw new GoneException({
+        code: 'HANDOFF_OFFER_STALE',
+        message: 'Handoff offer is stale',
+      });
+    }
+  }
+
+  function invokePrivateBuildOfferDisplay(
+    serviceInstance: ChatHandoffService,
+    flightOffer: unknown,
+    selectedOffer: AttestationOffer,
+  ): ChatHandoffDisplayDto | undefined {
+    const accessor = serviceInstance as unknown as {
+      buildOfferDisplay: (
+        fo: unknown,
+        so: AttestationOffer,
+      ) => ChatHandoffDisplayDto | undefined;
+    };
+    return accessor.buildOfferDisplay(flightOffer, selectedOffer);
+  }
+
+  describe('buildOfferDisplay raw vs normalized parity', () => {
+    it('characterizes airline name selection parity: operating carrier priority', () => {
+      const rawOffer = {
+        slices: [
+          {
+            segments: [
+              {
+                departing_at: '2026-12-01T08:00:00.000Z',
+                arriving_at: '2026-12-01T10:00:00.000Z',
+                operating_carrier: { name: 'Operating Air' },
+                marketing_carrier: { name: 'Marketing Air' },
+              },
+            ],
+          },
+        ],
+      };
+      const dbOffer = {
+        origin: 'SGN',
+        destination: 'HAN',
+        price: '125.00',
+        currency: 'USD',
+        rawOffer,
+      };
+      const selectedOffer: AttestationOffer = {
+        flightOfferId: 'fo1',
+        duffelOfferId: 'duff1',
+        airline: 'Selected Air',
+      };
+
+      const normalizedOffer = buildTestSupplierOffer({
+        airline: 'Operating Air',
+      });
+
+      const rawResult = invokePrivateBuildOfferDisplay(service, dbOffer, selectedOffer);
+      const normalizedResult = buildOfferDisplayFromNormalized(
+        normalizedOffer,
+        dbOffer,
+        selectedOffer,
+      );
+
+      expect(rawResult).toEqual(normalizedResult);
+      expect(rawResult?.airline).toBe('Operating Air');
+      expect(normalizedResult?.airline).toBe('Operating Air');
+    });
+
+    it('characterizes airline name selection parity: marketing carrier fallback when operating carrier is missing', () => {
+      const rawOffer = {
+        slices: [
+          {
+            segments: [
+              {
+                departing_at: '2026-12-01T08:00:00.000Z',
+                arriving_at: '2026-12-01T10:00:00.000Z',
+                operating_carrier: null,
+                marketing_carrier: { name: 'Marketing Air' },
+              },
+            ],
+          },
+        ],
+      };
+      const dbOffer = {
+        origin: 'SGN',
+        destination: 'HAN',
+        price: '125.00',
+        currency: 'USD',
+        rawOffer,
+      };
+      const selectedOffer: AttestationOffer = {
+        flightOfferId: 'fo1',
+        duffelOfferId: 'duff1',
+        airline: 'Selected Air',
+      };
+
+      const normalizedOffer = buildTestSupplierOffer({
+        airline: 'Marketing Air',
+      });
+
+      const rawResult = invokePrivateBuildOfferDisplay(service, dbOffer, selectedOffer);
+      const normalizedResult = buildOfferDisplayFromNormalized(
+        normalizedOffer,
+        dbOffer,
+        selectedOffer,
+      );
+
+      expect(rawResult).toEqual(normalizedResult);
+      expect(rawResult?.airline).toBe('Marketing Air');
+      expect(normalizedResult?.airline).toBe('Marketing Air');
+    });
+
+    it('characterizes airline name selection parity: selectedOffer.airline fallback when segment carriers are missing', () => {
+      const rawOffer = {
+        slices: [
+          {
+            segments: [
+              {
+                departing_at: '2026-12-01T08:00:00.000Z',
+                arriving_at: '2026-12-01T10:00:00.000Z',
+              },
+            ],
+          },
+        ],
+      };
+      const dbOffer = {
+        origin: 'SGN',
+        destination: 'HAN',
+        price: '125.00',
+        currency: 'USD',
+        rawOffer,
+      };
+      const selectedOffer: AttestationOffer = {
+        flightOfferId: 'fo1',
+        duffelOfferId: 'duff1',
+        airline: 'Attested Air',
+      };
+
+      const normalizedOffer = buildTestSupplierOffer({
+        airline: 'Attested Air',
+      });
+
+      const rawResult = invokePrivateBuildOfferDisplay(service, dbOffer, selectedOffer);
+      const normalizedResult = buildOfferDisplayFromNormalized(
+        normalizedOffer,
+        dbOffer,
+        selectedOffer,
+      );
+
+      expect(rawResult).toEqual(normalizedResult);
+      expect(rawResult?.airline).toBe('Attested Air');
+      expect(normalizedResult?.airline).toBe('Attested Air');
+    });
+
+    it('characterizes airline name selection parity: Unknown Airline final fallback', () => {
+      const rawOffer = {
+        slices: [
+          {
+            segments: [
+              {
+                departing_at: '2026-12-01T08:00:00.000Z',
+                arriving_at: '2026-12-01T10:00:00.000Z',
+              },
+            ],
+          },
+        ],
+      };
+      const dbOffer = {
+        origin: 'SGN',
+        destination: 'HAN',
+        price: '125.00',
+        currency: 'USD',
+        rawOffer,
+      };
+      const selectedOffer: AttestationOffer = {
+        flightOfferId: 'fo1',
+        duffelOfferId: 'duff1',
+      };
+
+      const normalizedOffer = buildTestSupplierOffer({
+        airline: 'Unknown Airline',
+        departureTime: '2026-12-01T08:00:00.000Z',
+        arrivalTime: '2026-12-01T10:00:00.000Z',
+        segments: [
+          {
+            supplierSegmentId: 'seg_1',
+            carrierCode: '',
+            flightNumber: '',
+            operatingCarrier: '',
+            departureAirport: 'SGN',
+            departureTerminal: null,
+            departureTime: '2026-12-01T08:00:00.000Z',
+            arrivalAirport: 'HAN',
+            arrivalTerminal: null,
+            arrivalTime: '2026-12-01T10:00:00.000Z',
+            duration: 120,
+            aircraft: null,
+            cabinClass: 'economy',
+          },
+        ],
+      });
+
+      const rawResult = invokePrivateBuildOfferDisplay(service, dbOffer, selectedOffer);
+      const normalizedResult = buildOfferDisplayFromNormalized(
+        normalizedOffer,
+        dbOffer,
+        selectedOffer,
+      );
+
+      expect(rawResult).toEqual(normalizedResult);
+      expect(rawResult?.airline).toBe('Unknown Airline');
+      expect(normalizedResult?.airline).toBe('Unknown Airline');
+    });
+  });
+
+  describe('resolveSafe raw vs normalized parity', () => {
+    it('characterizes passenger extraction parity between handoffPassengers and normalized FlightOffer.passengers', () => {
+      const normalizedOffer = buildTestSupplierOffer({
+        passengers: [
+          { supplierPassengerId: 'pas_1', type: 'ADULT' },
+          { supplierPassengerId: 'pas_2', type: 'CHILD' },
+          { supplierPassengerId: 'pas_3', type: 'INFANT' },
+        ],
+      });
+
+      const normalizedPassengers = extractNormalizedPassengers(normalizedOffer);
+
+      expect(normalizedPassengers).toEqual([
+        { id: 'pas_1', type: 'ADULT' },
+        { id: 'pas_2', type: 'CHILD' },
+        { id: 'pas_3', type: 'INFANT' },
+      ]);
+    });
+
+    it('characterizes segment extraction parity (firstFlightSegment & lastFlightSegment) on multi-slice round-trip', async () => {
+      const rawOffer = {
+        expires_at: '2026-12-31T23:59:59.000Z',
+        slices: [
+          {
+            segments: [
+              {
+                departing_at: '2026-12-01T08:00:00.000Z',
+                arriving_at: '2026-12-01T11:00:00.000Z',
+                operating_carrier: { name: 'Pacific Airways' },
+              },
+              {
+                departing_at: '2026-12-01T13:00:00.000Z',
+                arriving_at: '2026-12-01T20:00:00.000Z',
+                operating_carrier: { name: 'Pacific Airways' },
+              },
+            ],
+          },
+          {
+            segments: [
+              {
+                departing_at: '2026-12-10T10:00:00.000Z',
+                arriving_at: '2026-12-10T22:30:00.000Z',
+                operating_carrier: { name: 'Pacific Airways' },
+              },
+            ],
+          },
+        ],
+      };
+
+      const dbOffer = {
+        duffelOfferId: 'duff_roundtrip',
+        origin: 'SGN',
+        destination: 'LAX',
+        adults: 2,
+        children: 1,
+        infants: 0,
+        price: '850.00',
+        currency: 'USD',
+        rawOffer,
+      };
+
+      const normalizedOffer = buildTestSupplierOffer({
+        airline: 'Pacific Airways',
+        departureAirport: 'SGN',
+        arrivalAirport: 'LAX',
+        departureTime: '2026-12-01T08:00:00.000Z',
+        arrivalTime: '2026-12-01T20:00:00.000Z',
+        segments: [
+          {
+            supplierSegmentId: 's1',
+            carrierCode: 'PA',
+            flightNumber: 'PA1',
+            operatingCarrier: 'Pacific Airways',
+            departureAirport: 'SGN',
+            departureTerminal: null,
+            departureTime: '2026-12-01T08:00:00.000Z',
+            arrivalAirport: 'NRT',
+            arrivalTerminal: null,
+            arrivalTime: '2026-12-01T11:00:00.000Z',
+            duration: 180,
+            aircraft: '787',
+            cabinClass: 'economy',
+          },
+          {
+            supplierSegmentId: 's2',
+            carrierCode: 'PA',
+            flightNumber: 'PA2',
+            operatingCarrier: 'Pacific Airways',
+            departureAirport: 'NRT',
+            departureTerminal: null,
+            departureTime: '2026-12-01T13:00:00.000Z',
+            arrivalAirport: 'LAX',
+            arrivalTerminal: null,
+            arrivalTime: '2026-12-01T20:00:00.000Z',
+            duration: 420,
+            aircraft: '787',
+            cabinClass: 'economy',
+          },
+        ],
+        returnSegments: [
+          {
+            supplierSegmentId: 's3',
+            carrierCode: 'PA',
+            flightNumber: 'PA3',
+            operatingCarrier: 'Pacific Airways',
+            departureAirport: 'LAX',
+            departureTerminal: null,
+            departureTime: '2026-12-10T10:00:00.000Z',
+            arrivalAirport: 'SGN',
+            arrivalTerminal: null,
+            arrivalTime: '2026-12-10T22:30:00.000Z',
+            duration: 750,
+            aircraft: '787',
+            cabinClass: 'economy',
+          },
+        ],
+      });
+
+      jest.spyOn(service, 'resolve').mockResolvedValue({
+        id: 'handoff-rt',
+        flightOfferId: 'offer-rt',
+        duffelOfferIdHash: crypto.createHash('sha256').update('duff_roundtrip').digest('hex'),
+        expiresAt: new Date('2026-12-31T23:59:59.000Z'),
+        consumedAt: null,
+        claimedAt: null,
+        claimExpiresAt: null,
+        claimRecoverAfter: null,
+      } as unknown as ResolvedChatHandoff);
+
+      jest.spyOn(prisma.flightOffer, 'findUnique').mockResolvedValue(dbOffer as never);
+
+      const rawResult = await service.resolveSafe('token-rt', 'u1');
+      const normalizedOfferProjection = buildResolveSafeOfferFromNormalized(
+        normalizedOffer,
+        dbOffer,
+      );
+
+      expect(rawResult.offer).toEqual(normalizedOfferProjection);
+      expect(rawResult.offer.departureAt).toBe('2026-12-01T08:00:00.000Z');
+      expect(rawResult.offer.arrivalAt).toBe('2026-12-10T22:30:00.000Z');
+    });
+
+    it('characterizes identical rejection HANDOFF_OFFER_STALE when offer is expired', async () => {
+      const pastExpiry = '2020-01-01T00:00:00.000Z';
+      const rawOffer = {
+        expires_at: pastExpiry,
+        slices: [
+          {
+            segments: [
+              {
+                departing_at: '2020-01-02T08:00:00.000Z',
+                arriving_at: '2020-01-02T10:00:00.000Z',
+              },
+            ],
+          },
+        ],
+      };
+
+      const dbOffer = {
+        duffelOfferId: 'duff_expired',
+        origin: 'SGN',
+        destination: 'HAN',
+        price: '100.00',
+        currency: 'USD',
+        adults: 1,
+        children: 0,
+        infants: 0,
+        rawOffer,
+      };
+
+      const normalizedOffer = buildTestSupplierOffer({
+        offerExpiresAt: pastExpiry,
+      });
+
+      jest.spyOn(service, 'resolve').mockResolvedValue({
+        id: 'handoff-exp',
+        flightOfferId: 'offer-exp',
+        duffelOfferIdHash: crypto.createHash('sha256').update('duff_expired').digest('hex'),
+        expiresAt: new Date('2026-12-31T23:59:59.000Z'),
+        consumedAt: null,
+        claimedAt: null,
+        claimExpiresAt: null,
+        claimRecoverAfter: null,
+      } as unknown as ResolvedChatHandoff);
+
+      jest.spyOn(prisma.flightOffer, 'findUnique').mockResolvedValue(dbOffer as never);
+
+      let rawError: unknown = null;
+      try {
+        await service.resolveSafe('token-exp', 'u1');
+      } catch (err: unknown) {
+        rawError = err;
+      }
+
+      let normalizedError: unknown = null;
+      try {
+        assertNormalizedOfferNotStale(normalizedOffer);
+      } catch (err: unknown) {
+        normalizedError = err;
+      }
+
+      expect(rawError).toBeInstanceOf(GoneException);
+      expect(normalizedError).toBeInstanceOf(GoneException);
+
+      const rawRes = (rawError as GoneException).getResponse() as { code?: string };
+      const normRes = (normalizedError as GoneException).getResponse() as { code?: string };
+
+      expect(rawRes.code).toBe('HANDOFF_OFFER_STALE');
+      expect(normRes.code).toBe('HANDOFF_OFFER_STALE');
+      expect((rawError as GoneException).getStatus()).toBe(410);
+      expect((normalizedError as GoneException).getStatus()).toBe(410);
+    });
+  });
+
+  describe('parameterized raw vs normalized parity matrix', () => {
+    type ParityCase = {
+      name: string;
+      rawOffer: Record<string, unknown>;
+      normalizedOffer: SupplierFlightOffer;
+      dbOfferRow: {
+        origin: string;
+        destination: string;
+        price: string;
+        currency: string;
+        adults: number;
+        children: number;
+        infants: number;
+      };
+      selectedOffer: AttestationOffer;
+      expectedDisplay: ChatHandoffDisplayDto;
+      expectedSafeOffer: ChatHandoffSafeResolveResponse['offer'];
+    };
+
+    const cases: ParityCase[] = [
+      {
+        name: 'one-way direct flight with operating carrier',
+        rawOffer: {
+          expires_at: '2026-12-31T23:59:59.000Z',
+          passengers: [{ id: 'p1', type: 'adult' }],
+          slices: [
+            {
+              segments: [
+                {
+                  departing_at: '2026-12-05T07:00:00.000Z',
+                  arriving_at: '2026-12-05T09:15:00.000Z',
+                  operating_carrier: { name: 'Vietnam Airlines' },
+                },
+              ],
+            },
+          ],
+        },
+        normalizedOffer: buildTestSupplierOffer({
+          airline: 'Vietnam Airlines',
+          departureAirport: 'SGN',
+          arrivalAirport: 'DAD',
+          departureTime: '2026-12-05T07:00:00.000Z',
+          arrivalTime: '2026-12-05T09:15:00.000Z',
+          passengers: [{ supplierPassengerId: 'p1', type: 'ADULT' }],
+          segments: [
+            {
+              supplierSegmentId: 's1',
+              carrierCode: 'VN',
+              flightNumber: 'VN120',
+              operatingCarrier: 'Vietnam Airlines',
+              departureAirport: 'SGN',
+              departureTerminal: null,
+              departureTime: '2026-12-05T07:00:00.000Z',
+              arrivalAirport: 'DAD',
+              arrivalTerminal: null,
+              arrivalTime: '2026-12-05T09:15:00.000Z',
+              duration: 135,
+              aircraft: 'A321',
+              cabinClass: 'economy',
+            },
+          ],
+          returnSegments: null,
+        }),
+        dbOfferRow: {
+          origin: 'SGN',
+          destination: 'DAD',
+          price: '89.00',
+          currency: 'USD',
+          adults: 1,
+          children: 0,
+          infants: 0,
+        },
+        selectedOffer: {
+          flightOfferId: 'fo_direct',
+          duffelOfferId: 'duff_direct',
+          airline: 'Vietnam Airlines',
+        },
+        expectedDisplay: {
+          airline: 'Vietnam Airlines',
+          origin: 'SGN',
+          destination: 'DAD',
+          departureAt: '2026-12-05T07:00:00.000Z',
+          arrivalAt: '2026-12-05T09:15:00.000Z',
+          price: '89.00',
+          currency: 'USD',
+        },
+        expectedSafeOffer: {
+          airline: 'Vietnam Airlines',
+          origin: 'SGN',
+          destination: 'DAD',
+          departureAt: '2026-12-05T07:00:00.000Z',
+          arrivalAt: '2026-12-05T09:15:00.000Z',
+          price: '89.00',
+          currency: 'USD',
+          adults: 1,
+          children: 0,
+          infants: 0,
+        },
+      },
+      {
+        name: 'round-trip 2-slice flight with multiple passengers',
+        rawOffer: {
+          expires_at: '2026-12-31T23:59:59.000Z',
+          passengers: [
+            { id: 'p1', type: 'adult' },
+            { id: 'p2', type: 'child' },
+          ],
+          slices: [
+            {
+              segments: [
+                {
+                  departing_at: '2026-12-10T10:00:00.000Z',
+                  arriving_at: '2026-12-10T14:30:00.000Z',
+                  operating_carrier: { name: 'Singapore Airlines' },
+                },
+              ],
+            },
+            {
+              segments: [
+                {
+                  departing_at: '2026-12-20T16:00:00.000Z',
+                  arriving_at: '2026-12-20T20:30:00.000Z',
+                  operating_carrier: { name: 'Singapore Airlines' },
+                },
+              ],
+            },
+          ],
+        },
+        normalizedOffer: buildTestSupplierOffer({
+          airline: 'Singapore Airlines',
+          departureAirport: 'SGN',
+          arrivalAirport: 'SIN',
+          departureTime: '2026-12-10T10:00:00.000Z',
+          arrivalTime: '2026-12-10T14:30:00.000Z',
+          passengers: [
+            { supplierPassengerId: 'p1', type: 'ADULT' },
+            { supplierPassengerId: 'p2', type: 'CHILD' },
+          ],
+          segments: [
+            {
+              supplierSegmentId: 's1',
+              carrierCode: 'SQ',
+              flightNumber: 'SQ172',
+              operatingCarrier: 'Singapore Airlines',
+              departureAirport: 'SGN',
+              departureTerminal: null,
+              departureTime: '2026-12-10T10:00:00.000Z',
+              arrivalAirport: 'SIN',
+              arrivalTerminal: null,
+              arrivalTime: '2026-12-10T14:30:00.000Z',
+              duration: 270,
+              aircraft: 'A350',
+              cabinClass: 'economy',
+            },
+          ],
+          returnSegments: [
+            {
+              supplierSegmentId: 's2',
+              carrierCode: 'SQ',
+              flightNumber: 'SQ173',
+              operatingCarrier: 'Singapore Airlines',
+              departureAirport: 'SIN',
+              departureTerminal: null,
+              departureTime: '2026-12-20T16:00:00.000Z',
+              arrivalAirport: 'SGN',
+              arrivalTerminal: null,
+              arrivalTime: '2026-12-20T20:30:00.000Z',
+              duration: 270,
+              aircraft: 'A350',
+              cabinClass: 'economy',
+            },
+          ],
+        }),
+        dbOfferRow: {
+          origin: 'SGN',
+          destination: 'SIN',
+          price: '450.00',
+          currency: 'USD',
+          adults: 1,
+          children: 1,
+          infants: 0,
+        },
+        selectedOffer: {
+          flightOfferId: 'fo_rt',
+          duffelOfferId: 'duff_rt',
+          airline: 'Singapore Airlines',
+        },
+        expectedDisplay: {
+          airline: 'Singapore Airlines',
+          origin: 'SGN',
+          destination: 'SIN',
+          departureAt: '2026-12-10T10:00:00.000Z',
+          arrivalAt: '2026-12-20T20:30:00.000Z',
+          price: '450.00',
+          currency: 'USD',
+        },
+        expectedSafeOffer: {
+          airline: 'Singapore Airlines',
+          origin: 'SGN',
+          destination: 'SIN',
+          departureAt: '2026-12-10T10:00:00.000Z',
+          arrivalAt: '2026-12-20T20:30:00.000Z',
+          price: '450.00',
+          currency: 'USD',
+          adults: 1,
+          children: 1,
+          infants: 0,
+        },
+      },
+    ];
+
+    for (const testCase of cases) {
+      it(`produces 100% identical display and resolveSafe structures for: ${testCase.name}`, async () => {
+        const dbFlightOffer = {
+          ...testCase.dbOfferRow,
+          duffelOfferId: testCase.selectedOffer.duffelOfferId,
+          rawOffer: testCase.rawOffer,
+        };
+
+        // 1. Parity on buildOfferDisplay
+        const rawDisplay = invokePrivateBuildOfferDisplay(
+          service,
+          dbFlightOffer,
+          testCase.selectedOffer,
+        );
+        const normalizedDisplay = buildOfferDisplayFromNormalized(
+          testCase.normalizedOffer,
+          dbFlightOffer,
+          testCase.selectedOffer,
+        );
+
+        expect(rawDisplay).toEqual(testCase.expectedDisplay);
+        expect(normalizedDisplay).toEqual(testCase.expectedDisplay);
+        expect(rawDisplay).toEqual(normalizedDisplay);
+
+        // 2. Parity on resolveSafe
+        jest.spyOn(service, 'resolve').mockResolvedValueOnce({
+          id: 'handoff-matrix-test',
+          flightOfferId: 'offer-matrix-test',
+          duffelOfferIdHash: crypto
+            .createHash('sha256')
+            .update(testCase.selectedOffer.duffelOfferId)
+            .digest('hex'),
+          expiresAt: new Date('2026-12-31T23:59:59.000Z'),
+          consumedAt: null,
+          claimedAt: null,
+          claimExpiresAt: null,
+          claimRecoverAfter: null,
+        } as unknown as ResolvedChatHandoff);
+
+        jest
+          .spyOn(prisma.flightOffer, 'findUnique')
+          .mockResolvedValueOnce(dbFlightOffer as never);
+
+        const safeResponse = await service.resolveSafe('token-matrix', 'u1');
+        const normalizedSafeOffer = buildResolveSafeOfferFromNormalized(
+          testCase.normalizedOffer,
+          testCase.dbOfferRow,
+        );
+
+        expect(safeResponse.offer).toEqual(testCase.expectedSafeOffer);
+        expect(normalizedSafeOffer).toEqual(testCase.expectedSafeOffer);
+        expect(safeResponse.offer).toEqual(normalizedSafeOffer);
+
+        // Verify passengers parity
+        const normalizedPassengers = extractNormalizedPassengers(testCase.normalizedOffer);
+        expect(safeResponse.passengers).toEqual(normalizedPassengers);
+      });
+    }
+  });
+});
 });
