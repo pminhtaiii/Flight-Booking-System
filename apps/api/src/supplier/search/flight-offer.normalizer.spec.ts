@@ -147,7 +147,7 @@ function createSampleDuffelOffer(options: MockOfferOptions = {}): ExtendedDuffel
         ],
       },
     ],
-    conditions: options.conditions ?? {
+    conditions: 'conditions' in options ? options.conditions : {
       refund_before_departure: { allowed: true },
       change_before_departure: {
         allowed: true,
