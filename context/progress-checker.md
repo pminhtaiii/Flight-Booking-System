@@ -1,5 +1,23 @@
 # Progress Tracker
 
+### Feature 029 — Narrow the Duffel Supplier Boundary: Phase 3 Slice 2 Flight Offer Normalizer & Raw Reader Test Parity Complete (Tasks T014, T015, T018 Verified) (2026-09-30)
+
+- **T014 Stored-Offer and Live-Offer Normalization Parity Tests**:
+  - Implemented `apps/api/src/supplier/search/flight-offer.normalizer.spec.ts` with 30 unit tests locking deterministic UUID parity (RFC 4122 v4 via SHA-256 matching legacy output), live offer mapping into `FlightOffer` (one-way and round-trip return segments, uppercase passenger types, flight summaries, conditions, 100% `matchInput` parity, and intact `rawSupplierPayload` preservation), legacy stored snapshot decoding, and fail-closed null handling across corrupt payloads.
+  - Verified clean TDD RED status against stubbed implementation.
+- **T018 Implement FlightOfferNormalizer with Zero `any`**:
+  - Implemented `@Injectable() export class FlightOfferNormalizer` in `apps/api/src/supplier/search/flight-offer.normalizer.ts` with instance, static, and functional exports for `generateDeterministicUUID`, `parseISO8601Duration`, `normalizeOffer`, and `normalizeStoredOffer`.
+  - Enforced strict runtime type guards in `normalizeStoredOffer` validating structures, positive pricing, ISO-8601 dates, slices, segments, and passengers before projection into `FlightOffer`, returning `null` safely without unhandled exceptions on corrupt data.
+  - Verified strictly zero `any` across the entire implementation and turned all 30 tests 100% GREEN.
+- **T015 Raw-Reader Replacement Test Parity**:
+  - Extended test suites in `apps/api/src/booking-intent/booking-readiness.service.spec.ts`, `apps/api/src/agent-gateway/booking-readiness/agent-booking-readiness.service.spec.ts`, and `apps/api/src/chat-handoff/chat-handoff.service.spec.ts`.
+  - Added parameterized characterization tests proving 100% parity between raw Duffel JSON readers and `FlightOfferNormalizer.normalizeStoredOffer` for passenger mapping, trip completion date calculation, 1-based ordinal mapping, segment extraction, and malformed offer error handling (`OFFER_MALFORMED`).
+- **Verification Gates**:
+  - All 93 search and normalizer tests passed (`flight-offer.normalizer.spec.ts`, `duffel-search.service.spec.ts`, `flight-search-orchestrator.service.spec.ts`).
+  - All 74 raw-reader test cases passed across booking readiness, agent readiness, and chat handoff suites.
+  - TypeScript compilation (`tsc -p tsconfig.json --noEmit`) clean with 0 errors.
+  - Marked Tasks T013, T014, T015, T016, and T018 complete in `specs/029-duffel-provider-narrowing/tasks.md`.
+
 ### CI Feedback Loop Convergence — PR #354 (Commit f7b19a0c) Green (2026-09-30)
 
 - **CI Remediation & Pipeline Convergence**:
