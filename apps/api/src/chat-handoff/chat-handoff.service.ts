@@ -108,7 +108,7 @@ function isoDateValue(value: unknown): string | null {
   return date && !Number.isNaN(date.getTime()) ? date.toISOString() : null;
 }
 
-function firstFlightSegment(rawOffer: unknown): JsonRecord | null {
+export function firstFlightSegment(rawOffer: unknown): JsonRecord | null {
   if (!isJsonRecord(rawOffer) || !Array.isArray(rawOffer.slices)) {
     return null;
   }
@@ -122,7 +122,7 @@ function firstFlightSegment(rawOffer: unknown): JsonRecord | null {
   return isJsonRecord(firstSegment) ? firstSegment : null;
 }
 
-function lastFlightSegment(rawOffer: unknown): JsonRecord | null {
+export function lastFlightSegment(rawOffer: unknown): JsonRecord | null {
   if (!isJsonRecord(rawOffer) || !Array.isArray(rawOffer.slices)) {
     return null;
   }
@@ -136,7 +136,7 @@ function lastFlightSegment(rawOffer: unknown): JsonRecord | null {
   return isJsonRecord(lastSegment) ? lastSegment : null;
 }
 
-function handoffPassengers(
+export function handoffPassengers(
   rawOffer: JsonRecord | null,
 ): Array<{ id: string; type: 'ADULT' | 'CHILD' | 'INFANT' }> | null {
   if (!rawOffer || !Array.isArray(rawOffer.passengers)) return null;

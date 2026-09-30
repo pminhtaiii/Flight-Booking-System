@@ -34,12 +34,12 @@ type ReadinessContext = {
 
 type RawRecord = Record<string, unknown>;
 
-type StoredOfferPassenger = {
+export type StoredOfferPassenger = {
   id: string;
   type: PassengerType;
 };
 
-type NormalizedOffer = {
+export type NormalizedOffer = {
   passengers: StoredOfferPassenger[];
   segments: BookingReadinessSegmentInput[];
   airportCodes: string[];
@@ -420,7 +420,7 @@ export class BookingReadinessService {
     }
   }
 
-  private normalizeStoredOffer(rawOffer: unknown): NormalizedOffer {
+  normalizeStoredOffer(rawOffer: unknown): NormalizedOffer {
     if (
       !isRecord(rawOffer) ||
       !Array.isArray(rawOffer.passengers) ||
