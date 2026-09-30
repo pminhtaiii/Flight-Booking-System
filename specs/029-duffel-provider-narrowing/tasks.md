@@ -42,7 +42,7 @@
 
 - [x] T013 [P] [US1] Add search-port/cache/hash/ranking/rejection and live-offer lookup contract tests in `apps/api/src/supplier/search/duffel-search.service.spec.ts` and `apps/api/src/flights/flight-search-orchestrator.service.spec.ts`.
 - [x] T014 [P] [US1] Add stored-offer normalization parity tests for passenger IDs, expiry, carriers, segments, cabin, baggage, and malformed snapshots in `apps/api/src/supplier/search/flight-offer.normalizer.spec.ts`.
-- [ ] T015 [P] [US1] Add raw-reader replacement cases in `apps/api/src/booking-intent/booking-readiness.service.spec.ts`, `apps/api/src/agent-gateway/booking-readiness/agent-booking-readiness.service.spec.ts`, and `apps/api/src/chat-handoff/chat-handoff.service.spec.ts`.
+- [x] T015 [P] [US1] Add raw-reader replacement cases in `apps/api/src/booking-intent/booking-readiness.service.spec.ts`, `apps/api/src/agent-gateway/booking-readiness/agent-booking-readiness.service.spec.ts`, and `apps/api/src/chat-handoff/chat-handoff.service.spec.ts`.
 
 ### Implementation for User Story 1
 
