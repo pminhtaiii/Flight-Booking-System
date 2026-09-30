@@ -3,7 +3,7 @@ import { Injectable, Optional, HttpException, HttpStatus } from '@nestjs/common'
 import { CacheService } from '@/cache/cache.service';
 import { DuffelRateBudgetService } from '../core/duffel-rate-budget.service';
 import { DuffelSearchAdapter } from './duffel-search.adapter';
-import { FlightOfferNormalizer } from './flight-offer.normalizer';
+import { FlightOfferNormalizer, validateAndNormalizeOffer } from './flight-offer.normalizer';
 import { DuffelOffer } from '@/duffel/duffel.types';
 import {
   FlightOffer,
@@ -100,14 +100,23 @@ export class DuffelSearchService implements FlightSearchPort {
       if (!raw || typeof raw !== 'object') {
         continue;
       }
-      // Safe cast: raw offer from Duffel search response conforms to partial DuffelOffer structure
-      const normalizedOffer = this.normalizerInstance.normalizeOffer(
-        raw as unknown as DuffelOffer,
-        criteria.cabinClass,
-        i,
-      );
-      if (normalizedOffer) {
-        offers.push(normalizedOffer);
+      try {
+        // The validator checks the unknown supplier payload before admission.
+        const rawOffer = raw as DuffelOffer;
+        if (!validateAndNormalizeOffer(rawOffer, i).success) {
+          continue;
+        }
+        const normalizedOffer = this.normalizerInstance.normalizeOffer(
+          rawOffer,
+          criteria.cabinClass,
+          i,
+        );
+        if (normalizedOffer) {
+          offers.push(normalizedOffer);
+        }
+      } catch {
+        // Malformed nested supplier data must not discard the other search results.
+        continue;
       }
     }
 

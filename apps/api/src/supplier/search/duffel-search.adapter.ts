@@ -22,6 +22,8 @@ export class DuffelTimeoutError extends Error {
 
 @Injectable()
 export class DuffelSearchAdapter {
+  private mockOffer?: { id: string } & Record<string, unknown>;
+
   constructor(
     @Optional() @Inject(DUFFEL_SDK) private readonly duffel?: Duffel,
     @Optional() private readonly rateBudgetService?: DuffelRateBudgetService,
@@ -76,16 +78,7 @@ export class DuffelSearchAdapter {
     const cabinClass =
       (criteria.cabinClass && cabinClassMap[criteria.cabinClass.toLowerCase()]) || 'economy';
 
-    const isJest = process.env.JEST_WORKER_ID !== undefined;
-    const hasDuffelApiUrl = Boolean(
-      process.env.DUFFEL_API_URL && process.env.DUFFEL_API_URL.trim() !== '',
-    );
-    const token = process.env.DUFFEL_ACCESS_TOKEN;
-    const isMockEnv =
-      process.env.DUFFEL_MOCK === 'true' ||
-      (!isJest && !hasDuffelApiUrl && (process.env.NODE_ENV === 'test' || token === 'mock'));
-
-    if (isMockEnv) {
+    if (this.isMockMode()) {
       const mockPassengers: Array<{
         id: string;
         type: 'adult' | 'child' | 'infant_without_seat';
@@ -219,6 +212,8 @@ export class DuffelSearchAdapter {
         },
       ];
 
+      this.mockOffer = offers[0];
+
       return {
         id: 'or_mock_123',
         slices: mockSlices,
@@ -264,7 +259,26 @@ export class DuffelSearchAdapter {
     }
   }
 
+  private isMockMode(): boolean {
+    const isJest = process.env.JEST_WORKER_ID !== undefined;
+    const hasDuffelApiUrl = Boolean(
+      process.env.DUFFEL_API_URL && process.env.DUFFEL_API_URL.trim() !== '',
+    );
+    const token = process.env.DUFFEL_ACCESS_TOKEN;
+    return (
+      process.env.DUFFEL_MOCK === 'true' ||
+      (!isJest && !hasDuffelApiUrl && (process.env.NODE_ENV === 'test' || token === 'mock'))
+    );
+  }
+
   async getOffer(supplierOfferId: string, timeoutMs = 4500): Promise<unknown> {
+    if (this.isMockMode() && supplierOfferId.startsWith('off_mock_')) {
+      if (this.mockOffer?.id === supplierOfferId) {
+        return this.mockOffer;
+      }
+      throw new NotFoundException(`Duffel mock offer ${supplierOfferId} was not found`);
+    }
+
     if (!this.duffel) {
       throw new HttpException(
         {

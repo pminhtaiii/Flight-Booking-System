@@ -394,6 +394,35 @@ describe('DuffelSearchService Contract Tests (TDD RED)', () => {
   });
 
   describe('Search validation and caching', () => {
+    it.each([
+      { total_amount: 'invalid' },
+      { total_amount: '0' },
+      { total_currency: '' },
+      { slices: [] },
+      { slices: [{ segments: [] }] },
+      { slices: [{ segments: [{ departing_at: 'invalid' }] }] },
+      { slices: [{ segments: [null] }] },
+      { slices: [...createMockRawOffer('off_invalid').slices, { segments: [null] }] },
+      { passengers: [null] },
+    ])('skips invalid offers and preserves valid results for %p', async (invalidFields) => {
+      const validOffer = createMockRawOffer('off_valid');
+      searchAdapter.searchOffers.mockResolvedValueOnce({
+        offers: [{ ...createMockRawOffer('off_invalid'), ...invalidFields }, validOffer],
+      });
+
+      const result = await service.search(defaultCriteria, 'user');
+
+      expect(result.offers).toHaveLength(1);
+      expect(result.offers[0].supplierOfferId).toBe('off_valid');
+      expect(result.offers[0].matchInput.originalIndex).toBe(1);
+      expect(result.offers[0].rawSupplierPayload).toEqual(validOffer);
+      expect(cacheService.set).toHaveBeenCalledWith(
+        `flight:search:${result.searchHash}`,
+        JSON.stringify(result),
+        900,
+      );
+    });
+
     it('rejects a cache miss without an adapter before reserving budget or caching', async () => {
       const module = await Test.createTestingModule({
         providers: [
