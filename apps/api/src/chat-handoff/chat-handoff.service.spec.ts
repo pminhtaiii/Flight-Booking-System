@@ -1064,7 +1064,7 @@ describe('Raw-Reader Replacement Parity (T015)', () => {
             duration: 'PT1H20M',
             marketing_carrier: { iata_code: 'VN', name: 'Vietnam Airlines' },
             marketing_carrier_flight_number: '123',
-            operating_carrier: { iata_code: 'VN', name: 'Vietnam Airlines' },
+            operating_carrier: { iata_code: 'BL', name: 'Pacific Airlines' },
           },
         ],
       },
@@ -1150,7 +1150,9 @@ describe('Raw-Reader Replacement Parity (T015)', () => {
       const normalized = FlightOfferNormalizer.normalizeStoredOffer(rawOffer);
       expect(normalized).not.toBeNull();
 
-      expect(normalized!.airline).toBe(rawAirline);
+      // User-requested correction: handoff prefers the operating carrier; the offer airline prefers marketing.
+      expect(normalized!.segments[0].operatingCarrier).toBe(rawAirline);
+      expect(normalized!.airline).toBe(rawMarketingCarrier?.name ?? rawAirline);
       expect(normalized!.flightNumber).toBe(rawFlightNumber);
       expect(normalized!.departureAirport).toBe(rawOrigin);
       expect(normalized!.departureTime).toBe(rawDepartureAt);
@@ -1264,7 +1266,8 @@ describe('Raw-Reader Replacement Parity (T015)', () => {
 
     const safeResult = await service.resolveSafe('chk_handoff_validtoken', 'user-1');
 
-    expect(safeResult.offer.airline).toBe(normalized!.airline);
+    // Preserve the operating-carrier precedence characterized by the corrected parity test.
+    expect(safeResult.offer.airline).toBe(normalized!.segments[0].operatingCarrier);
     expect(safeResult.offer.departureAt).toBe(normalized!.departureTime);
     expect(safeResult.offer.arrivalAt).toBe(normalized!.arrivalTime);
     expect(safeResult.offer.origin).toBe(normalized!.departureAirport);

@@ -510,6 +510,8 @@ export class FlightOfferNormalizer {
       return null;
     }
 
+    const normalizedSlices: Record<string, unknown>[] = [];
+
     // 5. Each slice must have non-empty segments array with valid origins/destinations/timestamps
     for (const slice of candidate.slices) {
       if (
@@ -524,6 +526,7 @@ export class FlightOfferNormalizer {
       if (!Array.isArray(sliceObj.segments) || sliceObj.segments.length === 0) {
         return null;
       }
+      const normalizedSegments: Record<string, unknown>[] = [];
       for (const seg of sliceObj.segments) {
         if (
           seg === null ||
@@ -545,7 +548,12 @@ export class FlightOfferNormalizer {
           return null;
         }
         const originObj = segObj.origin as Record<string, unknown>;
-        if (typeof originObj.iata_code !== 'string' || originObj.iata_code.trim() === '') {
+        if (typeof originObj.iata_code !== 'string') {
+          return null;
+        }
+
+        const originCode = originObj.iata_code.trim().toUpperCase();
+        if (!/^[A-Z]{3}$/.test(originCode)) {
           return null;
         }
 
@@ -559,7 +567,12 @@ export class FlightOfferNormalizer {
           return null;
         }
         const destObj = segObj.destination as Record<string, unknown>;
-        if (typeof destObj.iata_code !== 'string' || destObj.iata_code.trim() === '') {
+        if (typeof destObj.iata_code !== 'string') {
+          return null;
+        }
+
+        const destinationCode = destObj.iata_code.trim().toUpperCase();
+        if (!/^[A-Z]{3}$/.test(destinationCode)) {
           return null;
         }
 
@@ -576,7 +589,13 @@ export class FlightOfferNormalizer {
         ) {
           return null;
         }
+        normalizedSegments.push({
+          ...segObj,
+          origin: { ...originObj, iata_code: originCode },
+          destination: { ...destObj, iata_code: destinationCode },
+        });
       }
+      normalizedSlices.push({ ...sliceObj, segments: normalizedSegments });
     }
 
     if (!Array.isArray(candidate.passengers) || candidate.passengers.length === 0) {
@@ -602,16 +621,17 @@ export class FlightOfferNormalizer {
       }
       const typeLower = pObj.type.trim().toLowerCase();
       if (
-        !typeLower.startsWith('adult') &&
-        !typeLower.startsWith('child') &&
-        !typeLower.startsWith('infant')
+        typeLower !== 'adult' &&
+        typeLower !== 'child' &&
+        typeLower !== 'infant'
       ) {
         return null;
       }
     }
 
     const normalized = FlightOfferNormalizer.normalizeOffer(
-      candidate as unknown as DuffelOffer,
+      // Required stored fields are validated above; copy normalized codes without mutating the snapshot.
+      { ...candidate, slices: normalizedSlices } as unknown as DuffelOffer,
       undefined,
       0,
     );

@@ -420,9 +420,76 @@ describe('FlightOfferNormalizer (T014)', () => {
     });
   });
 
+  // Stored snapshots use exact passenger types, as required by the legacy readers.
+  function createSampleStoredOffer(): ExtendedDuffelOffer {
+    return createSampleDuffelOffer({
+      passengers: [
+        { id: 'pas_adult_01', type: 'adult' },
+        { id: 'pas_child_02', type: 'child' },
+        { id: 'pas_infant_03', type: 'infant' },
+      ],
+    });
+  }
+
   describe('c. Legacy stored offer normalization (normalizeStoredOffer)', () => {
+    it('normalizes airport codes across outbound and return segments without changing the snapshot', () => {
+      const storedSnapshot = createSampleStoredOffer();
+      storedSnapshot.slices.push(createSampleRoundTripDuffelOffer().slices[1]);
+      const expectedCodes = storedSnapshot.slices.map((slice) =>
+        slice.segments.map((segment) => ({
+          departureAirport: segment.origin.iata_code,
+          arrivalAirport: segment.destination.iata_code,
+        })),
+      );
+      for (const slice of storedSnapshot.slices) {
+        for (const segment of slice.segments) {
+          segment.origin.iata_code = ` ${segment.origin.iata_code.toLowerCase()} `;
+          segment.destination.iata_code = ` ${segment.destination.iata_code.toLowerCase()} `;
+        }
+      }
+      const originalSnapshot = structuredClone(storedSnapshot);
+
+      const result = normalizer.normalizeStoredOffer(storedSnapshot);
+
+      expect(result).not.toBeNull();
+      expect(result?.departureAirport).toBe(expectedCodes[0][0].departureAirport);
+      expect(result?.arrivalAirport).toBe(expectedCodes[0][expectedCodes[0].length - 1].arrivalAirport);
+      expect(result?.segments).toMatchObject(expectedCodes[0]);
+      expect(result?.returnSegments).toMatchObject(expectedCodes[1]);
+      expect(result?.rawSupplierPayload).toBe(storedSnapshot);
+      expect(storedSnapshot).toEqual(originalSnapshot);
+    });
+
+    it.each([' ADULT ', ' Child ', ' InFaNt '])('accepts the exact passenger type %s after normalization', (type) => {
+      const result = normalizer.normalizeStoredOffer({
+        ...createSampleStoredOffer(),
+        passengers: [{ id: 'pas_01', type }],
+      });
+
+      expect(result?.passengers).toEqual([{ supplierPassengerId: 'pas_01', type: type.trim().toUpperCase() }]);
+    });
+
+    it.each(['origin', 'destination'] as const)('rejects malformed %s codes in every slice', (endpoint) => {
+      for (const code of ['', '  ', 'SF', 'SFOO', 'S1O', 'S-O', 'S F', 'éab', 123, null]) {
+        for (const sliceIndex of [0, 1]) {
+          const storedSnapshot = createSampleStoredOffer();
+          storedSnapshot.slices.push(createSampleRoundTripDuffelOffer().slices[1]);
+          const segment = storedSnapshot.slices[sliceIndex].segments[0];
+          Object.assign(segment[endpoint], { iata_code: code });
+          expect(normalizer.normalizeStoredOffer(storedSnapshot)).toBeNull();
+        }
+      }
+    });
+
+    it.each(['adult_extra', 'childish', 'infant_without_seat', ' INFANT_WITHOUT_SEAT ', 'unknown'])('rejects the noncanonical passenger type %s', (type) => {
+      expect(normalizer.normalizeStoredOffer({
+        ...createSampleStoredOffer(),
+        passengers: [{ id: 'pas_01', type }],
+      })).toBeNull();
+    });
+
     it('decodes a valid legacy stored JSON snapshot into a FlightOffer', () => {
-      const storedSnapshot = createSampleDuffelOffer();
+      const storedSnapshot = createSampleStoredOffer();
 
       const result = normalizer.normalizeStoredOffer(storedSnapshot);
 
@@ -441,7 +508,7 @@ describe('FlightOfferNormalizer (T014)', () => {
     });
 
     it('decodes stored snapshot via static method and exported function', () => {
-      const storedSnapshot = createSampleDuffelOffer();
+      const storedSnapshot = createSampleStoredOffer();
       const staticResult = FlightOfferNormalizer.normalizeStoredOffer(storedSnapshot);
       const exportResult = normalizeStoredOffer(storedSnapshot);
 
@@ -467,14 +534,14 @@ describe('FlightOfferNormalizer (T014)', () => {
     });
 
     it('returns null for missing or empty slices array', () => {
-      const base = createSampleDuffelOffer();
+      const base = createSampleStoredOffer();
       expect(normalizer.normalizeStoredOffer({ ...base, slices: undefined })).toBeNull();
       expect(normalizer.normalizeStoredOffer({ ...base, slices: [] })).toBeNull();
       expect(normalizer.normalizeStoredOffer({ ...base, slices: 'not-an-array' })).toBeNull();
     });
 
     it('returns null for slices with empty or missing segments array', () => {
-      const base = createSampleDuffelOffer();
+      const base = createSampleStoredOffer();
       expect(
         normalizer.normalizeStoredOffer({
           ...base,
@@ -490,7 +557,7 @@ describe('FlightOfferNormalizer (T014)', () => {
     });
 
     it('returns null for segments missing origin or destination', () => {
-      const baseMissingOrigin = createSampleDuffelOffer();
+      const baseMissingOrigin = createSampleStoredOffer();
       const badSegOrigin = { ...baseMissingOrigin.slices[0].segments[0], origin: undefined };
       expect(
         normalizer.normalizeStoredOffer({
@@ -499,7 +566,7 @@ describe('FlightOfferNormalizer (T014)', () => {
         }),
       ).toBeNull();
 
-      const baseMissingDest = createSampleDuffelOffer();
+      const baseMissingDest = createSampleStoredOffer();
       const badSegDest = { ...baseMissingDest.slices[0].segments[0], destination: undefined };
       expect(
         normalizer.normalizeStoredOffer({
@@ -510,7 +577,7 @@ describe('FlightOfferNormalizer (T014)', () => {
     });
 
     it('returns null for segments with invalid ISO timestamps', () => {
-      const baseBadDepart = createSampleDuffelOffer();
+      const baseBadDepart = createSampleStoredOffer();
       const badDepartSeg = {
         ...baseBadDepart.slices[0].segments[0],
         departing_at: 'invalid-iso-timestamp',
@@ -522,7 +589,7 @@ describe('FlightOfferNormalizer (T014)', () => {
         }),
       ).toBeNull();
 
-      const baseBadArrival = createSampleDuffelOffer();
+      const baseBadArrival = createSampleStoredOffer();
       const badArrivalSeg = {
         ...baseBadArrival.slices[0].segments[0],
         arriving_at: '2026-13-45T99:99:99',
@@ -536,14 +603,14 @@ describe('FlightOfferNormalizer (T014)', () => {
     });
 
     it('returns null for missing or empty passengers array', () => {
-      const base = createSampleDuffelOffer();
+      const base = createSampleStoredOffer();
       expect(normalizer.normalizeStoredOffer({ ...base, passengers: undefined })).toBeNull();
       expect(normalizer.normalizeStoredOffer({ ...base, passengers: [] })).toBeNull();
       expect(normalizer.normalizeStoredOffer({ ...base, passengers: 'not-an-array' })).toBeNull();
     });
 
     it('returns null for passengers with missing id or invalid type', () => {
-      const base = createSampleDuffelOffer();
+      const base = createSampleStoredOffer();
       expect(
         normalizer.normalizeStoredOffer({
           ...base,
@@ -565,7 +632,7 @@ describe('FlightOfferNormalizer (T014)', () => {
     });
 
     it('returns null for missing or non-numeric total_amount', () => {
-      const base = createSampleDuffelOffer();
+      const base = createSampleStoredOffer();
       expect(normalizer.normalizeStoredOffer({ ...base, total_amount: undefined })).toBeNull();
       expect(normalizer.normalizeStoredOffer({ ...base, total_amount: '' })).toBeNull();
       expect(normalizer.normalizeStoredOffer({ ...base, total_amount: '0' })).toBeNull();
@@ -578,7 +645,7 @@ describe('FlightOfferNormalizer (T014)', () => {
     });
 
     it('returns null for missing or empty total_currency', () => {
-      const base = createSampleDuffelOffer();
+      const base = createSampleStoredOffer();
       expect(normalizer.normalizeStoredOffer({ ...base, total_currency: undefined })).toBeNull();
       expect(normalizer.normalizeStoredOffer({ ...base, total_currency: '' })).toBeNull();
       expect(normalizer.normalizeStoredOffer({ ...base, total_currency: '   ' })).toBeNull();
@@ -586,7 +653,7 @@ describe('FlightOfferNormalizer (T014)', () => {
     });
 
     it('returns null for stored offers with duplicate passenger ids', () => {
-      const base = createSampleDuffelOffer();
+      const base = createSampleStoredOffer();
       expect(
         normalizer.normalizeStoredOffer({
           ...base,
