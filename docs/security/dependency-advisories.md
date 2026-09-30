@@ -30,7 +30,7 @@ A full workspace dependency audit identified 98 unique GitHub Security Advisorie
 
 ## 4. Complete Inventory of Deferred Advisories
 
-Total unique advisories registered: **98**
+Total unique advisories registered: **101**
 
 | GHSA ID | Package | Severity | Advisory Summary | Vulnerable Range | Patched Range |
 |---|---|---|---|---|---|
@@ -38,7 +38,10 @@ Total unique advisories registered: **98**
 | [GHSA-2g4f-4pwh-qvx6](https://github.com/advisories/GHSA-2g4f-4pwh-qvx6) | `ajv` | **MODERATE** | ajv has ReDoS when using `$data` option | `>=7.0.0-alpha.0 <8.18.0` | `>=8.18.0` |
 | [GHSA-w5vr-8v7q-w6rv](https://github.com/advisories/GHSA-w5vr-8v7q-w6rv) | `baseline-browser-mapping` | **MODERATE** | baseline-browser-mapping process termination on invalid input causes denial of service | `>=2.0.0 <2.11.0` | `>=2.11.0` |
 | [GHSA-3jxr-9vmj-r5cp](https://github.com/advisories/GHSA-3jxr-9vmj-r5cp) | `brace-expansion` | **HIGH** | brace-expansion: DoS via exponential-time expansion of consecutive non-expanding {} groups | `>=2.0.0 <2.1.2` | `>=2.1.2` |
+| [GHSA-6j4f-fj2g-mc7p](https://github.com/advisories/GHSA-6j4f-fj2g-mc7p) | `brace-expansion` | **HIGH** | brace-expansion: DoS via uncontrolled recursion in parseCommaParts causing stack exhaustion | `<1.1.19, >=2.0.0 <2.1.5` | `>=1.1.19, >=2.1.5` |
 | [GHSA-mh99-v99m-4gvg](https://github.com/advisories/GHSA-mh99-v99m-4gvg) | `brace-expansion` | **HIGH** | brace-expansion: DoS via unbounded expansion length causing an out-of-memory process crash | `<1.1.17` | `>=1.1.17` |
+| [GHSA-q2hr-2g5m-vwhr](https://github.com/advisories/GHSA-q2hr-2g5m-vwhr) | `brace-expansion` | **MODERATE** | brace-expansion: Quadratic-time expansion of the `{a},b}` rewrite causes CPU denial of service | `<1.1.21, >=2.0.0 <2.1.7` | `>=1.1.21, >=2.1.7` |
+| [GHSA-qhr7-859c-m2p7](https://github.com/advisories/GHSA-qhr7-859c-m2p7) | `brace-expansion` | **HIGH** | brace-expansion: DoS via uncontrolled recursion on nested brace groups causing stack exhaustion | `<1.1.20, >=2.0.0 <2.1.6` | `>=1.1.20, >=2.1.6` |
 | [GHSA-rgw5-rvv9-x895](https://github.com/advisories/GHSA-rgw5-rvv9-x895) | `brace-expansion` | **HIGH** | brace-expansion: DoS via unbounded intermediate arrays, bypassing the CVE-2026-14257 mitigation | `>=2.0.0 <2.1.4` | `>=2.1.4` |
 | [GHSA-73wf-gq98-2v4g](https://github.com/advisories/GHSA-73wf-gq98-2v4g) | `browserslist` | **HIGH** | Browserslist: Uncaught crash / prototype write via untrusted browserslist-stats.json custom stats (normalizeStats) | `<=4.28.6` | `>=4.28.7` |
 | [GHSA-c83g-rgw3-j3cx](https://github.com/advisories/GHSA-c83g-rgw3-j3cx) | `browserslist` | **HIGH** | Browserslist: Unbounded memory growth (no cache eviction) via distinct query results, leading to eventual OOM | `<=4.28.6` | `>=4.28.7` |

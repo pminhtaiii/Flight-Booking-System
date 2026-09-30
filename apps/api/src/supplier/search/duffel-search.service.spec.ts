@@ -11,7 +11,6 @@ import { DuffelRateBudgetService } from '../core/duffel-rate-budget.service';
 import { DuffelSearchService } from './duffel-search.service';
 import { DuffelSearchAdapter } from './duffel-search.adapter';
 import {
-  FlightOffer,
   FlightSearchCriteria,
   FlightSearchResult,
 } from './flight-search.port';
