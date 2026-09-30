@@ -8,11 +8,12 @@
   - **`duffel-core.module.ts`**: Internal NestJS module importing `CacheModule` and exporting `DUFFEL_SDK` and `DuffelRateBudgetService`. Wired into `DuffelModule`.
   - **Atomic Check-and-Increment in `CacheService` (`cache.service.ts`)**: Evaluates primary and optional secondary counter limits in a single round-trip Redis Lua script. Atomically sets TTL on key creation, rejects both counters if either limit would be exceeded, and fails closed (`storeError: true`) on Redis connection loss or execution errors, with in-memory fallback.
   - **`duffel-rate-budget.service.ts`**: Implements global daily rate budget enforcement under key `budget:duffel:daily:YYYY-MM-DD` (default 1,500 attempts) expiring at next UTC midnight (`00:00:00Z`). Supports optional caller sub-allocation constraints (`extraConstraint: { key, limit }`), returns typed results (`{ ok: true }`, `{ ok: false, error: 'EXHAUSTED' }`, `{ ok: false, error: 'UNAVAILABLE' }`), and enforces attempted-call semantics (zero refund/decrement methods).
-  - **Consumer Wiring & Monthly Budget Removal (`duffel.service.ts`, `reconciliation.service.ts`)**:
-    - All remote Duffel attempts (search, offer detail, ancillary seatmaps/services, repricing, orders, quotes, cancellations, retrievals) meter through `DuffelRateBudgetService.reserveAttempt()`, preserving 429 `RATE_LIMIT_EXCEEDED` on denial.
-    - User and agent flight search enforce daily sub-allocations (1,000 user, 500 agent) with 0 budget reservations on cache hits.
-    - Completely removed obsolete monthly budget keys (`budget:duffel:${year}-${month}`) from search and background reconciliation.
-    - Reconciliation cleanly catches 429 budget denials, bumps `budgetBlocked`, and defers without treating it as an unexpected failure or charging skipped syncs.
+- **Phase 3 Slice 3: Supplier Search Module, Search Adapter & Cleanup Relocation (Tasks T017, T019, T020 Complete)**:
+  - **`duffel-search.adapter.ts`**: Owns downstream Duffel request mapping, raw offer search (`searchOffers`), and live offer retrieval (`getOffer`). Enforces rate budget attempt reservations via `DuffelRateBudgetService` prior to live lookup upstream requests, maps errors cleanly (404 -> `NotFoundException`, 410 -> `GoneException`, timeouts -> `DuffelTimeoutError`), and provides mock fallbacks for testing.
+  - **`duffel-search.service.ts`**: Implements `FlightSearchPort`. Enforces criteria normalization and SHA-256 search query hashing, queries Redis cache (`flight:search:${searchHash}`) with 0 budget reservations and 0 adapter calls on hit, enforces daily caller sub-allocations (1,000 for user, 500 for agent), delegates offer mapping to `FlightOfferNormalizer`, and handles safe error mapping for live lookups.
+  - **`flight-offer-cleanup.service.ts`**: Houses the midnight cleanup cron (`@Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)`). Purges expired `FlightOffer` (retention default 7 days) and `OfferRecovery` (retention default 30 days) while preserving `SearchHistory` indefinitely.
+  - **`supplier-search.module.ts`**: Encapsulates all search implementations (`DuffelSearchService`, `DuffelSearchAdapter`, `FlightOfferNormalizer`, `FlightOfferCleanupService`) and exports **ONLY** `FLIGHT_SEARCH_PORT`. Registered in `AppModule`.
+  - **Cron Deduplication**: Removed `@Cron` from `DuffelCleanupService` while preserving `handleCleanup()` for backward compatibility until monolith deletion (T042), ensuring zero duplicate midnight cron executions.
 
 ## Feature 027 — Chat Turn Decomposition (Complete — Phases 1–7, Tasks T001–T027 Verified)
 
