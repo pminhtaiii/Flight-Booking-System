@@ -1,14 +1,21 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { CABIN_RANK, CabinClass } from '@/flight-match/flight-match.policy';
 import { DuffelOffer } from '@/duffel/duffel.types';
-import { RankedOffer, ScoredOffer, ScoringPreferences } from '@/flight-match/flight-match.types';
+import { FlightOffer } from '@/supplier/search/flight-search.port';
+import {
+  FlightMatchInput,
+  RankedOffer,
+  ScoredOffer,
+  ScoringPreferences,
+} from '@/flight-match/flight-match.types';
 import { ProfileService } from '@/profile/profile.service';
 import { FlightMatchScorerService } from '@/flight-match/flight-match-scorer.service';
 import { CategoryRankerService } from '@/flight-match/category-ranker.service';
 import { normalizeFlightOffers } from './flight-offer-normalizer';
 
 export interface OrchestratorParams {
-  readonly rawOffers: readonly DuffelOffer[];
+  readonly offers?: readonly FlightOffer[];
+  readonly rawOffers?: readonly DuffelOffer[];
   readonly query: {
     readonly origin: string;
     readonly destination: string;
@@ -25,6 +32,7 @@ export interface OrchestratorParams {
 }
 
 export interface OrchestratedFlightResult {
+  readonly offer?: FlightOffer;
   readonly rawOffer: DuffelOffer;
   readonly scoredOffer: ScoredOffer | RankedOffer;
 }
@@ -98,16 +106,40 @@ export class FlightSearchOrchestratorService {
   ) {}
 
   async orchestrateSearch(params: OrchestratorParams): Promise<OrchestratedSearchResponse> {
-    const normalized = normalizeFlightOffers(params.rawOffers);
-    const canonicalOffers = normalized.normalizedOffers.slice(0, 20);
+    let canonicalOffers: readonly FlightMatchInput[];
+    let droppedCount = 0;
+    let rejectionCounts: Readonly<Record<string, number>> = {};
+    let resolveRawOffer: (index: number, id?: string) => DuffelOffer;
+    let resolveFlightOffer: ((index: number, id?: string) => FlightOffer | undefined) | undefined;
 
-    if (normalized.droppedCount > 0) {
+    if (params.offers) {
+      const offersSlice = params.offers.slice(0, 20);
+      canonicalOffers = offersSlice.map((o) => o.matchInput);
+      droppedCount = 0;
+      rejectionCounts = {};
+      resolveRawOffer = (index: number, id?: string) => {
+        const found = id ? params.offers!.find((o) => o.id === id) : params.offers![index];
+        return (found?.rawSupplierPayload as DuffelOffer) ?? ({} as DuffelOffer);
+      };
+      resolveFlightOffer = (index: number, id?: string) => {
+        return id ? params.offers!.find((o) => o.id === id) : params.offers![index];
+      };
+    } else {
+      const rawOffers = params.rawOffers || [];
+      const normalized = normalizeFlightOffers(rawOffers);
+      canonicalOffers = normalized.normalizedOffers.slice(0, 20);
+      droppedCount = normalized.droppedCount;
+      rejectionCounts = normalized.rejectionCounts;
+      resolveRawOffer = (index: number) => rawOffers[index];
+    }
+
+    if (droppedCount > 0) {
       this.logger.warn(
-        `Dropped ${normalized.droppedCount} invalid offers for searchHash ${params.searchHash}`,
+        `Dropped ${droppedCount} invalid offers for searchHash ${params.searchHash}`,
         {
           searchHash: params.searchHash,
-          droppedCount: normalized.droppedCount,
-          rejectionCounts: normalized.rejectionCounts,
+          droppedCount,
+          rejectionCounts,
         },
       );
     }
@@ -159,9 +191,10 @@ export class FlightSearchOrchestratorService {
     const hasPersonalization = hasEffectivePreferences(effectivePreferences);
 
     if (!hasPersonalization) {
-      const rankedOffers = this.categoryRanker.rank(canonicalOffers);
+      const rankedOffers = this.categoryRanker.rank(canonicalOffers as FlightMatchInput[]);
       const results: OrchestratedFlightResult[] = rankedOffers.map((offer) => ({
-        rawOffer: params.rawOffers[offer.originalIndex],
+        offer: resolveFlightOffer?.(offer.originalIndex, offer.id),
+        rawOffer: resolveRawOffer(offer.originalIndex, offer.id),
         scoredOffer: {
           offer,
           matchResult: null,
@@ -180,15 +213,16 @@ export class FlightSearchOrchestratorService {
         mode: 'RANKED',
         results,
         meta,
-        droppedCount: normalized.droppedCount,
-        rejectionCounts: normalized.rejectionCounts,
+        droppedCount,
+        rejectionCounts,
       };
     }
 
-    const scoredOffers = this.scorer.scoreAll(canonicalOffers, effectivePreferences);
+    const scoredOffers = this.scorer.scoreAll(canonicalOffers as FlightMatchInput[], effectivePreferences);
 
     const results: OrchestratedFlightResult[] = scoredOffers.map((scoredOffer) => ({
-      rawOffer: params.rawOffers[scoredOffer.offer.originalIndex],
+      offer: resolveFlightOffer?.(scoredOffer.offer.originalIndex, scoredOffer.offer.id),
+      rawOffer: resolveRawOffer(scoredOffer.offer.originalIndex, scoredOffer.offer.id),
       scoredOffer,
     }));
 
@@ -218,8 +252,8 @@ export class FlightSearchOrchestratorService {
       mode: 'MATCHED',
       results,
       meta,
-      droppedCount: normalized.droppedCount,
-      rejectionCounts: normalized.rejectionCounts,
+      droppedCount,
+      rejectionCounts,
     };
   }
 }

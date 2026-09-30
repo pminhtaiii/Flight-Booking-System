@@ -4,7 +4,7 @@ import { FlightsService } from './flights.service';
 import { FlightSearchOrchestratorService } from './flight-search-orchestrator.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { CacheModule } from '../cache/cache.module';
-import { DuffelModule } from '../duffel/duffel.module';
+import { SupplierSearchModule } from '../supplier/search/supplier-search.module';
 import { AuditModule } from '../audit/audit.module';
 import { FlightMatchModule } from '../flight-match/flight-match.module';
 import { ProfileModule } from '../profile/profile.module';
@@ -13,7 +13,7 @@ import { ProfileModule } from '../profile/profile.module';
   imports: [
     PrismaModule,
     CacheModule,
-    DuffelModule,
+    SupplierSearchModule,
     AuditModule,
     FlightMatchModule,
     ProfileModule,

@@ -4,7 +4,12 @@ import { FlightsService } from './flights.service';
 import { FlightSearchOrchestratorService } from './flight-search-orchestrator.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CacheService } from '@/cache/cache.service';
-import { DuffelService, DuffelTimeoutError } from '@/duffel/duffel.service';
+import { DuffelTimeoutError } from '@/supplier/search/duffel-search.adapter';
+import {
+  FLIGHT_SEARCH_PORT,
+  FlightOffer,
+} from '@/supplier/search/flight-search.port';
+import { FlightOfferNormalizer } from '@/supplier/search/flight-offer.normalizer';
 import { AuditService } from '@/audit/audit.service';
 import { DuffelOffer } from '@/duffel/duffel.types';
 import { FlightMatchResult } from '@/flight-match/flight-match.types';
@@ -23,14 +28,27 @@ describe('FlightsService (T036)', () => {
     $transaction: jest.Mock;
   };
   let cacheService: { get: jest.Mock; set: jest.Mock };
-  let duffelService: {
-    searchFlights: jest.Mock;
+  let flightSearchPort: {
+    search: jest.Mock;
     getOfferById: jest.Mock;
+    normalizeStoredOffer: jest.Mock;
   };
   let auditService: { createLog: jest.Mock };
   let orchestratorService: { orchestrateSearch: jest.Mock };
 
   const flushWriteBehind = () => new Promise((resolve) => setImmediate(resolve));
+
+  const createMockNormalizedFlightOffer = (
+    rawOffer: DuffelOffer,
+    overrides: Partial<FlightOffer> = {},
+  ): FlightOffer => {
+    const normalized = FlightOfferNormalizer.normalizeOffer(rawOffer);
+    return {
+      ...normalized,
+      rawSupplierPayload: rawOffer,
+      ...overrides,
+    };
+  };
 
   const createMockDuffelOffer = (id: string, amount = '150.00', airline = 'Vietnam Airlines'): DuffelOffer => ({
     id,
@@ -138,9 +156,10 @@ describe('FlightsService (T036)', () => {
       set: jest.fn(),
     };
 
-    duffelService = {
-      searchFlights: jest.fn(),
+    flightSearchPort = {
+      search: jest.fn(),
       getOfferById: jest.fn(),
+      normalizeStoredOffer: jest.fn(),
     };
 
     auditService = {
@@ -156,7 +175,7 @@ describe('FlightsService (T036)', () => {
         FlightsService,
         { provide: PrismaService, useValue: prisma },
         { provide: CacheService, useValue: cacheService },
-        { provide: DuffelService, useValue: duffelService },
+        { provide: FLIGHT_SEARCH_PORT, useValue: flightSearchPort },
         { provide: AuditService, useValue: auditService },
         { provide: FlightSearchOrchestratorService, useValue: orchestratorService },
       ],
@@ -224,10 +243,12 @@ describe('FlightsService (T036)', () => {
     it('delegates result normalization, scoring, and metadata assembly with expected parameters', async () => {
       const rawOffer1 = createMockDuffelOffer('off_1', '250.00');
       const rawOffer2 = createMockDuffelOffer('off_2', '180.00');
+      const normOffer1 = createMockNormalizedFlightOffer(rawOffer1);
+      const normOffer2 = createMockNormalizedFlightOffer(rawOffer2);
       const searchHash = 'sha256_mock_hash_123';
 
-      duffelService.searchFlights.mockResolvedValue({
-        offerRequest: { id: 'req_1', offers: [rawOffer1, rawOffer2] },
+      flightSearchPort.search.mockResolvedValue({
+        offers: [normOffer1, normOffer2],
         cached: false,
         searchHash,
       });
@@ -236,6 +257,7 @@ describe('FlightsService (T036)', () => {
         mode: 'MATCHED',
         results: [
           {
+            offer: normOffer1,
             rawOffer: rawOffer1,
             scoredOffer: {
               offer: { id: 'uuid-1', originalIndex: 0 },
@@ -243,6 +265,7 @@ describe('FlightsService (T036)', () => {
             },
           },
           {
+            offer: normOffer2,
             rawOffer: rawOffer2,
             scoredOffer: {
               offer: { id: 'uuid-2', originalIndex: 1 },
@@ -278,7 +301,7 @@ describe('FlightsService (T036)', () => {
 
       expect(orchestratorService.orchestrateSearch).toHaveBeenCalledTimes(1);
       expect(orchestratorService.orchestrateSearch).toHaveBeenCalledWith({
-        rawOffers: [rawOffer1, rawOffer2],
+        offers: [normOffer1, normOffer2],
         query: {
           origin: 'HAN',
           destination: 'SGN',
@@ -298,8 +321,8 @@ describe('FlightsService (T036)', () => {
     it('passes empty array when rawResult.offers is undefined', async () => {
       const searchHash = 'sha256_empty_offers';
 
-      duffelService.searchFlights.mockResolvedValue({
-        offerRequest: { id: 'req_empty' },
+      flightSearchPort.search.mockResolvedValue({
+        offers: [],
         cached: false,
         searchHash,
       });
@@ -331,7 +354,7 @@ describe('FlightsService (T036)', () => {
 
       expect(orchestratorService.orchestrateSearch).toHaveBeenCalledWith(
         expect.objectContaining({
-          rawOffers: [],
+          offers: [],
         }),
       );
     });
@@ -341,11 +364,13 @@ describe('FlightsService (T036)', () => {
     it('preserves orchestrator sort order and attaches matchResult and scoredOffer id to each FlightOfferDto', async () => {
       const rawOfferA = createMockDuffelOffer('off_A', '300.00');
       const rawOfferB = createMockDuffelOffer('off_B', '150.00');
+      const normOfferA = createMockNormalizedFlightOffer(rawOfferA);
+      const normOfferB = createMockNormalizedFlightOffer(rawOfferB);
       const matchResultA = createMockMatchResult(60, 'FAIR');
       const matchResultB = createMockMatchResult(95, 'STRONG');
 
-      duffelService.searchFlights.mockResolvedValue({
-        offerRequest: { id: 'req_1', offers: [rawOfferA, rawOfferB] },
+      flightSearchPort.search.mockResolvedValue({
+        offers: [normOfferA, normOfferB],
         cached: false,
         searchHash: 'sha256_order_test',
       });
@@ -355,6 +380,7 @@ describe('FlightsService (T036)', () => {
         mode: 'MATCHED',
         results: [
           {
+            offer: normOfferB,
             rawOffer: rawOfferB,
             scoredOffer: {
               offer: { id: 'deterministic-uuid-b', originalIndex: 1 },
@@ -362,6 +388,7 @@ describe('FlightsService (T036)', () => {
             },
           },
           {
+            offer: normOfferA,
             rawOffer: rawOfferA,
             scoredOffer: {
               offer: { id: 'deterministic-uuid-a', originalIndex: 0 },
@@ -405,11 +432,12 @@ describe('FlightsService (T036)', () => {
   describe('Offer Persistence on Cache-Miss and Cache-Hit', () => {
     it('on cache-miss (cached: false): persists SearchHistory, and missing FlightOffer & OfferRecovery with skipDuplicates: true and zero score fields', async () => {
       const rawOffer = createMockDuffelOffer('off_miss', '199.99');
+      const normOffer = createMockNormalizedFlightOffer(rawOffer, { id: 'uuid-offer-miss' });
       const searchHash = 'sha256_cache_miss';
       const matchResult = createMockMatchResult(82);
 
-      duffelService.searchFlights.mockResolvedValue({
-        offerRequest: { id: 'req_miss', offers: [rawOffer] },
+      flightSearchPort.search.mockResolvedValue({
+        offers: [normOffer],
         cached: false,
         searchHash,
       });
@@ -418,6 +446,7 @@ describe('FlightsService (T036)', () => {
         mode: 'MATCHED',
         results: [
           {
+            offer: normOffer,
             rawOffer,
             scoredOffer: {
               offer: { id: 'uuid-offer-miss', originalIndex: 0 },
@@ -494,11 +523,12 @@ describe('FlightsService (T036)', () => {
 
     it('on cache-hit (cached: true): persists SearchHistory AND upserts missing FlightOffer & OfferRecovery with skipDuplicates: true', async () => {
       const rawOffer = createMockDuffelOffer('off_hit', '140.00');
+      const normOffer = createMockNormalizedFlightOffer(rawOffer, { id: 'uuid-offer-hit' });
       const searchHash = 'sha256_cache_hit';
       const matchResult = createMockMatchResult(91);
 
-      duffelService.searchFlights.mockResolvedValue({
-        offerRequest: { id: 'req_hit', offers: [rawOffer] },
+      flightSearchPort.search.mockResolvedValue({
+        offers: [normOffer],
         cached: true,
         searchHash,
       });
@@ -507,6 +537,7 @@ describe('FlightsService (T036)', () => {
         mode: 'MATCHED',
         results: [
           {
+            offer: normOffer,
             rawOffer,
             scoredOffer: {
               offer: { id: 'uuid-offer-hit', originalIndex: 0 },
@@ -564,8 +595,9 @@ describe('FlightsService (T036)', () => {
 
     it('does not throw when write-behind transaction encounters an error', async () => {
       const rawOffer = createMockDuffelOffer('off_err');
-      duffelService.searchFlights.mockResolvedValue({
-        offerRequest: { id: 'req_err', offers: [rawOffer] },
+      const normOffer = createMockNormalizedFlightOffer(rawOffer, { id: 'uuid-err' });
+      flightSearchPort.search.mockResolvedValue({
+        offers: [normOffer],
         cached: false,
         searchHash: 'sha256_err',
       });
@@ -574,6 +606,7 @@ describe('FlightsService (T036)', () => {
         mode: 'MATCHED',
         results: [
           {
+            offer: normOffer,
             rawOffer,
             scoredOffer: {
               offer: { id: 'uuid-err', originalIndex: 0 },
@@ -613,10 +646,11 @@ describe('FlightsService (T036)', () => {
   describe('Audit Telemetry (T037)', () => {
     it('emits search.completed audit log with safe parameters and strictly zero PII', async () => {
       const rawOffer = createMockDuffelOffer('off_audit');
+      const normOffer = createMockNormalizedFlightOffer(rawOffer);
       const searchHash = 'sha256_audit_hash';
 
-      duffelService.searchFlights.mockResolvedValue({
-        offerRequest: { id: 'req_audit', offers: [rawOffer] },
+      flightSearchPort.search.mockResolvedValue({
+        offers: [normOffer],
         cached: false,
         searchHash,
       });
@@ -625,9 +659,9 @@ describe('FlightsService (T036)', () => {
         mode: 'MATCHED',
         results: [
           {
-            rawOffer,
+            offer: normOffer,
             scoredOffer: {
-              offer: { id: 'uuid-audit', originalIndex: 0 },
+              offer: { id: normOffer.id, originalIndex: 0 },
               matchResult: createMockMatchResult(85),
             },
           },
@@ -705,10 +739,11 @@ describe('FlightsService (T036)', () => {
   describe('Search Caller Characterization (T001)', () => {
     it('delegates search for user caller ("user") and handles raw search cache miss', async () => {
       const rawOffer = createMockDuffelOffer('off_user_call');
+      const normOffer = createMockNormalizedFlightOffer(rawOffer);
       const searchHash = 'sha256_user_caller_hash';
 
-      duffelService.searchFlights.mockResolvedValue({
-        offerRequest: { id: 'req_user', offers: [rawOffer] },
+      flightSearchPort.search.mockResolvedValue({
+        offers: [normOffer],
         cached: false,
         searchHash,
       });
@@ -717,9 +752,9 @@ describe('FlightsService (T036)', () => {
         mode: 'MATCHED',
         results: [
           {
-            rawOffer,
+            offer: normOffer,
             scoredOffer: {
-              offer: { id: 'uuid-user-call', originalIndex: 0 },
+              offer: { id: normOffer.id, originalIndex: 0 },
               matchResult: createMockMatchResult(88),
             },
           },
@@ -748,7 +783,7 @@ describe('FlightsService (T036)', () => {
         caller: 'user',
       });
 
-      expect(duffelService.searchFlights).toHaveBeenCalledWith(
+      expect(flightSearchPort.search).toHaveBeenCalledWith(
         expect.objectContaining({
           origin: 'HAN',
           destination: 'SGN',
@@ -762,10 +797,11 @@ describe('FlightsService (T036)', () => {
 
     it('delegates search for agent caller ("agent") and handles raw search cache miss', async () => {
       const rawOffer = createMockDuffelOffer('off_agent_call');
+      const normOffer = createMockNormalizedFlightOffer(rawOffer);
       const searchHash = 'sha256_agent_caller_hash';
 
-      duffelService.searchFlights.mockResolvedValue({
-        offerRequest: { id: 'req_agent', offers: [rawOffer] },
+      flightSearchPort.search.mockResolvedValue({
+        offers: [normOffer],
         cached: false,
         searchHash,
       });
@@ -774,9 +810,9 @@ describe('FlightsService (T036)', () => {
         mode: 'MATCHED',
         results: [
           {
-            rawOffer,
+            offer: normOffer,
             scoredOffer: {
-              offer: { id: 'uuid-agent-call', originalIndex: 0 },
+              offer: { id: normOffer.id, originalIndex: 0 },
               matchResult: createMockMatchResult(85),
             },
           },
@@ -805,7 +841,7 @@ describe('FlightsService (T036)', () => {
         caller: 'agent',
       });
 
-      expect(duffelService.searchFlights).toHaveBeenCalledWith(
+      expect(flightSearchPort.search).toHaveBeenCalledWith(
         expect.objectContaining({
           origin: 'HAN',
           destination: 'SGN',
@@ -819,10 +855,11 @@ describe('FlightsService (T036)', () => {
 
     it('defaults caller to "user" when caller option is omitted', async () => {
       const rawOffer = createMockDuffelOffer('off_default_caller');
+      const normOffer = createMockNormalizedFlightOffer(rawOffer);
       const searchHash = 'sha256_default_caller_hash';
 
-      duffelService.searchFlights.mockResolvedValue({
-        offerRequest: { id: 'req_default', offers: [rawOffer] },
+      flightSearchPort.search.mockResolvedValue({
+        offers: [normOffer],
         cached: false,
         searchHash,
       });
@@ -831,9 +868,9 @@ describe('FlightsService (T036)', () => {
         mode: 'MATCHED',
         results: [
           {
-            rawOffer,
+            offer: normOffer,
             scoredOffer: {
-              offer: { id: 'uuid-default-call', originalIndex: 0 },
+              offer: { id: normOffer.id, originalIndex: 0 },
               matchResult: createMockMatchResult(80),
             },
           },
@@ -860,7 +897,7 @@ describe('FlightsService (T036)', () => {
 
       await service.search('user_1', query);
 
-      expect(duffelService.searchFlights).toHaveBeenCalledWith(
+      expect(flightSearchPort.search).toHaveBeenCalledWith(
         expect.anything(),
         'user',
       );
@@ -868,10 +905,11 @@ describe('FlightsService (T036)', () => {
 
     it('returns cached result on cache hit with cached: true and 0 additional searches', async () => {
       const rawOffer = createMockDuffelOffer('off_cached_call');
+      const normOffer = createMockNormalizedFlightOffer(rawOffer);
       const searchHash = 'sha256_cache_hit_hash';
 
-      duffelService.searchFlights.mockResolvedValue({
-        offerRequest: { id: 'req_cached', offers: [rawOffer] },
+      flightSearchPort.search.mockResolvedValue({
+        offers: [normOffer],
         cached: true,
         searchHash,
       });
@@ -880,9 +918,9 @@ describe('FlightsService (T036)', () => {
         mode: 'MATCHED',
         results: [
           {
-            rawOffer,
+            offer: normOffer,
             scoredOffer: {
-              offer: { id: 'uuid-cached-call', originalIndex: 0 },
+              offer: { id: normOffer.id, originalIndex: 0 },
               matchResult: createMockMatchResult(90),
             },
           },
@@ -912,15 +950,16 @@ describe('FlightsService (T036)', () => {
       });
 
       expect(response.meta.cached).toBe(true);
-      expect(duffelService.searchFlights).toHaveBeenCalledTimes(1);
+      expect(flightSearchPort.search).toHaveBeenCalledTimes(1);
     });
 
     it('returns cached result on cache hit for agent caller with cached: true and 0 additional searches', async () => {
       const rawOffer = createMockDuffelOffer('off_cached_agent_call');
+      const normOffer = createMockNormalizedFlightOffer(rawOffer);
       const searchHash = 'sha256_cache_hit_agent_hash';
 
-      duffelService.searchFlights.mockResolvedValue({
-        offerRequest: { id: 'req_cached_agent', offers: [rawOffer] },
+      flightSearchPort.search.mockResolvedValue({
+        offers: [normOffer],
         cached: true,
         searchHash,
       });
@@ -929,9 +968,9 @@ describe('FlightsService (T036)', () => {
         mode: 'MATCHED',
         results: [
           {
-            rawOffer,
+            offer: normOffer,
             scoredOffer: {
-              offer: { id: 'uuid-cached-agent-call', originalIndex: 0 },
+              offer: { id: normOffer.id, originalIndex: 0 },
               matchResult: createMockMatchResult(91),
             },
           },
@@ -961,7 +1000,7 @@ describe('FlightsService (T036)', () => {
       });
 
       expect(response.meta.cached).toBe(true);
-      expect(duffelService.searchFlights).toHaveBeenCalledWith(
+      expect(flightSearchPort.search).toHaveBeenCalledWith(
         expect.objectContaining({
           origin: 'HAN',
           destination: 'SGN',
@@ -970,11 +1009,11 @@ describe('FlightsService (T036)', () => {
         }),
         'agent',
       );
-      expect(duffelService.searchFlights).toHaveBeenCalledTimes(1);
+      expect(flightSearchPort.search).toHaveBeenCalledTimes(1);
     });
 
     it('propagates UPSTREAM_UNAVAILABLE 502 when upstream Duffel fails and skips persistence and audit', async () => {
-      duffelService.searchFlights.mockRejectedValue(
+      flightSearchPort.search.mockRejectedValue(
         new HttpException(
           {
             message: 'Upstream flight search service is temporarily unavailable',
@@ -1003,7 +1042,7 @@ describe('FlightsService (T036)', () => {
     });
 
     it('propagates RATE_LIMIT_EXCEEDED 429 when budget limit is exhausted and skips persistence and audit', async () => {
-      duffelService.searchFlights.mockRejectedValue(
+      flightSearchPort.search.mockRejectedValue(
         new HttpException(
           {
             message: 'Flight search capacity temporarily reached. Please try again later.',
@@ -1114,9 +1153,10 @@ describe('FlightsService (T036)', () => {
 
       const expectedDeterministicUuid = generateDeterministicUUID(multiSliceOffer.id);
       const searchHash = 'sha256_order_and_uuid_test';
+      const normMultiOffer = createMockNormalizedFlightOffer(multiSliceOffer);
 
-      duffelService.searchFlights.mockResolvedValue({
-        offerRequest: { id: 'req_multi', offers: [multiSliceOffer] },
+      flightSearchPort.search.mockResolvedValue({
+        offers: [normMultiOffer],
         cached: false,
         searchHash,
       });
@@ -1125,7 +1165,7 @@ describe('FlightsService (T036)', () => {
         mode: 'MATCHED',
         results: [
           {
-            rawOffer: multiSliceOffer,
+            offer: normMultiOffer,
             scoredOffer: {
               offer: { id: expectedDeterministicUuid, originalIndex: 0 },
               matchResult: createMockMatchResult(92),
@@ -1296,9 +1336,12 @@ describe('FlightsService (T036)', () => {
       expect(uuidA).toMatch(rfc4122Regex);
       expect(uuidB).toMatch(rfc4122Regex);
 
+      const normOfferA = createMockNormalizedFlightOffer(offerA);
+      const normOfferB = createMockNormalizedFlightOffer(offerB);
+
       const searchHash = 'sha256_multi_offer_hash';
-      duffelService.searchFlights.mockResolvedValue({
-        offerRequest: { id: 'req_two_offers', offers: [offerA, offerB] },
+      flightSearchPort.search.mockResolvedValue({
+        offers: [normOfferA, normOfferB],
         cached: false,
         searchHash,
       });
@@ -1307,14 +1350,14 @@ describe('FlightsService (T036)', () => {
         mode: 'MATCHED',
         results: [
           {
-            rawOffer: offerA,
+            offer: normOfferA,
             scoredOffer: {
               offer: { id: uuidA, originalIndex: 0 },
               matchResult: createMockMatchResult(95),
             },
           },
           {
-            rawOffer: offerB,
+            offer: normOfferB,
             scoredOffer: {
               offer: { id: uuidB, originalIndex: 1 },
               matchResult: createMockMatchResult(80),
@@ -1408,50 +1451,22 @@ describe('FlightsService (T036)', () => {
     const createMockLiveOffer = (
       duffelOfferId = 'off_stored_123',
       totalAmount = '150.00',
-    ) => ({
-      id: duffelOfferId,
-      total_amount: totalAmount,
-      total_currency: 'USD',
-      expires_at: '2026-10-01T12:00:00.000Z',
-      slices: [
-        {
-          id: 'sli_live_out',
-          duration: 'PT2H0M',
-          segments: [
-            {
-              id: 'seg_live_1',
-              duration: 'PT2H0M',
-              departing_at: '2026-10-01T08:00:00Z',
-              arriving_at: '2026-10-01T10:00:00Z',
-              origin: { id: 'HAN', name: 'Noi Bai', iata_code: 'HAN', type: 'airport' },
-              destination: { id: 'SGN', name: 'Tan Son Nhat', iata_code: 'SGN', type: 'airport' },
-              marketing_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
-              operating_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
-              marketing_carrier_flight_number: '123',
-              aircraft: { id: 'arc_1', name: 'Airbus A321', iata_code: '321' },
-              passengers: [
-                {
-                  passenger_id: 'pas_1',
-                  cabin_class: 'economy',
-                  baggages: [{ type: 'checked', quantity: 1 }],
-                },
-              ],
-            },
-          ],
+    ): FlightOffer => {
+      const rawOffer = createMockDuffelOffer(duffelOfferId, totalAmount);
+      return createMockNormalizedFlightOffer(rawOffer, {
+        conditions: {
+          refundable: true,
+          changeable: false,
+          changeBeforeDeparture: null,
         },
-      ],
-      passengers: [{ id: 'pas_1', type: 'adult' }],
-      conditions: {
-        refund_before_departure: { allowed: true },
-        change_before_departure: { allowed: false },
-      },
-    });
+      });
+    };
 
     it('retrieves live detail successfully with confirmed price and availability matching stored offer', async () => {
       prisma.flightOffer.findUnique.mockResolvedValue(
         createMockStoredFlightOffer(offerId, '150.00', 'off_stored_123'),
       );
-      duffelService.getOfferById.mockResolvedValue(
+      flightSearchPort.getOfferById.mockResolvedValue(
         createMockLiveOffer('off_stored_123', '150.00'),
       );
 
@@ -1464,7 +1479,7 @@ describe('FlightsService (T036)', () => {
       expect(detail.airline).toBe('Vietnam Airlines');
       expect(detail.conditions.refundable).toBe(true);
       expect(detail.conditions.changeable).toBe(false);
-      expect(duffelService.getOfferById).toHaveBeenCalledWith('off_stored_123');
+      expect(flightSearchPort.getOfferById).toHaveBeenCalledWith('off_stored_123');
 
       expect(auditService.createLog).toHaveBeenCalledWith(
         prisma,
@@ -1488,7 +1503,7 @@ describe('FlightsService (T036)', () => {
       prisma.flightOffer.findUnique.mockResolvedValue(
         createMockStoredFlightOffer(offerId, '150.00', 'off_stored_123'),
       );
-      duffelService.getOfferById.mockResolvedValue(
+      flightSearchPort.getOfferById.mockResolvedValue(
         createMockLiveOffer('off_stored_123', '175.50'),
       );
 
@@ -1514,7 +1529,7 @@ describe('FlightsService (T036)', () => {
       prisma.flightOffer.findUnique.mockResolvedValue(
         createMockStoredFlightOffer(offerId, '150.00', 'off_stored_123'),
       );
-      duffelService.getOfferById.mockRejectedValue({ status: 404, message: 'Offer not found' });
+      flightSearchPort.getOfferById.mockRejectedValue({ status: 404, message: 'Offer not found' });
 
       await expect(service.getFlightDetail(offerId, userId)).rejects.toMatchObject({
         status: HttpStatus.GONE,
@@ -1537,7 +1552,7 @@ describe('FlightsService (T036)', () => {
       prisma.flightOffer.findUnique.mockResolvedValue(
         createMockStoredFlightOffer(offerId, '150.00', 'off_stored_123'),
       );
-      duffelService.getOfferById.mockRejectedValue({ status: 410, message: 'Offer expired' });
+      flightSearchPort.getOfferById.mockRejectedValue({ status: 410, message: 'Offer expired' });
 
       await expect(service.getFlightDetail(offerId, userId)).rejects.toMatchObject({
         status: HttpStatus.GONE,
@@ -1555,7 +1570,7 @@ describe('FlightsService (T036)', () => {
       prisma.flightOffer.findUnique.mockResolvedValue(
         createMockStoredFlightOffer(offerId, '150.00', 'off_stored_123'),
       );
-      duffelService.getOfferById.mockRejectedValue({ status: 404, message: 'Offer not found' });
+      flightSearchPort.getOfferById.mockRejectedValue({ status: 404, message: 'Offer not found' });
       prisma.flightOffer.delete.mockRejectedValue(new Error('DB disconnect during purge'));
 
       await expect(service.getFlightDetail(offerId, userId)).rejects.toMatchObject({
@@ -1574,7 +1589,7 @@ describe('FlightsService (T036)', () => {
       prisma.flightOffer.findUnique.mockResolvedValue(
         createMockStoredFlightOffer(offerId, '150.00', 'off_stored_123'),
       );
-      duffelService.getOfferById.mockRejectedValue(new Error('Duffel API failure'));
+      flightSearchPort.getOfferById.mockRejectedValue(new Error('Duffel API failure'));
 
       await expect(service.getFlightDetail(offerId, userId)).rejects.toMatchObject({
         status: HttpStatus.BAD_GATEWAY,
@@ -1590,7 +1605,7 @@ describe('FlightsService (T036)', () => {
       prisma.flightOffer.findUnique.mockResolvedValue(
         createMockStoredFlightOffer(offerId, '150.00', 'off_stored_123'),
       );
-      duffelService.getOfferById.mockRejectedValue(new DuffelTimeoutError());
+      flightSearchPort.getOfferById.mockRejectedValue(new DuffelTimeoutError());
 
       await expect(service.getFlightDetail(offerId, userId)).rejects.toMatchObject({
         status: HttpStatus.BAD_GATEWAY,
