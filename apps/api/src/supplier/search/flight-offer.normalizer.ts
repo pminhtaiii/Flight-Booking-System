@@ -99,8 +99,8 @@ function capitalize(str: string | null | undefined): string | null {
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 }
 
-function normalizePassengerType(rawType?: string | null): 'ADULT' | 'CHILD' | 'INFANT' {
-  if (!rawType) return 'ADULT';
+function normalizePassengerType(rawType?: unknown): 'ADULT' | 'CHILD' | 'INFANT' {
+  if (!rawType || typeof rawType !== 'string') return 'ADULT';
   const lower = rawType.trim().toLowerCase();
   if (lower.startsWith('child')) return 'CHILD';
   if (lower.startsWith('infant')) return 'INFANT';

@@ -8,6 +8,11 @@ import { DuffelService } from './duffel.service';
 import { DuffelCleanupService } from './duffel-cleanup.service';
 import { DuffelFulfillmentAdapter } from './duffel-fulfillment.adapter';
 
+/**
+ * DuffelModule provides legacy Duffel integration services.
+ * Note: Offer cleanup cron (@Cron) has been relocated to FlightOfferCleanupService in SupplierSearchModule (T020).
+ * DuffelCleanupService remains registered here for backwards-compatibility until T042 monolith deletion.
+ */
 @Module({
   imports: [ConfigModule, CacheModule, PrismaModule, DuffelCoreModule],
   providers: [

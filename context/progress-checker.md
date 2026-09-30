@@ -1,6 +1,32 @@
 # Progress Tracker
 
-### Feature 029 — Narrow the Duffel Supplier Boundary: Phase 3 Slice 2 Flight Offer Normalizer & Raw Reader Test Parity Complete (Tasks T014, T015, T018 Verified) (2026-09-30)
+### Feature 029 — Narrow the Duffel Supplier Boundary: Phase 3 Slice 3 Supplier Search Module, Search Adapter & Cleanup Relocation Complete (Tasks T017, T019, T020 Verified) (2026-09-30)
+
+- **T017 DuffelSearchAdapter Extraction**:
+  - Extracted `DuffelSearchAdapter` to `apps/api/src/supplier/search/duffel-search.adapter.ts`.
+  - Encapsulated Duffel SDK request mapping, slice/passenger construction, raw offer search (`searchOffers`), and live offer retrieval (`getOffer`).
+  - Added rate budget reservation (`DuffelRateBudgetService.reserveAttempt()`) after validating SDK availability, preventing budget leaks on unconfigured SDKs.
+  - Implemented comprehensive error mapping (404 -> `NotFoundException`, 410 -> `GoneException`, timeouts -> `DuffelTimeoutError`, HTTP status/code propagation).
+  - Authored 28 unit tests in `apps/api/src/supplier/search/duffel-search.adapter.spec.ts` passing 100% GREEN.
+- **T019 DuffelSearchService Normalizer Wiring & Caller Sub-Allocations**:
+  - Refactored `DuffelSearchService` to inject `FlightOfferNormalizer`, delegating all offer normalization and eliminating ~140 lines of duplicate mapping logic.
+  - Enforced normalized query SHA-256 caching (`flight:search:${searchHash}`) with 15-minute TTL.
+  - Invariant verified: Cache hits return immediately with `cached: true`, zero rate budget reservations, and zero adapter calls.
+  - Invariant verified: Cache misses enforce caller daily sub-allocations (1,000 for `user`, 500 for `agent`) under `budget:duffel:daily:${caller}:${today}` with 429 `RATE_LIMIT_EXCEEDED` on exhaustion and fail-closed 429 `BUDGET_UNAVAILABLE` on store error.
+  - Protected live offer lookup (`getOfferById`) with safe error mapping (`BAD_GATEWAY` / `UPSTREAM_UNAVAILABLE`) upon normalization failure.
+  - Eliminated all `any` types; all 29 unit and contract tests in `apps/api/src/supplier/search/duffel-search.service.spec.ts` pass 100% GREEN.
+- **T020 SupplierSearchModule & Cleanup Cron Relocation**:
+  - Created `apps/api/src/supplier/search/flight-offer-cleanup.service.ts` decorated with `@Injectable()` and `@Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)`.
+  - Purges `FlightOffer` (older than 7 days) and `OfferRecovery` (older than 30 days) while preserving `SearchHistory` indefinitely.
+  - Removed duplicate `@Cron` decorator from `apps/api/src/duffel/duffel-cleanup.service.ts` while keeping `handleCleanup()` method intact for direct callers and legacy test harness backwards compatibility.
+  - Packaged `apps/api/src/supplier/search/supplier-search.module.ts` exporting **STRICTLY** `FLIGHT_SEARCH_PORT`. All internal services (`DuffelSearchService`, `DuffelSearchAdapter`, `FlightOfferNormalizer`, `FlightOfferCleanupService`) remain strictly encapsulated.
+  - Registered `SupplierSearchModule` in `apps/api/src/app.module.ts`.
+  - Authored unit test suite in `apps/api/src/supplier/search/supplier-search.module.spec.ts` (11 tests) validating module compilation, DI resolution, strict export metadata length === 1, cron metadata, and retention purge logic.
+- **Verification Gates & Code Review**:
+  - All 4 supplier search test suites (99 tests) passed 100% GREEN.
+  - `tsc -p tsconfig.json --noEmit` and ESLint passed with 0 errors.
+  - Dual-axis code review completed: Standards and Spec checks passed; review refinements applied.
+  - Marked Tasks T017, T019, and T020 complete in `specs/029-duffel-provider-narrowing/tasks.md`.
 
 - **T014 Stored-Offer and Live-Offer Normalization Parity Tests**:
   - Implemented `apps/api/src/supplier/search/flight-offer.normalizer.spec.ts` with 30 unit tests locking deterministic UUID parity (RFC 4122 v4 via SHA-256 matching legacy output), live offer mapping into `FlightOffer` (one-way and round-trip return segments, uppercase passenger types, flight summaries, conditions, 100% `matchInput` parity, and intact `rawSupplierPayload` preservation), legacy stored snapshot decoding, and fail-closed null handling across corrupt payloads.
