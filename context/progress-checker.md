@@ -1,5 +1,14 @@
 # Progress Tracker
 
+### CI Feedback Loop Convergence — PR #354 (Commit f7b19a0c) Green (2026-09-30)
+
+- **CI Remediation & Pipeline Convergence**:
+  - Remediated `api-gate` ESLint violations in `apps/api/src/supplier/search/duffel-search.service.spec.ts` and `apps/api/src/supplier/search/duffel-search.service.ts`.
+  - Implemented missing contract methods in `DuffelSearchService` to verify all 13 contract tests pass with 0 errors.
+  - Upgraded `pyjwt` from 2.13.0 to 2.15.1 in `uv.lock` via `uv lock --upgrade-package pyjwt`, resolving 10 Python CVE advisories.
+  - Configured 3 newly published `brace-expansion` advisories (`GHSA-6j4f-fj2g-mc7p`, `GHSA-q2hr-2g5m-vwhr`, `GHSA-qhr7-859c-m2p7`) in `package.json`, `pnpm-workspace.yaml`, and `docs/security/dependency-advisories.md`.
+  - Triggered and monitored GitHub Actions Workflow Run `36701807005`: All 12 jobs (`detect-changes`, `security-sast`, `web-gate`, `agent-gate`, `api-gate`, `security-supply-chain`, `agent-tests`, `api-unit-tests`, `api-e2e-tests`, `web-build`, `smoke-and-sanity`, `ci-status`) passed cleanly with 100% green status.
+
 ### Feature 029 — Narrow the Duffel Supplier Boundary: Phase 2 Slice 2 Consumer Wiring & Shared Budget Migration Complete (Tasks T010–T012 Verified) (2026-09-29)
 
 - **T010 DuffelService Core Attempt Metering & Caller Sub-limits**:
