@@ -1,6 +1,5 @@
 import 'reflect-metadata';
 import { BookingIntentService } from './booking-intent.service';
-import { DuffelTimeoutError } from '@/duffel/duffel.service';
 import {
   HttpException,
   HttpStatus,
@@ -19,8 +18,10 @@ type MockEncryptionService = {
   decryptBound: jest.Mock;
 };
 
-type MockDuffelService = {
+type MockFlightSearchPort = {
   getOfferById: jest.Mock;
+  search: jest.Mock;
+  normalizeStoredOffer: jest.Mock;
 };
 
 type MockPrismaService = {
@@ -68,7 +69,7 @@ type CanonicalPrismaMock = {
 describe('BookingIntentService Refinements', () => {
   let testable: TestableService;
   let mockEncryptionService: MockEncryptionService;
-  let mockDuffelService: MockDuffelService;
+  let mockFlightSearchPort: MockFlightSearchPort;
 
   beforeEach(() => {
     mockEncryptionService = {
@@ -78,13 +79,15 @@ describe('BookingIntentService Refinements', () => {
       decryptBound: jest.fn(),
     };
 
-    mockDuffelService = {
+    mockFlightSearchPort = {
       getOfferById: jest.fn(),
+      search: jest.fn(),
+      normalizeStoredOffer: jest.fn(),
     };
 
     const service = new BookingIntentService(
       {} as never,
-      mockDuffelService as never,
+      mockFlightSearchPort as never,
       {} as never,
       mockEncryptionService as never,
     );
@@ -159,11 +162,19 @@ describe('BookingIntentService Refinements', () => {
       );
       const duffel = {
         getOfferById: jest.fn().mockResolvedValue({
-          total_amount: '150.00',
-          total_currency: 'USD',
-          expires_at: null,
-          passengers: [{ id: 'duffel-passenger-1', type: 'adult' }],
+          id: 'offer-1',
+          supplierOfferId: 'duffel-offer-1',
+          totalAmount: '150.00',
+          price: 150,
+          currency: 'USD',
+          offerExpiresAt: null,
+          passengers: [{ supplierPassengerId: 'duffel-passenger-1', type: 'ADULT' }],
+          rawSupplierPayload: {
+            passengers: [{ id: 'duffel-passenger-1', type: 'adult' }],
+          },
         }),
+        search: jest.fn(),
+        normalizeStoredOffer: jest.fn(),
       };
       const audit = { createLog: jest.fn() };
       const encryption = {
@@ -310,11 +321,19 @@ describe('BookingIntentService Refinements', () => {
 
       const duffel = {
         getOfferById: jest.fn().mockResolvedValue({
-          total_amount: '150.00',
-          total_currency: 'USD',
-          expires_at: null,
-          passengers: [{ id: 'duffel-passenger-1', type: 'adult' }],
+          id: 'offer-1',
+          supplierOfferId: 'duffel-offer-1',
+          totalAmount: '150.00',
+          price: 150,
+          currency: 'USD',
+          offerExpiresAt: null,
+          passengers: [{ supplierPassengerId: 'duffel-passenger-1', type: 'ADULT' }],
+          rawSupplierPayload: {
+            passengers: [{ id: 'duffel-passenger-1', type: 'adult' }],
+          },
         }),
+        search: jest.fn(),
+        normalizeStoredOffer: jest.fn(),
       };
       const encryption = {
         encrypt: jest.fn(),
@@ -363,7 +382,7 @@ describe('BookingIntentService Refinements', () => {
 
   describe('Authoritative intent creation and zero-write transactions', () => {
     let prisma: CanonicalPrismaMock;
-    let duffel: { getOfferById: jest.Mock };
+    let duffel: MockFlightSearchPort;
     let audit: { createLog: jest.Mock };
     let encryption: MockEncryptionService;
     let readinessService: { evaluateAuthoritativeReadiness: jest.Mock };
@@ -398,14 +417,25 @@ describe('BookingIntentService Refinements', () => {
 
       duffel = {
         getOfferById: jest.fn().mockResolvedValue({
-          total_amount: '350.00',
-          total_currency: 'USD',
-          expires_at: null,
+          id: 'offer-intl-1',
+          supplierOfferId: 'duffel-intl-1',
+          totalAmount: '350.00',
+          price: 350,
+          currency: 'USD',
+          offerExpiresAt: null,
           passengers: [
-            { id: 'duffel-pas-1', type: 'adult' },
-            { id: 'duffel-pas-2', type: 'child' },
+            { supplierPassengerId: 'duffel-pas-1', type: 'ADULT' },
+            { supplierPassengerId: 'duffel-pas-2', type: 'CHILD' },
           ],
+          rawSupplierPayload: {
+            passengers: [
+              { id: 'duffel-pas-1', type: 'adult' },
+              { id: 'duffel-pas-2', type: 'child' },
+            ],
+          },
         }),
+        search: jest.fn(),
+        normalizeStoredOffer: jest.fn(),
       };
 
       audit = { createLog: jest.fn().mockResolvedValue({ id: 'log-1' }) };
@@ -1396,9 +1426,9 @@ describe('BookingIntentService Refinements', () => {
   });
 
   describe('fetchLiveOffer', () => {
-    it('rejects offer with missing total_amount', async () => {
-      mockDuffelService.getOfferById.mockResolvedValueOnce({
-        total_currency: 'USD',
+    it('rejects offer with missing totalAmount', async () => {
+      mockFlightSearchPort.getOfferById.mockResolvedValueOnce({
+        currency: 'USD',
       });
 
       await expect(testable.fetchLiveOffer('offer-123')).rejects.toThrow(
@@ -1410,12 +1440,13 @@ describe('BookingIntentService Refinements', () => {
           HttpStatus.BAD_GATEWAY,
         ),
       );
+      expect(mockFlightSearchPort.getOfferById).toHaveBeenCalledWith('offer-123', 4500);
     });
 
-    it('rejects offer with non-numeric total_amount', async () => {
-      mockDuffelService.getOfferById.mockResolvedValueOnce({
-        total_amount: 'invalid-price',
-        total_currency: 'USD',
+    it('rejects offer with non-numeric totalAmount', async () => {
+      mockFlightSearchPort.getOfferById.mockResolvedValueOnce({
+        totalAmount: 'invalid-price',
+        currency: 'USD',
       });
 
       await expect(testable.fetchLiveOffer('offer-123')).rejects.toThrow(
@@ -1427,12 +1458,13 @@ describe('BookingIntentService Refinements', () => {
           HttpStatus.BAD_GATEWAY,
         ),
       );
+      expect(mockFlightSearchPort.getOfferById).toHaveBeenCalledWith('offer-123', 4500);
     });
 
-    it('rejects offer with non-positive total_amount', async () => {
-      mockDuffelService.getOfferById.mockResolvedValueOnce({
-        total_amount: '-10.00',
-        total_currency: 'USD',
+    it('rejects offer with non-positive totalAmount', async () => {
+      mockFlightSearchPort.getOfferById.mockResolvedValueOnce({
+        totalAmount: '-10.00',
+        currency: 'USD',
       });
 
       await expect(testable.fetchLiveOffer('offer-123')).rejects.toThrow(
@@ -1444,27 +1476,38 @@ describe('BookingIntentService Refinements', () => {
           HttpStatus.BAD_GATEWAY,
         ),
       );
+      expect(mockFlightSearchPort.getOfferById).toHaveBeenCalledWith('offer-123', 4500);
     });
 
-    it('returns pricing if total_amount is a valid positive number string', async () => {
-      const mockRaw = {
-        total_amount: '150.00',
-        total_currency: 'USD',
-        expires_at: '2026-07-15T00:00:00Z',
+    it('returns pricing if totalAmount is a valid positive number string', async () => {
+      const mockRawPayload = {
+        passengers: [{ id: 'pas_1', type: 'adult' }],
       };
-      mockDuffelService.getOfferById.mockResolvedValueOnce(mockRaw);
+      const mockOffer = {
+        id: 'offer-123',
+        supplierOfferId: 'off_123',
+        totalAmount: '150.00',
+        price: 150.0,
+        currency: 'USD',
+        offerExpiresAt: '2026-07-15T00:00:00Z',
+        rawSupplierPayload: mockRawPayload,
+      };
+      mockFlightSearchPort.getOfferById.mockResolvedValueOnce(mockOffer);
 
       const result = await testable.fetchLiveOffer('offer-123');
+      expect(mockFlightSearchPort.getOfferById).toHaveBeenCalledWith('offer-123', 4500);
       expect(result).toEqual({
         totalAmount: '150.00',
         currency: 'USD',
         offerExpiresAt: new Date('2026-07-15T00:00:00Z'),
-        raw: mockRaw,
+        raw: mockRawPayload,
       });
     });
 
-    it('throws UPSTREAM_TIMEOUT on DuffelTimeoutError', async () => {
-      mockDuffelService.getOfferById.mockRejectedValueOnce(new DuffelTimeoutError());
+    it('throws UPSTREAM_TIMEOUT on timeout error', async () => {
+      mockFlightSearchPort.getOfferById.mockRejectedValueOnce(
+        new Error('Request timed out while contacting upstream'),
+      );
 
       await expect(testable.fetchLiveOffer('offer-123')).rejects.toThrow(
         new HttpException(
@@ -1475,6 +1518,62 @@ describe('BookingIntentService Refinements', () => {
           HttpStatus.BAD_GATEWAY,
         ),
       );
+      expect(mockFlightSearchPort.getOfferById).toHaveBeenCalledWith('offer-123', 4500);
+    });
+
+    it('throws OFFER_EXPIRED on 404 or 410 or expired error message', async () => {
+      mockFlightSearchPort.getOfferById.mockRejectedValueOnce(
+        new NotFoundException('Offer not found'),
+      );
+
+      await expect(testable.fetchLiveOffer('offer-123')).rejects.toThrow(
+        new HttpException(
+          {
+            code: 'OFFER_EXPIRED',
+            message: 'Offer no longer available',
+          },
+          HttpStatus.GONE,
+        ),
+      );
+      expect(mockFlightSearchPort.getOfferById).toHaveBeenCalledWith('offer-123', 4500);
+    });
+
+    it('throws UPSTREAM_RATE_LIMITED on status 429', async () => {
+      mockFlightSearchPort.getOfferById.mockRejectedValueOnce(
+        new HttpException(
+          {
+            code: 'RATE_LIMIT_EXCEEDED',
+            message: 'Upstream rate limited',
+          },
+          HttpStatus.TOO_MANY_REQUESTS,
+        ),
+      );
+
+      await expect(testable.fetchLiveOffer('offer-123')).rejects.toThrow(
+        new HttpException(
+          {
+            code: 'UPSTREAM_RATE_LIMITED',
+            message: 'API rate limit exceeded',
+          },
+          HttpStatus.TOO_MANY_REQUESTS,
+        ),
+      );
+      expect(mockFlightSearchPort.getOfferById).toHaveBeenCalledWith('offer-123', 4500);
+    });
+
+    it('throws UPSTREAM_UNAVAILABLE on unknown upstream failure', async () => {
+      mockFlightSearchPort.getOfferById.mockRejectedValueOnce(new Error('Connection reset'));
+
+      await expect(testable.fetchLiveOffer('offer-123')).rejects.toThrow(
+        new HttpException(
+          {
+            code: 'UPSTREAM_UNAVAILABLE',
+            message: 'Failed to confirm live offer pricing',
+          },
+          HttpStatus.BAD_GATEWAY,
+        ),
+      );
+      expect(mockFlightSearchPort.getOfferById).toHaveBeenCalledWith('offer-123', 4500);
     });
   });
 
@@ -1533,7 +1632,7 @@ describe('BookingIntentService Refinements', () => {
 
       service = new BookingIntentService(
         mockPrisma as unknown as import('../prisma/prisma.service').PrismaService,
-        {} as import('../duffel/duffel.service').DuffelService,
+        {} as import('@/supplier/search/flight-search.port').FlightSearchPort,
         mockAudit as unknown as import('../audit/audit.service').AuditService,
         snapshotEncryption as unknown as import('../common/encryption.service').EncryptionService,
       );

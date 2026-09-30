@@ -1,6 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { PrismaModule } from '@/prisma/prisma.module';
-import { DuffelModule } from '@/duffel/duffel.module';
+import { SupplierSearchModule } from '@/supplier/search/supplier-search.module';
 import { AuditModule } from '@/audit/audit.module';
 import { AirportsModule } from '@/airports/airports.module';
 import { ProfileModule } from '@/profile/profile.module';
@@ -23,7 +23,7 @@ import { HandoffFastFailGuard } from './guards/handoff-fast-fail.guard';
 @Module({
   imports: [
     PrismaModule,
-    DuffelModule,
+    SupplierSearchModule,
     AuditModule,
     AirportsModule,
     ProfileModule,
