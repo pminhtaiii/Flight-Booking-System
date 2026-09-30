@@ -40,13 +40,13 @@
 
 ### Tests for User Story 1
 
-- [ ] T013 [P] [US1] Add search-port/cache/hash/ranking/rejection and live-offer lookup contract tests in `apps/api/src/supplier/search/duffel-search.service.spec.ts` and `apps/api/src/flights/flight-search-orchestrator.service.spec.ts`.
-- [ ] T014 [P] [US1] Add stored-offer normalization parity tests for passenger IDs, expiry, carriers, segments, cabin, baggage, and malformed snapshots in `apps/api/src/supplier/search/flight-offer.normalizer.spec.ts`.
+- [x] T013 [P] [US1] Add search-port/cache/hash/ranking/rejection and live-offer lookup contract tests in `apps/api/src/supplier/search/duffel-search.service.spec.ts` and `apps/api/src/flights/flight-search-orchestrator.service.spec.ts`.
+- [x] T014 [P] [US1] Add stored-offer normalization parity tests for passenger IDs, expiry, carriers, segments, cabin, baggage, and malformed snapshots in `apps/api/src/supplier/search/flight-offer.normalizer.spec.ts`.
 - [ ] T015 [P] [US1] Add raw-reader replacement cases in `apps/api/src/booking-intent/booking-readiness.service.spec.ts`, `apps/api/src/agent-gateway/booking-readiness/agent-booking-readiness.service.spec.ts`, and `apps/api/src/chat-handoff/chat-handoff.service.spec.ts`.
 
 ### Implementation for User Story 1
 
-- [ ] T016 [US1] Define `FLIGHT_SEARCH_PORT`, complete normalized `FlightOffer`/`FlightSearchResult`, live lookup, and stored-offer normalization signatures in `apps/api/src/supplier/search/flight-search.port.ts` per `specs/029-duffel-provider-narrowing/contracts/supplier-boundaries.md`.
+- [x] T016 [US1] Define `FLIGHT_SEARCH_PORT`, complete normalized `FlightOffer`/`FlightSearchResult`, live lookup, and stored-offer normalization signatures in `apps/api/src/supplier/search/flight-search.port.ts` per `specs/029-duffel-provider-narrowing/contracts/supplier-boundaries.md`.
 - [ ] T017 [US1] Move Duffel request mapping, offer search, and live `offers.get` into `apps/api/src/supplier/search/duffel-search.adapter.ts`, reserving each real attempt in core.
 - [ ] T018 [US1] Move and extend Duffel-offer decoding into `apps/api/src/supplier/search/flight-offer.normalizer.ts`; preserve deterministic UUID, original index, rejection counts/order, and normalized stored-offer read behavior from `apps/api/src/flights/flight-offer-normalizer.ts`.
 - [ ] T019 [US1] Implement normalized-query cache/hash and caller sub-allocations in `apps/api/src/supplier/search/duffel-search.service.ts`; return the port envelope with raw payload as write-only persistence evidence.
