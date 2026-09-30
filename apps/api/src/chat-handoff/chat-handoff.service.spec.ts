@@ -976,8 +976,6 @@ describe('Raw-Reader Replacement Parity (T015)', () => {
   let prisma: PrismaService;
   let configService: ConfigService;
   let tokenService: ChatHandoffTokenService;
-  let attestationService: SelectionAttestationService;
-  let auditService: { createLog: jest.Mock };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -1038,8 +1036,6 @@ describe('Raw-Reader Replacement Parity (T015)', () => {
     prisma = module.get<PrismaService>(PrismaService);
     configService = module.get<ConfigService>(ConfigService);
     tokenService = module.get<ChatHandoffTokenService>(ChatHandoffTokenService);
-    attestationService = module.get<SelectionAttestationService>(SelectionAttestationService);
-    auditService = module.get<{ createLog: jest.Mock }>(AuditService);
   });
 
   afterEach(() => {

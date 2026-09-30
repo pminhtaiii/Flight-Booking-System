@@ -8,7 +8,6 @@ import { plainToInstance } from 'class-transformer';
 import { ValidationError, validate } from 'class-validator';
 import { BookingIntentController } from './booking-intent.controller';
 import { FlightOfferNormalizer } from '@/supplier/search/flight-offer.normalizer';
-import type { FlightOffer } from '@/supplier/search/flight-search.port';
 import type { NormalizedOffer } from './booking-readiness.service';
 
 type ReadinessPassengerSource =
