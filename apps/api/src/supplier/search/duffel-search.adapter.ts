@@ -240,6 +240,7 @@ export class DuffelSearchAdapter {
     try {
       const duffelResponse = await this.duffel.offerRequests.create({
         slices,
+        // Type assertion required: map domain passenger array to Duffel SDK parameter type
         passengers:
           passengers as unknown as Parameters<Duffel['offerRequests']['create']>[0]['passengers'],
         cabin_class: cabinClass,
@@ -307,11 +308,13 @@ export class DuffelSearchAdapter {
     try {
       const offerPromise = this.duffel.offers.get(supplierOfferId);
       const result = await Promise.race([offerPromise, timeoutPromise]);
+      // Safe cast: Duffel SDK wraps retrieved resource in a data property
       return (result as { data: unknown }).data;
     } catch (err: unknown) {
       if (
         err instanceof DuffelTimeoutError ||
         (err instanceof Error && err.name === 'DuffelTimeoutError') ||
+        // Safe check: duck-typed inspection of timeout error code
         (err as { code?: string })?.code === 'DUFFEL_TIMEOUT'
       ) {
         throw err;
@@ -321,6 +324,7 @@ export class DuffelSearchAdapter {
         throw err;
       }
 
+      // Safe cast: error narrowed to object dictionary for status and code extraction
       const errObj = err && typeof err === 'object' ? (err as Record<string, unknown>) : null;
       const status =
         typeof errObj?.status === 'number'
@@ -329,6 +333,7 @@ export class DuffelSearchAdapter {
           ? errObj.statusCode
           : undefined;
       const message = typeof errObj?.message === 'string' ? errObj.message : '';
+      // Safe cast: error detail array narrowed to object list
       const errors = Array.isArray(errObj?.errors)
         ? (errObj?.errors as Array<Record<string, unknown>>)
         : [];

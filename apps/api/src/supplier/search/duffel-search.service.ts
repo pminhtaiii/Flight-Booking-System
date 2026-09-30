@@ -22,6 +22,7 @@ export class DuffelSearchService implements FlightSearchPort {
     @Optional() private readonly searchAdapter?: DuffelSearchAdapter,
     @Optional() private readonly normalizer?: FlightOfferNormalizer,
   ) {
+    // Injected via SupplierSearchModule. Fallback to new instance allows legacy/unit tests to construct without DI.
     this.normalizerInstance = normalizer ?? new FlightOfferNormalizer();
   }
 
@@ -99,6 +100,7 @@ export class DuffelSearchService implements FlightSearchPort {
       if (!raw || typeof raw !== 'object') {
         continue;
       }
+      // Safe cast: raw offer from Duffel search response conforms to partial DuffelOffer structure
       const normalizedOffer = this.normalizerInstance.normalizeOffer(
         raw as unknown as DuffelOffer,
         criteria.cabinClass,
@@ -130,11 +132,25 @@ export class DuffelSearchService implements FlightSearchPort {
       throw new Error('Search adapter unavailable');
     }
     const rawOffer = await this.searchAdapter.getOffer(supplierOfferId, timeoutMs);
-    const offer = this.normalizerInstance.normalizeOffer(rawOffer as unknown as DuffelOffer);
-    if (!offer) {
-      throw new Error(`Failed to normalize offer: ${supplierOfferId}`);
+    try {
+      // Safe cast: raw offer from Duffel live lookup conforms to DuffelOffer structure
+      const offer = this.normalizerInstance.normalizeOffer(rawOffer as unknown as DuffelOffer);
+      if (!offer || !offer.id) {
+        throw new Error('Invalid normalized offer structure');
+      }
+      return offer;
+    } catch (err: unknown) {
+      if (err instanceof HttpException) {
+        throw err;
+      }
+      throw new HttpException(
+        {
+          code: 'UPSTREAM_UNAVAILABLE',
+          message: `Failed to normalize offer: ${supplierOfferId}`,
+        },
+        HttpStatus.BAD_GATEWAY,
+      );
     }
-    return offer;
   }
 
   normalizeStoredOffer(rawOffer: unknown): FlightOffer | null {

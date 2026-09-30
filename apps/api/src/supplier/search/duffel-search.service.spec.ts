@@ -522,6 +522,26 @@ describe('DuffelSearchService Contract Tests (TDD RED)', () => {
         GoneException,
       );
     });
+
+    it('maps live lookup normalization failure to HttpStatus.BAD_GATEWAY with UPSTREAM_UNAVAILABLE', async () => {
+      searchAdapter.getOffer.mockResolvedValueOnce({ id: undefined });
+
+      let caught: HttpException | undefined;
+      try {
+        await service.getOfferById('off_corrupt');
+      } catch (err: unknown) {
+        if (err instanceof HttpException) {
+          caught = err;
+        }
+      }
+
+      expect(caught).toBeDefined();
+      expect(caught?.getStatus()).toBe(HttpStatus.BAD_GATEWAY);
+      expect(caught?.getResponse()).toEqual({
+        code: 'UPSTREAM_UNAVAILABLE',
+        message: 'Failed to normalize offer: off_corrupt',
+      });
+    });
   });
 
   describe('normalizeStoredOffer Contract', () => {
