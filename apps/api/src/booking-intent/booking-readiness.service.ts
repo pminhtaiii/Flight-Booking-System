@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { HttpException, HttpStatus, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassengerType } from '@prisma/client';
 import { AirportsService } from '@/airports/airports.service';
@@ -16,6 +16,7 @@ import {
   BookingReadinessTravelerProfileSourceDto,
 } from './dto/booking-readiness.dto';
 import { ChatHandoffService } from '@/chat-handoff/chat-handoff.service';
+import { FLIGHT_SEARCH_PORT, type FlightSearchPort } from '@/supplier/search/flight-search.port';
 import { BookingReadinessObservability } from './booking-readiness.observability';
 import { BookingReadinessOperation } from '../common/observability/booking-readiness-observability.types';
 import { parseBookingReadinessConfig } from './booking-readiness.config';
@@ -187,6 +188,7 @@ export class BookingReadinessService {
     private readonly bookingReadinessObservability: BookingReadinessObservability,
     private readonly configService: ConfigService,
     private readonly chatHandoffService: ChatHandoffService,
+    @Inject(FLIGHT_SEARCH_PORT) private readonly flightSearchPort: FlightSearchPort,
     @Optional() private readonly metricsService?: BookingReadinessMetricsService,
   ) {}
 
@@ -421,70 +423,48 @@ export class BookingReadinessService {
   }
 
   normalizeStoredOffer(rawOffer: unknown): NormalizedOffer {
-    if (
-      !isRecord(rawOffer) ||
-      !Array.isArray(rawOffer.passengers) ||
-      !Array.isArray(rawOffer.slices)
-    ) {
+    const normalized = this.flightSearchPort.normalizeStoredOffer(rawOffer);
+    if (!normalized) {
       throw new Error('Stored offer data is malformed');
     }
 
-    const passengers = rawOffer.passengers.map((passenger): StoredOfferPassenger | null => {
-      if (!isRecord(passenger) || typeof passenger.id !== 'string') {
-        return null;
-      }
-
-      const type = passengerTypeFromRaw(passenger.type);
-      return type ? { id: passenger.id, type } : null;
+    const passengers: StoredOfferPassenger[] = normalized.passengers.map((p) => {
+      let type: PassengerType = PassengerType.ADULT;
+      if (p.type === 'CHILD') type = PassengerType.CHILD;
+      else if (p.type === 'INFANT') type = PassengerType.INFANT;
+      return {
+        id: p.supplierPassengerId,
+        type,
+      };
     });
 
-    if (passengers.some((passenger) => passenger === null) || passengers.length === 0) {
+    if (passengers.length === 0) {
       throw new Error('Stored offer passengers are malformed');
     }
 
-    const typedPassengers = passengers as StoredOfferPassenger[];
-    const passengerIds = new Set(typedPassengers.map((passenger) => passenger.id));
-    if (passengerIds.size !== typedPassengers.length) {
-      throw new Error('Stored offer passenger ids are malformed');
-    }
+    const allSegments = [
+      ...normalized.segments,
+      ...(normalized.returnSegments ?? []),
+    ];
 
-    const segments: BookingReadinessSegmentInput[] = [];
-    for (const slice of rawOffer.slices) {
-      if (!isRecord(slice) || !Array.isArray(slice.segments)) {
-        throw new Error('Stored offer slices are malformed');
-      }
-
-      for (const segment of slice.segments) {
-        if (!isRecord(segment) || !isRecord(segment.origin) || !isRecord(segment.destination)) {
-          throw new Error('Stored offer segments are malformed');
-        }
-
-        const originCode = iataFromRaw(segment.origin.iata_code);
-        const destinationCode = iataFromRaw(segment.destination.iata_code);
-        const arrivalDate = dateOnlyFromRaw(segment.arriving_at);
-        if (!originCode || !destinationCode || !arrivalDate) {
-          throw new Error('Stored offer segment data is malformed');
-        }
-
-        segments.push({
-          originCountryCode: originCode,
-          destinationCountryCode: destinationCode,
-          arrivalDate,
-        });
-      }
-    }
-
-    if (segments.length === 0) {
+    if (allSegments.length === 0) {
       throw new Error('Stored offer contains no segments');
     }
+
+    const segments: BookingReadinessSegmentInput[] = allSegments.map((s) => ({
+      originCountryCode: s.departureAirport,
+      destinationCountryCode: s.arrivalAirport,
+      arrivalDate: s.arrivalTime.slice(0, 10),
+    }));
 
     const airportCodes = [
       ...new Set(
         segments
           .flatMap((segment) => [segment.originCountryCode, segment.destinationCountryCode])
-          .filter((code): code is string => typeof code === 'string'),
+          .filter((code): code is string => typeof code === 'string' && code.length > 0),
       ),
     ];
+
     const tripCompletionDate = segments.reduce<string | null>((latest, segment) => {
       if (!segment.arrivalDate) {
         return latest;
@@ -496,10 +476,19 @@ export class BookingReadinessService {
       throw new Error('Stored offer trip completion is unavailable');
     }
 
-    return { passengers: typedPassengers, segments, airportCodes, tripCompletionDate };
+    return { passengers, segments, airportCodes, tripCompletionDate };
   }
 
   private assertOfferNotExpired(rawOffer: unknown): void {
+    const normalized = this.flightSearchPort.normalizeStoredOffer(rawOffer);
+    if (normalized?.offerExpiresAt) {
+      const expiresAt = new Date(normalized.offerExpiresAt);
+      if (expiresAt.getTime() <= Date.now()) {
+        throw httpError('OFFER_EXPIRED', 'Flight offer has expired', HttpStatus.CONFLICT);
+      }
+      return;
+    }
+
     if (!isRecord(rawOffer) || !Object.prototype.hasOwnProperty.call(rawOffer, 'expires_at')) {
       return;
     }

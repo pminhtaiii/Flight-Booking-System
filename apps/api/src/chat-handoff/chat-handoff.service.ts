@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   GoneException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -12,6 +13,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
+import { FLIGHT_SEARCH_PORT, type FlightSearchPort } from '@/supplier/search/flight-search.port';
 import {
   createChatTelemetryEvent,
   emitChatTelemetry,
@@ -170,6 +172,7 @@ export class ChatHandoffService {
     private readonly configService: ConfigService,
     private readonly tokenService: ChatHandoffTokenService,
     private readonly selectionAttestationService: SelectionAttestationService,
+    @Inject(FLIGHT_SEARCH_PORT) private readonly flightSearchPort: FlightSearchPort,
     @Optional() private readonly auditService?: AuditService,
   ) {}
 
@@ -540,37 +543,55 @@ export class ChatHandoffService {
     flightOffer: FlightOffer | null,
     selectedOffer: AttestationOffer,
   ): ChatHandoffDisplayDto | undefined {
-    const rawOffer = isJsonRecord(flightOffer?.rawOffer) ? flightOffer.rawOffer : null;
-    const firstSegment = firstFlightSegment(rawOffer);
-    const lastSegment = lastFlightSegment(rawOffer);
-    const operatingCarrier =
-      firstSegment && isJsonRecord(firstSegment.operating_carrier)
-        ? firstSegment.operating_carrier
-        : null;
-    const marketingCarrier =
-      firstSegment && isJsonRecord(firstSegment.marketing_carrier)
-        ? firstSegment.marketing_carrier
-        : null;
+    const normalizedOffer = flightOffer?.rawOffer
+      ? this.flightSearchPort.normalizeStoredOffer(flightOffer.rawOffer)
+      : null;
+
+    const firstSegment = normalizedOffer?.segments[0];
+    const lastSegment = normalizedOffer
+      ? (normalizedOffer.returnSegments && normalizedOffer.returnSegments.length > 0
+          ? normalizedOffer.returnSegments[normalizedOffer.returnSegments.length - 1]
+          : normalizedOffer.segments[normalizedOffer.segments.length - 1])
+      : null;
+
     const airline =
-      stringValue(operatingCarrier?.name) ??
-      stringValue(marketingCarrier?.name) ??
-      stringValue(selectedOffer?.airline) ??
+      firstSegment?.operatingCarrier ||
+      normalizedOffer?.airline ||
+      stringValue(selectedOffer?.airline) ||
       'Unknown Airline';
 
-    const origin = flightOffer?.origin ?? stringValue(selectedOffer?.origin);
-    const destination = flightOffer?.destination ?? stringValue(selectedOffer?.destination);
-    const departureAt = firstSegment
-      ? stringValue(firstSegment.departing_at)
-      : stringValue(selectedOffer?.departureAt);
-    const arrivalAt = lastSegment
-      ? stringValue(lastSegment.arriving_at)
-      : stringValue(selectedOffer?.arrivalAt);
-    const price = flightOffer
-      ? String(flightOffer.price)
-      : selectedOffer?.price !== undefined
-        ? String(selectedOffer.price)
-        : undefined;
-    const currency = flightOffer?.currency ?? stringValue(selectedOffer?.currency);
+    const origin =
+      normalizedOffer?.departureAirport ||
+      flightOffer?.origin ||
+      stringValue(selectedOffer?.origin);
+
+    const destination =
+      (normalizedOffer?.returnSegments && normalizedOffer.returnSegments.length > 0
+        ? lastSegment?.arrivalAirport
+        : normalizedOffer?.arrivalAirport) ||
+      flightOffer?.destination ||
+      stringValue(selectedOffer?.destination);
+
+    const departureAt =
+      firstSegment?.departureTime ||
+      stringValue(selectedOffer?.departureAt);
+
+    const arrivalAt =
+      lastSegment?.arrivalTime ||
+      stringValue(selectedOffer?.arrivalAt);
+
+    const price =
+      normalizedOffer?.totalAmount ??
+      (flightOffer
+        ? String(flightOffer.price)
+        : selectedOffer?.price !== undefined
+          ? String(selectedOffer.price)
+          : undefined);
+
+    const currency =
+      normalizedOffer?.currency ??
+      flightOffer?.currency ??
+      stringValue(selectedOffer?.currency);
 
     if (!origin && !destination && !departureAt) {
       return undefined;
@@ -753,44 +774,57 @@ export class ChatHandoffService {
       });
     }
 
-    const rawOffer = isJsonRecord(flightOffer.rawOffer) ? flightOffer.rawOffer : null;
-    const passengers = handoffPassengers(rawOffer);
-    const offerExpiresAt = isoDateValue(rawOffer?.expires_at);
-    if (!offerExpiresAt || new Date(offerExpiresAt) <= new Date()) {
+    const normalizedOffer = this.flightSearchPort.normalizeStoredOffer(flightOffer.rawOffer);
+    if (
+      !normalizedOffer ||
+      !normalizedOffer.offerExpiresAt ||
+      new Date(normalizedOffer.offerExpiresAt) <= new Date()
+    ) {
       throw new GoneException({
         code: 'HANDOFF_OFFER_STALE',
-        message: 'Handoff offer is stale',
+        message: 'Flight offer expired',
       });
     }
 
-    const firstSegment = firstFlightSegment(rawOffer);
-    const lastSegment = lastFlightSegment(rawOffer);
-    const departureAt = firstSegment ? stringValue(firstSegment.departing_at) : null;
-    const arrivalAt = lastSegment ? stringValue(lastSegment.arriving_at) : null;
+    const firstSegment = normalizedOffer.segments[0];
+    const lastSegment =
+      normalizedOffer.returnSegments && normalizedOffer.returnSegments.length > 0
+        ? normalizedOffer.returnSegments[normalizedOffer.returnSegments.length - 1]
+        : normalizedOffer.segments[normalizedOffer.segments.length - 1];
+
+    if (!firstSegment || !lastSegment) {
+      throw new NotFoundException('Handoff offer unavailable');
+    }
+
+    const departureAt = firstSegment.departureTime;
+    const arrivalAt = lastSegment.arrivalTime;
     if (!departureAt || !arrivalAt) {
       throw new NotFoundException('Handoff offer unavailable');
     }
 
-    const operatingCarrier =
-      firstSegment && isJsonRecord(firstSegment.operating_carrier)
-        ? firstSegment.operating_carrier
-        : null;
-    const marketingCarrier =
-      firstSegment && isJsonRecord(firstSegment.marketing_carrier)
-        ? firstSegment.marketing_carrier
-        : null;
     const airline =
-      stringValue(operatingCarrier?.name) ??
-      stringValue(marketingCarrier?.name) ??
+      firstSegment.operatingCarrier ||
+      normalizedOffer.airline ||
       'Unknown Airline';
+
+    const origin = normalizedOffer.departureAirport || flightOffer.origin;
+    const destination =
+      (normalizedOffer.returnSegments && normalizedOffer.returnSegments.length > 0
+        ? lastSegment.arrivalAirport
+        : normalizedOffer.arrivalAirport) || flightOffer.destination;
+
+    const passengers = normalizedOffer.passengers.map((p) => ({
+      id: p.supplierPassengerId,
+      type: p.type,
+    }));
 
     return {
       status: 'ACTIVE',
       expiresAt,
       offer: {
         airline,
-        origin: flightOffer.origin,
-        destination: flightOffer.destination,
+        origin,
+        destination,
         departureAt,
         arrivalAt,
         price: String(flightOffer.price),
@@ -799,7 +833,7 @@ export class ChatHandoffService {
         children: flightOffer.children,
         infants: flightOffer.infants,
       },
-      ...(passengers && passengers.length > 0 ? { passengers } : {}),
+      ...(passengers.length > 0 ? { passengers } : {}),
     };
   }
 

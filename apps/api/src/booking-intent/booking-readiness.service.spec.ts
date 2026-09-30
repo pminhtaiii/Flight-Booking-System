@@ -8,6 +8,7 @@ import { plainToInstance } from 'class-transformer';
 import { ValidationError, validate } from 'class-validator';
 import { BookingIntentController } from './booking-intent.controller';
 import { FlightOfferNormalizer } from '@/supplier/search/flight-offer.normalizer';
+import { FLIGHT_SEARCH_PORT, type FlightSearchPort } from '@/supplier/search/flight-search.port';
 import type { NormalizedOffer } from './booking-readiness.service';
 
 type ReadinessPassengerSource =
@@ -90,6 +91,7 @@ type ServiceHarness = {
     configService: LooseMock;
     duffelService: LooseMock;
     auditService: LooseMock;
+    flightSearchPort: FlightSearchPort;
   };
 };
 
@@ -125,7 +127,7 @@ function createLooseMock(): LooseMock {
 
 function instantiateWithNamedMocks<T>(
   ClassRef: new (...args: unknown[]) => T,
-  namedMocks: Record<string, unknown>,
+  namedMocks: Record<string | symbol, unknown>,
 ): T {
   const constructorParamTypes =
     (Reflect.getMetadata('design:paramtypes', ClassRef) as Array<{ name?: string }>) ?? [];
@@ -134,10 +136,20 @@ function instantiateWithNamedMocks<T>(
     throw new Error(`${ClassRef.name} constructor metadata is unavailable for test instantiation`);
   }
 
-  const constructorArgs = constructorParamTypes.map((paramType) => {
+  const selfParamTypes =
+    (Reflect.getMetadata('self:paramtypes', ClassRef) as Array<{ index: number; param: unknown }> | undefined) ?? [];
+
+  const constructorArgs = constructorParamTypes.map((paramType, index) => {
+    const injectToken = selfParamTypes.find((item) => item?.index === index)?.param;
+    if (injectToken && (injectToken as string | symbol) in namedMocks) {
+      return namedMocks[injectToken as string | symbol];
+    }
     const tokenName = paramType?.name;
     if (tokenName && tokenName in namedMocks) {
       return namedMocks[tokenName];
+    }
+    if (tokenName === 'Object' && (FLIGHT_SEARCH_PORT as symbol) in namedMocks) {
+      return namedMocks[FLIGHT_SEARCH_PORT as symbol];
     }
     return createLooseMock();
   });
@@ -222,6 +234,9 @@ function buildStoredOffer(overrides: Record<string, unknown> = {}): Record<strin
   return {
     id: 'offer-11111111-1111-4111-8111-111111111111',
     rawOffer: {
+      id: 'off_001',
+      total_amount: '450.00',
+      total_currency: 'USD',
       expires_at: '2030-08-10T15:45:00Z',
       passengers: [
         { id: 'pas_001', type: 'adult' },
@@ -229,24 +244,32 @@ function buildStoredOffer(overrides: Record<string, unknown> = {}): Record<strin
       ],
       slices: [
         {
+          duration: 'PT8H30M',
           segments: [
             {
+              id: 'seg_001',
               origin: { iata_code: 'sgn' },
               destination: { iata_code: 'hnl' },
+              departing_at: '2030-08-15T08:00:00Z',
               arriving_at: '2030-08-15T13:00:00Z',
             },
             {
+              id: 'seg_002',
               origin: { iata_code: 'HNL' },
               destination: { iata_code: 'LAX' },
+              departing_at: '2030-08-15T16:00:00Z',
               arriving_at: '2030-08-15T22:30:00Z',
             },
           ],
         },
         {
+          duration: 'PT15H',
           segments: [
             {
+              id: 'seg_003',
               origin: { iata_code: 'LAX' },
               destination: { iata_code: 'SGN' },
+              departing_at: '2030-08-20T01:00:00Z',
               arriving_at: '2030-08-20T05:45:00Z',
             },
           ],
@@ -314,6 +337,13 @@ function createServiceHarness(): ServiceHarness {
   const configService = createLooseMock();
   const duffelService = createLooseMock();
   const auditService = createLooseMock();
+  const flightSearchPort = {
+    search: jest.fn(),
+    getOfferById: jest.fn(),
+    normalizeStoredOffer: jest.fn((rawOffer: unknown) =>
+      FlightOfferNormalizer.normalizeStoredOffer(rawOffer),
+    ),
+  };
 
   configService.get.mockImplementation((key: string) => {
     if (key === 'FEATURE_FLAG_BOOKING_READINESS') {
@@ -331,6 +361,8 @@ function createServiceHarness(): ServiceHarness {
     ConfigService: configService,
     DuffelService: duffelService,
     AuditService: auditService,
+    FlightSearchPort: flightSearchPort,
+    [FLIGHT_SEARCH_PORT as symbol]: flightSearchPort,
   });
 
   if (typeof service.getAdvisoryReadiness !== 'function') {
@@ -348,6 +380,7 @@ function createServiceHarness(): ServiceHarness {
       configService,
       duffelService,
       auditService,
+      flightSearchPort: flightSearchPort as unknown as FlightSearchPort,
     },
   };
 }
