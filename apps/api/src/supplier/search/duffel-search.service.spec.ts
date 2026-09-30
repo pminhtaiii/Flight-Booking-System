@@ -393,6 +393,100 @@ describe('DuffelSearchService Contract Tests (TDD RED)', () => {
     });
   });
 
+  describe('Search validation and caching', () => {
+    it('rejects a cache miss without an adapter before reserving budget or caching', async () => {
+      const module = await Test.createTestingModule({
+        providers: [
+          DuffelSearchService,
+          { provide: CacheService, useValue: cacheService },
+          { provide: DuffelRateBudgetService, useValue: rateBudgetService },
+        ],
+      }).compile();
+      const unavailableService = module.get(DuffelSearchService);
+      cacheService.get.mockResolvedValueOnce(null);
+
+      await expect(unavailableService.search(defaultCriteria, 'user')).rejects.toThrow(
+        'Search adapter unavailable',
+      );
+      expect(rateBudgetService.reserveAttempt).not.toHaveBeenCalled();
+      expect(cacheService.set).not.toHaveBeenCalled();
+    });
+
+    it('serves a cache hit without an adapter', async () => {
+      const module = await Test.createTestingModule({
+        providers: [
+          DuffelSearchService,
+          { provide: CacheService, useValue: cacheService },
+          { provide: DuffelRateBudgetService, useValue: rateBudgetService },
+        ],
+      }).compile();
+      cacheService.get.mockResolvedValueOnce(JSON.stringify({ offers: [] }));
+
+      const result = await module.get(DuffelSearchService).search(defaultCriteria, 'user');
+
+      expect(result).toEqual({
+        offers: [],
+        searchHash: computeExpectedHash(defaultCriteria),
+        cached: true,
+      });
+      expect(rateBudgetService.reserveAttempt).not.toHaveBeenCalled();
+      expect(cacheService.set).not.toHaveBeenCalled();
+    });
+
+    it.each([undefined, {}])('preserves empty results for adapter response %p', async (response) => {
+      searchAdapter.searchOffers.mockResolvedValueOnce(response);
+
+      const result = await service.search(defaultCriteria, 'user');
+
+      expect(result.offers).toEqual([]);
+      expect(cacheService.set).toHaveBeenCalledWith(
+        `flight:search:${result.searchHash}`,
+        JSON.stringify(result),
+        900,
+      );
+    });
+
+    it.each([
+      ['adult', 'ADULT'],
+      ['child', 'CHILD'],
+      ['infant', 'INFANT'],
+      ['infant_without_seat', 'INFANT'],
+      ['unexpected', 'ADULT'],
+      [undefined, 'ADULT'],
+      [null, 'ADULT'],
+      [42, 'ADULT'],
+      [{}, 'ADULT'],
+    ])('normalizes passenger type %p to %s', async (type, expected) => {
+      searchAdapter.searchOffers.mockResolvedValueOnce({
+        offers: [{
+          ...createMockRawOffer('off_passenger_type'),
+          passengers: [{ id: 'pas_1', type }],
+        }],
+      });
+
+      const result = await service.search(defaultCriteria, 'user');
+
+      expect(result.offers[0].passengers).toEqual([
+        { supplierPassengerId: 'pas_1', type: expected },
+      ]);
+    });
+
+    it.each([false, true])('caches results for 15 minutes (empty: %s)', async (empty) => {
+      searchAdapter.searchOffers.mockResolvedValueOnce({
+        offers: empty ? [] : [createMockRawOffer('off_cache_ttl')],
+      });
+
+      const result = await service.search(defaultCriteria, 'user');
+
+      expect(result.offers).toHaveLength(empty ? 0 : 1);
+      expect(cacheService.set).toHaveBeenCalledWith(
+        `flight:search:${result.searchHash}`,
+        JSON.stringify(result),
+        900,
+      );
+    });
+  });
+
   describe('getOfferById Contract', () => {
     it('retrieves live offer and maps to normalized FlightOffer', async () => {
       const rawOffer = createMockRawOffer('off_live_999');

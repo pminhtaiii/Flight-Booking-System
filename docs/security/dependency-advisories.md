@@ -28,9 +28,11 @@ A full workspace dependency audit identified 98 unique GitHub Security Advisorie
 | **DOM-based XSS** | `maplibre-gl`, `postcss` | **Strict Content Escaping & SAST Enforcement**: React DOM escaping handles all client-rendered variables. SAST rule `safe-html-interpolation` forbids raw `dangerouslySetInnerHTML`. MapLibre GL is restricted to static airport and route GeoJSON coordinates without user-controlled HTML popups. |
 | **AI Agent Prompt / Tool Injection** | `langchain`, `@langchain/core`, `langsmith` | **GuardrailGateways & Sealed Capabilities**: AI tool execution is mediated by zero-authority `AdmissionContext`, sealed `TurnCapabilities`, and deterministic regex guardrails. Direct tool dispatch and raw payload logging are strictly prohibited and verified by custom Semgrep AST rules. |
 
-## 4. Complete Inventory of Deferred Advisories
+## 4. Workspace Inventory of Deferred Advisories
 
 Total unique advisories registered: **101**
+
+Version ranges below cover the release lines represented in this workspace dependency audit; they are not exhaustive upstream affected or patched ranges. For example, `pnpm-lock.yaml` resolves `brace-expansion` 1.1.15 and 2.1.1, so its rows cover the relevant 1.x and 2.x ranges. Consult each linked advisory for other release lines, including 3.x, 4.x, and 5.x.
 
 | GHSA ID | Package | Severity | Advisory Summary | Vulnerable Range | Patched Range |
 |---|---|---|---|---|---|

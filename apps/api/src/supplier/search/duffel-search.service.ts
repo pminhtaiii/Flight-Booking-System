@@ -38,6 +38,20 @@ export class DuffelSearchService implements FlightSearchPort {
     return crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
   }
 
+  private mapPassengerType(type: unknown): FlightOfferPassenger['type'] {
+    switch (type) {
+      case 'adult':
+        return 'ADULT';
+      case 'child':
+        return 'CHILD';
+      case 'infant':
+      case 'infant_without_seat':
+        return 'INFANT';
+      default:
+        return 'ADULT';
+    }
+  }
+
   private mapRawSegment(rawSeg: any): FlightSegment {
     return {
       supplierSegmentId: rawSeg.id || null,
@@ -113,7 +127,7 @@ export class DuffelSearchService implements FlightSearchPort {
     const passengers: FlightOfferPassenger[] = Array.isArray(rawOffer.passengers)
       ? rawOffer.passengers.map((p: any) => ({
           supplierPassengerId: p.id,
-          type: (p.type || 'adult').toUpperCase() as 'ADULT' | 'CHILD' | 'INFANT',
+          type: this.mapPassengerType(p.type),
         }))
       : [];
 
@@ -188,6 +202,10 @@ export class DuffelSearchService implements FlightSearchPort {
       }
     }
 
+    if (!this.searchAdapter) {
+      throw new Error('Search adapter unavailable');
+    }
+
     if (this.rateBudgetService) {
       const today = new Date().toISOString().split('T')[0];
       const limit = caller === 'user' ? 1000 : 500;
@@ -214,7 +232,7 @@ export class DuffelSearchService implements FlightSearchPort {
       }
     }
 
-    const adapterResponse = (await this.searchAdapter?.searchOffers(criteria)) as
+    const adapterResponse = (await this.searchAdapter.searchOffers(criteria)) as
       | { offers?: unknown[] }
       | undefined;
     const rawOffers = adapterResponse?.offers || [];
@@ -234,7 +252,7 @@ export class DuffelSearchService implements FlightSearchPort {
     };
 
     if (this.cacheService) {
-      await this.cacheService.set(cacheKey, JSON.stringify(result));
+      await this.cacheService.set(cacheKey, JSON.stringify(result), 900);
     }
 
     return result;
