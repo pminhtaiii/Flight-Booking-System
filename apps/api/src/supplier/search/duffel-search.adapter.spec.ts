@@ -296,6 +296,28 @@ describe('DuffelSearchAdapter', () => {
       expect(result).toEqual(rawOffer);
     });
 
+    it('throws INTERNAL_SERVER_ERROR without reserving budget when Duffel SDK is missing', async () => {
+      const adapterWithoutDuffel = new DuffelSearchAdapter(undefined, mockBudgetService);
+
+      let caught: HttpException | undefined;
+      try {
+        await adapterWithoutDuffel.getOffer('off_no_sdk');
+      } catch (err: unknown) {
+        if (err instanceof HttpException) {
+          caught = err;
+        }
+      }
+
+      expect(caught).toBeDefined();
+      expect(caught?.getStatus()).toBe(HttpStatus.INTERNAL_SERVER_ERROR);
+      expect(caught?.getResponse()).toEqual({
+        message: 'Duffel SDK is not available',
+        code: 'SDK_UNAVAILABLE',
+      });
+      expect(mockReserveAttempt).not.toHaveBeenCalled();
+      expect(mockOffersGet).not.toHaveBeenCalled();
+    });
+
     it('throws 429 RATE_LIMIT_EXCEEDED when rate budget is exhausted', async () => {
       mockReserveAttempt.mockResolvedValueOnce({
         ok: false,

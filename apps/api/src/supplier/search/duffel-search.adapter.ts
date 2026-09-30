@@ -264,6 +264,16 @@ export class DuffelSearchAdapter {
   }
 
   async getOffer(supplierOfferId: string, timeoutMs = 4500): Promise<unknown> {
+    if (!this.duffel) {
+      throw new HttpException(
+        {
+          message: 'Duffel SDK is not available',
+          code: 'SDK_UNAVAILABLE',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
     if (this.rateBudgetService) {
       const res = await this.rateBudgetService.reserveAttempt();
       if (!res.ok) {
@@ -285,16 +295,6 @@ export class DuffelSearchAdapter {
           HttpStatus.TOO_MANY_REQUESTS,
         );
       }
-    }
-
-    if (!this.duffel) {
-      throw new HttpException(
-        {
-          message: 'Duffel SDK is not available',
-          code: 'SDK_UNAVAILABLE',
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
     }
 
     const timeoutError = new DuffelTimeoutError();
