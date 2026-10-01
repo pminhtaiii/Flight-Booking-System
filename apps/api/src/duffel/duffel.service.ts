@@ -588,7 +588,27 @@ export class DuffelService {
         await this.reserveBudgetAttempt();
         await this.reserveBudgetAttempt();
 
-        const seatMapsPromise = this.duffel.seatMaps.get({ offer_id: offerId });
+        const seatMapsPromise = this.duffel.seatMaps
+          .get({ offer_id: offerId })
+          .catch((error: unknown) => {
+            const status =
+              error instanceof HttpException
+                ? error.getStatus()
+                : error && typeof error === 'object' && 'status' in error
+                  ? error.status
+                  : error && typeof error === 'object' && 'statusCode' in error
+                    ? error.statusCode
+                    : error &&
+                        typeof error === 'object' &&
+                        'meta' in error &&
+                        error.meta &&
+                        typeof error.meta === 'object' &&
+                        'status' in error.meta
+                      ? error.meta.status
+                    : undefined;
+            if (status === 404) return { data: [] };
+            throw error;
+          });
         const offerPromise = this.duffel.offers.get(offerId, { return_available_services: true });
 
         const [seatMapsRes, offerRes] = await Promise.race([

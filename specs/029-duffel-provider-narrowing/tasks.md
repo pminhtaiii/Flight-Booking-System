@@ -68,12 +68,12 @@
 
 ### Tests for User Story 2
 
-- [ ] T025 [P] [US2] Add adapter/catalog cache and missing-seat-map tests in `apps/api/src/supplier/ancillary/duffel-ancillary.service.spec.ts`.
-- [ ] T026 [P] [US2] Add repricing, currency, selected service, and passenger-scope parity cases in `apps/api/src/payment/ancillary-payment-validation.service.spec.ts` and `apps/api/src/ancillaries/ancillaries.service.spec.ts`.
+- [x] T025 [P] [US2] Add adapter/catalog cache and missing-seat-map tests in `apps/api/src/supplier/ancillary/duffel-ancillary.service.spec.ts`.
+- [x] T026 [P] [US2] Add repricing, currency, selected service, and passenger-scope parity cases in `apps/api/src/payment/ancillary-payment-validation.service.spec.ts` and `apps/api/src/ancillaries/ancillaries.service.spec.ts`.
 
 ### Implementation for User Story 2
 
-- [ ] T027 [US2] Extract seat-map, service, and priced-offer SDK calls with per-attempt budget reservation into `apps/api/src/supplier/ancillary/duffel-ancillary.adapter.ts`.
+- [x] T027 [US2] Extract seat-map, service, and priced-offer SDK calls with per-attempt budget reservation into `apps/api/src/supplier/ancillary/duffel-ancillary.adapter.ts`.
 - [ ] T028 [US2] Move seat-map/service and price normalization into `apps/api/src/supplier/ancillary/ancillary.normalizer.ts`, retaining existing shared `AncillaryCatalog` and repricing outputs.
 - [ ] T029 [US2] Implement cache/force-refresh/freshness and concrete ancillary operations in `apps/api/src/supplier/ancillary/duffel-ancillary.service.ts` and register them in `apps/api/src/supplier/ancillary/supplier-ancillary.module.ts`.
 - [ ] T030 [US2] Rewire `apps/api/src/ancillaries/ancillary-catalog.service.ts`, `apps/api/src/ancillaries/ancillaries.module.ts`, `apps/api/src/payment/ancillary-payment-validation.service.ts`, and `apps/api/src/payment/payment.module.ts` to the ancillary module; retain request-scoped identity validation.

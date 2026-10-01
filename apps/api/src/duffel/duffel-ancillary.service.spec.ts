@@ -15,7 +15,9 @@ jest.mock('@duffel/api', () => ({
 }));
 
 import { HttpStatus } from '@nestjs/common';
+import { Duffel } from '@duffel/api';
 import { CacheService } from '@/cache/cache.service';
+import { DuffelRateBudgetService } from '@/supplier/core/duffel-rate-budget.service';
 import { DuffelService } from './duffel.service';
 
 describe('DuffelService Ancillaries, Normalization, Caching & Repricing', () => {
@@ -1061,6 +1063,53 @@ describe('DuffelService Ancillaries, Normalization, Caching & Repricing', () => 
 
   describe('repriceOffer', () => {
     const offerId = 'off_123';
+
+    it('returns authoritative totals for duplicate baggage requests and reserves one SDK attempt', async () => {
+      const intendedServices = [
+        { serviceId: 'ase_bag_1', quantity: 1 },
+        { serviceId: 'ase_bag_1', quantity: 2 },
+      ];
+      mockOffersGetPriced.mockResolvedValue({
+        data: {
+          total_amount: '510.00',
+          total_currency: 'USD',
+          base_amount: '420.00',
+          base_currency: 'USD',
+          service_lines: [
+            {
+              total_amount: '30.00',
+              total_currency: 'USD',
+              quantity: 3,
+              service_id: 'ase_bag_1',
+            },
+          ],
+        },
+      });
+      const reserveAttempt = jest.fn().mockResolvedValue({ ok: true });
+      const sdk = {
+        offers: { getPriced: mockOffersGetPriced },
+      } as unknown as Duffel;
+      const repricingService = new DuffelService(
+        mockCacheService,
+        { reserveAttempt } as unknown as DuffelRateBudgetService,
+        sdk,
+      );
+
+      const result = await repricingService.repriceOffer(offerId, intendedServices);
+
+      expect(result).toEqual({
+        totalAmount: '510.00',
+        baseAmount: '420.00',
+        currency: 'USD',
+        serviceLines: [{ serviceId: 'ase_bag_1', amount: '30.00', quantity: 3 }],
+        invalidServiceIdentities: [],
+      });
+      expect(mockOffersGetPriced).toHaveBeenCalledWith(offerId, {
+        intended_payment_methods: [{ type: 'card', card_id: 'mock_card' }],
+        intended_services: [{ id: 'ase_bag_1', quantity: 3 }],
+      });
+      expect(reserveAttempt).toHaveBeenCalledTimes(1);
+    });
 
     it('deduplicates services by summing their quantities and returns repriced totals', async () => {
       const intendedServices = [
