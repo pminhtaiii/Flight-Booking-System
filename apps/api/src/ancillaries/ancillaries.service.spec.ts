@@ -295,6 +295,32 @@ describe('AncillariesService commit parity', () => {
     expect(fixture.selectionCreate).not.toHaveBeenCalled();
   });
 
+  it('returns HTTP 400 for a catalog service owned by a different passenger', async () => {
+    const fixture = createFixture();
+
+    await expect(
+      fixture.service.commit(
+        'user-1',
+        'intent-1',
+        'key-passenger-mismatch-status',
+        commitDto(fixture.catalogFingerprint, [
+          { intentPassengerId: 'p1', serviceId: 'ase_bag_p2', quantity: 1 },
+        ]),
+      ),
+    ).rejects.toMatchObject({
+      status: 400,
+      response: {
+        code: 'ANCILLARY_SCOPE_INVALID',
+        invalidSelections: expect.arrayContaining([
+          expect.objectContaining({
+            serviceId: 'ase_bag_p2',
+            intentPassengerId: 'p1',
+          }),
+        ]),
+      },
+    });
+  });
+
   it('rejects an unknown service identity with scoped details and no selection write', async () => {
     const fixture = createFixture();
 
@@ -321,6 +347,32 @@ describe('AncillariesService commit parity', () => {
       },
     });
     expect(fixture.selectionCreate).not.toHaveBeenCalled();
+  });
+
+  it('returns HTTP 400 for an unknown service identity', async () => {
+    const fixture = createFixture();
+
+    await expect(
+      fixture.service.commit(
+        'user-1',
+        'intent-1',
+        'key-unknown-service-status',
+        commitDto(fixture.catalogFingerprint, [
+          { intentPassengerId: 'p1', serviceId: 'ase_unknown', quantity: 1 },
+        ]),
+      ),
+    ).rejects.toMatchObject({
+      status: 400,
+      response: {
+        code: 'ANCILLARY_SCOPE_INVALID',
+        invalidSelections: expect.arrayContaining([
+          expect.objectContaining({
+            serviceId: 'ase_unknown',
+            intentPassengerId: 'p1',
+          }),
+        ]),
+      },
+    });
   });
 
   it('rejects a selected service whose catalog currency differs from the offer currency', async () => {
