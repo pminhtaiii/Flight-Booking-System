@@ -69,7 +69,7 @@
 ### Tests for User Story 2
 
 - [x] T025 [P] [US2] Add adapter/catalog cache and missing-seat-map tests in `apps/api/src/supplier/ancillary/duffel-ancillary.service.spec.ts`.
-- [ ] T026 [P] [US2] Add repricing, currency, selected service, and passenger-scope parity cases in `apps/api/src/payment/ancillary-payment-validation.service.spec.ts` and `apps/api/src/ancillaries/ancillaries.service.spec.ts`.
+- [x] T026 [P] [US2] Add repricing, currency, selected service, and passenger-scope parity cases in `apps/api/src/payment/ancillary-payment-validation.service.spec.ts` and `apps/api/src/ancillaries/ancillaries.service.spec.ts`.
 
 ### Implementation for User Story 2
 

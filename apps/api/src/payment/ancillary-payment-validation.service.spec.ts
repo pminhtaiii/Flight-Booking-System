@@ -1,5 +1,8 @@
+import { Duffel } from '@duffel/api';
+import { CacheService } from '@/cache/cache.service';
 import { DuffelService } from '@/duffel/duffel.service';
 import { PrismaService } from '@/prisma/prisma.service';
+import { DuffelRateBudgetService } from '@/supplier/core/duffel-rate-budget.service';
 import { AncillaryPaymentValidationService } from './ancillary-payment-validation.service';
 
 describe('AncillaryPaymentValidationService', () => {
@@ -207,6 +210,145 @@ describe('AncillaryPaymentValidationService', () => {
         data: expect.objectContaining({
           validationLeaseToken: null,
           validationLeaseExpiresAt: null,
+        }),
+      }),
+    );
+  });
+
+  it('uses authoritative SDK repricing for duplicate baggage selections and persists its totals', async () => {
+    jest.useRealTimers();
+    const future = new Date(Date.now() + 60 * 60 * 1000);
+    const selection = {
+      id: 'selection-3',
+      bookingIntentId: 'intent-1',
+      version: 3,
+      status: 'DRAFT_COMMITTED',
+      currency: 'USD',
+      total: '90.00',
+      validationLeaseToken: null,
+      validationLeaseExpiresAt: null,
+      seatSelections: [],
+      baggageSelections: [
+        {
+          serviceId: 'ase_bag_1',
+          intentPassengerId: 'p1',
+          quantity: 1,
+          segments: [{ segmentId: 'seg_1' }],
+        },
+        {
+          serviceId: 'ase_bag_1',
+          intentPassengerId: 'p2',
+          quantity: 2,
+          segments: [{ segmentId: 'seg_1' }],
+        },
+      ],
+    };
+    const intent = {
+      id: 'intent-1',
+      userId: 'user-1',
+      status: 'PENDING',
+      intentExpiresAt: future,
+      offerExpiresAt: future,
+      duffelOfferId: 'off_123',
+      confirmedPrice: '420.00',
+      currency: 'USD',
+      ancillaryVersion: 3,
+      currentAncillarySelectionId: 'selection-3',
+      currentAncillarySelection: selection,
+    };
+    type PaymentTransaction = {
+      $queryRaw: jest.Mock;
+      bookingIntent: {
+        findUnique: jest.Mock;
+        updateMany: jest.Mock;
+      };
+      ancillarySelection: {
+        updateMany: jest.Mock;
+      };
+    };
+    const selectionUpdate = jest.fn().mockResolvedValue({ count: 1 });
+    const bookingIntentUpdate = jest.fn().mockResolvedValue({ count: 1 });
+    const transaction: PaymentTransaction = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: 'intent-1' }]),
+      bookingIntent: {
+        findUnique: jest.fn().mockResolvedValue(intent),
+        updateMany: bookingIntentUpdate,
+      },
+      ancillarySelection: {
+        updateMany: selectionUpdate,
+      },
+    };
+    const prisma = {
+      $transaction: jest.fn(
+        async (callback: (tx: PaymentTransaction) => Promise<unknown>): Promise<unknown> =>
+          callback(transaction),
+      ),
+      ancillarySelection: {
+        updateMany: selectionUpdate,
+      },
+    };
+    const mockOffersGetPriced = jest.fn().mockResolvedValue({
+      data: {
+        total_amount: '510.00',
+        base_amount: '420.00',
+        total_currency: 'USD',
+        service_lines: [
+          {
+            service_id: 'ase_bag_1',
+            total_amount: '30.00',
+            quantity: 3,
+          },
+        ],
+      },
+    });
+    const sdk = {
+      offers: { getPriced: mockOffersGetPriced },
+    } as unknown as Duffel;
+    const reserveAttempt = jest.fn().mockResolvedValue({ ok: true });
+    const duffel = new DuffelService(
+      {} as unknown as CacheService,
+      { reserveAttempt } as unknown as DuffelRateBudgetService,
+      sdk,
+    );
+    const service = new AncillaryPaymentValidationService(
+      prisma as unknown as PrismaService,
+      duffel,
+    );
+
+    const result = await service.validateForPayment({
+      userId: 'user-1',
+      bookingIntentId: 'intent-1',
+      ancillarySelectionId: 'selection-3',
+      ancillarySelectionVersion: 3,
+    });
+
+    expect(result).toEqual({
+      selectionId: 'selection-3',
+      selectionVersion: 3,
+      baseAmount: '420.00',
+      grandTotal: '510.00',
+      currency: 'USD',
+      services: [{ serviceId: 'ase_bag_1', quantity: 3 }],
+    });
+    expect(mockOffersGetPriced).toHaveBeenCalledWith('off_123', {
+      intended_payment_methods: [{ type: 'card', card_id: 'mock_card' }],
+      intended_services: [{ id: 'ase_bag_1', quantity: 3 }],
+    });
+    expect(reserveAttempt).toHaveBeenCalledTimes(1);
+    expect(selectionUpdate).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'VALIDATED',
+          validatedBaseAmount: '420.00',
+          validatedGrandTotal: '510.00',
+        }),
+      }),
+    );
+    expect(bookingIntentUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          ancillaryStatus: 'VALIDATED',
+          validatedTotal: '510.00',
         }),
       }),
     );
