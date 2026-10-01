@@ -4,6 +4,8 @@
 
 **Goal:** Complete GOAL.md's T028 and T029 ancillary normalization, cache orchestration, repricing, and module registration.
 
+**Completion:** T028 and T029 are implemented, committed, independently approved, and converged within this slice. Already-supported guard cases received honest GREEN regressions rather than manufactured RED failures; newly added behavior and review fixes have recorded RED/GREEN evidence. Final spec review has zero findings; standards P2 findings are fixed, with one nonblocking duplication suggestion deferred. Final API gate: 127 suites / 2,311 tests passed; focused checkpoint: 191 tests; E2E checkpoint: four tests; TypeScript, lint, shared, and static contract gates passed. T030/T031 remain pending.
+
 **Architecture:** Extract supplier-shape interpretation into AncillaryNormalizer. DuffelAncillaryService owns cache/freshness and safe errors, calls the existing independently metered DuffelAncillaryAdapter, and returns shared ancillary domain types. SupplierAncillaryModule exports only the concrete service; consumer rewiring remains T030.
 
 **Tech Stack:** Existing TypeScript, NestJS, Jest, CacheService, shared types and installed Duffel adapter; no new dependency.

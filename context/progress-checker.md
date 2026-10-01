@@ -19,6 +19,8 @@
 - Added capability integration, module boundary, and E2E coverage. The module exports only the concrete service; per-call budget admission remains in the adapter.
 - Verification: focused ancillary/payment command passed 12 suites and 191 tests; ancillary capability plus catalog E2E command passed 2 suites and 4 tests; API `tsc -p tsconfig.json --noEmit` passed. Capability spec passed 40/40 and module spec passed 2/2. The final network-guard API suite passed 127 suites and 2,311 tests; final API/shared lint passed with zero warnings.
 - T029 is complete locally. T030 consumer rewiring and T031's broader ancillary/API checkpoint remain pending.
+- Final review and convergence: T028/T029 task reviews approved; scoped convergence found no gaps; spec review found zero issues. Standards' two P2 test-typing findings were corrected and re-reviewed; one nonblocking status-helper duplication suggestion remains deferred.
+- Final timeout regression: an uncached test reproduced `ETIMEDOUT` incorrectly returning 502; commit `8d93ab07` explicitly recognizes it and preserves 504 `UPSTREAM_UNAVAILABLE`. Capability/module checks passed 42/42, capability E2E 1/1, API compilation and lint passed. The final full network-guard API retry passed 127 suites / 2,311 tests (305.91 seconds). Its preceding concurrent run exceeded the existing flight-match p95 threshold (12.0177 ms versus <10 ms); no assertion was changed.
 
 ### Feature 029 — Narrow the Duffel Supplier Boundary: Ancillary Adapter and Normalizer Complete Locally (T025–T028) (2026-10-01)
 
