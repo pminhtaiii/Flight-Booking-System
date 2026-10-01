@@ -1,5 +1,5 @@
-import { DuffelService } from '@/duffel/duffel.service';
 import { PrismaService } from '@/prisma/prisma.service';
+import { DuffelAncillaryService } from '@/supplier/ancillary/duffel-ancillary.service';
 import { AncillaryPaymentValidationService } from './ancillary-payment-validation.service';
 
 type Pricing = {
@@ -64,12 +64,12 @@ const createHarness = (pricing: Pricing) => {
     ),
     ancillarySelection: { updateMany: jest.fn() },
   };
-  const duffel = { repriceOffer: jest.fn().mockResolvedValue(pricing) };
+  const ancillaryService = { repriceOffer: jest.fn().mockResolvedValue(pricing) };
   const service = new AncillaryPaymentValidationService(
     prisma as unknown as PrismaService,
-    duffel as unknown as DuffelService,
+    ancillaryService as unknown as DuffelAncillaryService,
   );
-  return { bookingIntentUpdate, duffel, selectionUpdate, service };
+  return { bookingIntentUpdate, ancillaryService, selectionUpdate, service };
 };
 
 const input = {
@@ -127,7 +127,7 @@ describe('AncillaryPaymentValidationService targeted conflicts', () => {
       response: { code, intentId: 'intent-1' },
     });
 
-    expect(harness.duffel.repriceOffer).toHaveBeenCalledTimes(1);
+    expect(harness.ancillaryService.repriceOffer).toHaveBeenCalledTimes(1);
     expect(harness.selectionUpdate).toHaveBeenLastCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({ validationLeaseToken: expect.any(String) }),

@@ -1,7 +1,9 @@
 import { Duffel } from '@duffel/api';
 import { CacheService } from '@/cache/cache.service';
-import { DuffelService } from '@/duffel/duffel.service';
 import { PrismaService } from '@/prisma/prisma.service';
+import { AncillaryNormalizer } from '@/supplier/ancillary/ancillary.normalizer';
+import { DuffelAncillaryAdapter } from '@/supplier/ancillary/duffel-ancillary.adapter';
+import { DuffelAncillaryService } from '@/supplier/ancillary/duffel-ancillary.service';
 import { DuffelRateBudgetService } from '@/supplier/core/duffel-rate-budget.service';
 import { AncillaryPaymentValidationService } from './ancillary-payment-validation.service';
 
@@ -67,7 +69,7 @@ describe('AncillaryPaymentValidationService', () => {
         }
       },
     );
-    const duffel = {
+    const ancillaryService = {
       repriceOffer: jest.fn().mockImplementation(async () => {
         expect(inTransaction).toBe(false);
         return {
@@ -84,7 +86,7 @@ describe('AncillaryPaymentValidationService', () => {
     };
     const service = new AncillaryPaymentValidationService(
       prisma as unknown as PrismaService,
-      duffel as unknown as DuffelService,
+      ancillaryService as unknown as DuffelAncillaryService,
     );
 
     const result = await service.validateForPayment({
@@ -105,7 +107,7 @@ describe('AncillaryPaymentValidationService', () => {
         { serviceId: 'seat-1', quantity: 1 },
       ],
     });
-    expect(duffel.repriceOffer).toHaveBeenCalledTimes(1);
+    expect(ancillaryService.repriceOffer).toHaveBeenCalledTimes(1);
     expect(prisma.$transaction).toHaveBeenCalledTimes(2);
     expect(prisma.ancillarySelection.updateMany).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -173,12 +175,12 @@ describe('AncillaryPaymentValidationService', () => {
     };
 
     // Duffel repricing hangs past 15s timeout
-    const duffel = {
+    const ancillaryService = {
       repriceOffer: jest.fn().mockImplementation(() => new Promise(() => {})),
     };
     const service = new AncillaryPaymentValidationService(
       prisma as unknown as PrismaService,
-      duffel as unknown as DuffelService,
+      ancillaryService as unknown as DuffelAncillaryService,
     );
 
     const validationPromise = service.validateForPayment({
@@ -304,15 +306,21 @@ describe('AncillaryPaymentValidationService', () => {
     const sdk = {
       offers: { getPriced: mockOffersGetPriced },
     } as unknown as Duffel;
+    // Keep the adapter and normalizer real; SDK, budget, and cache are external boundaries.
     const reserveAttempt = jest.fn().mockResolvedValue({ ok: true });
-    const duffel = new DuffelService(
-      {} as unknown as CacheService,
-      { reserveAttempt } as unknown as DuffelRateBudgetService,
-      sdk,
+    const cache = {
+      get: jest.fn().mockResolvedValue(null),
+      getTtl: jest.fn().mockResolvedValue(-2),
+      set: jest.fn().mockResolvedValue(undefined),
+    };
+    const ancillaryService = new DuffelAncillaryService(
+      new DuffelAncillaryAdapter(sdk, { reserveAttempt } as unknown as DuffelRateBudgetService),
+      new AncillaryNormalizer(),
+      cache as unknown as CacheService,
     );
     const service = new AncillaryPaymentValidationService(
       prisma as unknown as PrismaService,
-      duffel,
+      ancillaryService,
     );
 
     const result = await service.validateForPayment({
@@ -484,7 +492,7 @@ describe('AncillaryPaymentValidationService', () => {
         invalidServiceIdentities: [],
       };
 
-      const duffel = {
+      const ancillaryService = {
         repriceOffer: options?.pricingError
           ? jest.fn().mockRejectedValue(options.pricingError)
           : jest.fn().mockResolvedValue(options?.pricing ?? defaultPricing),
@@ -492,14 +500,14 @@ describe('AncillaryPaymentValidationService', () => {
 
       const service = new AncillaryPaymentValidationService(
         prisma as unknown as PrismaService,
-        duffel as unknown as DuffelService,
+        ancillaryService as unknown as DuffelAncillaryService,
       );
 
       return {
         service,
         prisma,
         transaction,
-        duffel,
+        ancillaryService,
         bookingIntentUpdate,
         selectionUpdate,
       };

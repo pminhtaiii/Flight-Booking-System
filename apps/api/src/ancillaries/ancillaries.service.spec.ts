@@ -1,9 +1,11 @@
 import { Duffel } from '@duffel/api';
 import { CacheService } from '@/cache/cache.service';
 import { AuditService } from '@/audit/audit.service';
-import { DuffelService } from '@/duffel/duffel.service';
 import { PaymentIdempotencyService } from '@/idempotency/payment-idempotency.service';
 import { PrismaService } from '@/prisma/prisma.service';
+import { AncillaryNormalizer } from '@/supplier/ancillary/ancillary.normalizer';
+import { DuffelAncillaryAdapter } from '@/supplier/ancillary/duffel-ancillary.adapter';
+import { DuffelAncillaryService } from '@/supplier/ancillary/duffel-ancillary.service';
 import { DuffelRateBudgetService } from '@/supplier/core/duffel-rate-budget.service';
 import type { AncillaryCatalog } from '@shared/types';
 import { AncillaryCatalogService } from './ancillary-catalog.service';
@@ -126,6 +128,7 @@ const catalogForFingerprint = (services: BaggageFixture[]): AncillaryCatalog => 
 });
 
 const createFixture = (services: BaggageFixture[] = baggageFixtures): CommitFixture => {
+  // Exercise the real supplier capability; only SDK, budget, and cache boundaries are doubled.
   const offerGet = jest.fn().mockResolvedValue({ data: rawOffer(services) });
   const seatMapsGet = jest.fn().mockResolvedValue({ data: [] });
   const cache = {
@@ -138,12 +141,12 @@ const createFixture = (services: BaggageFixture[] = baggageFixtures): CommitFixt
     seatMaps: { get: seatMapsGet },
     offers: { get: offerGet },
   } as unknown as Duffel;
-  const duffel = new DuffelService(
+  const ancillaryService = new DuffelAncillaryService(
+    new DuffelAncillaryAdapter(sdk, { reserveAttempt } as unknown as DuffelRateBudgetService),
+    new AncillaryNormalizer(),
     cache as unknown as CacheService,
-    { reserveAttempt } as unknown as DuffelRateBudgetService,
-    sdk,
   );
-  const catalogService = new AncillaryCatalogService(duffel);
+  const catalogService = new AncillaryCatalogService(ancillaryService);
   const intent = {
     id: 'intent-1',
     userId: 'user-1',
