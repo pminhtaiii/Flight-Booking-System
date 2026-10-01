@@ -48,6 +48,12 @@ Read only the context files relevant to the specific task:
   - If the task involves testing, running E2E suites, or pre-PR validation gates: read `context/testing.md`.
 - **Sub-Agent Delegation**: Use specialized sub-agents whenever possible, especially when performing code implementation or code reviews, to optimize task distribution and avoid context bloating.
 
+### Windows & Environment Rules
+
+- **PowerShell Syntax**: The shell is Windows PowerShell. Use `;` or separate command calls, never bash `&&` chains.
+- **Path Formatting**: Always use native Windows backslashes or valid absolute paths (`C:\Booking Systems\...`) when calling file tools.
+- **Background Tasks**: Never poll `manage_task status` in a loop; wait for the system's reactive background task notification.
+
 ### Local Development Startup
 
 To run the full stack locally (Next.js frontend, NestJS backend, and Python agent service), follow these instructions:
