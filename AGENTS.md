@@ -12,51 +12,47 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 <!-- END:nextjs-agent-rules -->
 
-## Read Before Anything Else
+## Context Pointers
 
-Read only the context files relevant to the specific task:
+Never read all context files at once. Selectively read only the document required for the active task:
 
-- For general understanding or new features: read `context/project-overview.md`.
-- For system layout, routing, database, and backend/frontend setup: read `context/architecture.md`.
-- For linting, file structure, naming conventions, and code guidelines: read `context/code-standards.md`.
-- For third-party library rules and configurations: read `context/library-docs.md`.
-- For active feature checkpoints and in-flight tasks: read `context/active-feature.md`.
-- For current progress status across features: read `context/progress-checker.md`.
-- For development lifecycle and workflow steps: read `context/workflow.md`.
-- For testing, E2E runner workflows, and pre-PR validation gates: read `context/testing.md`.
+| Task / Intent | Document to Read |
+| --- | --- |
+| In-flight feature checkpoints & immediate tasks | `context/active-feature.md` |
+| Master milestone progress & completed features | `context/progress-checker.md` |
+| System topology, module boundaries & ports | `context/architecture.md` |
+| Linting, conventions, naming & code guidelines | `context/code-standards.md` |
+| Third-party libraries & vendor configurations | `context/library-docs.md` |
+| High-level system overview & business concepts | `context/project-overview.md` |
+| TDD development workflow & lifecycle phases | `context/workflow.md` |
+| Testing, E2E runners & pre-PR validation gates | `context/testing.md` |
 
-## Rules That Never Change
+## Core Invariants
 
-- Always use subagents while doing the implementation or code reviews to avoid context rot.
-- Never use hardcoded hex values or raw Tailwind color classes.
-- Update all relevant files in the `context/` folder (such as `context/active-feature.md` and `context/architecture.md`) after completing any feature or slice to ensure project documentation remains in sync with the codebase.
-- Before any third party library — load its installed skill first, then read context/library-docs.md for project-specific rules.
+- **Sub-Agent Delegation**: Always use subagents for code implementation and code reviews to avoid context rot.
+- **Styling Rules**: Never use hardcoded hex values or raw Tailwind color classes. Always use semantic design tokens.
+- **Third-Party Libraries**: Load the library's installed skill first, then consult `context/library-docs.md` for repo-specific rules.
+- **Documentation Sync**: Update all relevant files in `context/` (e.g. `context/active-feature.md`, `context/architecture.md`) after completing any feature or slice.
+- **Fail-Fast on Repeated Failure**: If the same problem persists after one corrective prompt, stop immediately, explain the blockage, and ask the user for guidance.
 
-## Agent Operating Rules
+## Subagent Implementer Guardrails
 
-### Critical Guidelines
+When dispatching an implementer subagent, enforce these standards in the task prompt:
+1. **Zero Type Assertions**: Never use `as SomeType` or `as any`. Use type narrowing and runtime type guards.
+2. **Clean Lint**: No unused imports or variables. Must pass package ESLint / Ruff checks.
+3. **Ports & Adapters**: Depend only on exported port interfaces (e.g. `FLIGHT_SEARCH_PORT`), never internal vendor SDKs or implementations directly.
+4. **Constructor Injection**: Inject dependencies via NestJS constructor injection; never instantiate services with `new`.
+5. **Verify Before Returning**: Execute focused tests, typecheck, and package lint locally before marking tasks complete.
 
-- **Stop on Persistent Failure**: If the same problem persists after one corrective prompt — stop immediately, explain the situation, and ask the user for guidance.
-- **Third-Party Libraries**: Before using any third-party library, load its installed skill first, then read `context/library-docs.md` for project-specific rules.
-- **Context Folder Access**: Avoid reading all files in the `context/` folder by default. Instead, selectively read only the files relevant to the current task to prevent context bloating:
-  - If the task is about architecture, data flow, or NestJS/Next.js setup: read `context/architecture.md`.
-  - If the task is about coding conventions, directories, or rules: read `context/code-standards.md`.
-  - If the task requires using a third-party library: read `context/library-docs.md`.
-  - If the task involves the in-flight feature or status: read `context/active-feature.md` and `context/progress-checker.md`.
-  - If the task is a new feature or high-level request: read `context/project-overview.md`.
-  - If the task is implementation or requires the TDD workflow: read `context/workflow.md`.
-  - If the task involves testing, running E2E suites, or pre-PR validation gates: read `context/testing.md`.
-- **Sub-Agent Delegation**: Use specialized sub-agents whenever possible, especially when performing code implementation or code reviews, to optimize task distribution and avoid context bloating.
-
-### Windows & Environment Rules
+## Windows & Environment Rules
 
 - **PowerShell Syntax**: The shell is Windows PowerShell. Use `;` or separate command calls, never bash `&&` chains.
 - **Path Formatting**: Always use native Windows backslashes or valid absolute paths (`C:\Booking Systems\...`) when calling file tools.
 - **Background Tasks**: Never poll `manage_task status` in a loop; wait for the system's reactive background task notification.
 
-### Local Development Startup
+## Local Development Startup
 
-To run the full stack locally (Next.js frontend, NestJS backend, and Python agent service), follow these instructions:
+To run the full stack locally (Next.js frontend, NestJS backend, and Python agent service):
 
 1. **Docker Services**: Ensure Docker Desktop is active, then start PostgreSQL and Redis:
    ```bash
