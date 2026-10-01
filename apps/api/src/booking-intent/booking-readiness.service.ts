@@ -251,6 +251,15 @@ export class BookingReadinessService {
     rawOffer: unknown,
     passengers: readonly ResolvedPassenger[],
     context?: ReadinessContext,
+    flightOffer?: {
+      duffelOfferId?: string | null;
+      price?: unknown;
+      currency?: string | null;
+      departureDate?: Date | string | null;
+      adults?: number | null;
+      children?: number | null;
+      infants?: number | null;
+    } | null,
   ): Promise<BookingReadinessResponseDto> {
     const startedAt = Date.now();
     this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.BOOKING_READINESS_CHECKS);
@@ -258,7 +267,7 @@ export class BookingReadinessService {
 
     try {
       this.assertFeatureEnabled();
-      const normalizedOffer = this.normalizeStoredOffer(rawOffer);
+      const normalizedOffer = this.normalizeStoredOffer(rawOffer, flightOffer);
       const storedById = new Map(
         normalizedOffer.passengers.map((passenger) => [passenger.id, passenger]),
       );

@@ -322,6 +322,7 @@ export class BookingIntentService {
               traceId: context?.traceId,
               correlationId: context?.correlationId,
             },
+            flightOffer,
           )
         : Promise.resolve(null);
 
