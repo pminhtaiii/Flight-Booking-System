@@ -133,8 +133,8 @@ export class DuffelAncillaryService {
 
 Consumes real existing adapter.getSeatMaps/getOfferWithServices/getPricedOffer Promise<unknown>, Task 1 normalizer, CacheService.get/getTtl/set. Exports concrete service through module. No direct budget/SDK calls and no monolith dependency.
 
-- [ ] Step 1: Add a RED integration test through Nest Test.createTestingModule providing real service, adapter, normalizer and DuffelRateBudgetService. Override only DUFFEL_SDK and CacheService boundary providers. The cache double includes checkAndIncrement returning `{ allowed: true, current: 1 }`; exhaustion returns `{ allowed: false, current: 1500 }`, store failure adds `storeError: true`. Count this storage operation to verify reservations without mocking internal budget behavior. Set fresh cached catalog TTL 4; assert HIT/4, no SDK calls and no budget reservations. Run `pnpm --filter @api/backend exec jest --runInBand src/supplier/ancillary/duffel-ancillary.capability.spec.ts`, record RED missing class.
-- [ ] Step 2: Implement cache path and getSeatMapsAndServices signatures. Read TTL before value; ttl>3 and readable catalog returns HIT. Cache read/parse failure falls back to supplier without exposing raw values in logs.
+- [x] Step 1: Add a RED integration test through Nest Test.createTestingModule providing real service, adapter, normalizer and DuffelRateBudgetService. Override only DUFFEL_SDK and CacheService boundary providers. The cache double includes checkAndIncrement returning `{ allowed: true, current: 1 }`; exhaustion returns `{ allowed: false, current: 1500 }`, store failure adds `storeError: true`. Count this storage operation to verify reservations without mocking internal budget behavior. Set fresh cached catalog TTL 4; assert HIT/4, no SDK calls and no budget reservations. Run `pnpm --filter @api/backend exec jest --runInBand src/supplier/ancillary/duffel-ancillary.capability.spec.ts`, record RED missing class.
+- [x] Step 2: Implement cache path and getSeatMapsAndServices signatures. Read TTL before value; ttl>3 and readable catalog returns HIT. Cache read/parse failure falls back to supplier without exposing raw values in logs.
 
 ```typescript
 if (!forceRefresh) {
@@ -146,7 +146,7 @@ if (!forceRefresh) {
 }
 ```
 
-- [ ] Step 3: Add RED tests one at a time for TTL 3/0, TTL>3 without cached value, force refresh, cache parse failure, cache write failure. Implement concurrent raw lookup, guarded normalization and best-effort write TTL60:
+- [x] Step 3: Add RED tests one at a time for TTL 3/0, TTL>3 without cached value, force refresh, cache parse failure, cache write failure. Implement concurrent raw lookup, guarded normalization and best-effort write TTL60:
 
 ```typescript
 const [rawSeatMaps, rawOffer] = await Promise.all([
@@ -159,9 +159,9 @@ return catalog;
 ```
 
 Wrap cache read/write separately, supplier failures must not become cache hits. A deferred SDK test proves both calls start before either settles. Boundary tests prove two successful reservations for two calls, zero on cache HIT, no SDK call for denied adapter, safe budget exception propagation. Under concurrent per-call admission, a permitted sibling may start when the other is denied; do not charge twice in the service to reproduce monolith pre-reservation. Preserve old monolith suites unchanged and document this distinction.
-- [ ] Step 4: Add RED/GREEN missing-map tests for [], raw status404, statusCode404, meta.status404 and HttpException404 using actual adapter. Missing map retains baggage. Offer404 and seat-map500 produce 502 UPSTREAM_UNAVAILABLE, never graceful fallback. Supplier429 variants produce 429 UPSTREAM_RATE_LIMITED. Budget HttpExceptions retain 429 RATE_LIMIT_EXCEEDED/BUDGET_UNAVAILABLE and retry metadata. Use generic messages; never expose supplier error bodies.
-- [ ] Step 5: Add RED timeout test with fake timers and never-settling SDK promises. Implement existing 4500ms overall catalog Promise.race deadline and clear timer in finally on all outcomes. Timeout is 504 with code UPSTREAM_UNAVAILABLE (legacy wire code); never introduce GATEWAY_TIMEOUT as the body code. Assert no timer remains after success/failure. Test network timeout errors safely map to504 when applicable.
-- [ ] Step 6: Add RED deduplication/authoritative pricing test and implement:
+- [x] Step 4: Add RED/GREEN missing-map tests for [], raw status404, statusCode404, meta.status404 and HttpException404 using actual adapter. Missing map retains baggage. Offer404 and seat-map500 produce 502 UPSTREAM_UNAVAILABLE, never graceful fallback. Supplier429 variants produce 429 UPSTREAM_RATE_LIMITED. Budget HttpExceptions retain 429 RATE_LIMIT_EXCEEDED/BUDGET_UNAVAILABLE and retry metadata. Use generic messages; never expose supplier error bodies.
+- [x] Step 5: Add RED timeout test with fake timers and never-settling SDK promises. Implement existing 4500ms overall catalog Promise.race deadline and clear timer in finally on all outcomes. Timeout is 504 with code UPSTREAM_UNAVAILABLE (legacy wire code); never introduce GATEWAY_TIMEOUT as the body code. Assert no timer remains after success/failure. Test network timeout errors safely map to504 when applicable.
+- [x] Step 6: Add RED deduplication/authoritative pricing test and implement:
 
 ```typescript
 const quantities = new Map<string, number>();
@@ -174,7 +174,7 @@ return this.normalizer.normalizeRepricedOffer(pricedOffer, deduplicatedServices)
 ```
 
 Assert SDK intended_services combines bag quantities and preserves first-seen order; authoritative amounts exactly retained; one budget reservation; input array unchanged. Add raw SDK400 invalid-identity and all-ID fallback tests, pass rejection to normalizer only for400. Test 429, budget denial, generic failure and malformed successful price safe errors. No payment authority or retries added.
-- [ ] Step 7: Add RED Nest module resolution/export-isolation tests then implement exact registration:
+- [x] Step 7: Add RED Nest module resolution/export-isolation tests then implement exact registration:
 
 ```typescript
 @Module({
@@ -186,8 +186,8 @@ export class SupplierAncillaryModule {}
 ```
 
 Compile actual module with SDK/cache test overrides; resolve service and exercise public operation. Test module export metadata matches only concrete service, no core/SDK/adapter/normalizer leakage.
-- [ ] Step 8: Add capability E2E importing actual SupplierAncillaryModule, cache in-memory boundary and SDK double. Exercise MISS->HIT->force-refresh, 404 seat-map+baggage and deduplicated repricing. This extracted capability remains inactive for domain consumers until T030; don't rewire app/controller/payment to satisfy E2E.
-- [ ] Step 9: Run focused checkpoint and compile:
+- [x] Step 8: Add capability E2E importing actual SupplierAncillaryModule, cache in-memory boundary and SDK double. Exercise MISS->HIT->force-refresh, 404 seat-map+baggage and deduplicated repricing. This extracted capability remains inactive for domain consumers until T030; don't rewire app/controller/payment to satisfy E2E.
+- [x] Step 9: Run focused checkpoint and compile:
 
 ```powershell
 pnpm --filter @api/backend exec jest --runInBand src/supplier/ancillary src/ancillaries src/payment/ancillary-payment-validation.service.spec.ts src/duffel/duffel.service.spec.ts
@@ -195,7 +195,16 @@ pnpm --filter @api/backend exec jest --runInBand --config test/jest-e2e.json tes
 pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit
 ```
 
-- [ ] Step 10: Self-review, update relevant context docs accurately with actual evidence and remaining T030/T031, mark T029 [X], stage only task files/docs and commit `feat(ancillary): add cached supplier capability and module`. Record full RED/GREEN commands, counts, compile and limitations in task-2-report.md.
+- [x] Step 10: Self-review, update relevant context docs accurately with actual evidence and remaining T030/T031, mark T029 [X], stage only task files/docs and commit `feat(ancillary): add cached supplier capability and module`. Record full RED/GREEN commands, counts, compile and limitations in task-2-report.md.
+
+### Task 2 completion evidence
+
+All ten steps are complete by behavior and validation. The initial cache-hit and module behaviors were already green and received GREEN regression coverage; these checkboxes record completed behavior and do not claim a separately observed RED for every planned case.
+
+Validation: the original focused checkpoint passed 12 suites/191 tests; the requested E2E checkpoint passed 2 suites/4 tests; API TypeScript compile passed; the coordinator API network-guard and API/shared lint gates passed 127 suites/2,311 tests and zero lint warnings before the later timeout-code correction. The standards-only focused rerun first exposed the existing ETIMEDOUT 502-vs-504 mismatch (41/42); separate service-only commit 8d93ab0740caaf6d6e5b1d33b110d872a9a91089 corrected it. On top of that fix, the capability/module tests passed 2 suites/42 tests, capability E2E passed 1/1, TypeScript passed, and API lint passed with zero warnings.
+
+T030 consumer rewiring and T031 broader checkpoint remain pending.
+
 
 ## Slice convergence and final validation
 

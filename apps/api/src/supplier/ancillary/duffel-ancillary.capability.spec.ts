@@ -1,5 +1,5 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
+import { Test, TestingModule } from '@nestjs/testing';
 import { Duffel } from '@duffel/api';
 import { CacheService } from '@/cache/cache.service';
 import { AncillaryCatalog } from '@shared/types';
@@ -43,7 +43,49 @@ const rawOfferWithBaggage = {
   ],
 };
 
-function deferred<T>() {
+type AncillaryCacheDouble = {
+  getTtl: jest.Mock<Promise<number>, [string]>;
+  get: jest.Mock<Promise<string | null>, [string]>;
+  set: jest.Mock<Promise<void>, [string, string, number?]>;
+  checkAndIncrement: jest.Mock<
+    Promise<{ allowed: boolean; current: number; storeError?: boolean }>,
+    [
+      { key: string; limit: number; ttlSeconds: number },
+      { key: string; limit: number; ttlSeconds: number }?,
+    ]
+  >;
+};
+
+type AncillarySdkDouble = {
+  seatMaps: {
+    get: jest.Mock<Promise<{ data: unknown }>, [{ offer_id: string }]>;
+  };
+  offers: {
+    get: jest.Mock<
+      Promise<{ data: unknown }>,
+      [string, { return_available_services: boolean }]
+    >;
+    getPriced: jest.Mock<
+      Promise<{ data: unknown }>,
+      [
+        string,
+        {
+          intended_payment_methods: Array<{ type: 'card'; card_id: string }>;
+          intended_services: Array<{ id: string; quantity: number }>;
+        },
+      ]
+    >;
+  };
+};
+
+type CapabilityHarness = {
+  module: TestingModule;
+  service: DuffelAncillaryService;
+  cache: AncillaryCacheDouble;
+  sdk: AncillarySdkDouble;
+};
+
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((res) => {
     resolve = res;
@@ -51,8 +93,8 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-async function createHarness() {
-  const cache = {
+async function createHarness(): Promise<CapabilityHarness> {
+  const cache: AncillaryCacheDouble = {
     getTtl: jest.fn<Promise<number>, [string]>().mockResolvedValue(-2),
     get: jest.fn<Promise<string | null>, [string]>().mockResolvedValue(null),
     set: jest.fn<Promise<void>, [string, string, number?]>().mockResolvedValue(undefined),
@@ -66,7 +108,7 @@ async function createHarness() {
       >()
       .mockResolvedValue({ allowed: true, current: 1 }),
   };
-  const sdk = {
+  const sdk: AncillarySdkDouble = {
     seatMaps: {
       get: jest.fn<Promise<{ data: unknown }>, [{ offer_id: string }]>().mockResolvedValue({
         data: [],
@@ -96,6 +138,7 @@ async function createHarness() {
       DuffelAncillaryAdapter,
       AncillaryNormalizer,
       DuffelRateBudgetService,
+      // This double covers the adapter's required SDK subset; the real adapter, budget, and normalizer stay wired.
       { provide: DUFFEL_SDK, useValue: sdk as unknown as Duffel },
       { provide: CacheService, useValue: cache },
     ],

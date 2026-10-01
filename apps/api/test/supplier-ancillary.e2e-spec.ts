@@ -88,6 +88,7 @@ describe('Supplier ancillary capability (E2E)', () => {
           service_lines: [{ service_id: 'ase_bag_1', total_amount: '45.00', quantity: 3 }],
         },
       });
+    // The capability uses this SDK subset; the actual adapter remains behind the boundary override.
     const sdk = {
       seatMaps: { get: seatMapsGet },
       offers: { get: offersGet, getPriced: offersGetPriced },

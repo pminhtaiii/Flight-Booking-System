@@ -11,6 +11,7 @@ import { SupplierAncillaryModule } from './supplier-ancillary.module';
 
 describe('SupplierAncillaryModule', () => {
   it('exports only the concrete ancillary service', () => {
+    // Reflect metadata is untyped; narrow its result to the provider-list shape for this assertion.
     const exports = Reflect.getMetadata('exports', SupplierAncillaryModule) as unknown[];
 
     expect(exports).toEqual([DuffelAncillaryService]);
@@ -35,6 +36,7 @@ describe('SupplierAncillaryModule', () => {
         >()
         .mockResolvedValue({ allowed: true, current: 1 }),
     };
+    // This module test overrides the broad SDK surface while keeping real ancillary providers wired.
     const sdk = {
       seatMaps: {
         get: jest
