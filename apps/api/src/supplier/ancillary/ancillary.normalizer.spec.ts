@@ -560,4 +560,104 @@ describe('AncillaryNormalizer', () => {
       ),
     ).toThrow('Malformed supplier priced offer');
   });
+
+  it('preserves seat price strings beyond two fractional digits', () => {
+    const catalog = normalizer.normalizeCatalog(
+      [
+        {
+          segment_id: 'seg_1',
+          cabins: [
+            {
+              cabin_class: 'economy',
+              rows: [
+                {
+                  row_number: 1,
+                  sections: [
+                    {
+                      elements: [
+                        {
+                          type: 'seat',
+                          designator: '1A',
+                          available_services: [
+                            {
+                              id: 'seat_1',
+                              passenger_id: 'pas_1',
+                              total_amount: '15.1234',
+                              total_currency: 'USD',
+                            },
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      {
+        slices: [
+          {
+            segments: [
+              {
+                id: 'seg_1',
+                origin: { iata_code: 'SGN' },
+                destination: { iata_code: 'SIN' },
+              },
+            ],
+          },
+        ],
+      },
+    );
+
+    expect(catalog.segments[0].seatMap?.cabins[0].rows[0].elements[0].availableServices).toEqual([
+      {
+        serviceId: 'seat_1',
+        passengerId: 'pas_1',
+        amount: '15.1234',
+        currency: 'USD',
+      },
+    ]);
+  });
+
+  it('preserves baggage price strings beyond two fractional digits', () => {
+    const catalog = normalizer.normalizeCatalog([], {
+      available_services: [
+        {
+          id: 'bag_1',
+          type: 'baggage',
+          passenger_ids: ['pas_1'],
+          segment_ids: ['seg_1'],
+          total_amount: '30.1234',
+          total_currency: 'USD',
+          metadata: { type: 'checked' },
+        },
+      ],
+    });
+
+    expect(catalog.baggageServices[0]?.amount).toBe('30.1234');
+  });
+
+  it('preserves repriced price strings beyond two fractional digits', () => {
+    const result = normalizer.normalizeRepricedOffer(
+      {
+        total_amount: '473.1234',
+        base_amount: '420.1234',
+        total_currency: 'USD',
+        service_lines: [
+          { service_id: 'seat_1', total_amount: '18.1234', quantity: 1 },
+        ],
+      },
+      [{ id: 'seat_1', quantity: 1 }],
+    );
+
+    expect(result).toEqual({
+      totalAmount: '473.1234',
+      baseAmount: '420.1234',
+      currency: 'USD',
+      serviceLines: [{ serviceId: 'seat_1', amount: '18.1234', quantity: 1 }],
+      invalidServiceIdentities: [],
+    });
+  });
 });

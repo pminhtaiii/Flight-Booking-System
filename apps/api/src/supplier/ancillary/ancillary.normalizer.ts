@@ -39,7 +39,7 @@ function isNonEmptyString(value: unknown): value is string {
 }
 
 function isMoneyAmount(value: unknown): value is string {
-  return typeof value === 'string' && /^\d+(\.\d{1,2})?$/.test(value);
+  return typeof value === 'string' && /^\d+(\.\d+)?$/.test(value);
 }
 
 function getRecords(value: unknown): Record<string, unknown>[] {
