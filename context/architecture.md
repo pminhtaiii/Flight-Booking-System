@@ -2,70 +2,90 @@
 
 ## Status
 
-This document defines the core and intended system architecture for the Flight Booking System.
+This document defines the enduring architectural reference for the Flight Booking System. It articulates the authoritative system topology, core architectural principles, subsystem boundaries, data models, and security invariants.
 
-Runtime behavior must not be assumed implemented merely because it appears here. `context/progress-checker.md` and `context/active-feature.md` are the source of truth for implementation status. Historical feature change logs and release notes are archived in `docs/history/architecture-archive.md`.
+Runtime behavior must not be assumed implemented merely because it appears here. The single source of truth for active delivery status and verified task completion is:
+
+- `context/progress-checker.md` (Current feature delivery status)
+- `context/active-feature.md` (In-flight milestone checkpoints)
+
+Historical feature narratives, commit logs, and per-task completion checklists (Features 001–029) are archived in `docs/history/architecture-archive.md`.
 
 ---
 
 ## System Topology
 
-The Flight Booking System is organized as a multi-service monorepo with strict process, port, and security boundaries:
-
 ```text
-               +-------------------------------------------+
-               |          Next.js Web Frontend             |
-               |        (App Router, Port 3000)            |
-               |   - Server Components & Route Handlers    |
-               |   - backendClient (zero browser creds)    |
-               +--------------------+----------------------+
-                                    |
-            +-----------------------+-----------------------+
-            | HTTP / Session JWT                            | HTTP / SSE Stream
-            v                                               v
-+-------------------------------+               +-------------------------------+
-|         NestJS API            |               |      Python Agent Service     |
-|   (Backend, Port 3001)        |               |   (FastAPI / LangGraph, 3002) |
-| - Modular Monolith Domain     | <-----------+ | - TurnSessionCoordinator      |
-| - Capability Gateway Endpoints|  Service Key  | - Admission (Auth/PII/Quota)  |
-| - Transactional DB & Ledger   |  & HMAC Claim | - Memory & Tool Resolution    |
-+---------------+---------------+               +---------------+---------------+
-                |                                               |
-        +-------+-------+                               +-------+-------+
-        |               |                               |               |
-        v               v                               v               v
-+---------------+ +---------------+             +---------------+ +---------------+
-|  PostgreSQL   | |     Redis     | <-----------+ |  PostgreSQL   | |  OpenAI /     |
-|  (Port 5432)  | |  (Port 6379)  |  Cache/Fences |  (Direct Read | |  Mimo API     |
-| Prisma ORM    | | Budget & Rate |               |   Deferred)   | | LLM Engine    |
-+---------------+ +---------------+             +---------------+ +---------------+
-        |               |
-        v               v
-+---------------+ +---------------+
-|  Duffel API   | |  Stripe API   |
-| Supplier SDK  | | Payment / Web |
-+---------------+ +---------------+
+┌───────────────────────────────────────────────────────────────────────────────────┐
+│                                 Client Browser                                    │
+│   (React Server Components + Thin Interactive Client Components / Zero Credential)│
+└────────────┬─────────────────────────────┬───────────────────────────┬────────────┘
+             │ Next.js Server Actions /    │ Same-Origin Route Handler │ SSE Stream
+             │ Server Components           │ /api/booking-management/* │ (Port 3002)
+             ▼                             ▼                           │
+┌────────────────────────────────────────────────────────┐             │
+│            Web Frontend — Next.js (Port 3000)          │             │
+│  - App Router / React Server Components                │             │
+│  - Single-Owner createBackendClient (Server Only)      │             │
+│  - NextAuth Session & Private Bearer Token Resolution  │             │
+└───────────────────────────┬────────────────────────────┘             │
+                            │ Internal Server-to-Server                │
+                            │ (Bearer JWT / Private VPC)               │
+                            ▼                                          │
+┌────────────────────────────────────────────────────────┐             │
+│            Backend API — NestJS Monolith (Port 3001)   │             │
+│  - Modular Monolith Architecture (Strict DAG)          │             │
+│  - Supplier Boundary Narrowing (FLIGHT_SEARCH_PORT)   │             │
+│  - DuffelCoreModule (SDK Singleton + Rate Budget)      │             │
+│  - SupplierAncillaryModule (Catalog, Repricing, Seats) │             │
+│  - AgentGatewayModule (API Key + HMAC Claim Tokens)    │             │
+│  - PaymentFulfillmentSaga & Post-Commit Domain Events  │             │
+│  - Prisma ORM & Transactional Integrity                │             │
+└──────────────┬───────────────────┬───────────────────┬─┘             │
+               │                   │                   │               │
+      SQL / Tx │          Lua /    │ Capability Calls  │ HMAC Claims   │
+               │          Cache    │ (Service Key)     │               │
+               ▼                   ▼                   ▼               ▼
+┌──────────────────┐    ┌─────────────────┐    ┌───────────────────────────────┐
+│    PostgreSQL    │    │      Redis      │    │    Python Agent (Port 3002)   │
+│  (Port 5432)     │    │  (Port 6379)    │    │  - FastAPI + LangGraph        │
+│                  │    │                 │    │  - 4-Stage Admission Pipeline │
+│ - Users / Auth   │    │ - Search Hashes │    │  - Pure Pydantic Events       │
+│ - Bookings / PNR │    │ - Rate Budgets  │    │  - GraphEventInterpreter      │
+│ - Flight Offers  │    │ - Seat Maps     │    │  - ToolResultResolver         │
+│ - Payment Ledger │    │ - Session Locks │    │  - SSE Transport Formatter    │
+│ - Revisions      │    │ - Turn Quotas   │    └───────────────┬───────────────┘
+│ - Audit Logs     │    └─────────────────┘                    │
+└──────────────────┘                                           │
+         ▲                                                     │
+         │ Upstream Fulfillment / Status                       │
+         ├─────────────────────────────────┐                   │
+         ▼                                 ▼                   ▼
+┌─────────────────┐             ┌─────────────────┐  ┌──────────────────┐
+│   Duffel API    │             │   Stripe API    │  │ Mimo / OpenAI API│
+│ (Restricted     │             │ (Payment Intent │  │ (LLM Inference   │
+│  Ports Only)    │             │  & Webhooks)    │  │  Reasoning Engine│
+└─────────────────┘             └─────────────────┘  └──────────────────┘
 ```
+
+The system strictly decouples conversational reasoning from transactional authority. Browser clients never communicate directly with backend supplier APIs or Python services for transactional mutations. All transactional workflows terminate at the NestJS backend monolith.
 
 ---
 
 ## Stack
 
-The following is the authoritative technology baseline. Technology changes require an explicit Architectural Decision Record (ADR) and must preserve documented boundary contracts.
-
-| Layer | Tool / Technology | Purpose |
-| --- | --- | --- |
-| Languages | TypeScript (strict), Python 3.11+ | TS for Web/API, Python for conversational agent |
-| Frontend | Next.js 14 App Router, React 18, Tailwind CSS | SSR, Server Components, client state isolation |
-| Backend API | NestJS 10, Express, TypeScript | Transactional business logic, auth, booking fulfillment |
-| Agent Engine | FastAPI, LangGraph, LangChain, Pydantic v2 | Conversational workflow, tool interpretation, guardrails |
-| Database & ORM | PostgreSQL 16, Prisma ORM | Relational authority for users, bookings, payments, audit |
-| Cache & Budgets | Redis 7 (`ioredis`, `redis-py`) | Search cache, seat map catalog, atomic rate budget Lua |
-| Auth & Sessions | NextAuth.js (Auth.js) + JWT | Session cookies; HMAC-signed internal claim tokens |
-| Flight Supplier | Duffel API (`@duffel/api` SDK singleton) | Search, ancillaries, orders, ticketing behind budget |
-| Payments | Stripe API (Payment Intents, Webhooks) | PCI-DSS compliant payment processing and refunds |
-| Testing | Vitest, Jest, Pytest, Playwright | Unit, integration, characterization, and smoke gates |
-| Security | OWASP ZAP, Semgrep SAST, DAST Harness | Static security scanning, dynamic adversarial fuzzing |
+| Layer                  | Technology           | Version / Tooling                     | Architectural Role                                                       |
+| ---------------------- | -------------------- | ------------------------------------- | ------------------------------------------------------------------------ |
+| **Runtime & Language** | TypeScript / Node.js | TypeScript 5.4+, Node.js 20+ LTS      | Strict typing monorepo core (`@shared/types`, API, Web)                  |
+| **Agent Runtime**      | Python               | Python 3.12+, uv package manager      | High-performance AI service runtime (`apps/agent`)                       |
+| **Web Tier**           | Next.js              | Next.js 14 (App Router)               | Server-first rendering, thin client components, zero-credential boundary |
+| **Backend API**        | NestJS               | NestJS 10, Express, class-validator   | Modular monolith, domain boundary enforcement, saga orchestration        |
+| **AI Agent Service**   | FastAPI / LangGraph  | FastAPI, LangGraph v2, Pydantic v2    | Conversational workflow graph, streaming SSE event translation           |
+| **Persistence**        | PostgreSQL           | PostgreSQL 16 via Prisma ORM 5.x      | ACID transactional store, optimistic concurrency, relational schema      |
+| **Cache & State**      | Redis                | Redis 7 via ioredis & redis-py        | Distributed rate budgeting, session locks, cached catalog snapshots      |
+| **Suppliers**          | Duffel API           | `@duffel/api` SDK (narrowed provider) | Upstream flight search, seat maps, baggage, and booking orders           |
+| **Payments**           | Stripe               | Stripe Node SDK, Stripe Elements      | PCI-compliant card tokenization, Payment Intents, webhook ingestion      |
+| **Shared Contracts**   | Monorepo Shared      | Zod 3.x, npm workspaces / pnpm        | Single source of truth for DTO schemas, domain models, constants         |
 
 ---
 
@@ -73,276 +93,288 @@ The following is the authoritative technology baseline. Technology changes requi
 
 ### 1. LLM = Reasoning Component / Runtime = Authority
 
-The LLM is an untrusted advisory component with zero direct database or payment access. All mutations and system interactions cross deterministic runtime boundaries:
+The Large Language Model is strictly a stateless reasoning component. It possesses zero execution authority and is never treated as a privileged security perimeter.
+
+- All model actions cross deterministic runtime gates: schema validation, capability checks, session-state verification, and policy bounds.
+- The model never executes direct SQL queries, mutates database records, or triggers payment rails directly.
+- All operations execute through capability endpoints on the NestJS `AgentGatewayModule`, which independently validates identity, user permissions, and idempotency.
 
 ```text
-Model Tool Request
-      ↓
-Input Schema Validation (Pydantic / Zod)
-      ↓
-Pre-Stream Admission (Auth -> Length -> Gateway Health -> PII Scan -> Quota)
-      ↓
-Agent Gateway Guard (API Key + HMAC Claim Token Verification)
-      ↓
-Deterministic Domain Service Execution
-      ↓
-Output Guardrail / Sanitization (PII Redaction & Schema Projection)
-      ↓
-Model-Visible Result & SSE Dispatch
+Model Tool Request ──► Schema Validation ──► Capability Check ──► Policy Evaluation ──► Execution ──► Sanitization ──► Client
 ```
 
 ### 2. Zero-Client-Credential Boundary
 
-Browsers and client-side JavaScript never receive raw supplier credentials, API keys, upstream flight supplier IDs, or database connection strings:
-- All external API communication flows through server-side handlers.
-- The web application utilizes `apps/web/lib/server/backend-client.ts` as its single-owner transport.
-- Client payloads receive normalized, deterministic domain models with internal UUID identifiers.
+Browser runtimes and client-side JavaScript bundles must never hold or observe supplier credentials, private service keys, backend bearer JWTs, or private network URLs.
 
-### 3. Ports & Adapters (Supplier Boundary Narrowing)
+- Next.js Client Components (`"use client"`) never receive `accessToken`, `API_URL`, or secret environment variables via props, hooks, or hidden DOM inputs.
+- Authentication tokens are resolved exclusively on the server (via Server Components, Server Actions, or server-only modules via `getServerSession`).
+- Interactive client actions route through Server Actions or thin same-origin route handlers (`/api/booking-management/*`) delegating to server domain modules.
 
-External supplier APIs (Duffel, Stripe) sit behind strict, capability-local domain ports:
-- `FLIGHT_SEARCH_PORT` (`supplier-search.module.ts`) encapsulates flight offer queries and mapping.
-- `DuffelAncillaryService` (`supplier-ancillary.module.ts`) encapsulates seat maps and baggage catalogs.
-- Core business domains (`flights/`, `booking-intent/`, `booking-lifecycle/`) depend exclusively on domain interfaces and never import vendor SDKs or vendor data schemas directly.
+### 3. Ports & Adapters / Supplier Boundary Narrowing
+
+The core flight domain remains strictly vendor-blind. External travel suppliers (e.g., Duffel) are strictly encapsulated behind narrow, intention-revealing ports:
+
+- `SupplierSearchModule` exports solely the `FLIGHT_SEARCH_PORT` injection token (`FlightSearchPort`). Domain consumers (`FlightsService`, `BookingIntentService`, `BookingReadinessService`) consume normalized `FlightOffer` objects.
+- `SupplierAncillaryModule` encapsulates supplier-specific catalog ingestion, seat map availability, and repricing behind `DuffelAncillaryService`.
+- `DuffelCoreModule` isolates the `@duffel/api` SDK singleton (`DUFFEL_SDK`) and config validation. No raw supplier types or SDK instances leak into domain modules.
+
+```text
+Domain Consumer (FlightsService / BookingIntentService)
+      │
+      ▼  (Normalized FlightOffer)
+FLIGHT_SEARCH_PORT (Interface Token)
+      │
+      ▼
+DuffelSearchService (Criteria Normalization & Cache Hit Check)
+      │
+      ├──► Cache Hit: Returns cached FlightOffer (0 budget reservations, 0 SDK calls)
+      │
+      └──► Cache Miss: DuffelSearchAdapter
+                │
+                ├──► DuffelRateBudgetService (Atomic Redis check-and-increment)
+                │
+                └──► Duffel SDK Singleton (DUFFEL_SDK) ──► Upstream Duffel API
+```
 
 ### 4. Fail-Closed Security & Atomic Daily Rate Budgets
 
-External vendor access is governed by strict rate budgets:
-- `DuffelRateBudgetService` enforces global daily limits via atomic Redis Lua scripts (`budget:duffel:daily:YYYY-MM-DD`, default 1,500 attempts, expiring at next UTC midnight `00:00:00Z`).
-- Attempts follow attempted-call semantics: reservations decrement immediately before requests, with zero refund methods.
-- On Redis connection failure or script evaluation errors, the system fails closed (`storeError: true`, HTTP 429 / `BUDGET_UNAVAILABLE`), preventing unbudgeted upstream calls.
+Supplier rate limiting enforces financial and operational protection against downstream quota depletion:
+
+- Redis Lua scripts evaluate primary daily counter (`budget:duffel:daily:YYYY-MM-DD`) and optional caller sub-allocation counters (`budget:duffel:caller:{user|agent}:YYYY-MM-DD`) in a single atomic round-trip.
+- Key initialization atomically attaches an expiration TTL set to the next UTC midnight (`00:00:00Z`).
+- Attempted-call semantics: Budget permits are reserved prior to dispatching upstream supplier calls. Zero refund or decrement methods exist.
+- Fail-closed behavior: Any budget denial or Redis operational failure immediately yields HTTP 429 (`RATE_LIMIT_EXCEEDED` or `BUDGET_UNAVAILABLE`) with 0 upstream supplier calls.
+
+```text
+Caller Request
+      │
+      ▼
+Check & Increment (Redis Lua Script)
+      │
+      ├──► Both limits within budget ──► Allow (1 attempt reserved) ──► Invoke Duffel SDK
+      │
+      ├──► Counter exceeds budget   ──► Reject (0 SDK calls) ───────► HTTP 429 BUDGET_UNAVAILABLE
+      │
+      └──► Redis Error / Timeout    ──► Fail-Closed In-Memory Guard  ► HTTP 429 BUDGET_UNAVAILABLE
+```
 
 ### 5. Idempotent & Atomic Booking Fulfillment
 
-All booking creations and payments execute as atomic, idempotent transactions:
-- Two-phase booking reservation with version-fenced optimistic locking.
-- Idempotency keys (`idempotency_key`) recorded for all payment authorizations and settlement sagas.
-- Post-commit domain events decouple synchronous persistence from asynchronous projection listeners.
+Flight ticket purchase requires multi-party state convergence across local databases, Stripe, and airline suppliers:
+
+- Two-phase booking flow: Hold/Intent Creation ──► Stripe Payment Authorization ──► Supplier Order Creation ──► Atomic Finalization.
+- Orchestrated by `PaymentFulfillmentSaga` using bounded semaphore permits (Stripe: 20 active / 100 queued; Duffel: 10 active / 100 queued; 5,000 ms deadline) and idempotency locks. Transactions are never held open across external HTTP calls.
+- Atomic state transitions: Updates increment `Booking.version` optimistically. Domain events (`booking.confirmed`, `booking.cancelled`) dispatch strictly post-commit via `EventEmitterModule`.
+- Eventual consistency: Background projection workers synchronize read models (`BookingAgentProjection`) without blocking critical write paths.
+
+```text
+Client Confirm ──► PaymentFulfillmentSaga ──► Stripe Adapter (Charge) ──► Duffel Fulfillment (Order)
+                          │                                                        │
+                          ▼                                                        ▼
+                   Database Commit ◄───────────────────────────────────────────────┘
+                   (Booking.version++, Status=CONFIRMED)
+                          │
+                          ▼ (Post-Commit Dispatch)
+                   Domain Events (booking.confirmed) ──► BookingProjectionModule (Async Read-Model)
+```
 
 ---
 
 ## Project Structure
 
 ```text
-/
-├── AGENTS.md                          → Project operating rules and entrypoints
-├── pnpm-workspace.yaml                → Workspace topology
-├── package.json                       → Monorepo script registry
-│
+c:/Booking Systems/
 ├── apps/
-│   ├── api/                           → NestJS Backend Monolith
-│   │   ├── prisma/                    → Schema definitions, migrations, and seeds
+│   ├── api/                                # NestJS Monolithic Backend (Port 3001)
+│   │   ├── prisma/
+│   │   │   ├── schema.prisma               # Authoritative PostgreSQL relational schema
+│   │   │   └── migrations/                 # Version-controlled DB migrations
 │   │   └── src/
-│   │       ├── agent-gateway/         → Capability-local gateway umbrella & submodules
-│   │       │   ├── attested-flight-search/ → V1/V2 search & HMAC selection attestations
-│   │       │   ├── booking-readiness/ → Advisory readiness projection
-│   │       │   ├── safe-booking-read/ → Tier-1 & Tier-2 safe booking projections
-│   │       │   ├── auth/              → AgentAuthModule (API key & claim token guards)
-│   │       │   └── audit/             → AgentToolAuditModule (privacy-safe telemetry)
-│   │       ├── supplier-search/       → FlightSearchPort provider & Duffel adapter
-│   │       ├── supplier-ancillary/    → Seat maps, baggage catalog & repricing
-│   │       ├── duffel-core/           → DUFFEL_SDK provider & DuffelRateBudgetService
-│   │       ├── booking-lifecycle/     → BookingStateModule, transitions & recovery
-│   │       ├── booking-projection/    → Safe read model listeners, writers & metrics
-│   │       ├── booking-management/    → Owner read models, disruption & revision queries
-│   │       ├── cancellation/          → Cancellation quotes, obligations & refunds
-│   │       ├── chat/                  → Chat message persistence & AgentChatController
-│   │       ├── idempotency/           → PaymentIdempotencyService & lease management
-│   │       ├── payment/               → Stripe payment processing & trigger coordinators
-│   │       └── domain-events/         → Passive event publisher & transactional context
+│   │       ├── agent-gateway/              # Hardened capability endpoints for AI agent
+│   │       ├── ancillaries/                # Domain ancillary catalog & validation
+│   │       ├── auth/                       # JWT authentication, guards & strategies
+│   │       ├── booking-intent/             # Initial offer locks & pricing holds
+│   │       ├── booking-lifecycle/          # State machines, transitions & recovery
+│   │       ├── booking-management/         # User booking operations & cancellation
+│   │       ├── booking-projection/         # Event-driven async read-model projections
+│   │       ├── cache/                      # Redis client, Lua scripts & rate budgeting
+│   │       ├── cancellation/               # Cancellation quotes, policies & execution
+│   │       ├── disruption/                 # Schedule changes, alerts & passenger inbox
+│   │       ├── domain-events/              # Post-commit passive event infrastructure
+│   │       ├── duffel/                     # DuffelCoreModule (SDK singleton provider)
+│   │       ├── flights/                    # Search orchestration, scoring & rankings
+│   │       ├── payment/                    # Payment intents, Stripe webhooks & ledger
+│   │       ├── payment-fulfillment/        # PaymentFulfillmentSaga & supplier orders
+│   │       ├── supplier/                   # Ports & adapters (SupplierSearchModule, SupplierAncillaryModule)
+│   │       └── main.ts                     # NestJS bootstrap, global pipes & filters
 │   │
-│   ├── agent/                         → Python FastAPI Agent Service
-│   │   └── src/agent/
-│   │       ├── admission/             → AuthService, InputAdmissionService, QuotaService
-│   │       ├── chat_turn/             → Coordinator, runner, interpreter & resolver
-│   │       ├── guardrails/            → GuardrailGateway, PII scanning, output pipeline
-│   │       ├── memory/                → ConversationMemory, sliding window & compaction
-│   │       ├── streaming/             → SSE transport adapter & pre-stream admission
-│   │       └── graph/                 → LangGraph state machine & advisory nodes
+│   ├── agent/                              # Python Conversational Agent (Port 3002)
+│   │   ├── src/agent/
+│   │   │   ├── admission/                  # 4-stage sequential admission pipeline
+│   │   │   ├── chat_turn/                  # Pure Pydantic events, interpreter & resolver
+│   │   │   ├── graph/                      # LangGraph v2 workflow definitions
+│   │   │   ├── guardrails/                 # Prompt injection scans & input safety
+│   │   │   ├── memory/                     # Conversation history & thread state
+│   │   │   ├── streaming/                  # SSE wire formatting (format_sse)
+│   │   │   ├── tools/                      # Agent tool definitions (gateway callers)
+│   │   │   └── main.py                     # FastAPI application & lifespan management
+│   │   └── tests/                          # Pytest suite & synthetic graph fixtures
 │   │
-│   └── web/                           → Next.js Web Frontend
-│       ├── app/                       → App Router routes (search, bookings, dashboard)
-│       ├── components/                → React UI components (shadcn/ui, Radix UI)
-│       └── lib/server/                → Server-only backendClient transport & schemas
+│   └── web/                                # Next.js Web Frontend (Port 3000)
+│       ├── app/
+│       │   ├── (auth)/                     # Login, signup & profile routes
+│       │   ├── api/booking-management/     # Thin same-origin route handlers
+│       │   ├── bookings/                   # Booking management & revision history UI
+│       │   ├── search/                     # Flight search controls & results views
+│       │   └── layout.tsx                  # Root shell & navigation
+│       ├── components/                     # React Server Components & UI primitives
+│       └── lib/server/
+│           ├── backend-client.ts           # Single-owner resilient HTTP client
+│           └── booking-management.ts       # Server domain dispatcher for route handlers
 │
 ├── packages/
-│   └── shared/                        → Shared TypeScript types, Zod schemas & constants
+│   └── shared/                             # Cross-package shared types and constants
+│       ├── src/
+│       │   ├── constants/                  # Match thresholds, timeouts, cache keys
+│       │   ├── schemas/                    # Zod validation schemas
+│       │   └── types/                      # Domain interfaces, outcomes & DTO contracts
+│       └── package.json
 │
-├── tests/
-│   ├── ci/                            → Network isolation & contract verification gates
-│   ├── security/                      → SAST/DAST harness, ZAP config & adversarial corpus
-│   └── smoke/                         → Multi-service smoke test suite
-│
-├── context/
-│   ├── active-feature.md              → In-flight feature checkpoints & tasks
-│   ├── progress-checker.md            → Master project progress & completed features
-│   ├── architecture.md                → System architecture & invariant definitions (this file)
-│   ├── code-standards.md              → Linting, conventions & styling guidelines
-│   ├── library-docs.md                → Approved third-party libraries & usage rules
-│   └── workflow.md                    → Development lifecycle & TDD requirements
-│
-└── docs/
-    ├── history/                       → Historical archives (progress & architecture)
-    ├── adr/                           → Architectural Decision Records
-    └── security/                      → Threat model, security specs & runbooks
+├── docs/history/                           # Archived milestone logs & historical specs
+└── context/                                # Enduring developer & agent context files
 ```
 
 ---
 
 ## Core Subsystems
 
-### 1. NestJS Backend Monolith (`apps/api`)
+### 1. Backend API (NestJS Monolith)
 
-- **Modular Boundary Architecture**: Capability submodules are self-contained and anti-cyclic. Feature modules communicate via domain events or injected port tokens.
-- **Supplier Search (`supplier-search.module.ts`)**:
-  - Implements `FlightSearchPort`.
-  - Encapsulates `DuffelSearchService`, `DuffelSearchAdapter`, `FlightOfferNormalizer`, and cleanup cron.
-  - Queries Redis cache (`flight:search:${hash}`, 15 min TTL) before reserving rate budget.
-  - Normalizes vendor payloads into RFC 4122 v4 deterministic domain offers.
-- **Supplier Ancillaries (`supplier-ancillary.module.ts`)**:
-  - Encapsulates `DuffelAncillaryService` and `DuffelAncillaryAdapter`.
-  - Fetches seat maps and services concurrently; handles 404 seat maps gracefully as empty seat layouts while retaining baggage options.
-  - Writes normalized catalogs to Redis with a 60-second TTL.
-- **Duffel Core Foundation (`duffel-core.module.ts`)**:
-  - Injects singleton `@duffel/api` SDK via `DUFFEL_SDK`.
-  - Houses `DuffelRateBudgetService`, enforcing daily attempt quotas via atomic Redis Lua script.
-- **Agent Gateway Submodules (`agent-gateway/`)**:
-  - Endpoints protected by `AgentAuthGuard` requiring valid `X-Agent-Service-Key` and HMAC claim tokens.
-  - Exposes sanitized read models: attested flight searches, advisory booking readiness, and PII-stripped traveler preferences.
+The backend functions as an anti-cyclic modular monolith where all domain interactions follow strict acyclic dependency graphs (DAG) without circular imports or `forwardRef()` workarounds:
 
-### 2. Python Agent Service (`apps/agent`)
+- **`SupplierSearchModule`**: Encapsulates `DuffelSearchService`, `DuffelSearchAdapter`, `FlightOfferNormalizer`, and `FlightOfferCleanupService`. Exports solely `FLIGHT_SEARCH_PORT`. Normalizes supplier offers to RFC 4122 v4 deterministic UUID-identified `FlightOffer` structures and manages daily TTL purges.
+- **`SupplierAncillaryModule`**: Houses `DuffelAncillaryAdapter`, `AncillaryNormalizer`, and `DuffelAncillaryService`. Provides concurrent seat map and ancillary catalog retrieval with a strict 4,500 ms deadline. Safely translates missing seat maps (`meta.status=404`) into empty maps while preserving baggage, aggregates duplicate seat/baggage quantities, and enforces supplier-authoritative repricing totals.
+- **`DuffelCoreModule`**: Hosts the verified `@duffel/api` SDK singleton (`DUFFEL_SDK`), validates URL protocol and environment variables, and exports `DuffelRateBudgetService` for global quota governance.
+- **`AgentGatewayModule`**: Decomposed into capability-local submodules (`AttestedFlightSearchModule`, `AgentBookingReadinessModule`, `SafeBookingReadModule`, `TravelerPreferencesModule`). Authenticates agent requests via `AGENT_SERVICE_API_KEY` and short-lived user-bound HMAC claim tokens. Direct database access from agents is strictly prohibited.
+- **Booking Lifecycle & Projections**: `BookingStateModule` isolates database transitions; `BookingLifecycleModule` manages recovery workflows; `PaymentFulfillmentSaga` drives asynchronous supplier confirmation; `BookingProjectionModule` writes denormalized read-models (`BookingAgentProjection`) asynchronously via `booking.**` domain events.
+- **Domain Events Backbone**: Built on `EventEmitterModule.forRoot()` registered once in `AppModule`. Domain events are passive, behavior-free DTO envelopes containing typed primitives. Dispatched strictly after transaction commit; async listeners catch their own failures without invalidating committed database state.
 
-- **Event Transport Decoupling**:
-  - Domain events in `chat_turn/events.py` are pure Pydantic models (discriminated union: `token`, `tool_call`, `tool_result`, `flight_results`, `ACTION_HANDOFF`, `ACTION_REQUIRED`, `done`, `error`).
-  - Wire serialization (`format_sse`) resides strictly in `streaming/sse.py`.
-- **Stream Translation & Projections**:
-  - `GraphEventInterpreter` (`chat_turn/interpreter.py`): Pure async generator stream translator that converts LangGraph events to `ChatTurnEvent`. Completely tool-name agnostic with zero provider branching.
-  - `ToolResultResolver` (`chat_turn/resolver.py`): Pure domain projection engine mapping tool executions to typed `ToolResolution` and `HandoffResolution`.
-- **Ordered Admission Pipeline**:
-  - Thin FastAPI dependency chain in `streaming/sse.py` enforcing strict ordered progression:
-    `AuthService` (JWT verification) -> `Length/Health` -> `InputAdmissionService` (PII scan) -> `QuotaService` (burst + daily Redis limits) -> `TurnSessionCoordinator`.
-  - PII violation immediately terminates the turn with an SSE error event before any Redis initialization or quota consumption.
-- **Turn Lifecycle & Memory**:
-  - `TurnSessionCoordinator` manages session bootstrap, distributed lease acquisition, memory retrieval, graph execution, approved partial token persistence, and post-turn compaction.
+### 2. Python Agent Service (FastAPI / LangGraph)
 
-### 3. Next.js Web Frontend (`apps/web`)
+The AI agent provides conversational trip planning, preference matching, and guided checkout assistance over real-time SSE streams:
 
-- **Unified Server-to-Server Transport**:
-  - All backend requests route through `apps/web/lib/server/backend-client.ts` (`createBackendClient`).
-  - Enforces `server-only` execution boundary and dynamic `API_URL` resolution precedence.
-  - Fast-fails unauthenticated requests before dispatch.
-- **Deterministic Retry Matrix**:
-  - **GET Requests**: Bounded exponential retries (max 3 attempts, 100ms base delay) for 502/503/504 and 429 (`Retry-After` header parsing). Fast-fails immediately on 500 and 4xx.
-  - **Mutations (POST / PUT / PATCH / DELETE)**: Strictly single-send (zero automatic mutation retry) to prevent duplicate bookings or double-charges.
-  - **Deadlines**: 10-second timeout per attempt, bounded by a 31-second total request deadline.
-- **Zero-Credential Logging**:
-  - Transport diagnostics log only categorical cause codes (`missing_token`, `network`, `timeout`, `invalid_json`, `invalid_payload`). Tokens, request bodies, and PII are strictly excluded.
+- **Pure Pydantic `ChatTurnEvent`**: Strict discriminated union defining 8 canonical wire events (`token`, `tool_call`, `tool_result`, `flight_results`, `ACTION_HANDOFF`, `ACTION_REQUIRED`, `done`, `error`) completely isolated from transport logic.
+- **`GraphEventInterpreter`**: Pure async generator stream translator that converts raw LangGraph v2 streaming events into domain `ChatTurnEvent` items. It is completely tool-name agnostic (zero hardcoded tool name checks) and raises typed `ProjectionBlockedException` fail-closed if unapproved operations occur.
+- **`ToolResultResolver`**: Pure domain projection engine transforming validated tool completions and handoff node outputs into strongly typed `ToolResolution` and `HandoffResolution` instances.
+- **Ordered Admission Pipeline**: Every chat turn executes through a 4-stage sequential admission sequence before entering graph execution:
+  1. `AuthService`: Verifies incoming client request authentication and user identity.
+  2. `InputAdmissionService`: Scans user input for prompt injections, jailbreaks, and sensitive data.
+  3. `QuotaService`: Reserves daily user turn allocations in Redis.
+  4. `TurnSessionCoordinator`: Acquires a distributed Redis session lock (`session:lock:${sessionId}`) with background heartbeat to prevent concurrent race conditions.
+- **Streaming Transport**: `format_sse` serializes Pydantic domain events directly into HTTP/1.1 chunked text/event-stream envelopes.
+
+| Wire Event        | Payload Signature                                   | Architectural Role                                         |
+| ----------------- | --------------------------------------------------- | ---------------------------------------------------------- |
+| `token`           | `{ text: string }`                                  | Incremental LLM token streaming to client                  |
+| `tool_call`       | `{ id: string, name: string, input: object }`       | Notification of proposed tool execution                    |
+| `tool_result`     | `{ id: string, result: object }`                    | Deterministic outcome of capability call                   |
+| `flight_results`  | `{ offers: FlightOffer[] }`                         | Structured flight search payload projection                |
+| `ACTION_HANDOFF`  | `{ handoffToken: string, bookingIntentId: string }` | Transition token for authenticated UI checkout             |
+| `ACTION_REQUIRED` | `{ action: string, context: object }`               | Client confirmation gate before critical state transitions |
+| `done`            | `{ totalTokens?: number }`                          | Normal termination of the conversational turn              |
+| `error`           | `{ message: string, code: string }`                 | Fail-closed error delivery without leaking traces          |
+
+### 3. Web Frontend (Next.js)
+
+The frontend operates on Next.js 14 App Router, prioritizing React Server Components and centralizing all server-to-server backend communication:
+
+- **Single-Owner `backend-client.ts` (`createBackendClient`)**: Encapsulates all HTTP operations from Next.js server code to the NestJS backend.
+- **Strict GET Retries**: Automatically retries idempotent GET requests up to 3 attempts on transient network failures or gateway errors (502, 503, 504), adhering to upstream `Retry-After` headers on 429 responses. Configured with `ATTEMPT_TIMEOUT_MS = 10_000` and `TOTAL_TIMEOUT_MS = 31_000`.
+- **Single-Send Fast-Fail Mutations**: Non-idempotent mutations (POST, PUT, PATCH, DELETE) are executed exactly once. Network drops or server errors fail fast without automatic retry, preventing double-billing or duplicate booking intents.
+- **Thin Route Handlers (`app/api/booking-management/*`)**: 7 minimal route handlers (`force-dynamic`, `private, no-store`) delegating 100% of execution to server domain module `booking-management.ts` to shield backend topology from client browsers.
+- **Zero Credential / Token Logging**: Centralized redaction (`redactSensitive`) guarantees that bearer tokens, user session secrets, and customer PII are never logged to console streams or diagnostics.
+- **Typed Outcome Responses**: All client operations return discriminated `TransportResult<T>` unions (`{ ok: true, data }` or `{ ok: false, kind, ... }`), ensuring components handle failure states exhaustively.
 
 ---
 
 ## Data & Persistence Topology
 
-### PostgreSQL Entities (Prisma ORM)
+### PostgreSQL Entities (Prisma Relational Schema)
 
-```text
-+------------------+       +-------------------+       +--------------------+
-|      User        | 1   * |      Booking      | 1   * |      Payment       |
-|------------------|------>|-------------------|------>|--------------------|
-| id               |       | id                |       | id                 |
-| email, role      |       | user_id           |       | booking_id         |
-| profile_data     |       | status, pnr       |       | stripe_intent_id   |
-+------------------+       | total_amount      |       | amount, status     |
-                           +---------+---------+       +--------------------+
-                                     | 1
-                                     | *
-                           +---------v---------+
-                           |     Passenger     |
-                           |-------------------|
-                           | id, booking_id    |
-                           | first_name, etc.  |
-                           +-------------------+
-```
+- **`User` & `TravelerProfile`**: User identities, authentication records, saved travel preferences (airlines, seating, dietary), and role authorization.
+- **`Booking` & `BookingIntent`**: Authoritative booking records containing PNR, booking status (`PENDING`, `CONFIRMED`, `CANCELLED`), flight snapshots, and optimistic concurrency version counters (`Booking.version`).
+- **`FlightOffer` & `SearchHistory`**: Normalized flight search options stored with search query hashes, expiration timestamps, and raw JSONB supplier evidence for non-repudiation.
+- **`Passenger` & Ancillary Selections**: Passenger identity documents, seat selections (`SeatSelection`), and baggage assignments (`BaggageSelection`).
+- **`Payment` & `LedgerEntry`**: Stripe payment intent references, amount, currency, transaction status, refund obligations (`CancellationRefundObligation`), and immutable financial ledger entries.
+- **`ItineraryRevision` & `DisruptionAuditEvent`**: Immutable flight schedule modifications, airline notifications, passenger acknowledgment flags, and historical itinerary segments.
+- **`BookingAgentProjection`**: Read-optimized denormalized booking representation consumed by the AI agent gateway, hydrated asynchronously via post-commit domain events.
+- **`ChatSession`, `ChatMessage` & `ChatHandoff`**: Conversational session history, serialized thread messages, tool invocation logs, and handoff tokens.
 
-- `User`: Primary identity, credential hash, profile preferences.
-- `Booking`: Lifecycle state machine (`PENDING`, `CONFIRMED`, `CANCELLED`, `DISRUPTED`), PNR, total amount.
-- `FlightOffer`: Stored offer snapshots and validation metadata. Retention: 7 days.
-- `Payment`: Stripe payment intent reference, idempotency keys, refund records.
-- `ChatSession` & `ChatMessage`: Conversational history, token usage telemetry, advisory tool execution logs.
-- `DisruptionInbox`: Inbound flight disruption webhooks for asynchronous reconciliation.
+### Redis Topology
 
-### Redis Topologies & TTL Policies
-
-| Key Pattern | Purpose | Expiration (TTL) | Atomicity Model |
-| --- | --- | --- | --- |
-| `flight:search:${searchHash}` | Cached raw supplier search results | 15 minutes | Standard set / get |
-| `flight:ancillaries:catalog:${offerId}` | Normalized seat maps and baggage | 60 seconds | Best-effort write |
-| `budget:duffel:daily:${YYYY-MM-DD}` | Global daily Duffel API call limit | Next UTC midnight | Single-roundtrip Lua script |
-| `chat:quota:daily:${userId}:${date}` | Daily user message limit | 24 hours | INCR with EXPIRE |
-| `chat:quota:burst:${userId}` | 60-second burst message rate limit | 60 seconds | Sliding counter |
-| `session:lease:${sessionId}` | Active turn distributed lock | 30 seconds | SET NX EX |
-| `trusted_search_snapshot:${snapshotId}` | Validated search snapshot for chat | 30 minutes | 3-key attestation |
+| Cache Domain / Key Pattern              | TTL Policy                    | Eviction / Invalidation Behavior | Purpose                                                             |
+| --------------------------------------- | ----------------------------- | -------------------------------- | ------------------------------------------------------------------- |
+| `flight:search:${searchHash}`           | 15–30 minutes                 | Natural TTL expiration           | Caches normalized search results; hits consume 0 supplier budget    |
+| `ancillary:catalog:${offerId}`          | 60 seconds                    | Stale if remaining TTL < 3s      | Caches seat maps and ancillary baggage per active flight offer      |
+| `budget:duffel:daily:YYYY-MM-DD`        | Next UTC midnight (00:00:00Z) | Daily rollover                   | Global daily rate budget counter (default 1,500 attempts)           |
+| `budget:duffel:caller:user:YYYY-MM-DD`  | Next UTC midnight (00:00:00Z) | Daily rollover                   | Caller sub-allocation for direct user interactions (1,000 attempts) |
+| `budget:duffel:caller:agent:YYYY-MM-DD` | Next UTC midnight (00:00:00Z) | Daily rollover                   | Caller sub-allocation for AI conversational turns (500 attempts)    |
+| `session:lock:${sessionId}`             | 30 seconds                    | Heartbeat refreshed during turn  | Distributed lock preventing concurrent conflicting turns            |
+| `chat:quota:${userId}:${YYYY-MM-DD}`    | Next UTC midnight (00:00:00Z) | Daily rollover                   | Enforces per-user daily conversational turn limits                  |
+| `agent:search:snapshot:${snapshotId}`   | 30 minutes                    | Natural TTL expiration           | Preserves trusted search context for agent tool flight references   |
 
 ---
 
 ## Communication & Security Architecture
 
-### Inter-Service Contract Matrix
+### Inter-Service Protocols
 
-| Source | Destination | Protocol | Authentication / Authorization | Payload Contract |
-| --- | --- | --- | --- | --- |
-| Browser | Next.js Web | HTTPS / HTTP | Session Cookie (NextAuth.js) | HTML / RSC / Server Actions |
-| Next.js Web | NestJS API | HTTP (Private) | Bearer JWT (Session token) | JSON (Zod / DTO validated) |
-| Next.js Web | Python Agent | HTTP SSE Stream | Bearer JWT (Session token) | SSE Stream of `ChatTurnEvent` |
-| Python Agent | NestJS API | HTTP (Private) | `X-Agent-Service-Key` + HMAC Claim Token | JSON (Sanitized Gateway Read Models) |
-| NestJS API | Duffel API | HTTPS (Public) | Bearer `DUFFEL_ACCESS_TOKEN` | Supplier SDK Calls (Rate Budgeted) |
-| NestJS API | Stripe API | HTTPS (Public) | Bearer `STRIPE_SECRET_KEY` | Stripe SDK (Webhook Signed) |
+- **Web Frontend ──► Backend API**: Authenticated via private Bearer JWTs generated by NextAuth and injected exclusively on the server by `createBackendClient`. Client browser interacts via Server Actions or thin same-origin route handlers.
+- **Web Frontend ──► Agent Service**: Direct HTTP/1.1 chunked Server-Sent Events (SSE) streaming conversational tokens and structured tool updates.
+- **Agent Service ──► Backend Gateway**: Private server-to-server HTTP channel secured with dual credentials:
+  1. `AGENT_SERVICE_API_KEY`: Verifies service-level identity.
+  2. HMAC-SHA256 Claim Token (`CLAIM_TOKEN_SECRET`): Time-bounded cryptographic token proving user delegation for the active session, validated by `AgentGatewayGuard`.
 
 ### Trust Model
 
-- **Trusted Components**:
-  - NestJS core business logic, database transactions, and Stripe/Duffel adapters.
-  - Deterministic admission pipeline (`AuthService`, `QuotaService`).
-  - Redis rate budget scripts and Prisma ORM data layer.
-- **Untrusted Inputs**:
-  - LLM generated text and tool argument suggestions.
-  - End-user search prompts and chat messages.
-  - Upstream supplier webhook payloads (untrusted until cryptographic signature verification).
+```text
+┌──────────────────────────────┐       ┌──────────────────────────────┐       ┌──────────────────────────────┐
+│       UNTRUSTED ZONE         │       │     SEMI-TRUSTED ZONE        │       │       TRUSTED ZONE           │
+│ - Client Web Browser         │ ───►  │ - LLM Generation Output      │ ───►  │ - NestJS Backend Monolith    │
+│ - External User Prompts      │       │ - Agent Tool Call Proposals  │       │ - PostgreSQL Database        │
+│ - Raw Supplier Webhook Hooks │       │ - Raw Ingested Supplier JSON │       │ - Redis Cluster              │
+└──────────────────────────────┘       └──────────────────────────────┘       └──────────────────────────────┘
+```
 
-### Prompt Injection & Egress Boundary
+### Guardrail & Injection Boundary
 
-1. System instructions, model role, and safety rules are sealed server-side and immutable.
-2. User chat input is scanned for PII and adversarial injection patterns via `GuardrailGateway`.
-3. Agent tool calling is restricted to a closed capability set; no arbitrary shell, filesystem, or database execution tools exist.
-4. Tool outputs returning to the agent are projected and scrubbed of raw provider secrets, stack traces, and sensitive internal fields.
+- **Input Screening**: All incoming user turns are scanned by `InputAdmissionService` using deterministic pattern matchers and safety filters before prompt interpolation.
+- **PII Scrubbing**: Centralized sanitization strips credit card numbers (PANs), social security identifiers, and raw authorization secrets before persisting audit logs or transmitting context to LLMs.
+- **Tool Argument Gatekeeping**: Tool calls emitted by the reasoning model are strictly validated against Pydantic schemas in `ToolResultResolver` before capability requests are dispatched to the backend gateway.
 
 ---
 
 ## Failure & Outcome Model
 
-System errors map to deterministic, typed categorical outcome codes across all boundaries. Stack traces and internal database errors are never exposed to clients:
+The platform avoids leaking raw runtime exceptions, database error codes, or vendor SDK stack traces to users or clients. All errors are classified into explicit, strongly typed domain outcomes:
 
-- `RATE_LIMIT_EXCEEDED` / `BUDGET_UNAVAILABLE`: Daily supplier budget or user quota exhausted.
-- `OFFER_EXPIRED` / `OFFER_UNAVAILABLE`: Flight offer invalid or fare class changed.
-- `UNAUTHENTICATED` / `FORBIDDEN`: Missing session, invalid JWT, or role mismatch.
-- `GUARDRAIL_BLOCKED`: Input or output failed safety scan (PII, prompt injection).
-- `UPSTREAM_UNAVAILABLE`: Transient failure from Duffel or Stripe after bounded retry exhaustion.
-- `INVALID_PAYLOAD`: Malformed schema rejected at transport boundary.
-
----
-
-## Architecture Invariants
-
-1. **LLM Never Mutates Directly**: The Python agent service produces advisory suggestions and handoff intents; only the NestJS backend and authenticated user can commit bookings or trigger payments.
-2. **Deterministic Rate Budgeting**: Every live Duffel API call must check and reserve capacity in `DuffelRateBudgetService` prior to dispatch.
-3. **Fail-Closed on Budget Outage**: Redis failures in budget services must fail closed, rejecting external calls.
-4. **Single-Send Mutations**: Web client transports never retry mutating HTTP methods (`POST`, `PUT`, `PATCH`, `DELETE`).
-5. **No Upstream ID Leakage**: Upstream supplier IDs (e.g., Duffel offer IDs) are quarantined to the backend and never emitted to client DOM or unauthenticated endpoints.
-6. **Zero Raw Trace Leakage**: Production API and agent error responses never leak stack traces or raw upstream payloads.
+| Outcome Code                  | HTTP Status | Trigger Condition                                           | System Behavior                                          |
+| ----------------------------- | ----------- | ----------------------------------------------------------- | -------------------------------------------------------- |
+| `RATE_LIMIT_EXCEEDED`         | 429         | Per-user request frequency or turn limit exceeded           | Bounded reject with `Retry-After` header                 |
+| `BUDGET_UNAVAILABLE`          | 429         | Global or caller daily supplier budget exhausted            | Fails closed; zero upstream supplier calls dispatched    |
+| `OFFER_EXPIRED`               | 410 / 409   | Airline fare expired or seat availability lost              | Prompts user to refresh search; invalidates cached hold  |
+| `UNAUTHENTICATED`             | 401         | Missing, invalid, or expired JWT or HMAC claim token        | Terminates request; forces re-authentication             |
+| `FORBIDDEN`                   | 403         | Attempt to read or modify a resource owned by another user  | Access denied; audit event emitted                       |
+| `UPSTREAM_UNAVAILABLE`        | 503         | External supplier (Duffel/Stripe) returned 5xx or timed out | Retries idempotent calls; returns safe degraded response |
+| `GUARDRAIL_BLOCKED`           | 400         | Prompt injection or policy violation detected in turn       | Aborts agent turn; returns safe refusal response         |
+| `ANCILLARY_CURRENCY_MISMATCH` | 400         | Ancillary service currency does not match base offer        | Rejects selection; requires currency consistency         |
+| `STALE_REVISION`              | 409         | Optimistic concurrency conflict on `Booking.version`        | Rejects mutation; prompts client to reload latest state  |
 
 ---
 
 ## Historical Reference
 
-For granular historical change logs, task-level PR notes, and migration records across Features 001 through 029, consult:
-- `docs/history/architecture-archive.md` (Archived full system architecture logs)
-- `docs/history/progress-archive.md` (Archived granular progress records)
+This architecture represents the current consolidated state of the Flight Booking System. For chronological development milestones, feature implementation plans, and completed task breakdown logs (Features 001 through 029), refer to:
+
+- **`docs/history/architecture-archive.md`**: Complete historical commit logs and feature specifications.
