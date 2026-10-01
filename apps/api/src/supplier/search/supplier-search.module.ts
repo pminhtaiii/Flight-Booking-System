@@ -4,6 +4,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { CacheModule } from '@/cache/cache.module';
 import { PrismaModule } from '@/prisma/prisma.module';
 import { DuffelCoreModule } from '../core/duffel-core.module';
+import { DuffelModule } from '@/duffel/duffel.module';
 import { FLIGHT_SEARCH_PORT } from './flight-search.port';
 import { DuffelSearchService } from './duffel-search.service';
 import { DuffelSearchAdapter } from './duffel-search.adapter';
@@ -11,7 +12,7 @@ import { FlightOfferNormalizer } from './flight-offer.normalizer';
 import { FlightOfferCleanupService } from './flight-offer-cleanup.service';
 
 @Module({
-  imports: [ConfigModule, CacheModule, PrismaModule, DuffelCoreModule, ScheduleModule],
+  imports: [ConfigModule, CacheModule, PrismaModule, DuffelCoreModule, ScheduleModule, DuffelModule],
   providers: [
     DuffelSearchService,
     DuffelSearchAdapter,

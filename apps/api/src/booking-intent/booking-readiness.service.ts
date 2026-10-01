@@ -17,6 +17,7 @@ import {
 } from './dto/booking-readiness.dto';
 import { ChatHandoffService } from '@/chat-handoff/chat-handoff.service';
 import { FLIGHT_SEARCH_PORT, type FlightSearchPort } from '@/supplier/search/flight-search.port';
+import { complementStoredOfferPayload } from '@/supplier/search/stored-offer-payload.helper';
 import { BookingReadinessObservability } from './booking-readiness.observability';
 import { BookingReadinessOperation } from '../common/observability/booking-readiness-observability.types';
 import { parseBookingReadinessConfig } from './booking-readiness.config';
@@ -166,8 +167,8 @@ export class BookingReadinessService {
         throw httpError('OFFER_NOT_FOUND', 'Flight offer not found', HttpStatus.NOT_FOUND);
       }
 
-      this.assertOfferNotExpired(flightOffer.rawOffer);
-      const normalizedOffer = this.normalizeStoredOffer(flightOffer.rawOffer);
+      this.assertOfferNotExpired(flightOffer.rawOffer, flightOffer);
+      const normalizedOffer = this.normalizeStoredOffer(flightOffer.rawOffer, flightOffer);
       this.validatePassengerMappings(dto.passengers, normalizedOffer.passengers);
 
       const passengers = await this.resolvePassengers(
@@ -370,8 +371,20 @@ export class BookingReadinessService {
     }
   }
 
-  normalizeStoredOffer(rawOffer: unknown): NormalizedOffer {
-    const normalized = this.flightSearchPort.normalizeStoredOffer(rawOffer);
+  normalizeStoredOffer(
+    rawOffer: unknown,
+    flightOffer?: {
+      duffelOfferId?: string | null;
+      price?: unknown;
+      currency?: string | null;
+      departureDate?: Date | string | null;
+      adults?: number | null;
+      children?: number | null;
+      infants?: number | null;
+    } | null,
+  ): NormalizedOffer {
+    const payload = complementStoredOfferPayload(rawOffer, flightOffer);
+    const normalized = this.flightSearchPort.normalizeStoredOffer(payload);
     if (!normalized) {
       throw new Error('Stored offer data is malformed');
     }
@@ -427,8 +440,20 @@ export class BookingReadinessService {
     return { passengers, segments, airportCodes, tripCompletionDate };
   }
 
-  private assertOfferNotExpired(rawOffer: unknown): void {
-    const normalized = this.flightSearchPort.normalizeStoredOffer(rawOffer);
+  private assertOfferNotExpired(
+    rawOffer: unknown,
+    flightOffer?: {
+      duffelOfferId?: string | null;
+      price?: unknown;
+      currency?: string | null;
+      departureDate?: Date | string | null;
+      adults?: number | null;
+      children?: number | null;
+      infants?: number | null;
+    } | null,
+  ): void {
+    const payload = complementStoredOfferPayload(rawOffer, flightOffer);
+    const normalized = this.flightSearchPort.normalizeStoredOffer(payload);
     if (normalized?.offerExpiresAt) {
       const expiresAt = new Date(normalized.offerExpiresAt);
       if (Number.isNaN(expiresAt.getTime())) {

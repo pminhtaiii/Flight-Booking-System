@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { Duffel } from '@duffel/api';
 import { DUFFEL_SDK, DuffelRateBudgetService } from '@/supplier/core/duffel-core.module';
+import { DuffelService } from '@/duffel/duffel.service';
 import { FlightSearchCriteria } from './flight-search.port';
 
 export class DuffelTimeoutError extends Error {
@@ -27,7 +28,14 @@ export class DuffelSearchAdapter {
   constructor(
     @Optional() @Inject(DUFFEL_SDK) private readonly duffel?: Duffel,
     @Optional() private readonly rateBudgetService?: DuffelRateBudgetService,
+    @Optional() private readonly duffelService?: DuffelService,
   ) {}
+
+  private getDuffel(): Duffel | undefined {
+    const serviceDuffel = (this.duffelService as unknown as Record<string, unknown> | undefined)
+      ?.duffel as Duffel | undefined;
+    return serviceDuffel || this.duffel;
+  }
 
   async searchOffers(criteria: FlightSearchCriteria): Promise<unknown> {
     const origin = criteria.origin.trim().toUpperCase();
@@ -222,7 +230,8 @@ export class DuffelSearchAdapter {
       };
     }
 
-    if (!this.duffel) {
+    const duffelClient = this.getDuffel();
+    if (!duffelClient) {
       throw new HttpException(
         {
           message: 'Duffel SDK is not available',
@@ -233,7 +242,7 @@ export class DuffelSearchAdapter {
     }
 
     try {
-      const duffelResponse = await this.duffel.offerRequests.create({
+      const duffelResponse = await duffelClient.offerRequests.create({
         slices,
         // Type assertion required: map domain passenger array to Duffel SDK parameter type
         passengers:
@@ -279,7 +288,8 @@ export class DuffelSearchAdapter {
       throw new NotFoundException(`Duffel mock offer ${supplierOfferId} was not found`);
     }
 
-    if (!this.duffel) {
+    const duffelClient = this.getDuffel();
+    if (!duffelClient) {
       throw new HttpException(
         {
           message: 'Duffel SDK is not available',
@@ -320,7 +330,7 @@ export class DuffelSearchAdapter {
     });
 
     try {
-      const offerPromise = this.duffel.offers.get(supplierOfferId);
+      const offerPromise = duffelClient.offers.get(supplierOfferId);
       const result = await Promise.race([offerPromise, timeoutPromise]);
       // Safe cast: Duffel SDK wraps retrieved resource in a data property
       return (result as { data: unknown }).data;

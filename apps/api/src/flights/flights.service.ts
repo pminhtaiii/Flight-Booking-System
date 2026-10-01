@@ -36,6 +36,10 @@ type FlightSearchOptions = {
 };
 
 function mapFlightSegment(segment: FlightSegment): FlightSegmentDto {
+  const aircraftName = segment.aircraft || '';
+  const aircraft = aircraftName.includes('Airbus')
+    ? aircraftName.replace('Airbus ', '')
+    : aircraftName || null;
   return {
     carrierCode: segment.carrierCode,
     flightNumber: segment.flightNumber,
@@ -47,7 +51,7 @@ function mapFlightSegment(segment: FlightSegment): FlightSegmentDto {
     arrivalTerminal: segment.arrivalTerminal,
     arrivalTime: segment.arrivalTime,
     duration: segment.duration,
-    aircraft: segment.aircraft,
+    aircraft,
     cabinClass: segment.cabinClass,
   };
 }

@@ -18,6 +18,7 @@ import {
   type FlightSearchPort,
   type FlightSegment,
 } from '@/supplier/search/flight-search.port';
+import { complementStoredOfferPayload } from '@/supplier/search/stored-offer-payload.helper';
 import {
   createChatTelemetryEvent,
   emitChatTelemetry,
@@ -557,8 +558,9 @@ export class ChatHandoffService {
     flightOffer: FlightOffer | null,
     selectedOffer: AttestationOffer,
   ): ChatHandoffDisplayDto | undefined {
-    const normalizedOffer = flightOffer?.rawOffer
-      ? this.flightSearchPort.normalizeStoredOffer(flightOffer.rawOffer)
+    const payload = complementStoredOfferPayload(flightOffer?.rawOffer, flightOffer);
+    const normalizedOffer = payload
+      ? this.flightSearchPort.normalizeStoredOffer(payload)
       : null;
 
     const firstSegment = normalizedOffer?.segments[0];
@@ -782,7 +784,12 @@ export class ChatHandoffService {
       });
     }
 
-    const normalizedOffer = this.flightSearchPort.normalizeStoredOffer(flightOffer.rawOffer);
+    const hadOriginalPassengers =
+      isJsonRecord(flightOffer.rawOffer) &&
+      Array.isArray((flightOffer.rawOffer as Record<string, unknown>).passengers) &&
+      ((flightOffer.rawOffer as Record<string, unknown>).passengers as unknown[]).length > 0;
+    const payload = complementStoredOfferPayload(flightOffer.rawOffer, flightOffer);
+    const normalizedOffer = this.flightSearchPort.normalizeStoredOffer(payload);
     if (
       !normalizedOffer ||
       !normalizedOffer.offerExpiresAt ||
@@ -835,7 +842,7 @@ export class ChatHandoffService {
         children: flightOffer.children,
         infants: flightOffer.infants,
       },
-      ...(passengers.length > 0 ? { passengers } : {}),
+      ...(hadOriginalPassengers && passengers.length > 0 ? { passengers } : {}),
     };
   }
 

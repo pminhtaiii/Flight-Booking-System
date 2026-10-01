@@ -16,6 +16,7 @@ import {
 } from '../dto/booking-readiness.dto';
 import { PassengerType } from '@prisma/client';
 import { FLIGHT_SEARCH_PORT, type FlightSearchPort } from '@/supplier/search/flight-search.port';
+import { complementStoredOfferPayload } from '@/supplier/search/stored-offer-payload.helper';
 
 @Injectable()
 export class AgentBookingReadinessService {
@@ -162,7 +163,8 @@ export class AgentBookingReadinessService {
         });
       }
 
-      const normalizedOffer = this.flightSearchPort.normalizeStoredOffer(flightOffer.rawOffer);
+      const payload = complementStoredOfferPayload(flightOffer.rawOffer, flightOffer);
+      const normalizedOffer = this.flightSearchPort.normalizeStoredOffer(payload);
       if (!normalizedOffer || !normalizedOffer.passengers || normalizedOffer.passengers.length === 0) {
         throw new HttpException(
           { code: 'OFFER_MALFORMED', message: 'Stored offer data is malformed' },
