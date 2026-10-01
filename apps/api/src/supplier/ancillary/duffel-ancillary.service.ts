@@ -222,6 +222,7 @@ export class DuffelAncillaryService {
       error.name === 'TimeoutError' ||
       error.name === 'AbortError' ||
       code.includes('TIMEOUT') ||
+      code === 'ETIMEDOUT' ||
       code === 'ECONNABORTED'
     );
   }
