@@ -91,7 +91,7 @@
 
 ### Tests for User Story 3
 
-- [ ] T032 [P] [US3] Add order adapter, quote, cancellation, retrieval, snapshot, and redaction parity cases in `apps/api/src/supplier/order/duffel-order.adapter.spec.ts` and `apps/api/src/duffel/duffel-fulfillment.adapter.spec.ts`.
+- [x] T032 [P] [US3] Add order adapter, quote, cancellation, retrieval, snapshot, and redaction parity cases in `apps/api/src/supplier/order/duffel-order.adapter.spec.ts` and `apps/api/src/duffel/duffel-fulfillment.adapter.spec.ts`.
 - [ ] T033 [P] [US3] Add last-slot denial in both inline capture-failure and 25-second `handleBackgroundError` compensation, retained checkpoint/hold, sweeper TTL deferral, next-day cancellation, and already-cancelled replay tests in `apps/api/src/payment-fulfillment/payment-fulfillment.saga.spec.ts` and `apps/api/src/booking-lifecycle/booking-recovery.service.spec.ts`.
 
 ### Implementation for User Story 3
