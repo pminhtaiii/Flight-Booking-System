@@ -12,7 +12,7 @@ import { ChatHandoffTokenService } from './chat-handoff-token.service';
 import { SelectionAttestationService } from '@/agent-gateway/selection-attestation.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { FlightOfferNormalizer } from '@/supplier/search/flight-offer.normalizer';
-import { FLIGHT_SEARCH_PORT, type FlightOffer as PortFlightOffer } from '@/supplier/search/flight-search.port';
+import { FLIGHT_SEARCH_PORT } from '@/supplier/search/flight-search.port';
 import { CreateChatHandoffDto } from './dto/create-chat-handoff.dto';
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
@@ -22,104 +22,12 @@ import * as crypto from 'crypto';
 
 function createMockFlightSearchPort() {
   return {
-    searchOffers: jest.fn(),
-    getOffer: jest.fn(),
+    search: jest.fn(),
+    getOfferById: jest.fn(),
     createOrder: jest.fn(),
-    normalizeStoredOffer: jest.fn((rawOffer: unknown) => {
-      const normalized = FlightOfferNormalizer.normalizeStoredOffer(rawOffer);
-      if (normalized) {
-        return normalized;
-      }
-
-      if (
-        rawOffer !== null &&
-        typeof rawOffer === 'object' &&
-        !Array.isArray(rawOffer) &&
-        'slices' in (rawOffer as Record<string, unknown>)
-      ) {
-        const raw = rawOffer as {
-          id?: string;
-          total_amount?: string;
-          total_currency?: string;
-          expires_at?: string;
-          slices?: Array<{
-            segments?: Array<{
-              departing_at?: string;
-              arriving_at?: string;
-              operating_carrier?: { name?: string };
-              marketing_carrier?: { name?: string };
-            }>;
-          }>;
-        };
-
-        const firstSeg = raw.slices?.[0]?.segments?.[0];
-        if (firstSeg?.departing_at && firstSeg?.arriving_at) {
-          const opCarrier = firstSeg.operating_carrier?.name;
-          const mktCarrier = firstSeg.marketing_carrier?.name;
-          const carrierName = opCarrier ?? mktCarrier ?? 'Unknown Airline';
-
-          const syntheticOffer: PortFlightOffer = {
-            id: raw.id ?? 'mock-stored-offer-id',
-            supplierOfferId: raw.id ?? 'mock-stored-offer-id',
-            totalAmount: raw.total_amount ?? '125.00',
-            price: 125,
-            currency: raw.total_currency ?? 'USD',
-            offerExpiresAt: raw.expires_at ?? null,
-            passengers: [],
-            airline: carrierName,
-            flightNumber: 'FL123',
-            departureAirport: 'SGN',
-            arrivalAirport: 'HAN',
-            departureTime: firstSeg.departing_at,
-            arrivalTime: firstSeg.arriving_at,
-            duration: 120,
-            stops: 0,
-            fareClass: 'economy',
-            baggageAllowance: null,
-            segments: [
-              {
-                supplierSegmentId: 'seg_1',
-                carrierCode: 'VN',
-                flightNumber: 'FL123',
-                operatingCarrier: carrierName,
-                departureAirport: 'SGN',
-                departureTerminal: null,
-                departureTime: firstSeg.departing_at,
-                arrivalAirport: 'HAN',
-                arrivalTerminal: null,
-                arrivalTime: firstSeg.arriving_at,
-                duration: 120,
-                aircraft: null,
-                cabinClass: 'economy',
-              },
-            ],
-            returnSegments: null,
-            conditions: {
-              refundable: false,
-              changeable: false,
-              changeBeforeDeparture: null,
-            },
-            matchInput: {
-              id: raw.id ?? 'mock-stored-offer-id',
-              price: 125,
-              currency: raw.total_currency ?? 'USD',
-              stops: 0,
-              duration: 120,
-              outboundDepartureHour: 8,
-              outboundArrivalHour: 10,
-              carrierCodes: ['VN'],
-              cabinClass: 'economy',
-              hasCheckedBaggage: null,
-              originalIndex: 0,
-            },
-            rawSupplierPayload: rawOffer,
-          };
-          return syntheticOffer;
-        }
-      }
-
-      return null;
-    }),
+    normalizeStoredOffer: jest.fn((rawOffer: unknown) =>
+      FlightOfferNormalizer.normalizeStoredOffer(rawOffer),
+    ),
   };
 }
 
@@ -232,6 +140,8 @@ describe('ChatHandoffService', () => {
           {
             segments: [
               {
+                origin: { iata_code: 'SGN' },
+                destination: { iata_code: 'NRT' },
                 departing_at: '2026-09-20T02:00:00.000Z',
                 arriving_at: '2026-09-20T08:30:00.000Z',
                 operating_carrier: { name: 'Vietnam Airlines' },
@@ -854,6 +764,8 @@ describe('ChatHandoffService', () => {
             {
               segments: [
                 {
+                  origin: { iata_code: 'SGN' },
+                  destination: { iata_code: 'HAN' },
                   departing_at: '2026-12-01T08:00:00.000Z',
                   arriving_at: '2026-12-01T10:00:00.000Z',
                   operating_carrier: { name: 'T093 Airways' },
@@ -931,6 +843,8 @@ describe('ChatHandoffService', () => {
             {
               segments: [
                 {
+                  origin: { iata_code: 'SGN' },
+                  destination: { iata_code: 'HAN' },
                   departing_at: '2026-12-01T08:00:00.000Z',
                   arriving_at: '2026-12-01T10:00:00.000Z',
                   operating_carrier: { name: 'T093 Airways' },
@@ -1432,6 +1346,7 @@ describe('Raw-Reader Replacement Parity (T015)', () => {
 
     for (const malformed of legacyNullParserPayloads) {
       expect(FlightOfferNormalizer.normalizeStoredOffer(malformed)).toBeNull();
+      expect(createMockFlightSearchPort().normalizeStoredOffer(malformed)).toBeNull();
 
       const firstSeg = firstFlightSegment(malformed);
       const pass = handoffPassengers(malformed as Record<string, unknown> | null);

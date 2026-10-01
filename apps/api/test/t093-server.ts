@@ -40,12 +40,11 @@ async function bootstrap(): Promise<void> {
   const { AppModule } = await import('../src/app.module');
   const { HttpExceptionFilter } = await import('../src/common/filters/http-exception.filter');
   const { AirportsService } = await import('../src/airports/airports.service');
-  const { DuffelService } = await import('../src/duffel/duffel.service');
+  const { DuffelSearchAdapter } = await import('../src/supplier/search/duffel-search.adapter');
   const { StripeService } = await import('../src/common/stripe.service');
   const { PrismaService } = await import('../src/prisma/prisma.service');
 
-  type DuffelServiceInstance = InstanceType<typeof DuffelService>;
-  type SearchResult = Awaited<ReturnType<DuffelServiceInstance['searchFlights']>>;
+  type SearchAdapter = InstanceType<typeof DuffelSearchAdapter>;
 
   const counters = {
     supplierCalls: 0,
@@ -127,26 +126,17 @@ async function bootstrap(): Promise<void> {
     ],
   };
 
-  // Duffel does not export a constructible offer-request fixture type; this deterministic
-  // boundary double is validated by the typed searchFlights function below.
   const offerRequest = {
     id: 'orq_t093_sgn_han_001',
     offers: [deterministicOffer],
-  } as unknown as SearchResult['offerRequest'];
-
-  const searchFlights: DuffelServiceInstance['searchFlights'] = async (query, caller) => {
-    void query;
-    void caller;
-    counters.supplierCalls += 1;
-    return {
-      offerRequest,
-      cached: false,
-      searchHash: 't093-sgn-han-search',
-    };
   };
 
-  const getOfferById: DuffelServiceInstance['getOfferById'] = async (duffelOfferId) => {
-    void duffelOfferId;
+  const searchOffers: SearchAdapter['searchOffers'] = async () => {
+    counters.supplierCalls += 1;
+    return offerRequest;
+  };
+
+  const getOffer: SearchAdapter['getOffer'] = async () => {
     counters.supplierCalls += 1;
     return deterministicOffer;
   };
@@ -154,8 +144,8 @@ async function bootstrap(): Promise<void> {
   const moduleFixture = await Test.createTestingModule({
     imports: [AppModule],
   })
-    .overrideProvider(DuffelService)
-    .useValue({ searchFlights, getOfferById })
+    .overrideProvider(DuffelSearchAdapter)
+    .useValue({ searchOffers, getOffer })
     .overrideProvider(StripeService)
     .useValue(stripeBoundary)
     .compile();

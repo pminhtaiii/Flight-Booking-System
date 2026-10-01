@@ -22,7 +22,8 @@ import request from 'supertest';
 import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
-import { DuffelService } from '@/duffel/duffel.service';
+import { Duffel } from '@duffel/api';
+import { DUFFEL_SDK } from '@/supplier/core/duffel-core.module';
 import { CacheService } from '@/cache/cache.service';
 import { SelectionAttestationService } from '@/agent-gateway/selection-attestation.service';
 import { ChatHandoffService } from '@/chat-handoff/chat-handoff.service';
@@ -65,7 +66,7 @@ describe('Automated Alert Rules & End-to-End Trace Correlation (e2e)', () => {
   let jwtService: JwtService;
   let cacheService: CacheService;
   let attestationService: SelectionAttestationService;
-  let duffelService: DuffelService;
+  let duffel: Duffel;
   let handoffService: ChatHandoffService;
   let intentService: BookingIntentService;
 
@@ -110,7 +111,7 @@ describe('Automated Alert Rules & End-to-End Trace Correlation (e2e)', () => {
     jwtService = moduleFixture.get(JwtService);
     cacheService = moduleFixture.get(CacheService);
     attestationService = moduleFixture.get(SelectionAttestationService);
-    duffelService = moduleFixture.get(DuffelService);
+    duffel = moduleFixture.get<Duffel>(DUFFEL_SDK);
     handoffService = moduleFixture.get(ChatHandoffService);
     intentService = moduleFixture.get(BookingIntentService);
 
@@ -530,7 +531,7 @@ describe('Automated Alert Rules & End-to-End Trace Correlation (e2e)', () => {
         .expect(200);
 
       // 4. Consumption via Booking Intent
-      const duffelGetSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue({
+      const duffelGetSpy = jest.spyOn(duffel.offers, 'get').mockResolvedValue({
         data: {
           id: `off_trace_${runMarker}`,
           total_amount: '175.00',

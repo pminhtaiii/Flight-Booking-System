@@ -1215,6 +1215,45 @@ describe('FlightSearchOrchestratorService', () => {
       };
     };
 
+    it.each([null, 'usr_personalized'])(
+      'filters mixed currencies before the result cap for user %s',
+      async (userId) => {
+        const offers = Array.from({ length: 23 }, (_, index) => {
+          const raw = createMockDuffelOffer(`off_currency_${index}`, {
+            total_currency: index === 1 || index === 22 ? 'EUR' : 'USD',
+          });
+          const offer = createMockNormalizedFlightOffer(raw.id, raw);
+          return { ...offer, matchInput: { ...offer.matchInput, originalIndex: index } };
+        });
+
+        const response = await service.orchestrateSearch({
+          offers,
+          query: defaultQuery,
+          userId,
+          searchHash: 'currency_hash',
+          cached: false,
+        });
+
+        expect(response.droppedCount).toBe(2);
+        expect(response.rejectionCounts).toEqual({ MIXED_CURRENCY: 2 });
+        expect(response.results).toHaveLength(20);
+        expect(response.results.map((result) => result.offer)).toEqual([
+          offers[0], ...offers.slice(2, 21),
+        ]);
+        expect(response.results[1].rawOffer).toBe(offers[2].rawSupplierPayload);
+        expect(response.results.every((result) => result.scoredOffer.offer.currency === 'USD')).toBe(true);
+      },
+    );
+
+    it('handles an empty normalized offer list without currency rejections', async () => {
+      const response = await service.orchestrateSearch({
+        offers: [], query: defaultQuery, searchHash: 'empty_hash', cached: true,
+      });
+      expect(response.results).toEqual([]);
+      expect(response.droppedCount).toBe(0);
+      expect(response.rejectionCounts).toEqual({});
+    });
+
     it('asserts FlightSearchResult envelope compatibility with orchestrator cache and searchHash metadata', async () => {
       const rawOffer = createMockDuffelOffer('off_envelope_test');
       const normalizedOffer = createMockNormalizedFlightOffer('off_envelope_test', rawOffer);

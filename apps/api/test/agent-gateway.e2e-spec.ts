@@ -3,8 +3,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
-import { DuffelService } from '@/duffel/duffel.service';
-import { DuffelOfferRequest } from '@/duffel/duffel.types';
+import { DuffelSearchAdapter } from '@/supplier/search/duffel-search.adapter';
 import * as crypto from 'crypto';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { User } from '@prisma/client';
@@ -58,7 +57,7 @@ describe('Agent Gateway (E2E)', () => {
     prisma = moduleFixture.get<PrismaService>(PrismaService);
     cryptoService = moduleFixture.get<ChatMessageCryptoService>(ChatMessageCryptoService);
 
-    jest.spyOn(DuffelService.prototype, 'searchFlights').mockImplementation(async (query) => {
+    jest.spyOn(DuffelSearchAdapter.prototype, 'searchOffers').mockImplementation(async (query) => {
       const offerRequest = {
         id: 'or_123',
         offers: [
@@ -240,13 +239,9 @@ describe('Agent Gateway (E2E)', () => {
         ],
         slices: [],
         passengers: [],
-      } as unknown as DuffelOfferRequest;
-
-      return {
-        offerRequest,
-        cached: false,
-        searchHash: 'mock-hash',
       };
+
+      return offerRequest;
     });
   });
 

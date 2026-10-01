@@ -16,7 +16,9 @@ import { ConfigService } from '@nestjs/config';
 import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
-import { DuffelService } from '@/duffel/duffel.service';
+import { DuffelSearchAdapter } from '@/supplier/search/duffel-search.adapter';
+import { Duffel } from '@duffel/api';
+import { DUFFEL_SDK } from '@/supplier/core/duffel-core.module';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { AirportType, PassengerType, Prisma } from '@prisma/client';
 
@@ -271,7 +273,8 @@ describe('Booking Readiness Performance Benchmarks (E2E) - Task T075', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let jwtService: JwtService;
-  let duffelService: DuffelService;
+  let searchAdapter: DuffelSearchAdapter;
+  let duffel: Duffel;
 
   let baseUrl = '';
   let testUser: { id: string; email: string };
@@ -324,7 +327,8 @@ describe('Booking Readiness Performance Benchmarks (E2E) - Task T075', () => {
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
     jwtService = moduleFixture.get<JwtService>(JwtService);
-    duffelService = moduleFixture.get<DuffelService>(DuffelService);
+    searchAdapter = moduleFixture.get<DuffelSearchAdapter>(DuffelSearchAdapter);
+    duffel = moduleFixture.get<Duffel>(DUFFEL_SDK);
 
     // 1. Seed test user
     const user = await prisma.user.create({
@@ -787,15 +791,28 @@ describe('Booking Readiness Performance Benchmarks (E2E) - Task T075', () => {
         ],
       };
 
-      // Mock DuffelService to ensure 0 external supplier network calls (cast to never required for Jest spy on SDK client)
-      const duffelOfferSpy = jest.spyOn(duffelService, 'getOfferById').mockResolvedValue({
+      // Mock the supplier adapter to ensure zero external supplier network calls.
+      const duffelOfferSpy = jest.spyOn(searchAdapter, 'getOffer').mockResolvedValue({
         id: internationalOffer.duffelOfferId,
         total_amount: '500.00',
         total_currency: 'USD',
         expires_at: '2030-08-25T10:00:00Z',
         passengers: [{ id: 'pas_perf_intl_001', type: 'adult' }],
-      } as never);
-      const duffelOffersGetSpy = jest.spyOn(duffelService['duffel'].offers, 'get');
+        slices: [
+          {
+            duration: 'PT10H',
+            segments: [
+              {
+                origin: { iata_code: 'SGN' },
+                destination: { iata_code: 'LHR' },
+                departing_at: '2026-09-01T08:00:00Z',
+                arriving_at: '2026-09-01T18:00:00Z',
+              },
+            ],
+          },
+        ],
+      });
+      const duffelOffersGetSpy = jest.spyOn(duffel.offers, 'get');
 
       // 10 Warmup requests
       for (let w = 0; w < WARMUP_COUNT; w++) {
@@ -848,14 +865,27 @@ describe('Booking Readiness Performance Benchmarks (E2E) - Task T075', () => {
       const authHeaders = { Authorization: `Bearer ${testToken}` };
       const endpoint = `${baseUrl}/api/bookings/intents`;
 
-      // Mock DuffelService for fast in-memory execution and zero supplier calls (cast to never required for Jest spy on SDK client)
-      const duffelOfferSpy = jest.spyOn(duffelService, 'getOfferById').mockResolvedValue({
+      // Mock the supplier adapter for in-memory execution and zero supplier calls.
+      const duffelOfferSpy = jest.spyOn(searchAdapter, 'getOffer').mockResolvedValue({
         id: internationalOffer.duffelOfferId,
         total_amount: '500.00',
         total_currency: 'USD',
         expires_at: '2030-08-25T10:00:00Z',
         passengers: [{ id: 'pas_perf_intl_001', type: 'adult' }],
-      } as never);
+        slices: [
+          {
+            duration: 'PT10H',
+            segments: [
+              {
+                origin: { iata_code: 'SGN' },
+                destination: { iata_code: 'LHR' },
+                departing_at: '2026-09-01T08:00:00Z',
+                arriving_at: '2026-09-01T18:00:00Z',
+              },
+            ],
+          },
+        ],
+      });
 
       // 10 Warmup requests
       for (let w = 0; w < WARMUP_COUNT; w++) {

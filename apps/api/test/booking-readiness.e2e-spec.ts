@@ -12,7 +12,8 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
-import { DuffelService } from '@/duffel/duffel.service';
+import { Duffel } from '@duffel/api';
+import { DUFFEL_SDK } from '@/supplier/core/duffel-core.module';
 import { EncryptionService } from '@/common/encryption.service';
 import { ProfileService } from '@/profile/profile.service';
 import { AuditService } from '@/audit/audit.service';
@@ -23,7 +24,7 @@ type BootedApp = {
   app: INestApplication;
   prisma: PrismaService;
   jwtService: JwtService;
-  duffelService: DuffelService;
+  duffel: Duffel;
   encryptionService: EncryptionService;
   profileService: ProfileService;
   auditService: AuditService;
@@ -99,7 +100,7 @@ async function bootstrapReadinessApp(featureFlag: 'true' | 'false'): Promise<Boo
     app,
     prisma: moduleFixture.get(PrismaService),
     jwtService: moduleFixture.get(JwtService),
-    duffelService: moduleFixture.get(DuffelService),
+    duffel: moduleFixture.get<Duffel>(DUFFEL_SDK),
     encryptionService: moduleFixture.get(EncryptionService),
     profileService: moduleFixture.get(ProfileService),
     auditService: moduleFixture.get(AuditService),
@@ -424,7 +425,7 @@ describe('Booking Readiness (E2E RED)', () => {
     let app: INestApplication;
     let prisma: PrismaService;
     let jwtService: JwtService;
-    let duffelService: DuffelService;
+    let duffel: Duffel;
     let encryptionService: EncryptionService;
     let auditService: AuditService;
     let primaryUser: AuthUser;
@@ -435,7 +436,7 @@ describe('Booking Readiness (E2E RED)', () => {
       app = booted.app;
       prisma = booted.prisma;
       jwtService = booted.jwtService;
-      duffelService = booted.duffelService;
+      duffel = booted.duffel;
       encryptionService = booted.encryptionService;
       auditService = booted.auditService;
     });
@@ -455,7 +456,7 @@ describe('Booking Readiness (E2E RED)', () => {
       await seedAirport(prisma, 'HAN', 'VN');
       const offer = await seedReadinessOffer(prisma);
       const profile = await seedTravelerProfile(prisma, encryptionService, primaryUser.id);
-      const duffelSpy = jest.spyOn((duffelService as any).duffel.offers, 'get');
+      const duffelSpy = jest.spyOn(duffel.offers, 'get');
       const auditCreateLogSpy = jest.spyOn(auditService, 'createLog');
       const loggerWarnSpy = jest
         .spyOn(Logger.prototype, 'warn')
@@ -961,7 +962,7 @@ describe('Booking Readiness (E2E RED)', () => {
 
     it('keeps existing singular booking intent routes functional while the canonical readiness route is added', async () => {
       const singularOffer = await seedReadinessOffer(prisma);
-      const duffelSpy = jest.spyOn((duffelService as any).duffel.offers, 'get').mockResolvedValue({
+      const duffelSpy = jest.spyOn(duffel.offers, 'get').mockResolvedValue({
         data: {
           id: 'off_readiness_123',
           total_amount: '120.00',
@@ -969,7 +970,8 @@ describe('Booking Readiness (E2E RED)', () => {
           expires_at: '2030-08-25T10:00:00Z',
           passengers: [{ id: 'pas_001', type: 'adult' }],
         },
-      });
+        // The SDK response fixture includes only fields consumed by offer normalization.
+      } as never);
 
       const createResponse = await request(app.getHttpServer())
         .post('/api/bookings/intent')

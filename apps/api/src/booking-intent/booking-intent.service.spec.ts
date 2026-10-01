@@ -1542,6 +1542,33 @@ describe('BookingIntentService Refinements', () => {
       expect(mockFlightSearchPort.getOfferById).toHaveBeenCalledWith('offer-123', 4500);
     });
 
+    it.each([
+      { status: 410 },
+      { code: 'offer_expired' },
+      { code: 'not_found' },
+      new Error('Offer no longer available'),
+    ])('classifies supplier expiry errors: %p', async (error) => {
+      mockFlightSearchPort.getOfferById.mockRejectedValueOnce(error);
+
+      await expect(testable.fetchLiveOffer('offer-123')).rejects.toMatchObject({
+        response: { code: 'OFFER_EXPIRED' },
+      });
+    });
+
+    it('does not classify an internal expired-message error as OFFER_EXPIRED', async () => {
+      mockFlightSearchPort.getOfferById.mockResolvedValueOnce({
+        totalAmount: '150.00',
+        currency: 'USD',
+        get offerExpiresAt() {
+          throw new Error('Internal metadata expired');
+        },
+      });
+
+      await expect(testable.fetchLiveOffer('offer-123')).rejects.toMatchObject({
+        response: { code: 'UPSTREAM_UNAVAILABLE' },
+      });
+    });
+
     it('throws UPSTREAM_RATE_LIMITED on status 429', async () => {
       mockFlightSearchPort.getOfferById.mockRejectedValueOnce(
         new HttpException(
