@@ -12,7 +12,7 @@
   - Pushed commits `3962c47f` and `41650004` to `origin/codex/029-duffel-provider-narrowing`.
   - Monitored GitHub Actions workflow run `36818130970` via `inspect-ci.mjs --head --watch`: **All jobs passed (`Verdict: CI PASSED ✔`)**.
 
-### Feature 029 — Narrow the Duffel Supplier Boundary: Phase 4 Slice 1 Raw Ancillary Adapter Partial (T025 Correction and T027 Verified) (2026-10-01)
+### Feature 029 — Narrow the Duffel Supplier Boundary: Phase 4 Slice 1 Approved Scope Complete Locally (T025–T027) (2026-10-01)
 
 - **T027 Metered Raw SDK Adapter**:
   - Created `apps/api/src/supplier/ancillary/duffel-ancillary.adapter.ts` with constructor injection of `DUFFEL_SDK` and `DuffelRateBudgetService`.
@@ -26,7 +26,17 @@
   - Scoped ESLint on the adapter and spec: exit 0, zero errors/warnings.
 - **T025 legacy catalog correction**: Added immutable supplier and HTTP regression coverage for the installed SDK error shape `{ meta: { status: 404 } }`, preserving `seatMapAvailable: false`, `seatMap: null`, and authoritative baggage services. SDK `meta.status=500` remains an upstream failure. The fallback now inspects only numeric `meta.status` alongside the existing status/statusCode/HttpException shapes.
 - **T025 follow-up verification**: Supplier catalog suite 16/16, legacy Duffel ancillary suite 39/39, catalog HTTP E2E 3/3, API TypeScript compilation, and scoped ESLint all passed with exit code 0.
-- **Scope boundary**: T025 and T027 are verified in `specs/029-duffel-provider-narrowing/tasks.md`; T028–T030 remain unchecked.
+- **T026 authoritative repricing and selection parity**:
+  - Preserved supplier-authoritative priced-offer base/grand totals and currency, including deduplication of duplicate baggage selections into aggregated service quantities before repricing and persistence of the supplier totals.
+  - Preserved passenger/segment invalid-service mapping and stale-selection behavior, with explicit HTTP 400 coverage for passenger-scope mismatches and unknown service identities.
+  - Preserved catalog and repricing currency validation, including `ANCILLARY_CURRENCY_MISMATCH` outcomes when the selected catalog or supplier currency differs from the offer currency.
+- **Slice review and validation status**:
+  - Task reviews are clean; bounded T025–T027 convergence reported zero findings.
+  - Final Standards and Spec reviews both reported PASS with 0 findings against baseline `08a62ff4`.
+  - API/shared lint and typecheck passed; shared types passed 110/110, CI contract tests passed 23/23, and ancillary HTTP E2E passed 3/3.
+  - The initial full API run passed 123/124 suites and 2,248/2,249 tests, with the single existing flight-match performance threshold miss at p95 5.7162ms; the isolated corrective rerun passed 3/3 tests at p95 0.7577ms.
+  - Full API confirmation then passed with exit 0: 124/124 suites, 2,249/2,249 tests, 295.9s, and performance p95 values of 0.3749ms and 1.9484ms. This is the green local gate; remote PR/CI completion remains pending.
+- **Scope boundary**: The approved local slice is T025–T027 only. T028–T031 remain unchecked; this entry does not mark User Story 2 or Feature 029 complete.
 
 ### Feature 029 — Narrow the Duffel Supplier Boundary: Phase 3 Slice 4 Consumer Rewiring & Phase 3 Checkpoint Complete (Tasks T021–T024 Verified, US1 🎯 MVP Complete) (2026-10-01)
 
