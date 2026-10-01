@@ -19,6 +19,11 @@
     - `BookingIntentService` and `BookingIntentModule`: Live offer validation rewired to `flightSearchPort.getOfferById()`.
     - `BookingReadinessService`, `AgentBookingReadinessService`, and `ChatHandoffService`: Stored raw-offer JSON readers migrated to `flightSearchPort.normalizeStoredOffer()`. Replaced ad-hoc raw parsing with normalized domain values.
     - Zero `DuffelService` or `DuffelModule` imports remain in `flights/`, `booking-intent/`, `agent-gateway/`, or `chat-handoff/`.
+- **Phase 4 Slice 1: Ancillary Catalog/Repricing Characterization and Raw Adapter (T025–T027 partial, 2026-10-01)**:
+  - T025 catalog/cache/missing-seat-map and T026 pricing/selection parity characterization suites remain green from the upstream slice work; the legacy catalog 404 path still has a pending follow-up for the installed SDK `meta.status` error shape.
+  - **`duffel-ancillary.adapter.ts` (T027)**: Added a standalone `@Injectable()` adapter with the actual `DUFFEL_SDK` token and `DuffelRateBudgetService` injection. `getSeatMaps`, `getOfferWithServices`, and `getPricedOffer` reserve one daily attempt before each real SDK call and return raw unwrapped supplier data. Only numeric 404 status, statusCode, `HttpException`, or SDK `meta.status` errors become an empty seat-map result; other failures propagate unchanged.
+  - Budget denial remains fail-closed with HTTP 429, exact `RATE_LIMIT_EXCEEDED` / `BUDGET_UNAVAILABLE` messages, retry metadata, and zero SDK calls. Deterministic non-Jest mock mode returns raw seat, baggage, and pricing fixtures without SDK or budget calls; Jest always exercises the injected SDK boundary. Priced requests forward supplied service lines unchanged, including duplicates, and invalid mock identities retain an upstream-shaped 400 error for a future normalizer/caller.
+  - Verification: combined adapter/catalog/parity Jest command passed 5 suites and 108/108 tests; the new adapter passed 17/17. API TypeScript compilation and scoped ESLint passed with zero errors. T028–T030 remain unchecked, and this entry does not claim whole US2 convergence until the legacy `meta.status` follow-up is complete.
 
 ## Feature 027 — Chat Turn Decomposition (Complete — Phases 1–7, Tasks T001–T027 Verified)
 

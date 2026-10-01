@@ -56,13 +56,14 @@ expect(catalog.baggageServices).toContainEqual(expect.objectContaining({ service
 
 Run from apps/api: `./node_modules/.bin/jest.CMD --config jest.config.json --runInBand src/supplier/ancillary/duffel-ancillary.service.spec.ts`. Expected RED: 502 UPSTREAM_UNAVAILABLE from the missing map.
 
-- [ ] Catch only the seat-map operation's missing-map error inside the existing concurrent pair. Return `{ data: [] }` only for numeric 404 status/statusCode or HttpException.getStatus()=404; rethrow other errors. Preserve reservations before both operations and preserve the offer promise, timeout and normalizer.
+- [ ] Catch only the seat-map operation's missing-map error inside the existing concurrent pair. Return `{ data: [] }` only for numeric 404 status/statusCode/meta.status or HttpException.getStatus()=404; rethrow other errors. Installed DuffelError stores HTTP status at meta.status (SDK typings.d.ts:100-107,5150-5158). Preserve reservations before both operations and preserve the offer promise, timeout and normalizer.
 
 ```typescript
 const seatMapsPromise = this.duffel.seatMaps.get({ offer_id: offerId }).catch((error: unknown) => {
   const status = error instanceof HttpException ? error.getStatus()
     : error && typeof error === 'object' && 'status' in error ? error.status
-    : error && typeof error === 'object' && 'statusCode' in error ? error.statusCode : undefined;
+    : error && typeof error === 'object' && 'statusCode' in error ? error.statusCode
+    : error && typeof error === 'object' && 'meta' in error && error.meta && typeof error.meta === 'object' && 'status' in error.meta ? error.meta.status : undefined;
   if (status === 404) return { data: [] };
   throw error;
 });
@@ -124,11 +125,11 @@ async getOfferWithServices(offerId: string): Promise<unknown> {
 
 ```typescript
 if (!result.ok) {
-  throw new HttpException({ code: result.error === 'EXHAUSTED' ? 'RATE_LIMIT_EXCEEDED' : 'BUDGET_UNAVAILABLE', message: result.error === 'EXHAUSTED' ? 'Daily Duffel API rate limit exceeded' : 'Duffel rate budget is temporarily unavailable', retryAfterSeconds: result.retryAfterSeconds, ...('resetAt' in result ? { resetAt: result.resetAt } : {}) }, HttpStatus.TOO_MANY_REQUESTS);
+  throw new HttpException({ code: result.error === 'EXHAUSTED' ? 'RATE_LIMIT_EXCEEDED' : 'BUDGET_UNAVAILABLE', message: result.error === 'EXHAUSTED' ? 'Daily Duffel API rate limit exceeded' : 'Duffel rate budget store temporarily unavailable', retryAfterSeconds: result.retryAfterSeconds, ...('resetAt' in result ? { resetAt: result.resetAt } : {}) }, HttpStatus.TOO_MANY_REQUESTS);
 }
 ```
 
-- [ ] Implement seatMaps.get with its own reservation and only missing-map 404 fallback. Test raw data, empty/unavailable data, status/statusCode/HttpException 404, and non-404 propagation. Budget denial remains outside missing-map catch.
+- [ ] Implement seatMaps.get with its own reservation and only missing-map 404 fallback. Test raw data, empty/unavailable data, SDK meta.status/status/statusCode/HttpException 404, and non-404 propagation including SDK meta.status 500. Budget denial remains outside missing-map catch.
 - [ ] Implement getPricedOffer, using installed SDK request types without any:
 
 ```typescript

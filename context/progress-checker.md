@@ -12,6 +12,20 @@
   - Pushed commits `3962c47f` and `41650004` to `origin/codex/029-duffel-provider-narrowing`.
   - Monitored GitHub Actions workflow run `36818130970` via `inspect-ci.mjs --head --watch`: **All jobs passed (`Verdict: CI PASSED ✔`)**.
 
+### Feature 029 — Narrow the Duffel Supplier Boundary: Phase 4 Slice 1 Raw Ancillary Adapter Partial (T027 Verified, T025 Follow-up Pending) (2026-10-01)
+
+- **T027 Metered Raw SDK Adapter**:
+  - Created `apps/api/src/supplier/ancillary/duffel-ancillary.adapter.ts` with constructor injection of `DUFFEL_SDK` and `DuffelRateBudgetService`.
+  - Added raw `getSeatMaps`, `getOfferWithServices`, and `getPricedOffer` methods. Each real SDK operation reserves one attempt before dispatch, returns raw `.data`, forwards supplied pricing service lines unchanged, and preserves failed-attempt charging.
+  - Added fail-closed 429 budget errors with exact exhaustion/unavailable messages and retry/reset metadata. Seat-map 404 handling covers numeric `status`, `statusCode`, `HttpException.getStatus()`, and installed Duffel SDK `meta.status`; non-404 SDK-shaped errors propagate.
+  - Preserved deterministic non-Jest raw supplier fixtures (`seg_mock_1`, SGN → SIN, `pas_mock_1`, USD 15 seats, USD 30 baggage capped at 2, USD 420 base pricing, USD 35 baggage and USD 18 other services). Invalid mock pricing identities throw an upstream-shaped 400 containing their service IDs. Mock mode makes zero SDK and budget calls; Jest mode still uses injected SDK doubles.
+  - Added `duffel-ancillary.adapter.spec.ts` with 17 focused tests covering Nest resolution, raw calls, per-attempt reservations, denial/error behavior, all missing-map status shapes, SDK metadata propagation, mock fixtures, and environment restoration.
+- **Verification**:
+  - `apps/api` focused adapter/catalog/parity Jest command: 5 suites, 108/108 tests passed (exit 0; existing Duffel logs are expected).
+  - `apps/api` `tsc -p tsconfig.json --noEmit`: exit 0.
+  - Scoped ESLint on the adapter and spec: exit 0, zero errors/warnings.
+- **Scope boundary**: T027 is checked in `specs/029-duffel-provider-narrowing/tasks.md`; T028–T030 remain unchecked. The legacy T025 catalog fallback still needs the SDK `meta.status=404` correction and is intentionally left for the next follow-up before claiming a clean T025–T027 checkpoint.
+
 ### Feature 029 — Narrow the Duffel Supplier Boundary: Phase 3 Slice 4 Consumer Rewiring & Phase 3 Checkpoint Complete (Tasks T021–T024 Verified, US1 🎯 MVP Complete) (2026-10-01)
 
 - **T021 FlightsService & FlightSearchOrchestratorService Rewiring**:
