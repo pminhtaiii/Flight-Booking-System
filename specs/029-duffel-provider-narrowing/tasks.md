@@ -77,7 +77,7 @@
 - [x] T028 [US2] Move seat-map/service and price normalization into `apps/api/src/supplier/ancillary/ancillary.normalizer.ts`, retaining existing shared `AncillaryCatalog` and repricing outputs.
 - [x] T029 [US2] Implement cache/force-refresh/freshness and concrete ancillary operations in `apps/api/src/supplier/ancillary/duffel-ancillary.service.ts` and register them in `apps/api/src/supplier/ancillary/supplier-ancillary.module.ts`.
 - [x] T030 [US2] Rewire `apps/api/src/ancillaries/ancillary-catalog.service.ts`, `apps/api/src/ancillaries/ancillaries.module.ts`, `apps/api/src/payment/ancillary-payment-validation.service.ts`, and `apps/api/src/payment/payment.module.ts` to the ancillary module; retain request-scoped identity validation.
-- [ ] T031 [US2] Run ancillary/payment and API compile checkpoint in `specs/029-duffel-provider-narrowing/quickstart.md`.
+- [x] T031 [US2] Run ancillary/payment and API compile checkpoint in `specs/029-duffel-provider-narrowing/quickstart.md`.
 
 **Checkpoint**: Ancillary flow no longer depends on the Duffel monolith.
 

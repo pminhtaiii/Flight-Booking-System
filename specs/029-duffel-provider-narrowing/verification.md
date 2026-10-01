@@ -125,3 +125,37 @@ Run from `C:\Booking Systems` on 2026-09-29. All commands exited with code 0.
 - **All Duffel attempts share daily budget**: Total daily attempts capped at 1,500 via atomic Redis Lua script; no monthly counter active.
 - **Phase 2 Convergence**: Tasks T005 through T012 in `specs/029-duffel-provider-narrowing/tasks.md` are marked `[x]`. Phase 2 foundation is complete.
 
+## Phase 4: Ancillary Capability Isolation (T025–T031)
+
+Run from `C:\Booking Systems` on 2026-10-01. T030 rewiring and the T031 checkpoint passed locally.
+
+### T031 Checkpoint
+
+| Check | Command | Result |
+| --- | --- | --- |
+| **Phase 4 Quickstart Jest Checkpoint** | `pnpm --filter @api/backend exec jest --runInBand src/supplier/ancillary src/ancillaries src/payment/ancillary-payment-validation.service.spec.ts` | **PASS**: 11 suites passed, 153 tests passed, 0 failed; exit code 0 (~44.11s). |
+| **API TypeScript Check** | `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` | **PASS**: Exit code 0; no compiler diagnostics. |
+| **Supplier Ancillary Module E2E (additional mocked check)** | `pnpm --filter @api/backend exec jest --runInBand --config test/jest-e2e.json test/supplier-ancillary.e2e-spec.ts` | **PASS**: 1 suite passed, 1 test passed, 0 failed; exit code 0 (~47.04s). |
+| **Ancillary/Payment Legacy Boundary Census** | `rg -n --glob "*.ts" "DuffelService|DuffelModule" apps/api/src/ancillaries apps/api/src/payment/ancillary-payment-validation.service.ts apps/api/src/payment/payment.module.ts` | **PASS**: No production ancillary/payment-validation references. The only three matches are test assertions naming `DuffelModule` to verify it is absent. |
+| **Full API Network-Guard Gate (additional)** | `pnpm --filter @api/backend test:ci` (with `NODE_OPTIONS` requiring `tests/ci/node-network-guard.cjs`) | **PASS**: 127 suites passed, 2,312 tests passed, 0 failed; exit code 0. |
+| **CI Workflow Contract** | `node --test tests/ci/ci-workflow.contract.test.mjs` | **PASS**: 23 tests passed, 0 failed. |
+| **Shared Types** | `pnpm --filter @shared/types test` | **PASS**: 110 tests passed, 0 failed. |
+| **API/Shared ESLint** | `pnpm exec eslint "apps/api/**/*.ts" "packages/shared/**/*.ts" --max-warnings 0` | **PASS**: Exit code 0; 0 warnings and errors. |
+
+`PaymentModule` imports `SupplierAncillaryModule` directly. The passing ancillary and payment validation suites cover catalog/cache/freshness, missing-seat-map fallback, passenger scoping, repricing, validation, and payment-bound totals. The full API run and ancillary E2E used mocked external boundaries. Remote CI is not claimed here.
+
+### Scoped Convergence: T030/T031
+
+✅ **Converged for this slice** against spec FR-005, FR-010, and FR-012 and the supplier boundary contract's ancillary capability: ancillary/payment consumers use `DuffelAncillaryService` through `SupplierAncillaryModule`; catalog and authoritative repricing behavior remain covered; existing consumer contracts are unchanged; the focused Jest, E2E, compile, and boundary checks pass. Later order extraction, monolith deletion, naming/migration, and final audit tasks remain pending and are outside T030/T031.
+
+### Task Implementation Details
+
+#### T030: Consumer Rewiring
+- `AncillaryCatalogService` and `AncillaryPaymentValidationService` now consume `DuffelAncillaryService`.
+- `AncillariesModule` and `PaymentModule` import `SupplierAncillaryModule`; the catalog fingerprint, request-scoped identity checks, lease lifecycle, currency checks, and supplier-authoritative repricing totals remain covered by the focused tests.
+- Consumer tests use the ancillary capability boundary. T030 was committed as `b44b98c4` after review approval.
+
+#### T031: Phase 4 Checkpoint
+- Ran the exact Phase 4 checkpoint and TypeScript command from `specs/029-duffel-provider-narrowing/quickstart.md`; both exited 0.
+- Ran the supplier ancillary module E2E with mocked SDK/cache boundaries as an additional check.
+- Confirmed no production `DuffelService` or `DuffelModule` references remain in the ancillary consumers or ancillary payment validation service. The Phase 4 checkpoint is complete locally.
