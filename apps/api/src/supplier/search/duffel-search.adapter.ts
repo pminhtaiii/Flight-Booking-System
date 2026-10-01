@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { Duffel } from '@duffel/api';
 import { DUFFEL_SDK, DuffelRateBudgetService } from '@/supplier/core/duffel-core.module';
+import { DuffelService } from '@/duffel/duffel.service';
 import { FlightSearchCriteria } from './flight-search.port';
 
 export class DuffelTimeoutError extends Error {
@@ -22,10 +23,19 @@ export class DuffelTimeoutError extends Error {
 
 @Injectable()
 export class DuffelSearchAdapter {
+  private readonly mockOffers = new Map<string, { id: string } & Record<string, unknown>>();
+
   constructor(
     @Optional() @Inject(DUFFEL_SDK) private readonly duffel?: Duffel,
     @Optional() private readonly rateBudgetService?: DuffelRateBudgetService,
+    @Optional() private readonly duffelService?: DuffelService,
   ) {}
+
+  private getDuffel(): Duffel | undefined {
+    const serviceDuffel = (this.duffelService as unknown as Record<string, unknown> | undefined)
+      ?.duffel as Duffel | undefined;
+    return serviceDuffel || this.duffel;
+  }
 
   async searchOffers(criteria: FlightSearchCriteria): Promise<unknown> {
     const origin = criteria.origin.trim().toUpperCase();
@@ -76,16 +86,7 @@ export class DuffelSearchAdapter {
     const cabinClass =
       (criteria.cabinClass && cabinClassMap[criteria.cabinClass.toLowerCase()]) || 'economy';
 
-    const isJest = process.env.JEST_WORKER_ID !== undefined;
-    const hasDuffelApiUrl = Boolean(
-      process.env.DUFFEL_API_URL && process.env.DUFFEL_API_URL.trim() !== '',
-    );
-    const token = process.env.DUFFEL_ACCESS_TOKEN;
-    const isMockEnv =
-      process.env.DUFFEL_MOCK === 'true' ||
-      (!isJest && !hasDuffelApiUrl && (process.env.NODE_ENV === 'test' || token === 'mock'));
-
-    if (isMockEnv) {
+    if (this.isMockMode()) {
       const mockPassengers: Array<{
         id: string;
         type: 'adult' | 'child' | 'infant_without_seat';
@@ -201,7 +202,7 @@ export class DuffelSearchAdapter {
 
       const offers = [
         {
-          id: 'off_mock_123',
+          id: `off_mock_${123 + this.mockOffers.size}`,
           total_amount: '125.50',
           total_currency: 'USD',
           slices: mockSlices.map((s) => {
@@ -219,6 +220,10 @@ export class DuffelSearchAdapter {
         },
       ];
 
+      for (const offer of offers) {
+        this.mockOffers.set(offer.id, offer);
+      }
+
       return {
         id: 'or_mock_123',
         slices: mockSlices,
@@ -227,7 +232,8 @@ export class DuffelSearchAdapter {
       };
     }
 
-    if (!this.duffel) {
+    const duffelClient = this.getDuffel();
+    if (!duffelClient) {
       throw new HttpException(
         {
           message: 'Duffel SDK is not available',
@@ -238,7 +244,7 @@ export class DuffelSearchAdapter {
     }
 
     try {
-      const duffelResponse = await this.duffel.offerRequests.create({
+      const duffelResponse = await duffelClient.offerRequests.create({
         slices,
         // Type assertion required: map domain passenger array to Duffel SDK parameter type
         passengers:
@@ -264,8 +270,29 @@ export class DuffelSearchAdapter {
     }
   }
 
+  private isMockMode(): boolean {
+    const isJest = process.env.JEST_WORKER_ID !== undefined;
+    const hasDuffelApiUrl = Boolean(
+      process.env.DUFFEL_API_URL && process.env.DUFFEL_API_URL.trim() !== '',
+    );
+    const token = process.env.DUFFEL_ACCESS_TOKEN;
+    return (
+      process.env.DUFFEL_MOCK === 'true' ||
+      (!isJest && !hasDuffelApiUrl && (process.env.NODE_ENV === 'test' || token === 'mock'))
+    );
+  }
+
   async getOffer(supplierOfferId: string, timeoutMs = 4500): Promise<unknown> {
-    if (!this.duffel) {
+    if (this.isMockMode() && supplierOfferId.startsWith('off_mock_')) {
+      const mockOffer = this.mockOffers.get(supplierOfferId);
+      if (mockOffer) {
+        return mockOffer;
+      }
+      throw new NotFoundException(`Duffel mock offer ${supplierOfferId} was not found`);
+    }
+
+    const duffelClient = this.getDuffel();
+    if (!duffelClient) {
       throw new HttpException(
         {
           message: 'Duffel SDK is not available',
@@ -306,7 +333,7 @@ export class DuffelSearchAdapter {
     });
 
     try {
-      const offerPromise = this.duffel.offers.get(supplierOfferId);
+      const offerPromise = duffelClient.offers.get(supplierOfferId);
       const result = await Promise.race([offerPromise, timeoutPromise]);
       // Safe cast: Duffel SDK wraps retrieved resource in a data property
       return (result as { data: unknown }).data;

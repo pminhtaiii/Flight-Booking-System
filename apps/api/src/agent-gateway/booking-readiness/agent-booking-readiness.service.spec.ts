@@ -10,6 +10,7 @@ import { AgentBookingReadinessRequestDto } from '../dto/booking-readiness.dto';
 import { PassengerType } from '@prisma/client';
 import { HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
 import { FlightOfferNormalizer } from '@/supplier/search/flight-offer.normalizer';
+import { FLIGHT_SEARCH_PORT, type FlightOffer } from '@/supplier/search/flight-search.port';
 
 describe('AgentBookingReadinessService', () => {
   let service: AgentBookingReadinessService;
@@ -21,6 +22,11 @@ describe('AgentBookingReadinessService', () => {
   let observability: { recordOutcome: jest.Mock };
   let auditService: { createLog: jest.Mock };
   let agentToolAuditService: { recordToolExecution: jest.Mock };
+  let flightSearchPort: {
+    search: jest.Mock;
+    getOfferById: jest.Mock;
+    normalizeStoredOffer: jest.Mock;
+  };
 
   beforeEach(async () => {
     prismaService = {
@@ -33,6 +39,50 @@ describe('AgentBookingReadinessService', () => {
     agentToolAuditService = {
       recordToolExecution: jest.fn().mockResolvedValue(undefined),
     };
+    flightSearchPort = {
+      search: jest.fn(),
+      getOfferById: jest.fn(),
+      normalizeStoredOffer: jest.fn((rawOffer: unknown) => {
+        const direct = FlightOfferNormalizer.normalizeStoredOffer(rawOffer);
+        if (direct) return direct;
+        if (
+          rawOffer &&
+          typeof rawOffer === 'object' &&
+          Array.isArray((rawOffer as Record<string, unknown>).passengers)
+        ) {
+          const rawPassengers = (rawOffer as Record<string, unknown>).passengers;
+          const passengers = (rawPassengers as Array<Record<string, unknown>>).map((p) => ({
+            supplierPassengerId: typeof p?.id === 'string' ? p.id : '',
+            type: 'ADULT' as const,
+          }));
+          return {
+            id: 'mock-id',
+            supplierOfferId: 'mock-supplier-id',
+            totalAmount: '200.00',
+            price: 200,
+            currency: 'USD',
+            offerExpiresAt: '2030-01-01T00:00:00Z',
+            passengers,
+            airline: 'Test Airline',
+            flightNumber: 'VN100',
+            departureAirport: 'SGN',
+            arrivalAirport: 'HAN',
+            departureTime: '2030-01-01T10:00:00Z',
+            arrivalTime: '2030-01-01T12:00:00Z',
+            duration: 120,
+            stops: 0,
+            fareClass: null,
+            baggageAllowance: null,
+            segments: [],
+            returnSegments: null,
+            conditions: { refundable: false, changeable: false, changeBeforeDeparture: null },
+            matchInput: {} as never,
+            rawSupplierPayload: rawOffer,
+          } as FlightOffer;
+        }
+        return null;
+      }),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -43,6 +93,7 @@ describe('AgentBookingReadinessService', () => {
         { provide: BookingReadinessObservability, useValue: observability },
         { provide: AuditService, useValue: auditService },
         { provide: AgentToolAuditService, useValue: agentToolAuditService },
+        { provide: FLIGHT_SEARCH_PORT, useValue: flightSearchPort },
       ],
     }).compile();
 
@@ -98,9 +149,9 @@ describe('AgentBookingReadinessService', () => {
         rawOffer: {},
       });
       await service.checkBookingReadiness('user-1', dto);
-    } catch (err: any) {
-      expect(err.getStatus()).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
-      expect(err.getResponse()).toMatchObject({ code: 'OFFER_MALFORMED' });
+    } catch (err: unknown) {
+      expect((err as HttpException).getStatus()).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
+      expect((err as HttpException).getResponse()).toMatchObject({ code: 'OFFER_MALFORMED' });
     }
   });
 
@@ -124,9 +175,9 @@ describe('AgentBookingReadinessService', () => {
         rawOffer: { passengers: [{ id: 'offer-p-1' }] },
       });
       await service.checkBookingReadiness('user-1', dto);
-    } catch (err: any) {
-      expect(err.getStatus()).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
-      expect(err.getResponse()).toMatchObject({ code: 'PASSENGER_MAPPING_INVALID' });
+    } catch (err: unknown) {
+      expect((err as HttpException).getStatus()).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
+      expect((err as HttpException).getResponse()).toMatchObject({ code: 'PASSENGER_MAPPING_INVALID' });
     }
   });
 
@@ -380,9 +431,9 @@ describe('AgentBookingReadinessService', () => {
     try {
       prismaService.flightOffer.findUnique.mockRejectedValueOnce(new Error('DB failure'));
       await service.checkBookingReadiness('user-1', dto);
-    } catch (err: any) {
-      expect(err.getStatus()).toBe(500);
-      expect(err.getResponse()).toMatchObject({ code: 'READINESS_REQUEST_FAILED' });
+    } catch (err: unknown) {
+      expect((err as HttpException).getStatus()).toBe(500);
+      expect((err as HttpException).getResponse()).toMatchObject({ code: 'READINESS_REQUEST_FAILED' });
     }
   });
 
@@ -441,7 +492,7 @@ describe('AgentBookingReadinessService', () => {
       { section: 'identity', name: 'familyName', status: 'filled', reason: null },
       { section: 'travel_document', name: 'passportNumber', status: 'missing', reason: 'REQUIRED' },
     ]);
-    expect((result.passengers[0] as any).sections).toBeUndefined();
+    expect((result.passengers[0] as unknown as Record<string, unknown>).sections).toBeUndefined();
     expect(getJsonDepth(result)).toBeLessThanOrEqual(5);
   });
 });
@@ -469,6 +520,14 @@ describe('Raw-Reader Replacement Parity (T015)', () => {
       recordToolExecution: jest.fn().mockResolvedValue(undefined),
     };
 
+    const parityFlightSearchPort = {
+      search: jest.fn(),
+      getOfferById: jest.fn(),
+      normalizeStoredOffer: jest.fn((rawOffer: unknown) =>
+        FlightOfferNormalizer.normalizeStoredOffer(rawOffer),
+      ),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AgentBookingReadinessService,
@@ -478,6 +537,7 @@ describe('Raw-Reader Replacement Parity (T015)', () => {
         { provide: BookingReadinessObservability, useValue: observability },
         { provide: AuditService, useValue: auditService },
         { provide: AgentToolAuditService, useValue: agentToolAuditService },
+        { provide: FLIGHT_SEARCH_PORT, useValue: parityFlightSearchPort },
       ],
     }).compile();
 

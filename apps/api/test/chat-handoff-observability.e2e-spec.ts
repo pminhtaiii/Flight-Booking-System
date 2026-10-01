@@ -15,7 +15,8 @@ import * as crypto from 'crypto';
 import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
-import { DuffelService } from '@/duffel/duffel.service';
+import { Duffel } from '@duffel/api';
+import { DUFFEL_SDK } from '@/supplier/core/duffel-core.module';
 import { SelectionAttestationService } from '@/agent-gateway/selection-attestation.service';
 import { ChatHandoffService } from '@/chat-handoff/chat-handoff.service';
 import { BookingIntentService } from '@/booking-intent/booking-intent.service';
@@ -81,7 +82,7 @@ describe('chat handoff observability dashboard and alert contract', () => {
       prisma = moduleFixture.get(PrismaService);
       const jwtService = moduleFixture.get(JwtService);
       const attestationService = moduleFixture.get(SelectionAttestationService);
-      const duffelService = moduleFixture.get(DuffelService);
+      const duffel = moduleFixture.get<Duffel>(DUFFEL_SDK);
       const handoffService = moduleFixture.get(ChatHandoffService) as unknown as {
         logger: { log: jest.Mock; warn: jest.Mock };
       };
@@ -178,7 +179,7 @@ describe('chat handoff observability dashboard and alert contract', () => {
         .set('X-Trace-Id', traceId)
         .set('X-Correlation-Id', correlationId)
         .expect(200);
-      const duffelGet = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue({
+      const duffelGet = jest.spyOn(duffel.offers, 'get').mockResolvedValue({
         data: {
           id: `${runMarker}-offer`,
           total_amount: '100.00',

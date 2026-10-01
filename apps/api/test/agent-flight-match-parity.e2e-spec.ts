@@ -7,7 +7,8 @@ import { AppModule } from '@/app.module';
 import { CacheService } from '@/cache/cache.service';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { DuffelOffer, DuffelOfferRequest } from '@/duffel/duffel.types';
-import { DuffelService } from '@/duffel/duffel.service';
+import { Duffel } from '@duffel/api';
+import { DUFFEL_SDK } from '@/supplier/core/duffel-core.module';
 import { PrismaService } from '@/prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 
@@ -229,7 +230,7 @@ describe('Agent Flight Match Parity (E2E)', () => {
   let prisma: PrismaService;
   let cacheService: CacheService;
   let jwtService: JwtService;
-  let duffelService: DuffelService;
+  let duffel: Duffel;
   let duffelSpy: jest.SpyInstance;
   let duffelDetailSpy: jest.SpyInstance;
 
@@ -268,10 +269,10 @@ describe('Agent Flight Match Parity (E2E)', () => {
     prisma = moduleFixture.get<PrismaService>(PrismaService);
     cacheService = moduleFixture.get<CacheService>(CacheService);
     jwtService = moduleFixture.get<JwtService>(JwtService);
-    duffelService = moduleFixture.get<DuffelService>(DuffelService);
+    duffel = moduleFixture.get<Duffel>(DUFFEL_SDK);
 
-    duffelSpy = jest.spyOn(duffelService['duffel'].offerRequests, 'create');
-    duffelDetailSpy = jest.spyOn(duffelService['duffel'].offers, 'get');
+    duffelSpy = jest.spyOn(duffel.offerRequests, 'create');
+    duffelDetailSpy = jest.spyOn(duffel.offers, 'get');
   });
 
   afterAll(async () => {

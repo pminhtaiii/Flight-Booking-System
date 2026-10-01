@@ -1,5 +1,31 @@
 # Progress Tracker
 
+### Feature 029 — Narrow the Duffel Supplier Boundary: Phase 3 Slice 4 Consumer Rewiring & Phase 3 Checkpoint Complete (Tasks T021–T024 Verified, US1 🎯 MVP Complete) (2026-10-01)
+
+- **T021 FlightsService & FlightSearchOrchestratorService Rewiring**:
+  - Rewired `FlightsService` and `FlightsModule` to depend on `FLIGHT_SEARCH_PORT` (`SupplierSearchModule`) instead of `DuffelService` / `DuffelModule`.
+  - Injected `FlightSearchPort` into `FlightsService`; mapped input criteria to `FlightSearchCriteria`; converted `FlightSearchResult.offers` to `FlightOfferDto`.
+  - Updated flight detail lookup to call `flightSearchPort.getOfferById(duffelOfferId)`.
+  - Preserved database raw payload evidence in transaction, response DTO contracts, audit logs, match scoring, and expiry handling.
+  - Rewired `FlightsModule` imports to replace `DuffelModule` with `SupplierSearchModule`.
+- **T022 BookingIntentService Live Offer Lookup Rewiring**:
+  - Rewired `BookingIntentService` and `BookingIntentModule` to depend on `FLIGHT_SEARCH_PORT` / `SupplierSearchModule`.
+  - Migrated live offer verification in `BookingIntentService.createIntent` to `flightSearchPort.getOfferById(flightOffer.duffelOfferId)`.
+  - Preserved exact amount/currency, passenger matching, and offer expiry validation with unchanged error mappings.
+- **T023 Stored Raw-Offer Readers Migration to `normalizeStoredOffer`**:
+  - Migrated stored offer JSON parsing to `flightSearchPort.normalizeStoredOffer(rawSupplierPayload)` across `BookingReadinessService`, `AgentBookingReadinessService`, and `ChatHandoffService`.
+  - Eliminated ad-hoc raw Duffel JSON parsing for passenger validation, segment/carrier extraction, baggage allowance, and trip completion date calculation, relying entirely on the normalized domain `FlightOffer`.
+  - Rewired `BookingIntentModule`, `AgentBookingReadinessModule`, and `ChatHandoffModule` to import `SupplierSearchModule` and bind to `FLIGHT_SEARCH_PORT`.
+- **T024 Phase 3 Checkpoint & Verification Gate**:
+  - Verified 100% pass across all Phase 3 test matrices:
+    - Search & Orchestrator specs: 85/85 tests passed (`flights.service.spec.ts`, `flight-search-orchestrator.service.spec.ts`, `flights-module-wiring.spec.ts`).
+    - Booking Intent & Readiness specs: 57/57 tests passed (`booking-intent.service.spec.ts`, `booking-readiness.service.spec.ts`).
+    - Agent Gateway Readiness & Chat Handoff specs: 56/56 tests passed (`agent-booking-readiness.service.spec.ts`, `chat-handoff.service.spec.ts`).
+    - Phase 3 Search Quickstart Checkpoint: 323/323 tests passed across 13 suites (`supplier/core`, `supplier/search`, `flights`, `agent-gateway/attested-flight-search`).
+  - TypeScript compilation check (`tsc -p tsconfig.json --noEmit`): 0 errors, clean pass.
+  - Consumer Audit: 0 imports of `DuffelService` or `DuffelModule` in `src/flights/`, `src/booking-intent/`, `src/agent-gateway/booking-readiness/`, `src/chat-handoff/`, or `src/agent-gateway/`.
+  - **User Story 1 🎯 (MVP) Complete**: Flight search, offer detail, booking intent, readiness, and handoff flows are fully isolated from the legacy Duffel monolith.
+
 ### Feature 029 — Narrow the Duffel Supplier Boundary: Phase 3 Slice 3 Supplier Search Module, Search Adapter & Cleanup Relocation Complete (Tasks T017, T019, T020 Verified) (2026-09-30)
 
 - **T017 DuffelSearchAdapter Extraction**:

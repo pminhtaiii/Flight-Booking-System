@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Logger, HttpException, HttpStatus } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { ProfileService } from '@/profile/profile.service';
 import { BookingReadinessService } from '@/booking-intent/booking-readiness.service';
@@ -15,6 +15,8 @@ import {
   AgentBookingReadinessResponseDto,
 } from '../dto/booking-readiness.dto';
 import { PassengerType } from '@prisma/client';
+import { FLIGHT_SEARCH_PORT, type FlightSearchPort } from '@/supplier/search/flight-search.port';
+import { complementStoredOfferPayload } from '@/supplier/search/stored-offer-payload.helper';
 
 @Injectable()
 export class AgentBookingReadinessService {
@@ -27,6 +29,7 @@ export class AgentBookingReadinessService {
     private readonly bookingReadinessObservability: BookingReadinessObservability,
     private readonly auditService: AuditService,
     private readonly agentToolAuditService: AgentToolAuditService,
+    @Inject(FLIGHT_SEARCH_PORT) private readonly flightSearchPort: FlightSearchPort,
   ) {}
 
   private async recordReadinessOutcome(
@@ -160,9 +163,9 @@ export class AgentBookingReadinessService {
         });
       }
 
-      const rawOffer = flightOffer.rawOffer as { passengers?: Array<{ id?: string }> } | null;
-      const offerPassengers = rawOffer?.passengers;
-      if (!rawOffer || !Array.isArray(offerPassengers)) {
+      const payload = complementStoredOfferPayload(flightOffer.rawOffer, flightOffer);
+      const normalizedOffer = this.flightSearchPort.normalizeStoredOffer(payload);
+      if (!normalizedOffer || !normalizedOffer.passengers || normalizedOffer.passengers.length === 0) {
         throw new HttpException(
           { code: 'OFFER_MALFORMED', message: 'Stored offer data is malformed' },
           HttpStatus.UNPROCESSABLE_ENTITY,
@@ -174,8 +177,8 @@ export class AgentBookingReadinessService {
       internalDto.passengers = dto.passengers.map((p) => {
         // ordinal is 1-indexed
         const passengerIndex = p.passengerOrdinal - 1;
-        const offerPassenger = offerPassengers[passengerIndex];
-        if (!offerPassenger || !offerPassenger.id) {
+        const offerPassenger = normalizedOffer.passengers[passengerIndex];
+        if (!offerPassenger || !offerPassenger.supplierPassengerId) {
           throw new HttpException(
             {
               code: 'PASSENGER_MAPPING_INVALID',
@@ -186,7 +189,7 @@ export class AgentBookingReadinessService {
         }
 
         const pdto = new BookingReadinessPassengerDto();
-        pdto.offerPassengerId = offerPassenger.id;
+        pdto.offerPassengerId = offerPassenger.supplierPassengerId;
         pdto.passengerType = p.passengerType;
 
         if (p.sourceType === 'traveler_profile') {

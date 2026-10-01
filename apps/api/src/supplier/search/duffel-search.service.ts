@@ -3,7 +3,7 @@ import { Injectable, Optional, HttpException, HttpStatus } from '@nestjs/common'
 import { CacheService } from '@/cache/cache.service';
 import { DuffelRateBudgetService } from '../core/duffel-rate-budget.service';
 import { DuffelSearchAdapter } from './duffel-search.adapter';
-import { FlightOfferNormalizer } from './flight-offer.normalizer';
+import { FlightOfferNormalizer, validateAndNormalizeOffer } from './flight-offer.normalizer';
 import { DuffelOffer } from '@/duffel/duffel.types';
 import {
   FlightOffer,
@@ -46,6 +46,7 @@ export class DuffelSearchService implements FlightSearchPort {
   ): Promise<FlightSearchResult> {
     const searchHash = this.computeSearchHash(criteria);
     const cacheKey = `flight:search:${searchHash}`;
+    const rawCacheKey = `flights:raw:${searchHash}`;
 
     if (this.cacheService) {
       const cachedData = await this.cacheService.get(cacheKey);
@@ -56,6 +57,42 @@ export class DuffelSearchService implements FlightSearchPort {
           searchHash,
           cached: true,
         };
+      }
+
+      const cachedRaw = await this.cacheService.get(rawCacheKey);
+      if (cachedRaw) {
+        try {
+          const parsedRaw = JSON.parse(cachedRaw) as { offers?: unknown[] };
+          const rawOffers = Array.isArray(parsedRaw?.offers) ? parsedRaw.offers : [];
+          const offers: FlightOffer[] = [];
+          for (let i = 0; i < rawOffers.length; i++) {
+            const item = rawOffers[i];
+            if (!item || typeof item !== 'object') continue;
+            try {
+              // Rebuild cached neutral offers from their supplier payload so stale
+              // or malformed normalized fields cannot bypass supplier validation.
+              const rawOffer = 'supplierOfferId' in item && 'rawSupplierPayload' in item
+                ? item.rawSupplierPayload
+                : item;
+              // The validator checks the unknown cached supplier payload before admission.
+              const supplierOffer = rawOffer as DuffelOffer;
+              if (!validateAndNormalizeOffer(supplierOffer, i).success) continue;
+              const normalizedOffer = this.normalizerInstance.normalizeOffer(
+                supplierOffer,
+                criteria.cabinClass,
+                i,
+              );
+              if (normalizedOffer) offers.push(normalizedOffer);
+            } catch {
+              // Malformed cached entries must not discard other valid results.
+            }
+          }
+          if (offers.length > 0) {
+            return { offers, searchHash, cached: true };
+          }
+        } catch {
+          // A corrupt raw cache entry must not prevent a live search.
+        }
       }
     }
 
@@ -90,7 +127,7 @@ export class DuffelSearchService implements FlightSearchPort {
     }
 
     const adapterResponse = (await this.searchAdapter.searchOffers(criteria)) as
-      | { offers?: unknown[] }
+      | { id?: string; offers?: unknown[] }
       | undefined;
     const rawOffers = adapterResponse?.offers || [];
     const offers: FlightOffer[] = [];
@@ -100,14 +137,23 @@ export class DuffelSearchService implements FlightSearchPort {
       if (!raw || typeof raw !== 'object') {
         continue;
       }
-      // Safe cast: raw offer from Duffel search response conforms to partial DuffelOffer structure
-      const normalizedOffer = this.normalizerInstance.normalizeOffer(
-        raw as unknown as DuffelOffer,
-        criteria.cabinClass,
-        i,
-      );
-      if (normalizedOffer) {
-        offers.push(normalizedOffer);
+      try {
+        // The validator checks the unknown supplier payload before admission.
+        const rawOffer = raw as DuffelOffer;
+        if (!validateAndNormalizeOffer(rawOffer, i).success) {
+          continue;
+        }
+        const normalizedOffer = this.normalizerInstance.normalizeOffer(
+          rawOffer,
+          criteria.cabinClass,
+          i,
+        );
+        if (normalizedOffer) {
+          offers.push(normalizedOffer);
+        }
+      } catch {
+        // Malformed nested supplier data must not discard the other search results.
+        continue;
       }
     }
 
@@ -119,6 +165,12 @@ export class DuffelSearchService implements FlightSearchPort {
 
     if (this.cacheService) {
       await this.cacheService.set(cacheKey, JSON.stringify(result), 900);
+      const offerRequestId = adapterResponse?.id || `or_${searchHash}`;
+      await this.cacheService.set(
+        rawCacheKey,
+        JSON.stringify({ id: offerRequestId, offers: rawOffers }),
+        900,
+      );
     }
 
     return result;

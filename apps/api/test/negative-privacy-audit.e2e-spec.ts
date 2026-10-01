@@ -22,7 +22,8 @@ import Redis from 'ioredis';
 import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
-import { DuffelService } from '@/duffel/duffel.service';
+import { Duffel } from '@duffel/api';
+import { DUFFEL_SDK } from '@/supplier/core/duffel-core.module';
 import { ChatService } from '@/chat/chat.service';
 import { ChatMessageCryptoService } from '@/common/chat-message-crypto.service';
 import { SelectionAttestationService } from '@/agent-gateway/selection-attestation.service';
@@ -77,7 +78,7 @@ describe('Automated Negative Privacy & Security Continuous Audit (e2e)', () => {
   let chatService: ChatService;
   let cryptoService: ChatMessageCryptoService;
   let attestationService: SelectionAttestationService;
-  let duffelService: DuffelService;
+  let duffel: Duffel;
   let handoffService: ChatHandoffService;
   let intentService: BookingIntentService;
   let readinessObservability: BookingReadinessObservability;
@@ -120,7 +121,7 @@ describe('Automated Negative Privacy & Security Continuous Audit (e2e)', () => {
     chatService = moduleFixture.get(ChatService);
     cryptoService = moduleFixture.get(ChatMessageCryptoService);
     attestationService = moduleFixture.get(SelectionAttestationService);
-    duffelService = moduleFixture.get(DuffelService);
+    duffel = moduleFixture.get<Duffel>(DUFFEL_SDK);
     handoffService = moduleFixture.get(ChatHandoffService);
     intentService = moduleFixture.get(BookingIntentService);
     readinessObservability = moduleFixture.get(BookingReadinessObservability);
@@ -353,7 +354,7 @@ describe('Automated Negative Privacy & Security Continuous Audit (e2e)', () => {
         .expect(200);
 
       // Consume handoff
-      const duffelGetSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue({
+      const duffelGetSpy = jest.spyOn(duffel.offers, 'get').mockResolvedValue({
         data: {
           id: `off_01H123456789ABCDEF000000`,
           total_amount: '150.00',

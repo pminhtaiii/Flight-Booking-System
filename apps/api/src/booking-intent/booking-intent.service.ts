@@ -5,6 +5,7 @@ import {
   GoneException,
   HttpException,
   HttpStatus,
+  Inject,
   Injectable,
   NotFoundException,
   Optional,
@@ -13,7 +14,11 @@ import {
 } from '@nestjs/common';
 import { FlightOffer, Prisma, PassengerType } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
-import { DuffelService, DuffelTimeoutError } from '@/duffel/duffel.service';
+import {
+  FLIGHT_SEARCH_PORT,
+  type FlightSearchPort,
+  type FlightOfferPassenger,
+} from '@/supplier/search/flight-search.port';
 import { AuditService } from '@/audit/audit.service';
 import { EncryptionService } from '@/common/encryption.service';
 import { CreateIntentDto } from './dto/create-intent.dto';
@@ -83,7 +88,7 @@ export class BookingIntentService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly duffelService: DuffelService,
+    @Inject(FLIGHT_SEARCH_PORT) private readonly flightSearchPort: FlightSearchPort,
     private readonly auditService: AuditService,
     private readonly encryptionService: EncryptionService,
     @Optional() private readonly bookingReadinessService?: BookingReadinessService,
@@ -317,6 +322,7 @@ export class BookingIntentService {
               traceId: context?.traceId,
               correlationId: context?.correlationId,
             },
+            flightOffer,
           )
         : Promise.resolve(null);
 
@@ -347,8 +353,13 @@ export class BookingIntentService {
         isNaN(parsedTtl) || !process.env.BOOKING_INTENT_TTL_MINUTES ? 30 : parsedTtl;
       const intentExpiresAt = new Date(now.getTime() + ttlMinutes * 60 * 1000);
 
+      const offerPassengersInput =
+        Array.isArray(liveOffer.passengers) && liveOffer.passengers.length > 0
+          ? liveOffer.passengers
+          : liveOffer.raw ?? liveOffer.passengers;
+
       const duffelPassengerIds = this.extractDuffelPassengerIds(
-        liveOffer.raw,
+        offerPassengersInput,
         passengersForValidation,
       );
 
@@ -872,20 +883,24 @@ export class BookingIntentService {
   private async fetchLiveOffer(
     duffelOfferId: string,
     timeoutMs: number = 4500,
-  ): Promise<{ totalAmount: string; currency: string; offerExpiresAt: Date | null; raw: unknown }> {
+  ): Promise<{
+    totalAmount: string;
+    currency: string;
+    offerExpiresAt: Date | null;
+    raw: unknown;
+    passengers: readonly FlightOfferPassenger[];
+  }> {
+    let supplierRequestPending = true;
     try {
-      const rawOffer = await this.duffelService.getOfferById(duffelOfferId, timeoutMs);
-      const offer = rawOffer as {
-        total_amount?: string;
-        total_currency?: string;
-        expires_at?: string | null;
-      };
+      const offer = await this.flightSearchPort.getOfferById(duffelOfferId, timeoutMs);
+      supplierRequestPending = false;
 
       if (
         !offer ||
-        !offer.total_amount ||
-        isNaN(Number(offer.total_amount)) ||
-        Number(offer.total_amount) <= 0
+        !offer.totalAmount ||
+        typeof offer.totalAmount !== 'string' ||
+        isNaN(Number(offer.totalAmount)) ||
+        Number(offer.totalAmount) <= 0
       ) {
         throw new HttpException(
           {
@@ -897,18 +912,56 @@ export class BookingIntentService {
       }
 
       return {
-        totalAmount: offer.total_amount,
-        currency: offer.total_currency || 'USD',
-        offerExpiresAt: offer.expires_at ? new Date(offer.expires_at) : null,
-        raw: rawOffer,
+        totalAmount: offer.totalAmount,
+        currency: offer.currency || 'USD',
+        offerExpiresAt: offer.offerExpiresAt ? new Date(offer.offerExpiresAt) : null,
+        raw: offer.rawSupplierPayload,
+        passengers: offer.passengers ?? [],
       };
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
+    } catch (error: unknown) {
+      if (
+        error instanceof HttpException &&
+        typeof error.getResponse() === 'object' &&
+        error.getResponse() !== null &&
+        'code' in (error.getResponse() as Record<string, unknown>)
+      ) {
+        const res = error.getResponse() as Record<string, unknown>;
+        if (
+          res.code === 'UPSTREAM_UNAVAILABLE' ||
+          res.code === 'UPSTREAM_TIMEOUT' ||
+          res.code === 'OFFER_EXPIRED' ||
+          res.code === 'UPSTREAM_RATE_LIMITED'
+        ) {
+          throw error;
+        }
       }
-      const err = error as { status?: number; message?: string };
 
-      if (error instanceof DuffelTimeoutError) {
+      const status =
+        error instanceof HttpException
+          ? error.getStatus()
+          : typeof (error as Record<string, unknown>)?.status === 'number'
+          ? (error as { status: number }).status
+          : typeof (error as Record<string, unknown>)?.statusCode === 'number'
+          ? (error as { statusCode: number }).statusCode
+          : undefined;
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : typeof (error as Record<string, unknown>)?.message === 'string'
+          ? (error as { message: string }).message
+          : '';
+
+      const name = error instanceof Error ? error.name : '';
+
+      const isTimeout =
+        status === 504 ||
+        name.toLowerCase().includes('timeout') ||
+        message.toLowerCase().includes('timeout') ||
+        message.toLowerCase().includes('timed out') ||
+        (error as Record<string, unknown>)?.code === 'DUFFEL_TIMEOUT';
+
+      if (isTimeout) {
         throw new HttpException(
           {
             code: 'UPSTREAM_TIMEOUT',
@@ -918,24 +971,37 @@ export class BookingIntentService {
         );
       }
 
-      if (err.status === 404 || err.status === 410) {
+      const supplierCode = (error as Record<string, unknown>)?.code;
+      const isExpired =
+        status === 404 ||
+        status === 410 ||
+        supplierCode === 'OFFER_EXPIRED' ||
+        supplierCode === 'offer_expired' ||
+        supplierCode === 'not_found' ||
+        (supplierRequestPending && /not found|expired|gone|no longer available/i.test(message));
+
+      if (isExpired) {
         throw new HttpException(
           {
             code: 'OFFER_EXPIRED',
-            message: 'Duffel offer no longer available',
+            message: 'Offer no longer available',
           },
           HttpStatus.GONE,
         );
       }
 
-      if (err.status === 429) {
+      if (status === 429) {
         throw new HttpException(
           {
             code: 'UPSTREAM_RATE_LIMITED',
-            message: 'Duffel API rate limit exceeded',
+            message: 'API rate limit exceeded',
           },
           HttpStatus.TOO_MANY_REQUESTS,
         );
+      }
+
+      if (error instanceof HttpException) {
+        throw error;
       }
 
       throw new HttpException(
@@ -949,33 +1015,44 @@ export class BookingIntentService {
   }
 
   private extractDuffelPassengerIds(
-    rawOffer: unknown,
+    passengersInput: unknown,
     passengers: readonly { type: PassengerType }[],
   ): string[] {
-    if (!rawOffer || typeof rawOffer !== 'object') {
+    let rawPassengers: unknown;
+    if (Array.isArray(passengersInput)) {
+      rawPassengers = passengersInput;
+    } else if (
+      passengersInput &&
+      typeof passengersInput === 'object' &&
+      Array.isArray((passengersInput as { passengers?: unknown }).passengers)
+    ) {
+      rawPassengers = (passengersInput as { passengers: unknown[] }).passengers;
+    } else {
       throw new HttpException(
         { code: 'UPSTREAM_UNAVAILABLE', message: 'Offer passenger identities are unavailable' },
         HttpStatus.BAD_GATEWAY,
       );
     }
 
-    const rawPassengers = (rawOffer as { passengers?: unknown }).passengers;
-    if (!Array.isArray(rawPassengers)) {
-      throw new HttpException(
-        { code: 'UPSTREAM_UNAVAILABLE', message: 'Offer passenger identities are unavailable' },
-        HttpStatus.BAD_GATEWAY,
-      );
-    }
-
-    const supplierPassengers = rawPassengers.map((passenger) => {
+    const supplierPassengers = (rawPassengers as unknown[]).map((passenger) => {
       if (!passenger || typeof passenger !== 'object') {
         return null;
       }
-      const candidate = passenger as { id?: unknown; type?: unknown };
-      if (typeof candidate.id !== 'string' || typeof candidate.type !== 'string') {
+      const candidate = passenger as {
+        id?: unknown;
+        supplierPassengerId?: unknown;
+        type?: unknown;
+      };
+      const id =
+        typeof candidate.supplierPassengerId === 'string'
+          ? candidate.supplierPassengerId
+          : typeof candidate.id === 'string'
+          ? candidate.id
+          : null;
+      if (!id || typeof candidate.type !== 'string') {
         return null;
       }
-      return { id: candidate.id, type: candidate.type.toUpperCase() };
+      return { id, type: candidate.type.toUpperCase() };
     });
 
     if (supplierPassengers.some((passenger) => passenger === null)) {

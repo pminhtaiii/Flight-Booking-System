@@ -204,6 +204,9 @@ describe('DuffelSearchAdapter', () => {
         expect(result.offers[0].id).toBe('off_mock_123');
         expect(result.offers[0].total_amount).toBe('125.50');
         expect(result.offers[0].total_currency).toBe('USD');
+        await expect(adapter.getOffer(result.offers[0].id)).resolves.toEqual(result.offers[0]);
+        expect(mockOffersGet).not.toHaveBeenCalled();
+        expect(mockReserveAttempt).not.toHaveBeenCalled();
       } finally {
         if (prevMock !== undefined) {
           process.env.DUFFEL_MOCK = prevMock;
@@ -232,15 +235,30 @@ describe('DuffelSearchAdapter', () => {
         expect(mockOfferRequestsCreate).not.toHaveBeenCalled();
         expect(result.id).toBe('or_mock_123');
         expect(result.offers).toHaveLength(1);
+        await expect(adapter.getOffer(result.offers[0].id)).resolves.toEqual(result.offers[0]);
+        expect(mockOffersGet).not.toHaveBeenCalled();
+        expect(mockReserveAttempt).not.toHaveBeenCalled();
       } finally {
         if (prevJest !== undefined) {
           process.env.JEST_WORKER_ID = prevJest;
         } else {
           delete process.env.JEST_WORKER_ID;
         }
-        process.env.DUFFEL_ACCESS_TOKEN = prevToken;
-        process.env.DUFFEL_API_URL = prevUrl;
-        process.env.NODE_ENV = prevNodeEnv;
+        if (prevToken !== undefined) {
+          process.env.DUFFEL_ACCESS_TOKEN = prevToken;
+        } else {
+          delete process.env.DUFFEL_ACCESS_TOKEN;
+        }
+        if (prevUrl !== undefined) {
+          process.env.DUFFEL_API_URL = prevUrl;
+        } else {
+          delete process.env.DUFFEL_API_URL;
+        }
+        if (prevNodeEnv !== undefined) {
+          process.env.NODE_ENV = prevNodeEnv;
+        } else {
+          delete process.env.NODE_ENV;
+        }
       }
     });
 
@@ -273,6 +291,84 @@ describe('DuffelSearchAdapter', () => {
   });
 
   describe('getOffer', () => {
+    it('retrieves each mock offer after searches for different routes', async () => {
+      const prevMock = process.env.DUFFEL_MOCK;
+      try {
+        process.env.DUFFEL_MOCK = 'true';
+        const firstSearch = await adapter.searchOffers({
+          origin: 'SFO',
+          destination: 'JFK',
+          departureDate: '2026-10-01',
+          adults: 1,
+        });
+        const secondSearch = await adapter.searchOffers({
+          origin: 'LAX',
+          destination: 'ORD',
+          departureDate: '2026-10-02',
+          adults: 2,
+        });
+        // Mock search responses have the same offer envelope as the supplier API.
+        const firstOffer = (firstSearch as { offers: Array<{ id: string }> }).offers[0];
+        const secondOffer = (secondSearch as { offers: Array<{ id: string }> }).offers[0];
+
+        expect(firstOffer.id).not.toBe(secondOffer.id);
+        await expect(adapter.getOffer(firstOffer.id)).resolves.toEqual(firstOffer);
+        await expect(adapter.getOffer(secondOffer.id)).resolves.toEqual(secondOffer);
+        expect(mockOfferRequestsCreate).not.toHaveBeenCalled();
+        expect(mockOffersGet).not.toHaveBeenCalled();
+        expect(mockReserveAttempt).not.toHaveBeenCalled();
+      } finally {
+        if (prevMock !== undefined) {
+          process.env.DUFFEL_MOCK = prevMock;
+        } else {
+          delete process.env.DUFFEL_MOCK;
+        }
+      }
+    });
+
+    it('resolves searched mock offers without an SDK and rejects missing mock fixtures', async () => {
+      const prevMock = process.env.DUFFEL_MOCK;
+      try {
+        process.env.DUFFEL_MOCK = 'true';
+        const mockAdapter = new DuffelSearchAdapter(undefined, mockBudgetService);
+        await expect(mockAdapter.getOffer('off_mock_123')).rejects.toThrow(NotFoundException);
+        const result = await mockAdapter.searchOffers({
+          origin: 'SFO',
+          destination: 'JFK',
+          departureDate: '2026-10-01',
+          adults: 1,
+        });
+        const offer = await mockAdapter.getOffer('off_mock_123');
+        expect(result).toEqual(expect.objectContaining({ offers: [offer] }));
+        expect(mockReserveAttempt).not.toHaveBeenCalled();
+      } finally {
+        if (prevMock !== undefined) {
+          process.env.DUFFEL_MOCK = prevMock;
+        } else {
+          delete process.env.DUFFEL_MOCK;
+        }
+      }
+    });
+
+    it('keeps live offers on the SDK path even when mock mode is enabled', async () => {
+      const prevMock = process.env.DUFFEL_MOCK;
+      try {
+        process.env.DUFFEL_MOCK = 'true';
+        mockReserveAttempt.mockResolvedValueOnce({ ok: true });
+        const rawOffer = { id: 'off_live_123' };
+        mockOffersGet.mockResolvedValueOnce({ data: rawOffer });
+        await expect(adapter.getOffer(rawOffer.id)).resolves.toEqual(rawOffer);
+        expect(mockReserveAttempt).toHaveBeenCalledTimes(1);
+        expect(mockOffersGet).toHaveBeenCalledWith(rawOffer.id);
+      } finally {
+        if (prevMock !== undefined) {
+          process.env.DUFFEL_MOCK = prevMock;
+        } else {
+          delete process.env.DUFFEL_MOCK;
+        }
+      }
+    });
+
     it('reserves budget and retrieves offer data successfully', async () => {
       mockReserveAttempt.mockResolvedValueOnce({ ok: true });
       const rawOffer = { id: 'off_valid_123', total_amount: '350.00', total_currency: 'USD' };

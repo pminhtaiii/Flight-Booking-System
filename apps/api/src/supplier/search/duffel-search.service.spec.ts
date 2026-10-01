@@ -14,7 +14,7 @@ import {
   FlightSearchCriteria,
   FlightSearchResult,
 } from './flight-search.port';
-import { generateDeterministicUUID } from '@/flights/flight-offer-normalizer';
+import { generateDeterministicUUID, FlightOfferNormalizer } from './flight-offer.normalizer';
 
 describe('DuffelSearchService Contract Tests (TDD RED)', () => {
   let service: DuffelSearchService;
@@ -274,6 +274,82 @@ describe('DuffelSearchService Contract Tests (TDD RED)', () => {
     });
   });
 
+  describe('Raw cache validation', () => {
+    it('continues to the live adapter when cached JSON is corrupt', async () => {
+      cacheService.get.mockResolvedValueOnce(null).mockResolvedValueOnce('{invalid');
+      searchAdapter.searchOffers.mockResolvedValueOnce({
+        offers: [createMockRawOffer('off_live_after_corrupt_cache')],
+      });
+
+      const result = await service.search(defaultCriteria, 'user');
+
+      expect(result.cached).toBe(false);
+      expect(result.offers[0].supplierOfferId).toBe('off_live_after_corrupt_cache');
+      expect(searchAdapter.searchOffers).toHaveBeenCalledWith(defaultCriteria);
+      expect(rateBudgetService.reserveAttempt).toHaveBeenCalledTimes(1);
+    });
+
+    it('continues to the live adapter when every cached offer fails validation', async () => {
+      cacheService.get.mockResolvedValueOnce(null).mockResolvedValueOnce(JSON.stringify({
+        offers: [{ ...createMockRawOffer('off_bad_cache'), total_amount: 'invalid' }],
+      }));
+      searchAdapter.searchOffers.mockResolvedValueOnce({
+        offers: [createMockRawOffer('off_live_after_invalid_cache')],
+      });
+
+      const result = await service.search(defaultCriteria, 'user');
+
+      expect(result.cached).toBe(false);
+      expect(result.offers[0].supplierOfferId).toBe('off_live_after_invalid_cache');
+      expect(searchAdapter.searchOffers).toHaveBeenCalledWith(defaultCriteria);
+      expect(rateBudgetService.reserveAttempt).toHaveBeenCalledTimes(1);
+    });
+
+    it('skips malformed raw entries and returns only validated cached offers', async () => {
+      const validOffer = createMockRawOffer('off_valid_raw_cache');
+      cacheService.get.mockResolvedValueOnce(null).mockResolvedValueOnce(JSON.stringify({
+        offers: [
+          { ...createMockRawOffer('off_bad_price'), total_amount: 'invalid' },
+          { ...createMockRawOffer('off_bad_segment'), slices: [{ segments: [null] }] },
+          validOffer,
+        ],
+      }));
+
+      const result = await service.search(defaultCriteria, 'user');
+
+      expect(result.cached).toBe(true);
+      expect(result.offers).toHaveLength(1);
+      expect(result.offers[0].supplierOfferId).toBe('off_valid_raw_cache');
+      expect(result.offers[0].matchInput.originalIndex).toBe(2);
+      expect(searchAdapter.searchOffers).not.toHaveBeenCalled();
+      expect(rateBudgetService.reserveAttempt).not.toHaveBeenCalled();
+    });
+
+    it('revalidates and rebuilds cached FlightOffer entries from supplier payloads', async () => {
+      const validOffer = FlightOfferNormalizer.normalizeOffer(createMockRawOffer('off_neutral'));
+      cacheService.get.mockResolvedValueOnce(null).mockResolvedValueOnce(JSON.stringify({
+        offers: [
+          { ...validOffer, rawSupplierPayload: { id: 'off_corrupt', slices: [] } },
+          { supplierOfferId: 'off_incomplete', airline: 'Airline', segments: [] },
+          { ...validOffer, price: -1, currency: '' },
+        ],
+      }));
+
+      const result = await service.search(defaultCriteria, 'user');
+
+      expect(result.cached).toBe(true);
+      expect(result.offers).toHaveLength(1);
+      expect(result.offers[0]).toMatchObject({
+        supplierOfferId: 'off_neutral',
+        price: 350,
+        currency: 'USD',
+        matchInput: { originalIndex: 2 },
+      });
+      expect(searchAdapter.searchOffers).not.toHaveBeenCalled();
+      expect(rateBudgetService.reserveAttempt).not.toHaveBeenCalled();
+    });
+  });
+
   describe('Caller Sub-Allocation Limits & Budget Enforcement', () => {
     it('reserves user sub-allocation with limit 1,000 and budget:duffel:daily:user:YYYY-MM-DD', async () => {
       cacheService.get.mockResolvedValueOnce(null);
@@ -394,6 +470,35 @@ describe('DuffelSearchService Contract Tests (TDD RED)', () => {
   });
 
   describe('Search validation and caching', () => {
+    it.each([
+      { total_amount: 'invalid' },
+      { total_amount: '0' },
+      { total_currency: '' },
+      { slices: [] },
+      { slices: [{ segments: [] }] },
+      { slices: [{ segments: [{ departing_at: 'invalid' }] }] },
+      { slices: [{ segments: [null] }] },
+      { slices: [...createMockRawOffer('off_invalid').slices, { segments: [null] }] },
+      { passengers: [null] },
+    ])('skips invalid offers and preserves valid results for %p', async (invalidFields) => {
+      const validOffer = createMockRawOffer('off_valid');
+      searchAdapter.searchOffers.mockResolvedValueOnce({
+        offers: [{ ...createMockRawOffer('off_invalid'), ...invalidFields }, validOffer],
+      });
+
+      const result = await service.search(defaultCriteria, 'user');
+
+      expect(result.offers).toHaveLength(1);
+      expect(result.offers[0].supplierOfferId).toBe('off_valid');
+      expect(result.offers[0].matchInput.originalIndex).toBe(1);
+      expect(result.offers[0].rawSupplierPayload).toEqual(validOffer);
+      expect(cacheService.set).toHaveBeenCalledWith(
+        `flight:search:${result.searchHash}`,
+        JSON.stringify(result),
+        900,
+      );
+    });
+
     it('rejects a cache miss without an adapter before reserving budget or caching', async () => {
       const module = await Test.createTestingModule({
         providers: [

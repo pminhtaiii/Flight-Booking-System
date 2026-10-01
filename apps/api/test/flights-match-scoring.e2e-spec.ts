@@ -7,7 +7,8 @@ import { AppModule } from '@/app.module';
 import { CacheService } from '@/cache/cache.service';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { DuffelOffer, DuffelOfferRequest } from '@/duffel/duffel.types';
-import { DuffelService } from '@/duffel/duffel.service';
+import { DuffelSearchAdapter } from '@/supplier/search/duffel-search.adapter';
+import { FLIGHT_SEARCH_PORT, FlightSearchPort } from '@/supplier/search/flight-search.port';
 import { PrismaService } from '@/prisma/prisma.service';
 
 type FixtureOffer = {
@@ -552,8 +553,11 @@ function expectNoScoringPersistenceTables(tables: readonly { readonly table_name
     .toEqual([]);
 }
 
-async function warmRawCacheAsAgent(duffelService: DuffelService): Promise<void> {
-  const warmed = await duffelService.searchFlights(
+async function warmRawCacheAsAgent(
+  flightSearch: FlightSearchPort,
+  cacheService: CacheService,
+): Promise<void> {
+  const warmed = await flightSearch.search(
     {
       ...SEARCH_BODY,
       children: 0,
@@ -562,7 +566,9 @@ async function warmRawCacheAsAgent(duffelService: DuffelService): Promise<void> 
     'agent',
   );
   expect(warmed.cached).toBe(false);
-  expect(warmed.offerRequest.offers).toHaveLength(3);
+  expect(warmed.offers).toHaveLength(3);
+  // Keep only the raw cache entry to exercise its recovery path.
+  await cacheService.del(`flight:search:${warmed.searchHash}`);
 }
 
 describe('Flight match scoring (E2E)', (): void => {
@@ -570,7 +576,7 @@ describe('Flight match scoring (E2E)', (): void => {
   let prisma: PrismaService;
   let cacheService: CacheService;
   let jwtService: JwtService;
-  let duffelService: DuffelService;
+  let flightSearch: FlightSearchPort;
   let jwtToken: string;
   let duffelSpy: jest.SpyInstance;
   let duffelDetailSpy: jest.SpyInstance;
@@ -611,9 +617,10 @@ describe('Flight match scoring (E2E)', (): void => {
     prisma = moduleFixture.get<PrismaService>(PrismaService);
     cacheService = moduleFixture.get<CacheService>(CacheService);
     jwtService = moduleFixture.get<JwtService>(JwtService);
-    duffelService = moduleFixture.get<DuffelService>(DuffelService);
-    duffelSpy = jest.spyOn(duffelService['duffel'].offerRequests, 'create');
-    duffelDetailSpy = jest.spyOn(duffelService['duffel'].offers, 'get');
+    flightSearch = moduleFixture.get<FlightSearchPort>(FLIGHT_SEARCH_PORT);
+    const searchAdapter = moduleFixture.get<DuffelSearchAdapter>(DuffelSearchAdapter);
+    duffelSpy = jest.spyOn(searchAdapter, 'searchOffers');
+    duffelDetailSpy = jest.spyOn(searchAdapter, 'getOffer');
   });
 
   afterAll(async (): Promise<void> => {
@@ -663,9 +670,8 @@ describe('Flight match scoring (E2E)', (): void => {
     jwtToken = jwtService.sign({ id: user.id, email: user.email }, { expiresIn: '24h' });
     duffelSpy.mockReset();
     duffelDetailSpy.mockReset();
-    // Duffel's SDK response type is external and wider than the local adapter contract.
-    duffelSpy.mockResolvedValue({ data: createOfferRequest() } as unknown as never);
-    duffelDetailSpy.mockResolvedValue({ data: createOfferRequest().offers[0] } as unknown as never);
+    duffelSpy.mockResolvedValue(createOfferRequest());
+    duffelDetailSpy.mockResolvedValue(createOfferRequest().offers[0]);
   });
 
   it('returns the matched OpenAPI contract with private no-store headers', async (): Promise<void> => {
@@ -796,7 +802,7 @@ describe('Flight match scoring (E2E)', (): void => {
   });
 
   it('recovers an agent-warmed raw cache offer for browser persistence and public detail', async (): Promise<void> => {
-    await warmRawCacheAsAgent(duffelService);
+    await warmRawCacheAsAgent(flightSearch, cacheService);
 
     expect(await prisma.flightOffer.count()).toBe(0);
     expect(await prisma.offerRecovery.count()).toBe(0);
@@ -940,8 +946,8 @@ describe('Flight match scoring (E2E)', (): void => {
       },
     });
     duffelSpy.mockResolvedValueOnce({
-      data: { id: 'or_empty_offers', offers: [], slices: [], passengers: [] },
-    } as unknown as never);
+      id: 'or_empty_offers', offers: [], slices: [], passengers: [],
+    });
 
     const response = await search().expect(200);
 
@@ -1008,8 +1014,8 @@ describe('Flight match scoring (E2E)', (): void => {
     ];
 
     duffelSpy.mockResolvedValueOnce({
-      data: { id: 'or_tie_test', offers: tieOffers, slices: tieOffers[0].slices, passengers: tieOffers[0].passengers },
-    } as unknown as never);
+      id: 'or_tie_test', offers: tieOffers, slices: tieOffers[0].slices, passengers: tieOffers[0].passengers,
+    });
 
     const response = await search().expect(200);
 

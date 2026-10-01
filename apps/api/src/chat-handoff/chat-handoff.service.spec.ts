@@ -12,12 +12,24 @@ import { ChatHandoffTokenService } from './chat-handoff-token.service';
 import { SelectionAttestationService } from '@/agent-gateway/selection-attestation.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { FlightOfferNormalizer } from '@/supplier/search/flight-offer.normalizer';
+import { FLIGHT_SEARCH_PORT } from '@/supplier/search/flight-search.port';
 import { CreateChatHandoffDto } from './dto/create-chat-handoff.dto';
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import { ChatHandoff, FlightOffer, Prisma } from '@prisma/client';
 import { AuditService } from '@/audit/audit.service';
 import * as crypto from 'crypto';
+
+function createMockFlightSearchPort() {
+  return {
+    search: jest.fn(),
+    getOfferById: jest.fn(),
+    createOrder: jest.fn(),
+    normalizeStoredOffer: jest.fn((rawOffer: unknown) =>
+      FlightOfferNormalizer.normalizeStoredOffer(rawOffer),
+    ),
+  };
+}
 
 // User approved updating existing tests for Feature 017 T093 security and lifecycle coverage on 2026-08-10.
 
@@ -98,6 +110,10 @@ describe('ChatHandoffService', () => {
           provide: AuditService,
           useValue: { createLog: jest.fn().mockResolvedValue(undefined) },
         },
+        {
+          provide: FLIGHT_SEARCH_PORT,
+          useValue: createMockFlightSearchPort(),
+        },
       ],
     }).compile();
 
@@ -124,6 +140,8 @@ describe('ChatHandoffService', () => {
           {
             segments: [
               {
+                origin: { iata_code: 'SGN' },
+                destination: { iata_code: 'NRT' },
                 departing_at: '2026-09-20T02:00:00.000Z',
                 arriving_at: '2026-09-20T08:30:00.000Z',
                 operating_carrier: { name: 'Vietnam Airlines' },
@@ -746,6 +764,8 @@ describe('ChatHandoffService', () => {
             {
               segments: [
                 {
+                  origin: { iata_code: 'SGN' },
+                  destination: { iata_code: 'HAN' },
                   departing_at: '2026-12-01T08:00:00.000Z',
                   arriving_at: '2026-12-01T10:00:00.000Z',
                   operating_carrier: { name: 'T093 Airways' },
@@ -823,6 +843,8 @@ describe('ChatHandoffService', () => {
             {
               segments: [
                 {
+                  origin: { iata_code: 'SGN' },
+                  destination: { iata_code: 'HAN' },
                   departing_at: '2026-12-01T08:00:00.000Z',
                   arriving_at: '2026-12-01T10:00:00.000Z',
                   operating_carrier: { name: 'T093 Airways' },
@@ -1028,6 +1050,10 @@ describe('Raw-Reader Replacement Parity (T015)', () => {
         {
           provide: AuditService,
           useValue: { createLog: jest.fn().mockResolvedValue(undefined) },
+        },
+        {
+          provide: FLIGHT_SEARCH_PORT,
+          useValue: createMockFlightSearchPort(),
         },
       ],
     }).compile();
@@ -1320,6 +1346,7 @@ describe('Raw-Reader Replacement Parity (T015)', () => {
 
     for (const malformed of legacyNullParserPayloads) {
       expect(FlightOfferNormalizer.normalizeStoredOffer(malformed)).toBeNull();
+      expect(createMockFlightSearchPort().normalizeStoredOffer(malformed)).toBeNull();
 
       const firstSeg = firstFlightSegment(malformed);
       const pass = handoffPassengers(malformed as Record<string, unknown> | null);
