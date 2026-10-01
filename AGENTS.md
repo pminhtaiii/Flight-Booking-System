@@ -20,7 +20,8 @@ Read only the context files relevant to the specific task:
 - For system layout, routing, database, and backend/frontend setup: read `context/architecture.md`.
 - For linting, file structure, naming conventions, and code guidelines: read `context/code-standards.md`.
 - For third-party library rules and configurations: read `context/library-docs.md`.
-- For current progress status: read `context/progress-checker.md`.
+- For active feature checkpoints and in-flight tasks: read `context/active-feature.md`.
+- For current progress status across features: read `context/progress-checker.md`.
 - For development lifecycle and workflow steps: read `context/workflow.md`.
 - For testing, E2E runner workflows, and pre-PR validation gates: read `context/testing.md`.
 
@@ -28,7 +29,7 @@ Read only the context files relevant to the specific task:
 
 - Always use subagents while doing the implementation or code reviews to avoid context rot.
 - Never use hardcoded hex values or raw Tailwind color classes.
-- Update all relevant files in the `context/` folder (such as `context/architecture.md` and `context/progress-checker.md`) after completing any feature to ensure project documentation remains in sync with the codebase.
+- Update all relevant files in the `context/` folder (such as `context/active-feature.md` and `context/architecture.md`) after completing any feature or slice to ensure project documentation remains in sync with the codebase.
 - Before any third party library — load its installed skill first, then read context/library-docs.md for project-specific rules.
 
 ## Agent Operating Rules
@@ -41,7 +42,7 @@ Read only the context files relevant to the specific task:
   - If the task is about architecture, data flow, or NestJS/Next.js setup: read `context/architecture.md`.
   - If the task is about coding conventions, directories, or rules: read `context/code-standards.md`.
   - If the task requires using a third-party library: read `context/library-docs.md`.
-  - If the task involves updating status/progress: read `context/progress-checker.md`.
+  - If the task involves the in-flight feature or status: read `context/active-feature.md` and `context/progress-checker.md`.
   - If the task is a new feature or high-level request: read `context/project-overview.md`.
   - If the task is implementation or requires the TDD workflow: read `context/workflow.md`.
   - If the task involves testing, running E2E suites, or pre-PR validation gates: read `context/testing.md`.
