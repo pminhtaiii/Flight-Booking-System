@@ -10,7 +10,7 @@ import { AgentBookingReadinessRequestDto } from '../dto/booking-readiness.dto';
 import { PassengerType } from '@prisma/client';
 import { HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
 import { FlightOfferNormalizer } from '@/supplier/search/flight-offer.normalizer';
-import { FLIGHT_SEARCH_PORT, type FlightSearchPort, type FlightOffer } from '@/supplier/search/flight-search.port';
+import { FLIGHT_SEARCH_PORT, type FlightOffer } from '@/supplier/search/flight-search.port';
 
 describe('AgentBookingReadinessService', () => {
   let service: AgentBookingReadinessService;

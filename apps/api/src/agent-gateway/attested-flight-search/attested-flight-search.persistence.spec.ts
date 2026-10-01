@@ -90,7 +90,7 @@ describe('Attested flight search persistence boundary', () => {
       ],
     };
     const normalizer = new FlightOfferNormalizer();
-    let isCached = false;
+    const isCached = false;
     flightSearch = jest.fn().mockImplementation(async (criteria) => {
       const normalized = normalizer.normalizeOffer(
         offer,

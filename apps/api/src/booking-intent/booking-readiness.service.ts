@@ -51,60 +51,8 @@ function isRecord(value: unknown): value is RawRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function isValidDateOnly(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return false;
-  }
-
-  const [year, month, day] = value.split('-').map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return (
-    !Number.isNaN(date.getTime()) &&
-    date.getUTCFullYear() === year &&
-    date.getUTCMonth() === month - 1 &&
-    date.getUTCDate() === day
-  );
-}
-
-function dateOnlyFromRaw(value: unknown): string | null {
-  if (typeof value !== 'string') {
-    return null;
-  }
-
-  const dateOnly = value.slice(0, 10);
-  return isValidDateOnly(dateOnly) ? dateOnly : null;
-}
-
-function iataFromRaw(value: unknown): string | null {
-  if (typeof value !== 'string') {
-    return null;
-  }
-
-  const normalized = value.trim().toUpperCase();
-  return /^[A-Z]{3}$/.test(normalized) ? normalized : null;
-}
-
 function httpError(code: string, message: string, status: HttpStatus): HttpException {
   return new HttpException({ code, message }, status);
-}
-
-function passengerTypeFromRaw(value: unknown): PassengerType | null {
-  if (typeof value !== 'string') {
-    return null;
-  }
-
-  const normalized = value.trim().toLowerCase();
-  if (normalized === 'adult') {
-    return PassengerType.ADULT;
-  }
-  if (normalized === 'child') {
-    return PassengerType.CHILD;
-  }
-  if (normalized === 'infant') {
-    return PassengerType.INFANT;
-  }
-
-  return null;
 }
 
 function currentDateOnly(): string {
