@@ -205,6 +205,37 @@ describe('Ancillary catalog HTTP contract (E2E)', () => {
     expect(cacheBoundary.checkAndIncrement).toHaveBeenCalledTimes(2);
   });
 
+  it('returns 200 with missing seats and retained baggage for an SDK meta.status 404', async () => {
+    mockSeatMapsGet.mockRejectedValue({
+      meta: { status: 404 },
+      message: 'Seat map not found',
+    });
+    mockOffersGet.mockResolvedValue({ data: rawOffer });
+
+    const response = await request(app.getHttpServer())
+      .get(`/bookings/intent/${intentId}/ancillaries`)
+      .query({ refresh: true })
+      .expect(200);
+
+    expect(response.body.catalog.segments).toEqual([
+      {
+        segmentId: 'seg_1',
+        origin: 'SGN',
+        destination: 'SIN',
+        seatMapAvailable: false,
+        seatMap: null,
+      },
+    ]);
+    expect(response.body.catalog.baggageServices).toContainEqual(
+      expect.objectContaining({
+        serviceId: 'ase_bag_1',
+        passengerId: 'pas_1',
+        amount: '30.00',
+        currency: 'USD',
+      }),
+    );
+  });
+
   it('returns 429 without an upstream call when the real budget denies the operation', async () => {
     cacheBoundary.checkAndIncrement.mockResolvedValue({ allowed: false, current: 1500 });
 

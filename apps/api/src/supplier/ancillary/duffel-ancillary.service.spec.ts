@@ -317,8 +317,42 @@ describe('DuffelService ancillary catalog contract', () => {
     expect(catalog.baggageServices).toHaveLength(1);
   });
 
+  it('treats the installed SDK meta.status 404 as an unavailable map', async () => {
+    mockSeatMapsGet.mockRejectedValue({
+      meta: { status: 404 },
+      message: 'Seat map not found',
+    });
+    mockOffersGet.mockResolvedValue({ data: rawOffer });
+
+    const catalog = await service.getSeatMapsAndServices('off_123', true);
+
+    expect(catalog.segments[0].seatMapAvailable).toBe(false);
+    expect(catalog.segments[0].seatMap).toBeNull();
+    expect(catalog.baggageServices).toContainEqual(
+      expect.objectContaining({
+        serviceId: 'ase_bag_1',
+        passengerId: 'pas_1',
+        amount: '30.00',
+        currency: 'USD',
+      }),
+    );
+  });
+
   it('propagates a seat-map 500 as UPSTREAM_UNAVAILABLE', async () => {
     mockSeatMapsGet.mockRejectedValue({ status: 500, message: 'Supplier internal failure' });
+    mockOffersGet.mockResolvedValue({ data: rawOffer });
+
+    await expect(service.getSeatMapsAndServices('off_123', true)).rejects.toMatchObject({
+      status: HttpStatus.BAD_GATEWAY,
+      response: { code: 'UPSTREAM_UNAVAILABLE' },
+    });
+  });
+
+  it('propagates the installed SDK meta.status 500 as UPSTREAM_UNAVAILABLE', async () => {
+    mockSeatMapsGet.mockRejectedValue({
+      meta: { status: 500 },
+      message: 'Supplier internal failure',
+    });
     mockOffersGet.mockResolvedValue({ data: rawOffer });
 
     await expect(service.getSeatMapsAndServices('off_123', true)).rejects.toMatchObject({

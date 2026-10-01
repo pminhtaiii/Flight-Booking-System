@@ -598,6 +598,13 @@ export class DuffelService {
                   ? error.status
                   : error && typeof error === 'object' && 'statusCode' in error
                     ? error.statusCode
+                    : error &&
+                        typeof error === 'object' &&
+                        'meta' in error &&
+                        error.meta &&
+                        typeof error.meta === 'object' &&
+                        'status' in error.meta
+                      ? error.meta.status
                     : undefined;
             if (status === 404) return { data: [] };
             throw error;

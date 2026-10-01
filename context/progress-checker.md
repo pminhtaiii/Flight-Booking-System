@@ -12,7 +12,7 @@
   - Pushed commits `3962c47f` and `41650004` to `origin/codex/029-duffel-provider-narrowing`.
   - Monitored GitHub Actions workflow run `36818130970` via `inspect-ci.mjs --head --watch`: **All jobs passed (`Verdict: CI PASSED ✔`)**.
 
-### Feature 029 — Narrow the Duffel Supplier Boundary: Phase 4 Slice 1 Raw Ancillary Adapter Partial (T027 Verified, T025 Follow-up Pending) (2026-10-01)
+### Feature 029 — Narrow the Duffel Supplier Boundary: Phase 4 Slice 1 Raw Ancillary Adapter Partial (T025 Correction and T027 Verified) (2026-10-01)
 
 - **T027 Metered Raw SDK Adapter**:
   - Created `apps/api/src/supplier/ancillary/duffel-ancillary.adapter.ts` with constructor injection of `DUFFEL_SDK` and `DuffelRateBudgetService`.
@@ -24,7 +24,9 @@
   - `apps/api` focused adapter/catalog/parity Jest command: 5 suites, 108/108 tests passed (exit 0; existing Duffel logs are expected).
   - `apps/api` `tsc -p tsconfig.json --noEmit`: exit 0.
   - Scoped ESLint on the adapter and spec: exit 0, zero errors/warnings.
-- **Scope boundary**: T027 is checked in `specs/029-duffel-provider-narrowing/tasks.md`; T028–T030 remain unchecked. The legacy T025 catalog fallback still needs the SDK `meta.status=404` correction and is intentionally left for the next follow-up before claiming a clean T025–T027 checkpoint.
+- **T025 legacy catalog correction**: Added immutable supplier and HTTP regression coverage for the installed SDK error shape `{ meta: { status: 404 } }`, preserving `seatMapAvailable: false`, `seatMap: null`, and authoritative baggage services. SDK `meta.status=500` remains an upstream failure. The fallback now inspects only numeric `meta.status` alongside the existing status/statusCode/HttpException shapes.
+- **T025 follow-up verification**: Supplier catalog suite 16/16, legacy Duffel ancillary suite 39/39, catalog HTTP E2E 3/3, API TypeScript compilation, and scoped ESLint all passed with exit code 0.
+- **Scope boundary**: T025 and T027 are verified in `specs/029-duffel-provider-narrowing/tasks.md`; T028–T030 remain unchecked.
 
 ### Feature 029 — Narrow the Duffel Supplier Boundary: Phase 3 Slice 4 Consumer Rewiring & Phase 3 Checkpoint Complete (Tasks T021–T024 Verified, US1 🎯 MVP Complete) (2026-10-01)
 
