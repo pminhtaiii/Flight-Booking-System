@@ -12,7 +12,17 @@
   - Pushed commits `3962c47f` and `41650004` to `origin/codex/029-duffel-provider-narrowing`.
   - Monitored GitHub Actions workflow run `36818130970` via `inspect-ci.mjs --head --watch`: **All jobs passed (`Verdict: CI PASSED ✔`)**.
 
-### Feature 029 — Narrow the Duffel Supplier Boundary: Phase 4 Slice 1 Approved Scope Complete Locally (T025–T027) (2026-10-01)
+### Feature 029 — Ancillary Service and Module Complete Locally (T029, 2026-10-01)
+
+- Added `DuffelAncillaryService` and `SupplierAncillaryModule`. The service validates cached catalog shape, serves hits only above 3 seconds TTL, dispatches parallel adapter lookups on misses, keeps the 4,500 ms catalog deadline, caches normalized results for 60 seconds on a best-effort basis, preserves missing-seat-map baggage, and safely maps supplier and budget failures.
+- Repricing aggregates duplicate service quantities in first-seen order, calls the real adapter once, preserves supplier amounts/currency, normalizes raw SDK 400 invalid identities, and returns generic safe errors for rate limits, budget denial, malformed prices, and other failures.
+- Added capability integration, module boundary, and E2E coverage. The module exports only the concrete service; per-call budget admission remains in the adapter.
+- Verification: focused ancillary/payment command passed 12 suites and 191 tests; ancillary capability plus catalog E2E command passed 2 suites and 4 tests; API `tsc -p tsconfig.json --noEmit` passed. Capability spec passed 40/40 and module spec passed 2/2. The final network-guard API suite passed 127 suites and 2,311 tests; final API/shared lint passed with zero warnings.
+- T029 is complete locally. T030 consumer rewiring and T031's broader ancillary/API checkpoint remain pending.
+- Final review and convergence: T028/T029 task reviews approved; scoped convergence found no gaps; spec review found zero issues. Standards' two P2 test-typing findings were corrected and re-reviewed; one nonblocking status-helper duplication suggestion remains deferred.
+- Final timeout regression: an uncached test reproduced `ETIMEDOUT` incorrectly returning 502; commit `8d93ab07` explicitly recognizes it and preserves 504 `UPSTREAM_UNAVAILABLE`. Capability/module checks passed 42/42, capability E2E 1/1, API compilation and lint passed. The final full network-guard API retry passed 127 suites / 2,311 tests (305.91 seconds). Its preceding concurrent run exceeded the existing flight-match p95 threshold (12.0177 ms versus <10 ms); no assertion was changed.
+
+### Feature 029 — Narrow the Duffel Supplier Boundary: Ancillary Adapter and Normalizer Complete Locally (T025–T028) (2026-10-01)
 
 - **T027 Metered Raw SDK Adapter**:
   - Created `apps/api/src/supplier/ancillary/duffel-ancillary.adapter.ts` with constructor injection of `DUFFEL_SDK` and `DuffelRateBudgetService`.
@@ -30,13 +40,16 @@
   - Preserved supplier-authoritative priced-offer base/grand totals and currency, including deduplication of duplicate baggage selections into aggregated service quantities before repricing and persistence of the supplier totals.
   - Preserved passenger/segment invalid-service mapping and stale-selection behavior, with explicit HTTP 400 coverage for passenger-scope mismatches and unknown service identities.
   - Preserved catalog and repricing currency validation, including `ANCILLARY_CURRENCY_MISMATCH` outcomes when the selected catalog or supplier currency differs from the offer currency.
+- **T028 guarded ancillary normalizer**:
+  - Added `apps/api/src/supplier/ancillary/ancillary.normalizer.ts` and its spec. It validates nested supplier records, maps seat maps to offer segments, expands baggage services per passenger, preserves supplier repricing amounts, and returns invalid service identities for numeric 400 status/statusCode/SDK metadata.
+  - Focused normalizer verification passed 17/17 tests; `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit` passed.
 - **Slice review and validation status**:
   - Task reviews are clean; bounded T025–T027 convergence reported zero findings.
   - Final Standards and Spec reviews both reported PASS with 0 findings against baseline `08a62ff4`.
   - API/shared lint and typecheck passed; shared types passed 110/110, CI contract tests passed 23/23, and ancillary HTTP E2E passed 3/3.
   - The initial full API run passed 123/124 suites and 2,248/2,249 tests, with the single existing flight-match performance threshold miss at p95 5.7162ms; the isolated corrective rerun passed 3/3 tests at p95 0.7577ms.
   - Full API confirmation then passed with exit 0: 124/124 suites, 2,249/2,249 tests, 295.9s, and performance p95 values of 0.3749ms and 1.9484ms. This is the green local gate; remote PR/CI completion remains pending.
-- **Scope boundary**: The approved local slice is T025–T027 only. T028–T031 remain unchecked; this entry does not mark User Story 2 or Feature 029 complete.
+- **Scope boundary at this earlier checkpoint**: T025–T028 were complete locally; T029 was completed in the entry above. T030–T031 remain pending, so User Story 2 and Feature 029 are not complete.
 
 ### Feature 029 — Narrow the Duffel Supplier Boundary: Phase 3 Slice 4 Consumer Rewiring & Phase 3 Checkpoint Complete (Tasks T021–T024 Verified, US1 🎯 MVP Complete) (2026-10-01)
 
