@@ -16,7 +16,8 @@ import * as crypto from 'crypto';
 import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
-import { DuffelService } from '@/duffel/duffel.service';
+import { Duffel } from '@duffel/api';
+import { DUFFEL_SDK } from '@/supplier/core/duffel-core.module';
 import { StripeService } from '@/common/stripe.service';
 import { SelectionAttestationService } from '@/agent-gateway/selection-attestation.service';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
@@ -152,7 +153,7 @@ describe('Chat handoff performance (E2E)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let jwtService: JwtService;
-  let duffelService: DuffelService;
+  let duffel: Duffel;
   let stripeService: StripeService;
   let attestationService: SelectionAttestationService;
   let jwtStrategy: JwtStrategy;
@@ -214,7 +215,7 @@ describe('Chat handoff performance (E2E)', () => {
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
     jwtService = moduleFixture.get<JwtService>(JwtService);
-    duffelService = moduleFixture.get<DuffelService>(DuffelService);
+    duffel = moduleFixture.get<Duffel>(DUFFEL_SDK);
     stripeService = moduleFixture.get<StripeService>(StripeService);
     attestationService = moduleFixture.get<SelectionAttestationService>(
       SelectionAttestationService,
@@ -353,7 +354,7 @@ describe('Chat handoff performance (E2E)', () => {
   }
 
   it('keeps 100 public handoff creates and resolves below the p95 limit without supplier calls', async () => {
-    const duffelGet = jest.spyOn(duffelService['duffel'].offers, 'get');
+    const duffelGet = jest.spyOn(duffel.offers, 'get');
     const paymentCreate = jest.spyOn(stripeService, 'createPaymentIntent');
 
     // Warm-up is intentionally excluded from all measured samples.
@@ -424,7 +425,7 @@ describe('Chat handoff performance (E2E)', () => {
 
   it('allows one supplier-reaching canonical intent winner for 100 simultaneous handoff consumers', async () => {
     const handoffToken = await createHandoff(SAMPLE_COUNT + 2);
-    const duffelGet = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue({
+    const duffelGet = jest.spyOn(duffel.offers, 'get').mockResolvedValue({
       data: {
         id: `${RUN_MARKER}-offer`,
         total_amount: '100.00',

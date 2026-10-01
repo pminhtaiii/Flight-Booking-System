@@ -5,7 +5,8 @@ import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CacheService } from '@/cache/cache.service';
 import { JwtService } from '@nestjs/jwt';
-import { DuffelService } from '@/duffel/duffel.service';
+import { Duffel } from '@duffel/api';
+import { DUFFEL_SDK } from '@/supplier/core/duffel-core.module';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { Prisma } from '@prisma/client';
 
@@ -149,7 +150,7 @@ describe('Flights Detail & Re-price (E2E)', () => {
     });
 
     describe('Retrieving Existing Offer', () => {
-      let duffelService: DuffelService;
+      let duffel: Duffel;
       let sdkSpy: jest.SpyInstance;
 
       const mockDuffelOffer = {
@@ -223,8 +224,8 @@ describe('Flights Detail & Re-price (E2E)', () => {
       };
 
       beforeEach(async () => {
-        duffelService = app.get<DuffelService>(DuffelService);
-        sdkSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue({
+        duffel = app.get<Duffel>(DUFFEL_SDK);
+        sdkSpy = jest.spyOn(duffel.offers, 'get').mockResolvedValue({
           data: mockDuffelOffer,
           status: 200,
         } as any);

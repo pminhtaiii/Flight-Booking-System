@@ -890,8 +890,10 @@ export class BookingIntentService {
     raw: unknown;
     passengers: readonly FlightOfferPassenger[];
   }> {
+    let supplierRequestPending = true;
     try {
       const offer = await this.flightSearchPort.getOfferById(duffelOfferId, timeoutMs);
+      supplierRequestPending = false;
 
       if (
         !offer ||
@@ -969,10 +971,14 @@ export class BookingIntentService {
         );
       }
 
+      const supplierCode = (error as Record<string, unknown>)?.code;
       const isExpired =
         status === 404 ||
         status === 410 ||
-        /not found|expired|gone|no longer available/i.test(message);
+        supplierCode === 'OFFER_EXPIRED' ||
+        supplierCode === 'offer_expired' ||
+        supplierCode === 'not_found' ||
+        (supplierRequestPending && /not found|expired|gone|no longer available/i.test(message));
 
       if (isExpired) {
         throw new HttpException(

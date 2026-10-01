@@ -23,7 +23,7 @@ export class DuffelTimeoutError extends Error {
 
 @Injectable()
 export class DuffelSearchAdapter {
-  private mockOffer?: { id: string } & Record<string, unknown>;
+  private readonly mockOffers = new Map<string, { id: string } & Record<string, unknown>>();
 
   constructor(
     @Optional() @Inject(DUFFEL_SDK) private readonly duffel?: Duffel,
@@ -202,7 +202,7 @@ export class DuffelSearchAdapter {
 
       const offers = [
         {
-          id: 'off_mock_123',
+          id: `off_mock_${123 + this.mockOffers.size}`,
           total_amount: '125.50',
           total_currency: 'USD',
           slices: mockSlices.map((s) => {
@@ -220,7 +220,9 @@ export class DuffelSearchAdapter {
         },
       ];
 
-      this.mockOffer = offers[0];
+      for (const offer of offers) {
+        this.mockOffers.set(offer.id, offer);
+      }
 
       return {
         id: 'or_mock_123',
@@ -282,8 +284,9 @@ export class DuffelSearchAdapter {
 
   async getOffer(supplierOfferId: string, timeoutMs = 4500): Promise<unknown> {
     if (this.isMockMode() && supplierOfferId.startsWith('off_mock_')) {
-      if (this.mockOffer?.id === supplierOfferId) {
-        return this.mockOffer;
+      const mockOffer = this.mockOffers.get(supplierOfferId);
+      if (mockOffer) {
+        return mockOffer;
       }
       throw new NotFoundException(`Duffel mock offer ${supplierOfferId} was not found`);
     }

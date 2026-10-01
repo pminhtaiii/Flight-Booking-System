@@ -4,8 +4,7 @@ import request from 'supertest';
 import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CacheService } from '@/cache/cache.service';
-import { DuffelService } from '@/duffel/duffel.service';
-import { DuffelOfferRequest } from '@/duffel/duffel.types';
+import { DuffelSearchAdapter } from '@/supplier/search/duffel-search.adapter';
 import * as crypto from 'crypto';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { User } from '@prisma/client';
@@ -27,7 +26,7 @@ describe('Agent Gateway Polish (E2E)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let cacheService: CacheService;
-  let duffelService: DuffelService;
+  let searchAdapter: DuffelSearchAdapter;
 
   const apiKey = 'test-agent-api-key';
   let token: string;
@@ -56,7 +55,7 @@ describe('Agent Gateway Polish (E2E)', () => {
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
     cacheService = moduleFixture.get<CacheService>(CacheService);
-    duffelService = moduleFixture.get<DuffelService>(DuffelService);
+    searchAdapter = moduleFixture.get<DuffelSearchAdapter>(DuffelSearchAdapter);
   });
 
   afterAll(async () => {
@@ -280,9 +279,9 @@ describe('Agent Gateway Polish (E2E)', () => {
     });
 
     it('should return 502 UPSTREAM_UNAVAILABLE on any upstream HTTP or Duffel client error', async () => {
-      // Mock DuffelService.searchFlights to reject/throw an error
+      // Mock DuffelSearchAdapter.searchOffers to reject/throw an error
       const searchSpy = jest
-        .spyOn(duffelService, 'searchFlights')
+        .spyOn(searchAdapter, 'searchOffers')
         .mockRejectedValue(new Error('Duffel API down'));
 
       const res = await request(app.getHttpServer())
@@ -349,11 +348,9 @@ describe('Agent Gateway Polish (E2E)', () => {
         ],
       };
 
-      const searchSpy = jest.spyOn(duffelService, 'searchFlights').mockResolvedValue({
-        offerRequest: rawDuffelResponse as unknown as DuffelOfferRequest,
-        cached: false,
-        searchHash: 'mock-hash',
-      });
+      const searchSpy = jest
+        .spyOn(searchAdapter, 'searchOffers')
+        .mockResolvedValue(rawDuffelResponse);
 
       const res = await request(app.getHttpServer())
         .get('/agent-gateway/flights/search')
@@ -388,12 +385,8 @@ describe('Agent Gateway Polish (E2E)', () => {
     });
 
     it('should create an AuditLog with ACTION = AGENT_TOOL_CALL when flight search succeeds', async () => {
-      const searchSpy = jest.spyOn(duffelService, 'searchFlights').mockResolvedValue({
-        offerRequest: {
-          offers: [],
-        } as unknown as DuffelOfferRequest,
-        cached: false,
-        searchHash: 'mock-hash',
+      const searchSpy = jest.spyOn(searchAdapter, 'searchOffers').mockResolvedValue({
+        offers: [],
       });
 
       await request(app.getHttpServer())
@@ -416,7 +409,7 @@ describe('Agent Gateway Polish (E2E)', () => {
 
     it('should create an AuditLog with ACTION = AGENT_TOOL_CALL when flight search fails', async () => {
       const searchSpy = jest
-        .spyOn(duffelService, 'searchFlights')
+        .spyOn(searchAdapter, 'searchOffers')
         .mockRejectedValue(new Error('Duffel API down'));
 
       await request(app.getHttpServer())

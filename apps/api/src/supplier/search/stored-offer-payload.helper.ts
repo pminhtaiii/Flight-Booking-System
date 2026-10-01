@@ -39,16 +39,20 @@ export function complementStoredOfferPayload(
     obj.total_currency = flightOffer.currency;
   }
 
+  const departureDate = flightOffer.departureDate ? new Date(flightOffer.departureDate) : null;
+  const departureTimestamp =
+    departureDate && !Number.isNaN(departureDate.getTime()) ? departureDate.toISOString() : null;
+
   if (Array.isArray(obj.slices)) {
-    obj.slices = obj.slices.map((slice) => {
+    obj.slices = obj.slices.map((slice, sliceIndex) => {
       if (!slice || typeof slice !== 'object' || Array.isArray(slice)) return slice;
       const sliceObj = { ...(slice as Record<string, unknown>) };
       if (Array.isArray(sliceObj.segments)) {
         sliceObj.segments = sliceObj.segments.map((seg) => {
           if (!seg || typeof seg !== 'object' || Array.isArray(seg)) return seg;
           const segObj = { ...(seg as Record<string, unknown>) };
-          if (!segObj.departing_at && flightOffer.departureDate) {
-            segObj.departing_at = new Date(flightOffer.departureDate).toISOString();
+          if (!segObj.departing_at && sliceIndex === 0 && departureTimestamp) {
+            segObj.departing_at = departureTimestamp;
           }
           return segObj;
         });

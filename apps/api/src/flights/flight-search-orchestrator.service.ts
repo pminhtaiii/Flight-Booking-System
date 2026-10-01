@@ -116,10 +116,11 @@ export class FlightSearchOrchestratorService {
     let resolveFlightOffer: ((index: number, id?: string) => FlightOffer | undefined) | undefined;
 
     if (params.offers) {
-      const offersSlice = params.offers.slice(0, 20);
-      canonicalOffers = offersSlice.map((o) => o.matchInput);
-      droppedCount = 0;
-      rejectionCounts = {};
+      const currency = params.offers[0]?.matchInput.currency;
+      const sameCurrencyOffers = params.offers.filter((o) => o.matchInput.currency === currency);
+      canonicalOffers = sameCurrencyOffers.slice(0, 20).map((o) => o.matchInput);
+      droppedCount = params.offers.length - sameCurrencyOffers.length;
+      rejectionCounts = droppedCount > 0 ? { MIXED_CURRENCY: droppedCount } : {};
       resolveRawOffer = (index: number, id?: string): DuffelOffer => {
         const found = id ? params.offers!.find((o) => o.id === id) : params.offers![index];
         const raw = found?.rawSupplierPayload;

@@ -5,7 +5,8 @@ import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CacheService } from '@/cache/cache.service';
 import { JwtService } from '@nestjs/jwt';
-import { DuffelService } from '@/duffel/duffel.service';
+import { Duffel } from '@duffel/api';
+import { DUFFEL_SDK } from '@/supplier/core/duffel-core.module';
 import { DuffelCleanupService } from '@/duffel/duffel-cleanup.service';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { DuffelOfferRequest } from '@/duffel/duffel.types';
@@ -258,8 +259,8 @@ describe('Flights Analytics & Search History (E2E)', () => {
     };
 
     beforeEach(() => {
-      const duffelService = app.get<DuffelService>(DuffelService);
-      sdkSpy = jest.spyOn(duffelService['duffel'].offerRequests, 'create').mockResolvedValue({
+      const duffel = app.get<Duffel>(DUFFEL_SDK);
+      sdkSpy = jest.spyOn(duffel.offerRequests, 'create').mockResolvedValue({
         data: mockDuffelResponse,
       } as unknown as { data: DuffelOfferRequest });
     });

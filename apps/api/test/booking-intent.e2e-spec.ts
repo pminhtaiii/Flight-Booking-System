@@ -9,7 +9,9 @@ import request from 'supertest';
 import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
-import { DuffelService } from '@/duffel/duffel.service';
+import { DuffelSearchAdapter } from '@/supplier/search/duffel-search.adapter';
+import { Duffel } from '@duffel/api';
+import { DUFFEL_SDK } from '@/supplier/core/duffel-core.module';
 import { AuditService } from '@/audit/audit.service';
 import { EncryptionService } from '@/common/encryption.service';
 import { BookingIntentCron } from '@/booking-intent/booking-intent.cron';
@@ -22,7 +24,8 @@ describe('Booking Intent (E2E)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let jwtService: JwtService;
-  let duffelService: DuffelService;
+  let searchAdapter: DuffelSearchAdapter;
+  let duffel: Duffel;
   let auditService: AuditService;
   let encryptionService: EncryptionService;
   let cron: BookingIntentCron;
@@ -56,7 +59,8 @@ describe('Booking Intent (E2E)', () => {
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
     jwtService = moduleFixture.get<JwtService>(JwtService);
-    duffelService = moduleFixture.get<DuffelService>(DuffelService);
+    searchAdapter = moduleFixture.get<DuffelSearchAdapter>(DuffelSearchAdapter);
+    duffel = moduleFixture.get<Duffel>(DUFFEL_SDK);
     auditService = moduleFixture.get<AuditService>(AuditService);
     encryptionService = moduleFixture.get<EncryptionService>(EncryptionService);
     cron = moduleFixture.get<BookingIntentCron>(BookingIntentCron);
@@ -177,7 +181,7 @@ describe('Booking Intent (E2E)', () => {
       const offer = await createMockFlightOffer({ adults: 1 });
 
       const duffelSpy = jest
-        .spyOn(duffelService['duffel'].offers, 'get')
+        .spyOn(duffel.offers, 'get')
         .mockResolvedValue(liveOfferResponse('125.50'));
 
       const res = await request(app.getHttpServer())
@@ -255,7 +259,7 @@ describe('Booking Intent (E2E)', () => {
       });
 
       const duffelSpy = jest
-        .spyOn(duffelService['duffel'].offers, 'get')
+        .spyOn(duffel.offers, 'get')
         .mockResolvedValue(liveOfferResponse());
 
       const res = await request(app.getHttpServer())
@@ -387,7 +391,7 @@ describe('Booking Intent (E2E)', () => {
       const offer = await createMockFlightOffer({ adults: 1 });
 
       const duffelSpy = jest
-        .spyOn(duffelService['duffel'].offers, 'get')
+        .spyOn(duffel.offers, 'get')
         .mockResolvedValue(liveOfferResponse());
 
       // Force AuditService.createLog to fail
@@ -430,7 +434,7 @@ describe('Booking Intent (E2E)', () => {
       duffelError.status = 410;
 
       const duffelSpy = jest
-        .spyOn(duffelService['duffel'].offers, 'get')
+        .spyOn(duffel.offers, 'get')
         .mockRejectedValue(duffelError);
 
       const res = await request(app.getHttpServer())
@@ -531,7 +535,7 @@ describe('Booking Intent (E2E)', () => {
       expect(readiness.body.scope).toBe('DOMESTIC');
 
       const duffelSpy = jest
-        .spyOn(duffelService['duffel'].offers, 'get')
+        .spyOn(duffel.offers, 'get')
         .mockResolvedValue(liveOfferResponse());
       const createRes = await request(app.getHttpServer())
         .post('/api/bookings/intents')
@@ -648,7 +652,7 @@ describe('Booking Intent (E2E)', () => {
           ]),
         );
 
-      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue({
+      const duffelSpy = jest.spyOn(duffel.offers, 'get').mockResolvedValue({
         data: {
           id: 'off_duffel_mixed',
           total_amount: '200.00',
@@ -820,7 +824,7 @@ describe('Booking Intent (E2E)', () => {
       });
 
       const duffelSpy = jest
-        .spyOn(duffelService['duffel'].offers, 'get')
+        .spyOn(duffel.offers, 'get')
         .mockResolvedValue(liveOfferResponse());
 
       const res = await request(app.getHttpServer())
@@ -892,7 +896,7 @@ describe('Booking Intent (E2E)', () => {
       const offer = await createMockFlightOffer({ adults: 1 });
 
       const duffelSpy = jest
-        .spyOn(duffelService['duffel'].offers, 'get')
+        .spyOn(duffel.offers, 'get')
         .mockResolvedValue(liveOfferResponse());
 
       const createRes = await request(app.getHttpServer())
@@ -932,7 +936,7 @@ describe('Booking Intent (E2E)', () => {
       const offer = await createMockFlightOffer({ adults: 1 });
 
       const duffelSpy = jest
-        .spyOn(duffelService['duffel'].offers, 'get')
+        .spyOn(duffel.offers, 'get')
         .mockResolvedValue(liveOfferResponse());
 
       const createRes = await request(app.getHttpServer())
@@ -966,7 +970,7 @@ describe('Booking Intent (E2E)', () => {
       const offer = await createMockFlightOffer({ adults: 1 });
 
       const duffelSpy = jest
-        .spyOn(duffelService['duffel'].offers, 'get')
+        .spyOn(duffel.offers, 'get')
         .mockResolvedValue(liveOfferResponse());
 
       const createRes = await request(app.getHttpServer())
@@ -1055,7 +1059,7 @@ describe('Booking Intent (E2E)', () => {
       const offer = await createMockFlightOffer({ adults: 1 });
 
       const duffelSpy = jest
-        .spyOn(duffelService['duffel'].offers, 'get')
+        .spyOn(duffel.offers, 'get')
         .mockResolvedValue(liveOfferResponse());
 
       // 1. Default TTL path
@@ -1147,7 +1151,7 @@ describe('Booking Intent (E2E)', () => {
       const offer = await createMockFlightOffer({ adults: 1 });
 
       const duffelSpy = jest
-        .spyOn(duffelService['duffel'].offers, 'get')
+        .spyOn(duffel.offers, 'get')
         .mockResolvedValue(liveOfferResponse());
 
       // Create two intents
@@ -1285,7 +1289,7 @@ describe('Booking Intent (E2E)', () => {
       });
 
       const duffelSpy = jest
-        .spyOn(duffelService['duffel'].offers, 'get')
+        .spyOn(duffel.offers, 'get')
         .mockResolvedValue(liveOfferResponse());
 
       const res = await request(app.getHttpServer())
@@ -1365,7 +1369,7 @@ describe('Booking Intent (E2E)', () => {
       });
 
       const duffelSpy = jest
-        .spyOn(duffelService['duffel'].offers, 'get')
+        .spyOn(duffel.offers, 'get')
         .mockResolvedValue(liveOfferResponse());
 
       const res = await request(app.getHttpServer())
@@ -1426,7 +1430,7 @@ describe('Booking Intent (E2E)', () => {
 
       // We mock duffel get to also alter the DB state behind the scenes, making the claim expired!
       const duffelSpy = jest
-        .spyOn(duffelService['duffel'].offers, 'get')
+        .spyOn(duffel.offers, 'get')
         .mockImplementation(async () => {
           // Expire the claim that was just acquired!
           await prisma.chatHandoff.update({
@@ -1492,9 +1496,9 @@ describe('Booking Intent (E2E)', () => {
         },
       });
 
-      const { DuffelTimeoutError } = await import('@/duffel/duffel.service');
+      const { DuffelTimeoutError } = await import('@/supplier/search/duffel-search.adapter');
       const duffelSpy = jest
-        .spyOn(duffelService, 'getOfferById')
+        .spyOn(searchAdapter, 'getOffer')
         .mockRejectedValue(new DuffelTimeoutError());
 
       const res = await request(app.getHttpServer())
@@ -1554,7 +1558,7 @@ describe('Booking Intent (E2E)', () => {
       });
 
       const duffelSpy = jest
-        .spyOn(duffelService['duffel'].offers, 'get')
+        .spyOn(duffel.offers, 'get')
         .mockResolvedValue(liveOfferResponse());
 
       const requests = Array.from({ length: 100 }).map(() =>

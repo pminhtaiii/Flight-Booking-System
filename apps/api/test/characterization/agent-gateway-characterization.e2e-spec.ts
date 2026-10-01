@@ -16,7 +16,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
-import { DuffelService } from '@/duffel/duffel.service';
+import { DuffelSearchAdapter } from '@/supplier/search/duffel-search.adapter';
 import { SelectionAttestationService } from '@/agent-gateway/selection-attestation.service';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { User, Prisma } from '@prisma/client';
@@ -33,7 +33,7 @@ describe('Agent Gateway Characterization (E2E)', () => {
   jest.setTimeout(60000);
   let app: INestApplication;
   let prisma: PrismaService;
-  let duffelService: DuffelService;
+  let searchAdapter: DuffelSearchAdapter;
   let attestationService: SelectionAttestationService;
 
   const apiKey = 'test-agent-api-key';
@@ -61,13 +61,13 @@ describe('Agent Gateway Characterization (E2E)', () => {
     await app.init();
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
-    duffelService = moduleFixture.get<DuffelService>(DuffelService);
+    searchAdapter = moduleFixture.get<DuffelSearchAdapter>(DuffelSearchAdapter);
     attestationService = moduleFixture.get<SelectionAttestationService>(
       SelectionAttestationService,
     );
 
     // Mock Duffel flight search
-    jest.spyOn(duffelService, 'searchFlights').mockImplementation(async (query: any) => {
+    jest.spyOn(searchAdapter, 'searchOffers').mockImplementation(async (query) => {
       const offerRequest = {
         id: 'or_char_123',
         offers: [
@@ -106,20 +106,7 @@ describe('Agent Gateway Characterization (E2E)', () => {
           },
         ],
       };
-      return {
-        offerRequest,
-        flightOffers: [
-          {
-            id: 'fo_char_1',
-            searchHash: 'sh_char_1',
-            duffelOfferId: 'off_char_1',
-            price: 250.0,
-            currency: 'USD',
-            rawOffer: offerRequest.offers[0],
-          },
-        ],
-        searchHash: 'sh_char_1',
-      } as any;
+      return offerRequest;
     });
   });
 

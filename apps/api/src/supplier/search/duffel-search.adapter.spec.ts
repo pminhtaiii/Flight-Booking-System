@@ -291,6 +291,41 @@ describe('DuffelSearchAdapter', () => {
   });
 
   describe('getOffer', () => {
+    it('retrieves each mock offer after searches for different routes', async () => {
+      const prevMock = process.env.DUFFEL_MOCK;
+      try {
+        process.env.DUFFEL_MOCK = 'true';
+        const firstSearch = await adapter.searchOffers({
+          origin: 'SFO',
+          destination: 'JFK',
+          departureDate: '2026-10-01',
+          adults: 1,
+        });
+        const secondSearch = await adapter.searchOffers({
+          origin: 'LAX',
+          destination: 'ORD',
+          departureDate: '2026-10-02',
+          adults: 2,
+        });
+        // Mock search responses have the same offer envelope as the supplier API.
+        const firstOffer = (firstSearch as { offers: Array<{ id: string }> }).offers[0];
+        const secondOffer = (secondSearch as { offers: Array<{ id: string }> }).offers[0];
+
+        expect(firstOffer.id).not.toBe(secondOffer.id);
+        await expect(adapter.getOffer(firstOffer.id)).resolves.toEqual(firstOffer);
+        await expect(adapter.getOffer(secondOffer.id)).resolves.toEqual(secondOffer);
+        expect(mockOfferRequestsCreate).not.toHaveBeenCalled();
+        expect(mockOffersGet).not.toHaveBeenCalled();
+        expect(mockReserveAttempt).not.toHaveBeenCalled();
+      } finally {
+        if (prevMock !== undefined) {
+          process.env.DUFFEL_MOCK = prevMock;
+        } else {
+          delete process.env.DUFFEL_MOCK;
+        }
+      }
+    });
+
     it('resolves searched mock offers without an SDK and rejects missing mock fixtures', async () => {
       const prevMock = process.env.DUFFEL_MOCK;
       try {

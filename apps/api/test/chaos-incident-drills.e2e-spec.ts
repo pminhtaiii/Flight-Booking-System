@@ -10,7 +10,7 @@ import request from 'supertest';
 import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
-import { DuffelService, DuffelTimeoutError } from '@/duffel/duffel.service';
+import { DuffelSearchAdapter, DuffelTimeoutError } from '@/supplier/search/duffel-search.adapter';
 import { ChatHandoffService } from '@/chat-handoff/chat-handoff.service';
 import { ChatHandoffTokenService } from '@/chat-handoff/chat-handoff-token.service';
 import { CacheService } from '@/cache/cache.service';
@@ -24,7 +24,7 @@ describe('Chaos & Fault-Tolerance Incident Drills (E2E)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let jwtService: JwtService;
-  let duffelService: DuffelService;
+  let searchAdapter: DuffelSearchAdapter;
   let chatHandoffService: ChatHandoffService;
   let tokenService: ChatHandoffTokenService;
   let cacheService: CacheService;
@@ -52,7 +52,7 @@ describe('Chaos & Fault-Tolerance Incident Drills (E2E)', () => {
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
     jwtService = moduleFixture.get<JwtService>(JwtService);
-    duffelService = moduleFixture.get<DuffelService>(DuffelService);
+    searchAdapter = moduleFixture.get<DuffelSearchAdapter>(DuffelSearchAdapter);
     chatHandoffService = moduleFixture.get<ChatHandoffService>(ChatHandoffService);
     tokenService = moduleFixture.get<ChatHandoffTokenService>(ChatHandoffTokenService);
     cacheService = moduleFixture.get<CacheService>(CacheService);
@@ -176,7 +176,7 @@ describe('Chaos & Fault-Tolerance Incident Drills (E2E)', () => {
 
       // 1. Simulate Duffel 504 / timeout during live offer validation
       const duffelSpy = jest
-        .spyOn(duffelService, 'getOfferById')
+        .spyOn(searchAdapter, 'getOffer')
         .mockRejectedValue(new DuffelTimeoutError('Upstream Duffel supplier 504 gateway timeout'));
 
       const reqBody = {
@@ -238,13 +238,15 @@ describe('Chaos & Fault-Tolerance Incident Drills (E2E)', () => {
 
       // 4. Supplier Recovery: Restore supplier service and retry createIntent
       duffelSpy.mockRestore();
-      jest.spyOn(duffelService, 'getOfferById').mockResolvedValue({
+      jest.spyOn(searchAdapter, 'getOffer').mockResolvedValue({
         id: offer.duffelOfferId,
+        // The stored fixture supplies the itinerary returned by the supplier.
+        slices: (offer.rawOffer as Prisma.JsonObject).slices,
         total_amount: '150.00',
         total_currency: 'USD',
         expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
         passengers: [{ id: 'duffel-pas-1', type: 'adult' }],
-      } as unknown as Awaited<ReturnType<DuffelService['getOfferById']>>);
+      });
 
       const successRes = await request(app.getHttpServer())
         .post('/api/bookings/intent')
@@ -317,13 +319,15 @@ describe('Chaos & Fault-Tolerance Incident Drills (E2E)', () => {
       expect(resolveRes.body.offer.destination).toBe('HAN');
 
       // 2. Assert createIntent and tryAcquireClaim successfully acquire new claim and consume handoff
-      jest.spyOn(duffelService, 'getOfferById').mockResolvedValue({
+      jest.spyOn(searchAdapter, 'getOffer').mockResolvedValue({
         id: offer.duffelOfferId,
+        // The stored fixture supplies the itinerary returned by the supplier.
+        slices: (offer.rawOffer as Prisma.JsonObject).slices,
         total_amount: '150.00',
         total_currency: 'USD',
         expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
         passengers: [{ id: 'duffel-pas-1', type: 'adult' }],
-      } as unknown as Awaited<ReturnType<DuffelService['getOfferById']>>);
+      });
 
       const createRes = await request(app.getHttpServer())
         .post('/api/bookings/intent')
