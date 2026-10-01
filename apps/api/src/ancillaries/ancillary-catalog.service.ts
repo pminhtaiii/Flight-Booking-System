@@ -1,14 +1,14 @@
 import { Injectable } from '@nestjs/common';
-import { DuffelService } from '@/duffel/duffel.service';
-import { AncillaryCatalog } from '@shared/types';
+import { DuffelAncillaryService } from '@/supplier/ancillary/duffel-ancillary.service';
+import type { AncillaryCatalog } from '@shared/types';
 import * as crypto from 'crypto';
 
 @Injectable()
 export class AncillaryCatalogService {
-  constructor(private readonly duffelService: DuffelService) {}
+  constructor(private readonly ancillaryService: DuffelAncillaryService) {}
 
   async getCatalog(offerId: string, refresh = false): Promise<AncillaryCatalog> {
-    return this.duffelService.getSeatMapsAndServices(offerId, refresh);
+    return this.ancillaryService.getSeatMapsAndServices(offerId, refresh);
   }
 
   fingerprint(catalog: AncillaryCatalog): string {

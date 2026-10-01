@@ -1,5 +1,5 @@
-import { DuffelService } from '@/duffel/duffel.service';
 import { PrismaService } from '@/prisma/prisma.service';
+import { DuffelAncillaryService } from '@/supplier/ancillary/duffel-ancillary.service';
 import { AncillaryPaymentValidationService } from './ancillary-payment-validation.service';
 
 describe('AncillaryPaymentValidationService expiry races', () => {
@@ -63,7 +63,7 @@ describe('AncillaryPaymentValidationService expiry races', () => {
       ),
       ancillarySelection: { updateMany: jest.fn() },
     };
-    const duffel = {
+    const ancillaryService = {
       repriceOffer: jest.fn().mockResolvedValue({
         totalAmount: '473.00',
         baseAmount: '420.00',
@@ -77,7 +77,7 @@ describe('AncillaryPaymentValidationService expiry races', () => {
     };
     const service = new AncillaryPaymentValidationService(
       prisma as unknown as PrismaService,
-      duffel as unknown as DuffelService,
+      ancillaryService as unknown as DuffelAncillaryService,
     );
 
     await expect(
@@ -189,14 +189,14 @@ describe('AncillaryPaymentValidationService expiry races', () => {
         currency: 'USD',
         invalidServiceIdentities: ['seat-1'],
       };
-      const duffel = {
+      const ancillaryService = {
         repriceOffer: jest
           .fn()
           .mockResolvedValue(completion === 'validated' ? validPricing : stalePricing),
       };
       const service = new AncillaryPaymentValidationService(
         prisma as unknown as PrismaService,
-        duffel as unknown as DuffelService,
+        ancillaryService as unknown as DuffelAncillaryService,
       );
 
       await expect(

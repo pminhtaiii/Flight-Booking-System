@@ -1,5 +1,5 @@
-import { DuffelService } from '@/duffel/duffel.service';
 import { PrismaService } from '@/prisma/prisma.service';
+import { DuffelAncillaryService } from '@/supplier/ancillary/duffel-ancillary.service';
 import { AncillaryPaymentValidationService } from './ancillary-payment-validation.service';
 
 describe('AncillaryPaymentValidationService stale CAS', () => {
@@ -60,7 +60,7 @@ describe('AncillaryPaymentValidationService stale CAS', () => {
       ),
       ancillarySelection: { updateMany: jest.fn() },
     };
-    const duffel = {
+    const ancillaryService = {
       repriceOffer: jest.fn().mockResolvedValue({
         totalAmount: '0.00',
         baseAmount: '0.00',
@@ -71,7 +71,7 @@ describe('AncillaryPaymentValidationService stale CAS', () => {
     };
     const service = new AncillaryPaymentValidationService(
       prisma as unknown as PrismaService,
-      duffel as unknown as DuffelService,
+      ancillaryService as unknown as DuffelAncillaryService,
     );
 
     await expect(

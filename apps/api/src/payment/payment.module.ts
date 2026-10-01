@@ -7,7 +7,7 @@ import { PaymentMethodsModule } from './payment-methods.module';
 import { PaymentController } from './payment.controller';
 import { PaymentWebhookController } from './payment-webhook.controller';
 import { PaymentWebhookService } from './payment-webhook.service';
-import { DuffelModule } from '../duffel/duffel.module';
+import { SupplierAncillaryModule } from '@/supplier/ancillary/supplier-ancillary.module';
 import { AuditModule } from '../audit/audit.module';
 import { PaymentCronService } from './payment-cron.service';
 import { BookingStateModule } from '../booking-lifecycle/booking-state.module';
@@ -22,7 +22,7 @@ import { DomainEventsModule } from '@/domain-events/domain-events.module';
 @Module({
   imports: [
     PrismaModule,
-    DuffelModule,
+    SupplierAncillaryModule,
     AuditModule,
     IdempotencyModule,
     RefundModule,
@@ -51,4 +51,3 @@ import { DomainEventsModule } from '@/domain-events/domain-events.module';
   ],
 })
 export class PaymentModule {}
-
