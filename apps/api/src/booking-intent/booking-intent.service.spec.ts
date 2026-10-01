@@ -45,6 +45,7 @@ type TestableService = {
     currency: string;
     offerExpiresAt: Date | null;
     raw: unknown;
+    passengers: readonly import('@/supplier/search/flight-search.port').FlightOfferPassenger[];
   }>;
   extractDuffelPassengerIds(
     rawOffer: unknown,
@@ -1483,6 +1484,7 @@ describe('BookingIntentService Refinements', () => {
       const mockRawPayload = {
         passengers: [{ id: 'pas_1', type: 'adult' }],
       };
+      const mockPassengers = [{ supplierPassengerId: 'pas_1', type: 'ADULT' as const }];
       const mockOffer = {
         id: 'offer-123',
         supplierOfferId: 'off_123',
@@ -1491,6 +1493,7 @@ describe('BookingIntentService Refinements', () => {
         currency: 'USD',
         offerExpiresAt: '2026-07-15T00:00:00Z',
         rawSupplierPayload: mockRawPayload,
+        passengers: mockPassengers,
       };
       mockFlightSearchPort.getOfferById.mockResolvedValueOnce(mockOffer);
 
@@ -1501,6 +1504,7 @@ describe('BookingIntentService Refinements', () => {
         currency: 'USD',
         offerExpiresAt: new Date('2026-07-15T00:00:00Z'),
         raw: mockRawPayload,
+        passengers: mockPassengers,
       });
     });
 

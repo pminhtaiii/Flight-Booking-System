@@ -944,13 +944,13 @@ describe('BookingReadinessService RED slice', () => {
 
   it('maps stored offer expiry from local raw offer metadata to 409 OFFER_EXPIRED without writes or supplier calls', async () => {
     const { service, mocks } = createServiceHarness();
+    const baseStored = buildStoredOffer();
     mocks.prisma.flightOffer = {
       findUnique: jest.fn().mockResolvedValue(
         buildStoredOffer({
           rawOffer: {
+            ...(baseStored.rawOffer as Record<string, unknown>),
             expires_at: '2026-08-02T12:00:00Z',
-            passengers: [{ id: 'pas_001', type: 'adult' }],
-            slices: [{ segments: [] }],
           },
         }),
       ),

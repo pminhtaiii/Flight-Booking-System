@@ -13,7 +13,11 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
-import { FLIGHT_SEARCH_PORT, type FlightSearchPort } from '@/supplier/search/flight-search.port';
+import {
+  FLIGHT_SEARCH_PORT,
+  type FlightSearchPort,
+  type FlightSegment,
+} from '@/supplier/search/flight-search.port';
 import {
   createChatTelemetryEvent,
   emitChatTelemetry,
@@ -26,6 +30,16 @@ import { ChatHandoffTokenService } from './chat-handoff-token.service';
 import { SelectionAttestationService } from '@/agent-gateway/selection-attestation.service';
 import { FlightOffer, Prisma } from '@prisma/client';
 import * as crypto from 'crypto';
+
+function resolveLastSegment(offer: {
+  readonly segments: readonly FlightSegment[];
+  readonly returnSegments?: readonly FlightSegment[] | null;
+}): FlightSegment | undefined {
+  if (offer.returnSegments && offer.returnSegments.length > 0) {
+    return offer.returnSegments[offer.returnSegments.length - 1];
+  }
+  return offer.segments[offer.segments.length - 1];
+}
 
 type JsonRecord = Record<string, unknown>;
 
@@ -548,11 +562,7 @@ export class ChatHandoffService {
       : null;
 
     const firstSegment = normalizedOffer?.segments[0];
-    const lastSegment = normalizedOffer
-      ? (normalizedOffer.returnSegments && normalizedOffer.returnSegments.length > 0
-          ? normalizedOffer.returnSegments[normalizedOffer.returnSegments.length - 1]
-          : normalizedOffer.segments[normalizedOffer.segments.length - 1])
-      : null;
+    const lastSegment = normalizedOffer ? resolveLastSegment(normalizedOffer) : null;
 
     const airline =
       firstSegment?.operatingCarrier ||
@@ -566,9 +576,7 @@ export class ChatHandoffService {
       stringValue(selectedOffer?.origin);
 
     const destination =
-      (normalizedOffer?.returnSegments && normalizedOffer.returnSegments.length > 0
-        ? lastSegment?.arrivalAirport
-        : normalizedOffer?.arrivalAirport) ||
+      normalizedOffer?.arrivalAirport ||
       flightOffer?.destination ||
       stringValue(selectedOffer?.destination);
 
@@ -782,15 +790,12 @@ export class ChatHandoffService {
     ) {
       throw new GoneException({
         code: 'HANDOFF_OFFER_STALE',
-        message: 'Flight offer expired',
+        message: 'Handoff offer is stale',
       });
     }
 
     const firstSegment = normalizedOffer.segments[0];
-    const lastSegment =
-      normalizedOffer.returnSegments && normalizedOffer.returnSegments.length > 0
-        ? normalizedOffer.returnSegments[normalizedOffer.returnSegments.length - 1]
-        : normalizedOffer.segments[normalizedOffer.segments.length - 1];
+    const lastSegment = resolveLastSegment(normalizedOffer);
 
     if (!firstSegment || !lastSegment) {
       throw new NotFoundException('Handoff offer unavailable');
@@ -808,10 +813,7 @@ export class ChatHandoffService {
       'Unknown Airline';
 
     const origin = normalizedOffer.departureAirport || flightOffer.origin;
-    const destination =
-      (normalizedOffer.returnSegments && normalizedOffer.returnSegments.length > 0
-        ? lastSegment.arrivalAirport
-        : normalizedOffer.arrivalAirport) || flightOffer.destination;
+    const destination = normalizedOffer.arrivalAirport || flightOffer.destination;
 
     const passengers = normalizedOffer.passengers.map((p) => ({
       id: p.supplierPassengerId,

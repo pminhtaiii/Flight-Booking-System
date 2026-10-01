@@ -1232,7 +1232,7 @@ describe('FlightsService (T036)', () => {
       // Stops and endpoints
       expect(offerResult.departureAirport).toBe('HAN');
       expect(offerResult.arrivalAirport).toBe('SGN');
-      expect(offerResult.stops).toBe(1);
+      expect(offerResult.stops).toBe(2);
 
       // Verify deterministic UUID is persisted in database
       expect(prisma.flightOffer.createMany).toHaveBeenCalledWith({

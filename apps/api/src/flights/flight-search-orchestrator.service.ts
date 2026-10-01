@@ -33,6 +33,9 @@ export interface OrchestratorParams {
 
 export interface OrchestratedFlightResult {
   readonly offer?: FlightOffer;
+  /**
+   * Raw supplier offer payload retained for backward compatibility with tests and callers.
+   */
   readonly rawOffer: DuffelOffer;
   readonly scoredOffer: ScoredOffer | RankedOffer;
 }
@@ -117,9 +120,11 @@ export class FlightSearchOrchestratorService {
       canonicalOffers = offersSlice.map((o) => o.matchInput);
       droppedCount = 0;
       rejectionCounts = {};
-      resolveRawOffer = (index: number, id?: string) => {
+      resolveRawOffer = (index: number, id?: string): DuffelOffer => {
         const found = id ? params.offers!.find((o) => o.id === id) : params.offers![index];
-        return (found?.rawSupplierPayload as DuffelOffer) ?? ({} as DuffelOffer);
+        const raw = found?.rawSupplierPayload;
+        // Cast to DuffelOffer for backward compatibility with callers and tests expecting legacy raw payload shapes
+        return typeof raw === 'object' && raw !== null ? (raw as DuffelOffer) : ({} as DuffelOffer);
       };
       resolveFlightOffer = (index: number, id?: string) => {
         return id ? params.offers!.find((o) => o.id === id) : params.offers![index];
@@ -191,7 +196,7 @@ export class FlightSearchOrchestratorService {
     const hasPersonalization = hasEffectivePreferences(effectivePreferences);
 
     if (!hasPersonalization) {
-      const rankedOffers = this.categoryRanker.rank(canonicalOffers as FlightMatchInput[]);
+      const rankedOffers = this.categoryRanker.rank([...canonicalOffers]);
       const results: OrchestratedFlightResult[] = rankedOffers.map((offer) => ({
         offer: resolveFlightOffer?.(offer.originalIndex, offer.id),
         rawOffer: resolveRawOffer(offer.originalIndex, offer.id),
@@ -218,7 +223,7 @@ export class FlightSearchOrchestratorService {
       };
     }
 
-    const scoredOffers = this.scorer.scoreAll(canonicalOffers as FlightMatchInput[], effectivePreferences);
+    const scoredOffers = this.scorer.scoreAll([...canonicalOffers], effectivePreferences);
 
     const results: OrchestratedFlightResult[] = scoredOffers.map((scoredOffer) => ({
       offer: resolveFlightOffer?.(scoredOffer.offer.originalIndex, scoredOffer.offer.id),

@@ -26,7 +26,6 @@ import {
   CabinMismatchDetail,
 } from './dto/search-flight.dto';
 import { FlightDetailResponseDto } from './dto/detail-flight.dto';
-import { DuffelOffer, DuffelSegment } from '@/duffel/duffel.types';
 import { Prisma } from '@prisma/client';
 
 export type CabinClass = 'economy' | 'premium_economy' | 'business' | 'first';
@@ -35,22 +34,6 @@ type FlightSearchOptions = {
   persistence?: 'deferred' | 'required';
   caller?: 'user' | 'agent';
 };
-
-function parseISO8601Duration(durationStr: string | null | undefined): number {
-  if (!durationStr) return 0;
-  const regex = /P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?/;
-  const matches = durationStr.match(regex);
-  if (!matches) return 0;
-  const days = parseInt(matches[1] || '0', 10);
-  const hours = parseInt(matches[2] || '0', 10);
-  const minutes = parseInt(matches[3] || '0', 10);
-  return days * 1440 + hours * 60 + minutes;
-}
-
-function capitalize(str: string | null | undefined): string | null {
-  if (!str) return null;
-  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
-}
 
 function mapFlightSegment(segment: FlightSegment): FlightSegmentDto {
   return {
@@ -85,17 +68,6 @@ function mapFlightOffer(
     returnSegments,
   );
 
-  const rawDuffel = offer.rawSupplierPayload as DuffelOffer | undefined;
-  const outboundSlice = rawDuffel?.slices?.[0];
-  const outboundDuration = outboundSlice?.duration
-    ? parseISO8601Duration(outboundSlice.duration)
-    : offer.duration;
-  const outboundStops = outboundSlice
-    ? outboundSlice.segments.length - 1
-    : offer.segments.length > 0
-      ? offer.segments.length - 1
-      : offer.stops;
-
   return {
     id,
     duffelOfferId: offer.supplierOfferId,
@@ -105,8 +77,8 @@ function mapFlightOffer(
     arrivalAirport: offer.arrivalAirport,
     departureTime: offer.departureTime,
     arrivalTime: offer.arrivalTime,
-    duration: outboundDuration,
-    stops: outboundStops,
+    duration: offer.duration,
+    stops: offer.stops,
     price: offer.price,
     currency: offer.currency,
     fareClass: offer.fareClass,
@@ -117,29 +89,6 @@ function mapFlightOffer(
     segments,
     returnSegments,
     matchResult: null,
-  };
-}
-
-function mapSegment(segment: DuffelSegment): FlightSegmentDto {
-  const aircraftName = segment.aircraft?.name || '';
-  const aircraftCode = segment.aircraft?.iata_code || '';
-  const aircraft = aircraftName.includes('Airbus')
-    ? aircraftName.replace('Airbus ', '')
-    : aircraftName || aircraftCode || null;
-
-  return {
-    carrierCode: segment.marketing_carrier?.iata_code || '',
-    flightNumber: segment.marketing_carrier_flight_number || '',
-    operatingCarrier: segment.operating_carrier?.name || '',
-    departureAirport: segment.origin?.iata_code || '',
-    departureTerminal: segment.origin_terminal || null,
-    departureTime: segment.departing_at,
-    arrivalAirport: segment.destination?.iata_code || '',
-    arrivalTerminal: segment.destination_terminal || null,
-    arrivalTime: segment.arriving_at,
-    duration: parseISO8601Duration(segment.duration),
-    aircraft,
-    cabinClass: (segment.passengers?.[0]?.cabin_class || 'economy') as CabinClass,
   };
 }
 
@@ -210,65 +159,6 @@ function computeCabinMatch(
   return {
     cabinClassMatch,
     cabinMismatchDetails: cabinClassMatch === 'full' ? null : mismatchDetailsList,
-  };
-}
-
-function mapOffer(offer: DuffelOffer, id: string, requestedCabinClass: CabinClass): FlightOfferDto {
-  const outboundSlice = offer.slices[0];
-  const firstSegment = outboundSlice?.segments[0];
-  const lastSegment = outboundSlice?.segments[outboundSlice.segments.length - 1];
-
-  const airline =
-    firstSegment?.operating_carrier?.name ||
-    firstSegment?.marketing_carrier?.name ||
-    'Unknown Airline';
-  const flightNumber =
-    (firstSegment?.marketing_carrier?.iata_code || '') +
-    (firstSegment?.marketing_carrier_flight_number || '');
-
-  const segmentBaggage = firstSegment?.passengers?.[0]?.baggages;
-  let baggageAllowance: string | null = null;
-  if (segmentBaggage && segmentBaggage.length > 0) {
-    const bag = segmentBaggage[0];
-    baggageAllowance = bag.quantity === undefined && bag.weight !== undefined
-      ? `${bag.weight}${(bag.weight_unit || 'kg').toLowerCase()} ${bag.type}`
-      : `${bag.quantity || 0} ${bag.type} bag(s)`;
-  }
-
-  const cabinClass = firstSegment?.passengers?.[0]?.cabin_class || null;
-
-  const returnSlice = offer.slices[1];
-
-  const segments = outboundSlice?.segments.map(mapSegment) || [];
-  const returnSegments = returnSlice ? returnSlice.segments.map(mapSegment) : null;
-
-  const { cabinClassMatch, cabinMismatchDetails } = computeCabinMatch(
-    requestedCabinClass,
-    segments,
-    returnSegments,
-  );
-
-  return {
-    id,
-    duffelOfferId: offer.id,
-    airline,
-    flightNumber,
-    departureAirport: firstSegment?.origin?.iata_code || '',
-    arrivalAirport: lastSegment?.destination?.iata_code || '',
-    departureTime: firstSegment?.departing_at || '',
-    arrivalTime: lastSegment?.arriving_at || '',
-    duration: parseISO8601Duration(outboundSlice?.duration || 'PT0H0M'),
-    stops: outboundSlice ? outboundSlice.segments.length - 1 : 0,
-    price: parseFloat(offer.total_amount),
-    currency: offer.total_currency,
-    fareClass: capitalize(cabinClass),
-    baggageAllowance,
-    requestedCabinClass,
-    cabinClassMatch,
-    cabinMismatchDetails,
-    segments,
-    returnSegments,
-    matchResult: null,
   };
 }
 
@@ -360,9 +250,11 @@ export class FlightsService {
 
     // Map each OrchestratedFlightResult from orchestrated.results to FlightOfferDto
     const results: FlightOfferDto[] = orchestrated.results.map((res) => {
-      const offerDto = res.offer
-        ? mapFlightOffer(res.offer, res.scoredOffer.offer.id, passengersInfo.cabinClass)
-        : mapOffer(res.rawOffer, res.scoredOffer.offer.id, passengersInfo.cabinClass);
+      const offer = res.offer;
+      if (!offer) {
+        throw new ServiceUnavailableException('Missing offer in search results');
+      }
+      const offerDto = mapFlightOffer(offer, res.scoredOffer.offer.id, passengersInfo.cabinClass);
       return {
         ...offerDto,
         matchResult: res.scoredOffer.matchResult,
@@ -655,17 +547,6 @@ export class FlightsService {
       type: passenger.type,
     }));
 
-    const rawDuffel = liveOffer.rawSupplierPayload as DuffelOffer | undefined;
-    const outboundSlice = rawDuffel?.slices?.[0];
-    const duration = outboundSlice?.duration
-      ? parseISO8601Duration(outboundSlice.duration)
-      : liveOffer.duration;
-    const stops = outboundSlice
-      ? outboundSlice.segments.length - 1
-      : liveOffer.segments.length > 0
-        ? liveOffer.segments.length - 1
-        : liveOffer.stops;
-
     // 5. Create audit log
     await this.auditService.createLog(this.prisma, {
       userId,
@@ -689,8 +570,8 @@ export class FlightsService {
       arrivalAirport: liveOffer.arrivalAirport,
       departureTime: liveOffer.departureTime,
       arrivalTime: liveOffer.arrivalTime,
-      duration,
-      stops,
+      duration: liveOffer.duration,
+      stops: liveOffer.stops,
       originalPrice,
       confirmedPrice,
       priceChanged,

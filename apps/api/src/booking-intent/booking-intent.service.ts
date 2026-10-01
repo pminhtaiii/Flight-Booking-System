@@ -14,7 +14,11 @@ import {
 } from '@nestjs/common';
 import { FlightOffer, Prisma, PassengerType } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
-import { FLIGHT_SEARCH_PORT, type FlightSearchPort } from '@/supplier/search/flight-search.port';
+import {
+  FLIGHT_SEARCH_PORT,
+  type FlightSearchPort,
+  type FlightOfferPassenger,
+} from '@/supplier/search/flight-search.port';
 import { AuditService } from '@/audit/audit.service';
 import { EncryptionService } from '@/common/encryption.service';
 import { CreateIntentDto } from './dto/create-intent.dto';
@@ -348,8 +352,13 @@ export class BookingIntentService {
         isNaN(parsedTtl) || !process.env.BOOKING_INTENT_TTL_MINUTES ? 30 : parsedTtl;
       const intentExpiresAt = new Date(now.getTime() + ttlMinutes * 60 * 1000);
 
+      const offerPassengersInput =
+        Array.isArray(liveOffer.passengers) && liveOffer.passengers.length > 0
+          ? liveOffer.passengers
+          : liveOffer.raw ?? liveOffer.passengers;
+
       const duffelPassengerIds = this.extractDuffelPassengerIds(
-        liveOffer.raw,
+        offerPassengersInput,
         passengersForValidation,
       );
 
@@ -873,7 +882,13 @@ export class BookingIntentService {
   private async fetchLiveOffer(
     duffelOfferId: string,
     timeoutMs: number = 4500,
-  ): Promise<{ totalAmount: string; currency: string; offerExpiresAt: Date | null; raw: unknown }> {
+  ): Promise<{
+    totalAmount: string;
+    currency: string;
+    offerExpiresAt: Date | null;
+    raw: unknown;
+    passengers: readonly FlightOfferPassenger[];
+  }> {
     try {
       const offer = await this.flightSearchPort.getOfferById(duffelOfferId, timeoutMs);
 
@@ -898,6 +913,7 @@ export class BookingIntentService {
         currency: offer.currency || 'USD',
         offerExpiresAt: offer.offerExpiresAt ? new Date(offer.offerExpiresAt) : null,
         raw: offer.rawSupplierPayload,
+        passengers: offer.passengers ?? [],
       };
     } catch (error: unknown) {
       if (
@@ -992,34 +1008,39 @@ export class BookingIntentService {
   }
 
   private extractDuffelPassengerIds(
-    rawOffer: unknown,
+    passengersInput: unknown,
     passengers: readonly { type: PassengerType }[],
   ): string[] {
-    if (!rawOffer || typeof rawOffer !== 'object') {
+    let rawPassengers: unknown;
+    if (Array.isArray(passengersInput)) {
+      rawPassengers = passengersInput;
+    } else if (
+      passengersInput &&
+      typeof passengersInput === 'object' &&
+      Array.isArray((passengersInput as { passengers?: unknown }).passengers)
+    ) {
+      rawPassengers = (passengersInput as { passengers: unknown[] }).passengers;
+    } else {
       throw new HttpException(
         { code: 'UPSTREAM_UNAVAILABLE', message: 'Offer passenger identities are unavailable' },
         HttpStatus.BAD_GATEWAY,
       );
     }
 
-    const rawPassengers = (rawOffer as { passengers?: unknown }).passengers;
-    if (!Array.isArray(rawPassengers)) {
-      throw new HttpException(
-        { code: 'UPSTREAM_UNAVAILABLE', message: 'Offer passenger identities are unavailable' },
-        HttpStatus.BAD_GATEWAY,
-      );
-    }
-
-    const supplierPassengers = rawPassengers.map((passenger) => {
+    const supplierPassengers = (rawPassengers as unknown[]).map((passenger) => {
       if (!passenger || typeof passenger !== 'object') {
         return null;
       }
-      const candidate = passenger as { id?: unknown; supplierPassengerId?: unknown; type?: unknown };
+      const candidate = passenger as {
+        id?: unknown;
+        supplierPassengerId?: unknown;
+        type?: unknown;
+      };
       const id =
-        typeof candidate.id === 'string'
-          ? candidate.id
-          : typeof candidate.supplierPassengerId === 'string'
+        typeof candidate.supplierPassengerId === 'string'
           ? candidate.supplierPassengerId
+          : typeof candidate.id === 'string'
+          ? candidate.id
           : null;
       if (!id || typeof candidate.type !== 'string') {
         return null;

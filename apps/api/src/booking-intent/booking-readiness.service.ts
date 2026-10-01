@@ -483,31 +483,12 @@ export class BookingReadinessService {
     const normalized = this.flightSearchPort.normalizeStoredOffer(rawOffer);
     if (normalized?.offerExpiresAt) {
       const expiresAt = new Date(normalized.offerExpiresAt);
+      if (Number.isNaN(expiresAt.getTime())) {
+        throw new Error('Stored offer expiry is malformed');
+      }
       if (expiresAt.getTime() <= Date.now()) {
         throw httpError('OFFER_EXPIRED', 'Flight offer has expired', HttpStatus.CONFLICT);
       }
-      return;
-    }
-
-    if (!isRecord(rawOffer) || !Object.prototype.hasOwnProperty.call(rawOffer, 'expires_at')) {
-      return;
-    }
-
-    if (rawOffer.expires_at === null || rawOffer.expires_at === undefined) {
-      return;
-    }
-
-    if (typeof rawOffer.expires_at !== 'string') {
-      throw new Error('Stored offer expiry is malformed');
-    }
-
-    const expiresAt = new Date(rawOffer.expires_at);
-    if (Number.isNaN(expiresAt.getTime())) {
-      throw new Error('Stored offer expiry is malformed');
-    }
-
-    if (expiresAt.getTime() <= Date.now()) {
-      throw httpError('OFFER_EXPIRED', 'Flight offer has expired', HttpStatus.CONFLICT);
     }
   }
 
