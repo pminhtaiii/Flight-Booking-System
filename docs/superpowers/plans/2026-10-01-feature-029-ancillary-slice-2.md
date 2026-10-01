@@ -133,7 +133,7 @@ export class DuffelAncillaryService {
 
 Consumes real existing adapter.getSeatMaps/getOfferWithServices/getPricedOffer Promise<unknown>, Task 1 normalizer, CacheService.get/getTtl/set. Exports concrete service through module. No direct budget/SDK calls and no monolith dependency.
 
-- [ ] Step 1: Add a RED integration test through Nest Test.createTestingModule providing real service, adapter and normalizer. Override only DUFFEL_SDK, CacheService and DuffelRateBudgetService boundary providers. Set fresh cached catalog TTL 4; assert HIT/4, no SDK calls and no budget reservations. Run `pnpm --filter @api/backend exec jest --runInBand src/supplier/ancillary/duffel-ancillary.capability.spec.ts`, record RED missing class.
+- [ ] Step 1: Add a RED integration test through Nest Test.createTestingModule providing real service, adapter, normalizer and DuffelRateBudgetService. Override only DUFFEL_SDK and CacheService boundary providers. The cache double includes checkAndIncrement returning `{ allowed: true, current: 1 }`; exhaustion returns `{ allowed: false, current: 1500 }`, store failure adds `storeError: true`. Count this storage operation to verify reservations without mocking internal budget behavior. Set fresh cached catalog TTL 4; assert HIT/4, no SDK calls and no budget reservations. Run `pnpm --filter @api/backend exec jest --runInBand src/supplier/ancillary/duffel-ancillary.capability.spec.ts`, record RED missing class.
 - [ ] Step 2: Implement cache path and getSeatMapsAndServices signatures. Read TTL before value; ttl>3 and readable catalog returns HIT. Cache read/parse failure falls back to supplier without exposing raw values in logs.
 
 ```typescript
