@@ -14,7 +14,7 @@ Overall status:
 FEATURES 001–028 100% COMPLETE / FEATURE 029 PHASES 0–3 COMPLETE / PHASE 4 US2 COMPLETE LOCALLY (T025–T031) / PHASE 5 STARTED (T032–T034 COMPLETE; T035–T043 PENDING) / PHASES 6–8 PENDING
 ```
 
-The system operates on branch `codex/029-duffel-provider-narrowing`. Features 001–028 are verified and complete. In Feature 029, Phases 0–3 are fully implemented and verified; Phase 4 (T025–T031), including `DuffelAncillaryService`, `SupplierAncillaryModule`, consumer rewiring, its focused test/typecheck checkpoint, and post-T030 network-guard API suite (127 suites, 2,312 tests), is complete locally. Phase 5 has started: T032–T034 are complete, including T033 code review GO, zero-gap scoped convergence, and the full local API gate. T035–T043 remain pending, including order consumer rewiring. Legacy monolith deletion and Phases 7–8 remain pending; final dual review and remote CI are tracked in the PR.
+The system operates on branch `codex/029-duffel-provider-narrowing`. Features 001–028 are verified and complete. In Feature 029, Phases 0–3 are fully implemented and verified; Phase 4 (T025–T031), including `DuffelAncillaryService`, `SupplierAncillaryModule`, consumer rewiring, its focused test/typecheck checkpoint, and post-T030 network-guard API suite (127 suites, 2,312 tests), is complete locally. Phase 5 has started: T032–T034 are complete, including T033 code review GO, zero-gap scoped convergence, and the final local API gate (128 suites, 2,346 tests). Standards review has 0 open findings (2 resolved); the small Spec delta recheck and remote CI remain pending in the PR. T035–T043 remain pending, including order consumer rewiring. Legacy monolith deletion and Phases 7–8 remain pending.
 
 ---
 
