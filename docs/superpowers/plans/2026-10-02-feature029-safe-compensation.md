@@ -16,7 +16,7 @@
 - When `duffel_order_created` evidence exists, never void the payment hold, fail the booking, or complete the idempotency key until supplier cancellation is confirmed.
 - Preserve `booking:recovery:defer:{bookingId}` and the positive-TTL sweeper skip; an absent/expired key permits a safe recheck.
 - Add no dependencies, ports, services, or abstractions. Add no `any` or type assertions in changed code or new test statements; narrow persisted metadata from `unknown`.
-- Keep existing test cases and assertions unchanged. Add only focused regression cases to the existing adjacent specs.
+- Keep existing test assertions unchanged. Human approval on 2026-10-02 permits replacing the two already-cancelled replay error fixtures with explicit CANCELLED evidence and documenting that approval; all other existing cases remain unchanged.
 - Use PowerShell commands from the repository root. Commit T040 and T041 separately, after each task’s focused checks pass.
 
 ## File Map
@@ -110,7 +110,7 @@ expect(mockCacheService.set).toHaveBeenCalledWith(
 ```
 
 - [ ] Step 5: Verify both typed 429 codes with upstream `resetAt` and positive integer retry seconds; missing reset computes `Date.now() + retryAfterSeconds * 1000`. Add uncovered cases one at a time using RED/GREEN. Retain the generic-error and invalid retry-metadata 300-second fallback. Confirm pending cancellation, cache-write failure and lookup errors never void/fail, and confirmed cancellation records `duffel_order_cancelled` before release. Preserve already-cancelled replay and duplicate-effect guards.
-- [ ] Step 6: Preserve and verify positive-TTL skip and expired/missing-key safe recheck through public recovery entry points. Reuse adequate existing tests. Run unchanged `apps/api/test/payment-fulfillment-safety.e2e-spec.ts` for service-graph coverage of capture failure, rate deferral, TTL skip, retry and confirmed cancellation before release/failure. If that suite lacks an in-scope required behavior, add a new test rather than modify its existing assertions.
+- [ ] Step 6: Preserve and verify positive-TTL skip and expired/missing-key safe recheck through public recovery entry points. Reuse adequate existing tests. Run `apps/api/test/payment-fulfillment-safety.e2e-spec.ts` with the approved replay-fixture correction for service-graph coverage of capture failure, rate deferral, TTL skip, retry and confirmed cancellation before release/failure. If that suite lacks an in-scope required behavior, add a new test rather than modify its existing assertions.
 - [ ] Step 7: Run focused recovery spec, `pnpm --filter @api/backend test:e2e -- test/payment-fulfillment-safety.e2e-spec.ts`, `pnpm --filter @api/backend exec tsc -p tsconfig.json --noEmit`, and `pnpm --filter @api/backend lint`. Keep database E2Es on the existing disposable `feature029_slice2_test` database when needed; do not reset unrelated data. All commands must exit 0; record test evidence.
 - [ ] Step 8: Update task and checkpoint docs accurately; do not claim full-feature convergence. Commit exact task files with `git commit -m "fix(api): defer unconfirmed stale recovery (T041)"`. Report RED/GREEN evidence, commit and concerns.
 
@@ -121,3 +121,8 @@ After both task reviews approve, run scoped speckit-converge for T040/T041, full
 ## Self-review
 
 Coverage maps T040 to inline/background recoverable compensation and T041 to typed retry timing, stale recovery safety, TTL gates and safe replay. Interfaces remain unchanged. No new dependency, any, assertion or service. Each new behavioral test is followed immediately by RED/GREEN before another test is introduced. Focused test, typecheck and lint precede each task commit. Existing tests remain intact. No unspecified implementation steps.
+
+
+## Human-approved amendment (2026-10-02)
+
+The human approved both replay-fixture corrections: replace rejected `Error('The order has already_cancelled')` in the unit replay case with resolved `{ id: 'ord_123', status: 'CANCELLED' }`; replace the queued Error in the safety E2E replay with `{ id: 'order-safety-1', status: 'CANCELLED' }`. Keep every existing assertion intact; rename the misleading unit title and document approval in comments. Remove recovery's error-text-only confirmation path. Add one RED/GREEN regression that a thrown already_cancelled error remains unconfirmed, produces bounded deferral, and never releases the hold, fails the booking or writes cancellation proof. The real supplier cancellation capability returns CANCELLED only after confirming provider state; a thrown error means it could not confirm. Include the approved E2E correction in the T041 commit. This amendment overrides earlier instructions to run that test unchanged.
