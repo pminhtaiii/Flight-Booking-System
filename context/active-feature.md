@@ -6,14 +6,14 @@ This file tracks the currently active in-flight feature, its checkpoints, and ex
 
 ## Feature 029 — Narrow the Duffel Supplier Boundary
 
-- **Status**: In Progress (Phase 5; T032–T039 complete locally; T040–T043 next)
+- **Status**: In Progress (Phase 5; T032–T041 complete locally; T042–T043 pending)
 - **Branch**: `codex/029-duffel-provider-narrowing`
 - **Specification**: [specs/029-duffel-provider-narrowing/spec.md](../specs/029-duffel-provider-narrowing/spec.md)
 - **Implementation Plan**: [specs/029-duffel-provider-narrowing/plan.md](../specs/029-duffel-provider-narrowing/plan.md)
 - **Tasks**: [specs/029-duffel-provider-narrowing/tasks.md](../specs/029-duffel-provider-narrowing/tasks.md)
 
 ### Current Summary
-Phases 0–4 are complete locally. Phase 5 is complete locally through T039: fulfillment now lives in `SupplierOrderModule`, and cancellation, booking recovery, disruption sync, and payment fulfillment consume its exports. T038 is committed as `df56f6a6`; both task reviews passed after scoped fixes. The network-guard API suite passed 132 suites/2,384 tests on an isolated retry after an earlier concurrent run exceeded the existing performance threshold; neither code nor threshold was changed for that retry. Focused order/consumer tests passed 481 tests, module composition passed 29, five consumer E2E suites passed 34, and four migrated compensation/idempotency/passenger/event E2E suites passed 59. Booking-events passed another 18 tests after removing an unnecessary type assertion. Database checks used the disposable `feature029_slice2_test` database. API typecheck, full API/shared lint, shared contracts (110 tests), and static CI contracts (23 tests) passed. Fixture corrections were explicitly approved on 2026-10-02 and documented in comments. Slice 3 convergence passed with zero gaps. Final Spec review has zero findings; Standards has one low-severity duplication suggestion and no hard violations or blockers. The [slice verification record](../specs/029-duffel-provider-narrowing/slice-3-verification.md) preserves both reports and local evidence; remote CI is checked on the draft PR. T040–T043, neutral naming/schema (T044–T054), and final audit (T055–T057) remain pending; Feature 029 is not complete.
+Phases 0–4 are complete locally. Phase 5 is complete locally through T041: fulfillment now lives in `SupplierOrderModule`, and cancellation, booking recovery, disruption sync, and payment fulfillment consume its exports. T040 preserves recoverable saga state when cancellation is unconfirmed; T041 defers unsafe stale recovery and requires explicit cancellation proof. Both independent task reviews had zero findings. Slice 4 validation passed 132 API suites/2,404 tests with the network guard, 59 broader transactional E2E tests, shared contracts (110), and static CI contracts (23). Scoped T040/T041 convergence and final Spec review passed with zero findings; final Standards review found a test annotation issue fixed in ed24a4c0 and independently rechecked with zero open findings and a nonblocking local helper duplication smell. Evidence is archived in the [Slice 4 verification record](../specs/029-duffel-provider-narrowing/slice-4-verification.md). T041 validation on 2026-10-02 passed the recovery suite (55/55), payment safety E2E (2/2), API TypeScript check, and API lint. Fixture corrections were explicitly approved on 2026-10-02 and documented beside the corrected cases. Earlier T039 validation and Slice 3 convergence/review findings are in the [slice verification record](../specs/029-duffel-provider-narrowing/slice-3-verification.md); they are separate from T041 results. T042–T043, neutral naming/schema (T044–T054), and final audit (T055–T057) remain pending; Feature 029 is not complete.
 
 ---
 
@@ -88,7 +88,10 @@ Exit gate:
 - [x] Extract order retrieval and snapshot recovery plus service-graph E2E (T037; `2a85a113`; focused checks and independent review passed).
 - [x] Add `SupplierOrderModule` and bind fulfillment capability (T038; present on the current base).
 - [x] Rewire cancellation, booking recovery, sync, fulfillment modules, and AppModule to supplier order boundaries (T039; task review and local gates passed).
-- [ ] Complete remaining order work (T040–T043; pending).
+- [x] Preserve saga retry checkpoint, payment hold, PROCESSING booking, and order evidence during unconfirmed compensation (T040; reviewed with zero findings).
+- [x] Defer stale recovery on missing/invalid order IDs, lookup failures, unconfirmed cancellation, and typed budget/rate denial; require explicit cancellation proof (T041; recovery 55/55, safety E2E 2/2, API typecheck and lint passed).
+- [ ] Delete the legacy Duffel monolith after equivalent tests and consumer migration (T042).
+- [ ] Run the order/saga/recovery/privacy and API compile checkpoint (T043).
 
 Exit gate:
 ```text
