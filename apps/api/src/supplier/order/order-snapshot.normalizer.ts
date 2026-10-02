@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import type { FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
 import type { NormalizedSegment } from '@/disruption/domain/itinerary-normalizer';
 
@@ -229,6 +229,117 @@ export function normalizeDuffelOrder(order: unknown): NormalizedSegment[] {
 
 @Injectable()
 export class OrderSnapshotNormalizer {
+  preparePassengers(passengers: unknown, offer: unknown): Array<Record<string, unknown>> {
+    const offerRecord = toRecord(offer);
+    const offerPassengerValues = offerRecord?.passengers;
+    if (!offerPassengerValues) {
+      throw new HttpException('Duffel offer or passenger list not found.', HttpStatus.NOT_FOUND);
+    }
+    if (!Array.isArray(offerPassengerValues)) {
+      throw new HttpException('Duffel offer or passenger list not found.', HttpStatus.NOT_FOUND);
+    }
+    if (!Array.isArray(passengers)) {
+      throw new HttpException('Passengers must be an array.', HttpStatus.BAD_REQUEST);
+    }
+
+    const offerPassengersByType = new Map<string, Array<{ id: string; type: string }>>();
+    for (const value of offerPassengerValues) {
+      const passenger = toRecord(value);
+      const id = fieldString(passenger, 'id');
+      const type = fieldString(passenger, 'type');
+      if (!id || !type) continue;
+      const matchingPassengers = offerPassengersByType.get(type) ?? [];
+      matchingPassengers.push({ id, type });
+      offerPassengersByType.set(type, matchingPassengers);
+    }
+
+    const typeCounters = new Map<string, number>();
+    return passengers.map((value) => {
+      const passenger = toRecord(value);
+      if (!passenger) {
+        throw new HttpException('Invalid passenger.', HttpStatus.BAD_REQUEST);
+      }
+      const type = fieldString(passenger, 'type');
+      if (!type) {
+        throw new HttpException('Passenger type is required for passenger.', HttpStatus.BAD_REQUEST);
+      }
+      const normalizedType = type.toLowerCase();
+      const duffelType = normalizedType === 'infant' ? 'infant_without_seat' : normalizedType;
+      const passengerIndex = typeCounters.get(duffelType) ?? 0;
+      const matchedOfferPassenger = offerPassengersByType.get(duffelType)?.[passengerIndex];
+      if (!matchedOfferPassenger) {
+        throw new HttpException(
+          `Could not match passenger of type ${type} at index ${passengerIndex} with offer passengers`,
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      typeCounters.set(duffelType, passengerIndex + 1);
+
+      const givenName = this.preferredString(passenger, 'givenName', 'given_name');
+      const familyName = this.preferredString(passenger, 'familyName', 'family_name');
+      if (!givenName) {
+        throw new HttpException('Given name is required for passenger.', HttpStatus.BAD_REQUEST);
+      }
+      if (!familyName) {
+        throw new HttpException('Family name is required for passenger.', HttpStatus.BAD_REQUEST);
+      }
+
+      const genderInput = fieldString(passenger, 'gender');
+      const firstGenderCharacter = genderInput?.trim().toLowerCase()[0];
+      const gender = firstGenderCharacter === 'm' ? 'm' : firstGenderCharacter === 'f' ? 'f' : 'u';
+      const suppliedTitle = fieldString(passenger, 'title');
+      const title = suppliedTitle
+        ? suppliedTitle.toLowerCase().trim()
+        : gender === 'f'
+          ? 'ms'
+          : 'mr';
+
+      const rawDate = passenger.born_on || passenger.bornOn || passenger.dateOfBirth;
+      const bornOn =
+        rawDate instanceof Date
+          ? rawDate.toISOString().split('T')[0]
+          : typeof rawDate === 'string'
+            ? rawDate.split('T')[0]
+            : '';
+      const phoneNumber = this.preferredString(passenger, 'phoneNumber', 'phone_number');
+      const email = fieldString(passenger, 'email');
+      if (!bornOn) {
+        throw new HttpException(
+          `Date of birth is required for passenger ${givenName} ${familyName}`,
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      if (!phoneNumber) {
+        throw new HttpException(
+          `Phone number is required for passenger ${givenName} ${familyName}`,
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      if (!email) {
+        throw new HttpException(
+          `Email address is required for passenger ${givenName} ${familyName}`,
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const prepared: Record<string, unknown> = {
+        id: matchedOfferPassenger.id,
+        given_name: givenName,
+        family_name: familyName,
+        born_on: bornOn,
+        gender,
+        title,
+        phone_number: phoneNumber,
+        email,
+      };
+      const identityDocuments = passenger.identity_documents;
+      if (Array.isArray(identityDocuments) && identityDocuments.length > 0) {
+        prepared.identity_documents = identityDocuments;
+      }
+      return prepared;
+    });
+  }
+
   mapDuffelOrderToSnapshots(order: unknown): {
     flightSnapshot: FlightSnapshot;
     passengerSnapshot: PassengerSnapshot;
@@ -238,5 +349,9 @@ export class OrderSnapshotNormalizer {
 
   normalizeDuffelOrder(order: unknown): NormalizedSegment[] {
     return normalizeDuffelOrder(order);
+  }
+
+  private preferredString(record: OrderRecord, first: string, second: string): string | undefined {
+    return fieldString(record, first) || fieldString(record, second);
   }
 }

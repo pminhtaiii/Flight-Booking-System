@@ -25,7 +25,7 @@ import {
   FulfillmentGatewayPort,
 } from '@/payment-fulfillment/ports/fulfillment-gateway.port';
 import { StripePaymentAdapter } from '@/common/stripe-payment.adapter';
-import { DuffelFulfillmentAdapter } from '@/duffel/duffel-fulfillment.adapter';
+import { DuffelFulfillmentAdapter } from '@/supplier/order/duffel-fulfillment.adapter';
 import { BookingRecoveryService } from '@/booking-lifecycle/booking-recovery.service';
 import { BookingLifecycleModule } from '@/booking-lifecycle/booking-lifecycle.module';
 import { BookingStateModule } from '@/booking-lifecycle/booking-state.module';

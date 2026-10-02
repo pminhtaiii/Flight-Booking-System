@@ -9,19 +9,45 @@ import {
   FulfillmentGatewayPort,
   PassengerEnrichmentInput,
   PersistedOrderEvidence,
-  PersistedOrderPassenger,
   PortInvocationControl,
 } from '@/payment-fulfillment/ports';
+import { HttpException, HttpStatus } from '@nestjs/common';
+import type { Provider } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { CacheService } from '@/cache/cache.service';
 import { PrismaService } from '@/prisma/prisma.service';
+import { DUFFEL_SDK, DUFFEL_SDK_CONFIGURATION } from '@/supplier/core/duffel-core.module';
+import { DuffelRateBudgetService } from '@/supplier/core/duffel-rate-budget.service';
+import { DuffelCancellationService } from './duffel-cancellation.service';
 import { DuffelFulfillmentAdapter } from './duffel-fulfillment.adapter';
-import { DuffelService } from './duffel.service';
-import { DuffelModule } from './duffel.module';
+import { DuffelOrderAdapter } from './duffel-order.adapter';
+import { DuffelRecoveryService } from './duffel-recovery.service';
+import { OrderSnapshotNormalizer } from './order-snapshot.normalizer';
+import { DuffelModule } from '@/duffel/duffel.module';
+
+type SdkResponse = { data: unknown };
+type DuffelSdkDouble = {
+  offers: { get: jest.Mock<Promise<SdkResponse>, [offerId: string]> };
+  orders: { get: jest.Mock<Promise<SdkResponse>, [orderId: string]> };
+  orderCancellations: {
+    create: jest.Mock<Promise<SdkResponse>, [input: { order_id: string }]>
+    confirm: jest.Mock<Promise<SdkResponse>, [quoteId: string]>;
+  };
+};
 
 describe('DuffelFulfillmentAdapter', () => {
   let adapter: DuffelFulfillmentAdapter;
-  let mockDuffelService: jest.Mocked<Partial<DuffelService>>;
+  let mockOffersGet: DuffelSdkDouble['offers']['get'];
+  let mockOrdersGet: DuffelSdkDouble['orders']['get'];
+  let mockCancellationCreate: DuffelSdkDouble['orderCancellations']['create'];
+  let mockCancellationConfirm: DuffelSdkDouble['orderCancellations']['confirm'];
+  let cacheCheck: (...args: unknown[]) => Promise<{ allowed: boolean; storeError: boolean }>;
+  let fetchResponseBody: unknown;
+  let fetchResponseStatus: number;
+  let fetchError: unknown;
+  let fetchCalls: Array<{ input: RequestInfo | URL; init?: RequestInit }>;
+  let boundaryOrder: string[];
+  let testModules: TestingModule[] = [];
   let mockControl: PortInvocationControl;
 
   const validCreateOrderInput: CreateOrderInput = {
@@ -112,19 +138,94 @@ describe('DuffelFulfillmentAdapter', () => {
     },
   ];
 
-  beforeEach(() => {
-    mockDuffelService = {
-      createOrder: jest.fn(),
-      cancelOrder: jest.fn(),
-      retrieveCompleteOrder: jest.fn(),
-      mapDuffelOrderToSnapshots: jest.fn(),
-    };
+  function parsedRequestBody(index = 0): unknown {
+    const body = fetchCalls[index]?.init?.body;
+    return typeof body === 'string' ? JSON.parse(body) : undefined;
+  }
 
+  async function createTestModule(semaphore?: BoundedSemaphore): Promise<TestingModule> {
+    const sdk: DuffelSdkDouble = {
+      offers: { get: mockOffersGet },
+      orders: { get: mockOrdersGet },
+      orderCancellations: {
+        create: mockCancellationCreate,
+        confirm: mockCancellationConfirm,
+      },
+    };
+    const providers: Provider[] = [
+      DuffelFulfillmentAdapter,
+      DuffelOrderAdapter,
+      DuffelCancellationService,
+      DuffelRecoveryService,
+      OrderSnapshotNormalizer,
+      DuffelRateBudgetService,
+      { provide: DUFFEL_SDK, useValue: sdk },
+      {
+        provide: DUFFEL_SDK_CONFIGURATION,
+        useValue: { token: 'test-token', basePath: 'http://127.0.0.1:4010' },
+      },
+      { provide: CacheService, useValue: { checkAndIncrement: cacheCheck } },
+    ];
+    if (semaphore) providers.push({ provide: BoundedSemaphore, useValue: semaphore });
+    const moduleRef = await Test.createTestingModule({ providers }).compile();
+    testModules.push(moduleRef);
+    return moduleRef;
+  }
+
+  beforeEach(async () => {
+    mockOffersGet = jest.fn<Promise<SdkResponse>, [string]>().mockImplementation(async () => {
+      boundaryOrder.push('offerLookup');
+      return { data: { passengers: [{ id: 'pas_test_1', type: 'adult' }] } };
+    });
+    mockOrdersGet = jest.fn<Promise<SdkResponse>, [string]>().mockImplementation(async () => {
+      boundaryOrder.push('orderGet');
+      throw new Error('Duffel order retrieval failed');
+    });
+    mockCancellationCreate = jest
+      .fn<Promise<SdkResponse>, [{ order_id: string }]>()
+      .mockImplementation(async () => {
+        boundaryOrder.push('cancelQuote');
+        return { data: { id: 'cancel_123', order_id: 'ord_123' } };
+      });
+    mockCancellationConfirm = jest
+      .fn<Promise<SdkResponse>, [string]>()
+      .mockImplementation(async () => {
+        boundaryOrder.push('cancelConfirm');
+        return {
+          data: {
+            id: 'cancel_123',
+            order_id: 'ord_123',
+            confirmed_at: '2026-10-02T10:00:00.000Z',
+          },
+        };
+      });
+    cacheCheck = jest.fn().mockResolvedValue({ allowed: true, storeError: false });
+    fetchResponseBody = { data: rawDuffelOrder };
+    fetchResponseStatus = 201;
+    fetchError = undefined;
+    fetchCalls = [];
+    boundaryOrder = [];
+    jest.spyOn(global, 'fetch').mockImplementation(async (input, init) => {
+      boundaryOrder.push('orderPost');
+      fetchCalls.push({ input, init });
+      if (fetchError !== undefined) throw fetchError;
+      return new Response(JSON.stringify(fetchResponseBody), {
+        status: fetchResponseStatus,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
     mockControl = {
       beforeInvoke: jest.fn().mockResolvedValue(undefined),
     };
 
-    adapter = new DuffelFulfillmentAdapter(mockDuffelService as DuffelService);
+    const moduleRef = await createTestModule();
+    adapter = moduleRef.get(DuffelFulfillmentAdapter);
+  });
+
+  afterEach(async () => {
+    jest.restoreAllMocks();
+    await Promise.all(testModules.map((moduleRef) => moduleRef.close()));
+    testModules = [];
   });
 
   describe('Semaphore Configuration & Defaults', () => {
@@ -134,26 +235,24 @@ describe('DuffelFulfillmentAdapter', () => {
       process.env = { ...originalEnv };
     });
 
-    it('initializes with default semaphore parameters (10, 100, 5000) when env vars are absent', () => {
+    it('initializes with default semaphore parameters (10, 100, 5000) when env vars are absent', async () => {
       delete process.env.DUFFEL_ADMISSION_ACTIVE_LIMIT;
       delete process.env.DUFFEL_ADMISSION_QUEUE_LIMIT;
       delete process.env.DUFFEL_ADMISSION_TIMEOUT_MS;
 
-      const defaultAdapter = new DuffelFulfillmentAdapter(mockDuffelService as DuffelService);
-      const sem = defaultAdapter.semaphore;
+      const sem = (await createTestModule()).get(DuffelFulfillmentAdapter).semaphore;
 
       expect(sem.activeLimit).toBe(10);
       expect(sem.queueLimit).toBe(100);
       expect(sem.timeoutMs).toBe(5000);
     });
 
-    it('configures semaphore limits from environment variables when provided', () => {
+    it('configures semaphore limits from environment variables when provided', async () => {
       process.env.DUFFEL_ADMISSION_ACTIVE_LIMIT = '5';
       process.env.DUFFEL_ADMISSION_QUEUE_LIMIT = '15';
       process.env.DUFFEL_ADMISSION_TIMEOUT_MS = '2500';
 
-      const configuredAdapter = new DuffelFulfillmentAdapter(mockDuffelService as DuffelService);
-      const sem = configuredAdapter.semaphore;
+      const sem = (await createTestModule()).get(DuffelFulfillmentAdapter).semaphore;
 
       expect(sem.activeLimit).toBe(5);
       expect(sem.queueLimit).toBe(15);
@@ -175,9 +274,9 @@ describe('DuffelFulfillmentAdapter', () => {
       ['DUFFEL_ADMISSION_TIMEOUT_MS', '0'],
     ])(
       'throws an Error naming the variable when %s is set to %p',
-      (envVar, invalidValue) => {
+      async (envVar, invalidValue) => {
         process.env[envVar] = invalidValue;
-        expect(() => new DuffelFulfillmentAdapter(mockDuffelService as DuffelService)).toThrow(
+        await expect(createTestModule()).rejects.toThrow(
           `Invalid configuration for ${envVar}: "${invalidValue}"`,
         );
       },
@@ -185,52 +284,58 @@ describe('DuffelFulfillmentAdapter', () => {
   });
 
   describe('createOrder', () => {
-    it('maps serviceId to id, passes metadata and idempotencyKey, calls beforeInvoke before SDK, and redacts PII', async () => {
-      const callOrder: string[] = [];
+    it('maps the provider request, calls beforeInvoke before offer lookup, and redacts PII', async () => {
       mockControl.beforeInvoke = jest.fn().mockImplementation(async () => {
-        callOrder.push('beforeInvoke');
-      });
-      (mockDuffelService.createOrder as jest.Mock).mockImplementation(async () => {
-        callOrder.push('duffelCreateOrder');
-        return rawDuffelOrder;
+        boundaryOrder.push('beforeInvoke');
       });
 
       const outcome = await adapter.createOrder(validCreateOrderInput, mockControl);
 
-      expect(callOrder).toEqual(['beforeInvoke', 'duffelCreateOrder']);
-      expect(mockDuffelService.createOrder).toHaveBeenCalledWith(
-        'off_test_123',
-        validCreateOrderInput.passengers,
-        [{ id: 'srv_bag_123', quantity: 2 }],
-        {
-          bookingIntentId: 'intent_123',
-          paymentId: 'pay_123',
+      expect(boundaryOrder).toEqual(['beforeInvoke', 'offerLookup', 'orderPost']);
+      expect(mockOffersGet).toHaveBeenCalledWith('off_test_123');
+      expect(fetchCalls[0]?.input).toBe('http://127.0.0.1:4010/air/orders');
+      expect(fetchCalls[0]?.init?.method).toBe('POST');
+      expect(fetchCalls[0]?.init?.headers).toMatchObject({
+        'Idempotency-Key': 'idem_key_123-duffel-order',
+      });
+      expect(parsedRequestBody()).toEqual({
+        data: {
+          type: 'instant',
+          selected_offers: ['off_test_123'],
+          passengers: [
+            {
+              id: 'pas_test_1',
+              given_name: 'John',
+              family_name: 'Doe',
+              born_on: '1990-01-01',
+              gender: 'u',
+              title: 'mr',
+              phone_number: '+1234567890',
+              email: 'john.doe@example.com',
+            },
+          ],
+          services: [{ id: 'srv_bag_123', quantity: 2 }],
+          metadata: { bookingIntentId: 'intent_123', paymentId: 'pay_123' },
         },
-        'idem_key_123',
-      );
+      });
 
       expect(outcome.orderId).toBe('ord_duffel_123');
       expect(outcome.bookingReference).toBe('ABCDEF');
 
       // Verify PII redaction on evidence
-      const passengers = outcome.evidence.passengers as unknown as Array<
-        Record<string, unknown>
-      >;
-      const passengerEvidence = passengers[0];
-      expect(passengerEvidence.email).toBe('REDACTED');
-      expect(passengerEvidence.born_on).toBe('REDACTED');
-      expect(passengerEvidence.given_name).toBe('REDACTED');
-      expect(passengerEvidence.family_name).toBe('REDACTED');
-      expect(passengerEvidence.phone_number).toBe('REDACTED');
-      expect(passengerEvidence.id).toBe('pas_test_1');
+      const passengerEvidence = outcome.evidence.passengers?.[0];
+      expect(passengerEvidence?.email).toBe('REDACTED');
+      expect(passengerEvidence?.born_on).toBe('REDACTED');
+      expect(passengerEvidence?.given_name).toBe('REDACTED');
+      expect(passengerEvidence?.family_name).toBe('REDACTED');
+      expect(passengerEvidence?.phone_number).toBe('REDACTED');
+      expect(passengerEvidence?.id).toBe('pas_test_1');
 
       // Verify original raw order was not mutated
       expect(rawDuffelOrder.passengers[0].email).toBe('john.doe@example.com');
     });
 
     it('passes undefined services when services list is empty or omitted', async () => {
-      (mockDuffelService.createOrder as jest.Mock).mockResolvedValue(rawDuffelOrder);
-
       const inputWithoutServices: CreateOrderInput = {
         ...validCreateOrderInput,
         services: [],
@@ -238,16 +343,10 @@ describe('DuffelFulfillmentAdapter', () => {
 
       await adapter.createOrder(inputWithoutServices, mockControl);
 
-      expect(mockDuffelService.createOrder).toHaveBeenCalledWith(
-        'off_test_123',
-        validCreateOrderInput.passengers,
-        undefined,
-        {
-          bookingIntentId: 'intent_123',
-          paymentId: 'pay_123',
-        },
-        'idem_key_123',
-      );
+      expect(parsedRequestBody()).not.toHaveProperty('data.services');
+      // Human approved 2026-10-02: legacy createOrder omits metadata without a services array.
+      expect(parsedRequestBody()).not.toHaveProperty('data.metadata');
+      expect(parsedRequestBody()).toMatchObject({ data: { selected_offers: ['off_test_123'] } });
     });
 
     it('releases permit and never calls DuffelService if beforeInvoke fails', async () => {
@@ -257,14 +356,13 @@ describe('DuffelFulfillmentAdapter', () => {
         'Pre-flight lock failed',
       );
 
-      expect(mockDuffelService.createOrder).not.toHaveBeenCalled();
+      expect(mockOffersGet).not.toHaveBeenCalled();
+      expect(fetchCalls).toHaveLength(0);
       expect(adapter.semaphore.activeCount).toBe(0);
     });
 
     it('releases permit and propagates upstream error when duffelService.createOrder throws', async () => {
-      (mockDuffelService.createOrder as jest.Mock).mockRejectedValue(
-        new Error('Upstream Duffel error on createOrder'),
-      );
+      fetchError = new Error('Upstream Duffel error on createOrder');
 
       await expect(adapter.createOrder(validCreateOrderInput, mockControl)).rejects.toThrow(
         'Upstream Duffel error on createOrder',
@@ -291,7 +389,7 @@ describe('DuffelFulfillmentAdapter', () => {
         ],
       };
 
-      (mockDuffelService.createOrder as jest.Mock).mockResolvedValue(duffelOrderWithSensitivePii);
+      fetchResponseBody = { data: duffelOrderWithSensitivePii };
 
       const outcome = await adapter.createOrder(validCreateOrderInput, mockControl);
 
@@ -305,20 +403,16 @@ describe('DuffelFulfillmentAdapter', () => {
   });
 
   describe('cancelOrder', () => {
-    it('calls beforeInvoke before calling duffelService.cancelOrder and returns CancelOrderOutcome', async () => {
-      const callOrder: string[] = [];
+    it('calls beforeInvoke before Duffel cancellation requests and returns CancelOrderOutcome', async () => {
       mockControl.beforeInvoke = jest.fn().mockImplementation(async () => {
-        callOrder.push('beforeInvoke');
-      });
-      (mockDuffelService.cancelOrder as jest.Mock).mockImplementation(async () => {
-        callOrder.push('duffelCancelOrder');
-        return { id: 'ord_123', status: 'CANCELLED' };
+        boundaryOrder.push('beforeInvoke');
       });
 
       const outcome = await adapter.cancelOrder('ord_123', mockControl);
 
-      expect(callOrder).toEqual(['beforeInvoke', 'duffelCancelOrder']);
-      expect(mockDuffelService.cancelOrder).toHaveBeenCalledWith('ord_123');
+      expect(boundaryOrder).toEqual(['beforeInvoke', 'cancelQuote', 'cancelConfirm']);
+      expect(mockCancellationCreate).toHaveBeenCalledWith({ order_id: 'ord_123' });
+      expect(mockCancellationConfirm).toHaveBeenCalledWith('cancel_123');
       expect(outcome).toEqual({
         success: true,
         orderId: 'ord_123',
@@ -327,11 +421,9 @@ describe('DuffelFulfillmentAdapter', () => {
       expect(adapter.semaphore.activeCount).toBe(0);
     });
 
-    // Human approval 2026-10-02: use direct mock assignment in these new cases without changing behavioral expectations.
     it('normalizes Duffel confirmed cancellation response to the port contract', async () => {
-      mockDuffelService.cancelOrder = jest.fn().mockResolvedValue({
-        id: 'cancel_123',
-        status: 'confirmed',
+      mockCancellationConfirm.mockResolvedValueOnce({
+        data: { id: 'cancel_123', status: 'confirmed' },
       });
 
       await expect(adapter.cancelOrder('ord_123', mockControl)).resolves.toEqual({
@@ -342,7 +434,7 @@ describe('DuffelFulfillmentAdapter', () => {
     });
 
     it('does not confirm a status-less Duffel object', async () => {
-      mockDuffelService.cancelOrder = jest.fn().mockResolvedValue({ id: 'cancel_123' });
+      mockCancellationConfirm.mockResolvedValueOnce({ data: { id: 'cancel_123' } });
 
       await expect(adapter.cancelOrder('ord_123', mockControl)).resolves.toEqual({
         success: false,
@@ -352,9 +444,8 @@ describe('DuffelFulfillmentAdapter', () => {
     });
 
     it('confirms a status-less cancellation with a non-empty confirmed_at', async () => {
-      mockDuffelService.cancelOrder = jest.fn().mockResolvedValue({
-        id: 'cancel_123',
-        confirmed_at: '2026-10-02T10:00:00.000Z',
+      mockCancellationConfirm.mockResolvedValueOnce({
+        data: { id: 'cancel_123', confirmed_at: '2026-10-02T10:00:00.000Z' },
       });
 
       await expect(adapter.cancelOrder('ord_123', mockControl)).resolves.toEqual({
@@ -381,7 +472,7 @@ describe('DuffelFulfillmentAdapter', () => {
         status: undefined,
       },
     ])('returns an unconfirmed outcome for a $name Duffel result', async ({ result, status }) => {
-      mockDuffelService.cancelOrder = jest.fn().mockResolvedValue(result);
+      mockCancellationConfirm.mockResolvedValueOnce({ data: result });
 
       const outcome = await adapter.cancelOrder('ord_123', mockControl);
 
@@ -397,13 +488,14 @@ describe('DuffelFulfillmentAdapter', () => {
         'Pre-flight lock failed',
       );
 
-      expect(mockDuffelService.cancelOrder).not.toHaveBeenCalled();
+      expect(mockCancellationCreate).not.toHaveBeenCalled();
+      expect(mockCancellationConfirm).not.toHaveBeenCalled();
       expect(adapter.semaphore.activeCount).toBe(0);
     });
 
     it('releases permit and propagates upstream error when duffelService.cancelOrder throws', async () => {
-      (mockDuffelService.cancelOrder as jest.Mock).mockRejectedValue(
-        new Error('Upstream Duffel cancellation rejected'),
+      mockCancellationCreate.mockRejectedValueOnce(
+        new HttpException('Upstream Duffel cancellation rejected', HttpStatus.BAD_GATEWAY),
       );
 
       await expect(adapter.cancelOrder('ord_123', mockControl)).rejects.toThrow(
@@ -411,22 +503,39 @@ describe('DuffelFulfillmentAdapter', () => {
       );
 
       expect(mockControl.beforeInvoke).toHaveBeenCalled();
+      expect(mockOrdersGet).toHaveBeenCalledWith('ord_123');
       expect(adapter.semaphore.activeCount).toBe(0);
     });
   });
 
   describe('retrieveOrderSnapshot', () => {
+    // Human approved this exact legacy-normalizer output when replacing the old service mock.
     const mockSnapshots = {
       flightSnapshot: {
         segments: [
           {
             airline: { name: 'British Airways', iataCode: 'BA' },
             flightNumber: 'BA123',
-            departureAirport: { iataCode: 'LHR', name: 'Heathrow', city: 'London' },
-            arrivalAirport: { iataCode: 'JFK', name: 'JFK', city: 'New York' },
+            departureAirport: {
+              iataCode: 'LHR',
+              name: 'Heathrow',
+              city: 'London',
+              terminal: undefined,
+            },
+            arrivalAirport: {
+              iataCode: 'JFK',
+              name: 'JFK',
+              city: 'New York',
+              terminal: undefined,
+            },
             departureAt: '2026-10-01T10:00:00.000Z',
             arrivalAt: '2026-10-01T13:00:00.000Z',
             duration: 'PT8H',
+            aircraftType: undefined,
+            duffelSegmentId: 'seg_1',
+            sliceOrder: 0,
+            segmentOrder: 0,
+            globalOrder: 0,
           },
         ],
         totalDuration: 'PT8H',
@@ -436,7 +545,7 @@ describe('DuffelFulfillmentAdapter', () => {
       passengerSnapshot: {
         passengers: [
           {
-            type: 'ADULT' as const,
+            type: 'ADULT',
             firstName: 'Jane',
             lastName: 'Smith',
             dateOfBirth: '1985-05-20',
@@ -448,9 +557,38 @@ describe('DuffelFulfillmentAdapter', () => {
     };
 
     it('returns snapshots and departureAt Date on retrieveCompleteOrder success', async () => {
-      const freshOrder = { id: 'ord_123' };
-      (mockDuffelService.retrieveCompleteOrder as jest.Mock).mockResolvedValue(freshOrder);
-      (mockDuffelService.mapDuffelOrderToSnapshots as jest.Mock).mockReturnValue(mockSnapshots);
+      const freshOrder = {
+        id: 'ord_123',
+        slices: [
+          {
+            duration: 'PT8H',
+            segments: [
+              {
+                id: 'seg_1',
+                departing_at: '2026-10-01T10:00:00.000Z',
+                arriving_at: '2026-10-01T13:00:00.000Z',
+                duration: 'PT8H',
+                marketing_carrier_flight_number: 'BA123',
+                operating_carrier: { name: 'British Airways', iata_code: 'BA' },
+                origin: { iata_code: 'LHR', name: 'Heathrow', city_name: 'London' },
+                destination: { iata_code: 'JFK', name: 'JFK', city_name: 'New York' },
+              },
+            ],
+          },
+        ],
+        passengers: [
+          {
+            id: 'pas_1',
+            type: 'adult',
+            given_name: 'Jane',
+            family_name: 'Smith',
+            born_on: '1985-05-20',
+            email: 'jane@example.com',
+            phone_number: '+1987654321',
+          },
+        ],
+      };
+      mockOrdersGet.mockResolvedValueOnce({ data: freshOrder });
 
       const outcome = await adapter.retrieveOrderSnapshot(
         'ord_123',
@@ -461,8 +599,7 @@ describe('DuffelFulfillmentAdapter', () => {
       );
 
       expect(mockControl.beforeInvoke).toHaveBeenCalled();
-      expect(mockDuffelService.retrieveCompleteOrder).toHaveBeenCalledWith('ord_123');
-      expect(mockDuffelService.mapDuffelOrderToSnapshots).toHaveBeenCalledWith(freshOrder);
+      expect(mockOrdersGet).toHaveBeenCalledWith('ord_123');
       expect(outcome.flightSnapshot).toEqual(mockSnapshots.flightSnapshot);
       expect(outcome.passengerSnapshot).toEqual(mockSnapshots.passengerSnapshot);
       expect(outcome.departureAt).toEqual(new Date('2026-10-01T10:00:00.000Z'));
@@ -470,10 +607,7 @@ describe('DuffelFulfillmentAdapter', () => {
     });
 
     it('falls back to enrichRedactedDuffelOrder when retrieveCompleteOrder throws', async () => {
-      (mockDuffelService.retrieveCompleteOrder as jest.Mock).mockRejectedValue(
-        new Error('Upstream Duffel error'),
-      );
-      (mockDuffelService.mapDuffelOrderToSnapshots as jest.Mock).mockReturnValue(mockSnapshots);
+      mockOrdersGet.mockRejectedValueOnce(new Error('Upstream Duffel error'));
 
       const outcome = await adapter.retrieveOrderSnapshot(
         'ord_123',
@@ -483,13 +617,11 @@ describe('DuffelFulfillmentAdapter', () => {
         mockControl,
       );
 
-      expect(mockDuffelService.retrieveCompleteOrder).toHaveBeenCalledWith('ord_123');
-      // mapDuffelOrderToSnapshots should have been called with the enriched fallback evidence
-      expect(mockDuffelService.mapDuffelOrderToSnapshots).toHaveBeenCalled();
-      const enrichedArg = (mockDuffelService.mapDuffelOrderToSnapshots as jest.Mock).mock.calls[0][0];
-      expect(enrichedArg.passengers[0].given_name).toBe('Jane');
-      expect(enrichedArg.passengers[0].family_name).toBe('Smith');
-      expect(enrichedArg.passengers[0].born_on).toBe('1985-05-20');
+      expect(mockOrdersGet).toHaveBeenCalledWith('ord_123');
+      expect(outcome.passengerSnapshot.passengers[0]?.firstName).toBe('Jane');
+      expect(outcome.passengerSnapshot.passengers[0]?.lastName).toBe('Smith');
+      expect(outcome.passengerSnapshot.passengers[0]?.dateOfBirth).toBe('1985-05-20');
+      expect(outcome.passengerSnapshot.contactEmail).toBe('jane@example.com');
       expect(outcome.departureAt).toEqual(new Date('2026-10-01T10:00:00.000Z'));
       expect(adapter.semaphore.activeCount).toBe(0);
     });
@@ -507,18 +639,22 @@ describe('DuffelFulfillmentAdapter', () => {
         ),
       ).rejects.toThrow('Pre-flight lock failed');
 
-      expect(mockDuffelService.retrieveCompleteOrder).not.toHaveBeenCalled();
-      expect(mockDuffelService.mapDuffelOrderToSnapshots).not.toHaveBeenCalled();
+      expect(mockOrdersGet).not.toHaveBeenCalled();
       expect(adapter.semaphore.activeCount).toBe(0);
     });
 
-    it('releases permit and propagates error when both retrieveCompleteOrder and mapDuffelOrderToSnapshots fail', async () => {
-      (mockDuffelService.retrieveCompleteOrder as jest.Mock).mockRejectedValue(
-        new Error('Duffel API network failure'),
-      );
-      (mockDuffelService.mapDuffelOrderToSnapshots as jest.Mock).mockImplementation(() => {
-        throw new Error('Fallback mapping failed');
+    it('releases permit and propagates a malformed retrieved order error', async () => {
+      // Human approved migrating this old service mock to the real normalizer boundary.
+      const brokenOrder = new Proxy({ id: 'ord_123' }, {
+        get: (target, property) => {
+          if (property === 'id') return target.id;
+          if (property === 'slices') {
+          throw new Error('Fallback mapping failed');
+          }
+          return undefined;
+        },
       });
+      mockOrdersGet.mockResolvedValueOnce({ data: brokenOrder });
 
       await expect(
         adapter.retrieveOrderSnapshot(
@@ -539,12 +675,11 @@ describe('DuffelFulfillmentAdapter', () => {
     it('rejects with AdmissionQueueFullException on queue overflow and does not invoke beforeInvoke or SDK', async () => {
       // Create adapter with tiny semaphore: activeLimit = 1, queueLimit = 1, timeoutMs = 2000
       const tightSemaphore = new BoundedSemaphore(1, 1, 2000);
-      const tightAdapter = new DuffelFulfillmentAdapter(
-        mockDuffelService as DuffelService,
-        tightSemaphore,
+      const tightAdapter = (await createTestModule(tightSemaphore)).get(
+        DuffelFulfillmentAdapter,
       );
 
-      let releaseTask1: () => void;
+      let releaseTask1: (() => void) | undefined;
       const task1Promise = new Promise<void>((resolve) => {
         releaseTask1 = resolve;
       });
@@ -569,10 +704,11 @@ describe('DuffelFulfillmentAdapter', () => {
       );
 
       expect(call3Control.beforeInvoke).not.toHaveBeenCalled();
-      expect(mockDuffelService.cancelOrder).not.toHaveBeenCalled();
+      expect(mockCancellationCreate).not.toHaveBeenCalled();
 
       // Clean up Call 1 and Call 2
-      releaseTask1!();
+      if (!releaseTask1) throw new Error('Expected the first task to hold its permit.');
+      releaseTask1();
       await call1;
       await call2;
       expect(tightAdapter.semaphore.activeCount).toBe(0);
@@ -580,12 +716,11 @@ describe('DuffelFulfillmentAdapter', () => {
 
     it('rejects with AdmissionTimeoutException on admission timeout and does not invoke beforeInvoke or SDK', async () => {
       const timeoutSemaphore = new BoundedSemaphore(1, 2, 50); // 50ms timeout
-      const timeoutAdapter = new DuffelFulfillmentAdapter(
-        mockDuffelService as DuffelService,
-        timeoutSemaphore,
+      const timeoutAdapter = (await createTestModule(timeoutSemaphore)).get(
+        DuffelFulfillmentAdapter,
       );
 
-      let releaseTask1: () => void;
+      let releaseTask1: (() => void) | undefined;
       const task1Promise = new Promise<void>((resolve) => {
         releaseTask1 = resolve;
       });
@@ -602,10 +737,11 @@ describe('DuffelFulfillmentAdapter', () => {
 
       await expect(call2).rejects.toThrow(AdmissionTimeoutException);
       expect(call2Control.beforeInvoke).not.toHaveBeenCalled();
-      expect(mockDuffelService.cancelOrder).not.toHaveBeenCalled();
+      expect(mockCancellationCreate).not.toHaveBeenCalled();
 
       // Clean up Call 1
-      releaseTask1!();
+      if (!releaseTask1) throw new Error('Expected the first task to hold its permit.');
+      releaseTask1();
       await call1;
       expect(timeoutAdapter.semaphore.activeCount).toBe(0);
     });
@@ -641,19 +777,19 @@ describe('DuffelFulfillmentAdapter', () => {
 
       expect(redacted.id).toBe('ord_privacy_123');
       expect(redacted.bookingReference).toBe('XYZ987');
-      const passengers = redacted.passengers as unknown as Array<Record<string, unknown>>;
+      const passengers = redacted.passengers ?? [];
       const p1 = passengers[0];
       const p2 = passengers[1];
-      expect(p1.email).toBe('REDACTED');
-      expect(p1.born_on).toBe('REDACTED');
-      expect(p1.given_name).toBe('REDACTED');
-      expect(p1.family_name).toBe('REDACTED');
-      expect(p1.phone_number).toBe('REDACTED');
-      expect(p2.email).toBe('REDACTED');
-      expect(p2.born_on).toBe('REDACTED');
-      expect(p2.given_name).toBe('REDACTED');
-      expect(p2.family_name).toBe('REDACTED');
-      expect(p2.phone_number).toBe('REDACTED');
+      expect(p1?.email).toBe('REDACTED');
+      expect(p1?.born_on).toBe('REDACTED');
+      expect(p1?.given_name).toBe('REDACTED');
+      expect(p1?.family_name).toBe('REDACTED');
+      expect(p1?.phone_number).toBe('REDACTED');
+      expect(p2?.email).toBe('REDACTED');
+      expect(p2?.born_on).toBe('REDACTED');
+      expect(p2?.given_name).toBe('REDACTED');
+      expect(p2?.family_name).toBe('REDACTED');
+      expect(p2?.phone_number).toBe('REDACTED');
       expect(redacted).not.toHaveProperty('private_provider_payload');
       expect(Object.keys(redacted).sort()).toEqual(
         ['bookingReference', 'booking_reference', 'id', 'passengers'].sort(),
@@ -706,18 +842,25 @@ describe('DuffelFulfillmentAdapter', () => {
         redactedOrder,
         passengerEnrichment,
         'primary@example.com',
-      ) as { passengers: Array<Record<string, unknown>> };
+      );
 
-      expect(enriched.passengers[0].given_name).toBe('Alice');
-      expect(enriched.passengers[0].family_name).toBe('Wonderland');
-      expect(enriched.passengers[0].born_on).toBe('1995-03-15');
-      expect(enriched.passengers[0].email).toBe('alice@example.com');
-      expect(enriched.passengers[0].phone_number).toBe('+1112223333');
-
-      expect(enriched.passengers[1].given_name).toBe('Bob');
-      expect(enriched.passengers[1].family_name).toBe('Builder');
-      expect(enriched.passengers[1].born_on).toBe('1988-08-08');
-      expect(enriched.passengers[1].phone_number).toBe('+4445556666');
+      expect(enriched).toMatchObject({
+        passengers: [
+          {
+            given_name: 'Alice',
+            family_name: 'Wonderland',
+            born_on: '1995-03-15',
+            email: 'alice@example.com',
+            phone_number: '+1112223333',
+          },
+          {
+            given_name: 'Bob',
+            family_name: 'Builder',
+            born_on: '1988-08-08',
+            phone_number: '+4445556666',
+          },
+        ],
+      });
     });
 
     it('redactDuffelOrder strictly strips identity documents, passports, and non-allowlisted PII fields while redacting emails and phone numbers', () => {
@@ -784,7 +927,7 @@ describe('DuffelFulfillmentAdapter', () => {
       expect(redacted.bookingReference).toBe('XYZ987');
       expect(redacted.booking_reference).toBe('XYZ987');
 
-      const passengers = redacted.passengers as readonly PersistedOrderPassenger[];
+      const passengers = redacted.passengers ?? [];
       expect(passengers).toHaveLength(1);
       const p1 = passengers[0];
 
@@ -797,20 +940,17 @@ describe('DuffelFulfillmentAdapter', () => {
       expect(p1.family_name).toBe('REDACTED');
 
       // Assert non-allowlisted PII fields (passports, emergency contacts, loyalty) are completely absent
-      const passengerRecord = p1 as unknown as Record<string, unknown>;
-      expect(passengerRecord.passport_number).toBeUndefined();
-      expect(passengerRecord.passport_expiry).toBeUndefined();
-      expect(passengerRecord.identity_documents).toBeUndefined();
-      expect(passengerRecord.emergency_contact).toBeUndefined();
-      expect(passengerRecord.loyalty_programme_accounts).toBeUndefined();
+      expect(p1).not.toHaveProperty('passport_number');
+      expect(p1).not.toHaveProperty('passport_expiry');
+      expect(p1).not.toHaveProperty('identity_documents');
+      expect(p1).not.toHaveProperty('emergency_contact');
+      expect(p1).not.toHaveProperty('loyalty_programme_accounts');
 
       // Assert segment passenger data only keeps cabin_class and strips seat/passenger PII
-      const segmentPassenger = redacted.slices?.[0]?.segments?.[0]?.passengers?.[0] as
-        | Record<string, unknown>
-        | undefined;
+      const segmentPassenger = redacted.slices?.[0]?.segments?.[0]?.passengers?.[0];
       expect(segmentPassenger?.cabin_class).toBe('economy');
-      expect(segmentPassenger?.seat_number).toBeUndefined();
-      expect(segmentPassenger?.passenger_id).toBeUndefined();
+      expect(segmentPassenger).not.toHaveProperty('seat_number');
+      expect(segmentPassenger).not.toHaveProperty('passenger_id');
 
       // JSON serialization does not contain sensitive raw strings anywhere
       const serialized = JSON.stringify(redacted);
@@ -857,8 +997,7 @@ describe('DuffelFulfillmentAdapter', () => {
     it('characterizes that cancellation quote generation is handled outside the fulfillment port', () => {
       // The port is intentionally narrow (governs execution and retrieval).
       // Cancellation quotes are generated by cancellation domain services rather than the fulfillment gateway port.
-      const portRecord = adapter as unknown as Record<string, unknown>;
-      expect(portRecord.createCancellationQuote).toBeUndefined();
+      expect('createCancellationQuote' in adapter).toBe(false);
     });
 
     it('requires PortInvocationControl with beforeInvoke for all port operations', async () => {
@@ -891,21 +1030,33 @@ describe('DuffelFulfillmentAdapter', () => {
       const moduleRef: TestingModule = await Test.createTestingModule({
         imports: [DuffelModule],
       })
+        .overrideProvider(DUFFEL_SDK)
+        .useValue({
+          offers: { get: mockOffersGet },
+          orders: { get: mockOrdersGet },
+          orderCancellations: {
+            create: mockCancellationCreate,
+            confirm: mockCancellationConfirm,
+          },
+        })
+        .overrideProvider(DUFFEL_SDK_CONFIGURATION)
+        .useValue({ token: 'test-token', basePath: 'http://127.0.0.1:4010' })
         .overrideProvider(CacheService)
-        .useValue({})
+        .useValue({ checkAndIncrement: cacheCheck })
         .overrideProvider(PrismaService)
         .useValue({})
         .compile();
+      testModules.push(moduleRef);
 
-      const gatewayPort = moduleRef.get(FULFILLMENT_GATEWAY_PORT);
-      const adapterInstance = moduleRef.get(DuffelFulfillmentAdapter);
+      const gatewayPort = moduleRef.get<FulfillmentGatewayPort>(FULFILLMENT_GATEWAY_PORT);
+      const adapterInstance = moduleRef.get(DuffelFulfillmentAdapter, { strict: false });
 
       expect(gatewayPort).toBeDefined();
       expect(adapterInstance).toBeDefined();
       expect(gatewayPort).toBeInstanceOf(DuffelFulfillmentAdapter);
       expect(adapterInstance).toBeInstanceOf(DuffelFulfillmentAdapter);
       expect(moduleRef.get(FULFILLMENT_GATEWAY_PORT)).toBe(
-        moduleRef.get(DuffelFulfillmentAdapter),
+        moduleRef.get(DuffelFulfillmentAdapter, { strict: false }),
       );
     });
   });

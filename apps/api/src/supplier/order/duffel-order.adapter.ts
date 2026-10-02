@@ -107,6 +107,26 @@ export class DuffelOrderAdapter {
     }
   }
 
+  async getOfferById(offerId: string, timeoutMs = 4500): Promise<unknown> {
+    const timeoutError = new Error('Duffel offer lookup timed out.');
+    timeoutError.name = 'DuffelTimeoutError';
+    let timeoutHandle: NodeJS.Timeout | undefined;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutHandle = setTimeout(() => reject(timeoutError), timeoutMs);
+    });
+
+    try {
+      const offerPromise = (async (): Promise<unknown> => {
+        await this.reserveAttempt();
+        const response = await this.duffel.offers.get(offerId);
+        return response.data;
+      })();
+      return await Promise.race([offerPromise, timeoutPromise]);
+    } finally {
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+    }
+  }
+
   async createCancellationQuote(duffelOrderId: string): Promise<unknown> {
     return this.meteredCall(
       () => this.duffel.orderCancellations.create({ order_id: duffelOrderId }),
