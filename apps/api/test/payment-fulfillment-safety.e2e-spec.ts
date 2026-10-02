@@ -469,7 +469,8 @@ describe('Payment fulfillment safety E2E', () => {
           metadata: { id: 'order-safety-1' },
         },
       });
-      fixture.duffelCancellationResults.push(new Error('The order has already_cancelled'));
+      // Human approval 2026-10-02: replay success requires explicit provider CANCELLED evidence.
+      fixture.duffelCancellationResults.push({ id: 'order-safety-1', status: 'CANCELLED' });
 
       await fixture.recovery.handleReconciliationRequested({ bookingId: 'booking-safety-1' });
 
