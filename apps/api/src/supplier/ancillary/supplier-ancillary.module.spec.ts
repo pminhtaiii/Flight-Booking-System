@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { Test } from '@nestjs/testing';
 import { Duffel } from '@duffel/api';
 import { CacheService } from '@/cache/cache.service';
-import { DUFFEL_SDK } from '@/supplier/core/duffel-core.module';
+import { DUFFEL_SDK, DUFFEL_SDK_CONFIGURATION } from '@/supplier/core/duffel-core.module';
 import { DuffelRateBudgetService } from '@/supplier/core/duffel-rate-budget.service';
 import { DuffelAncillaryAdapter } from './duffel-ancillary.adapter';
 import { AncillaryNormalizer } from './ancillary.normalizer';
@@ -68,6 +68,9 @@ describe('SupplierAncillaryModule', () => {
     const module = await Test.createTestingModule({ imports: [SupplierAncillaryModule] })
       .overrideProvider(DUFFEL_SDK)
       .useValue(sdk)
+      // human2026-10-02 approval: keep module compilation independent of DUFFEL_ACCESS_TOKEN.
+      .overrideProvider(DUFFEL_SDK_CONFIGURATION)
+      .useValue({ token: 'duffel-test-token', basePath: 'http://127.0.0.1:4010' })
       .overrideProvider(CacheService)
       .useValue(cache)
       .compile();
