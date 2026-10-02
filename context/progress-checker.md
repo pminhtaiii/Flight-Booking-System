@@ -11,10 +11,10 @@ Do not mark a capability complete because it appears in architecture or planning
 Overall status:
 
 ```text
-FEATURES 001–028 100% COMPLETE / FEATURE 029 PHASES 0–3 COMPLETE / PHASE 4 US2 COMPLETE LOCALLY (T025–T031) / PHASE 5 STARTED (T032–T034 COMPLETE; T035–T043 PENDING) / PHASES 6–8 PENDING
+FEATURES 001–028 100% COMPLETE / FEATURE 029 PHASES 0–4 COMPLETE LOCALLY / PHASE 5 IN PROGRESS (T032–T037 COMPLETE; T038–T043 PENDING) / PHASES 6–7 PENDING
 ```
 
-The system operates on branch `codex/029-duffel-provider-narrowing`. Features 001–028 are verified and complete. In Feature 029, Phases 0–3 are fully implemented and verified; Phase 4 (T025–T031), including `DuffelAncillaryService`, `SupplierAncillaryModule`, consumer rewiring, its focused test/typecheck checkpoint, and post-T030 network-guard API suite (127 suites, 2,312 tests), is complete locally. Phase 5 has started: T032–T034 are complete, including T033 code review GO and zero-gap scoped convergence. The latest API unit run passed 128 suites/2,359 tests, with typecheck and API/shared lint passing. E2E fixture correction commit `34b2db3b` is complete, and focused E2Es pass 2/2 against the isolated task database. Standards review has 0 open findings (2 resolved), and Spec review is GO. PR #361 remote CI remains pending push. T035–T043 remain pending, including order consumer rewiring. Legacy monolith deletion and Phases 7–8 remain pending.
+The system operates on branch `codex/029-duffel-provider-narrowing`. Features 001–028 and Feature 029 Phases 0–4 are complete locally. Phase 5 is complete through T037, with one reviewed commit per task: `2223c7c9` (normalizer), `0c28be32` (cancellation), and `2a85a113` (recovery). All three independent task reviews found no issues. The network-guard API suite passed 131 suites/2,383 tests; API typecheck and full API/shared lint passed. The new Nest order-services E2E passed 1 test, and existing booking/cancellation/compensation E2Es passed 3 suites/39 tests against the isolated `feature029_slice2_test` database. Shared and static CI contracts passed 110 and 23 tests respectively. New-test fixture refinements were explicitly approved on 2026-10-02 and documented in comments. Scoped convergence found no gaps. Final Spec review has 0 findings; Standards has 2 optional P3 duplication suggestions and no blockers. The [slice verification record](../specs/029-duffel-provider-narrowing/slice-2-verification.md) contains evidence and both reports. T038 module/fulfillment binding is next; T039–T043, neutral naming/schema (T044–T054), and final audit (T055–T057) remain pending. PR #361 was merged; a fresh slice PR carries the live remote CI result.
 
 ---
 
@@ -27,10 +27,9 @@ Detailed phase-by-phase execution, live task checklists, and exit gates are trac
 - [x] Phase 2: Core Foundation & Shared Rate Budget (T005–T012)
 - [x] Phase 3: Search Capability Isolation (US1 Complete 🎯) (T013–T024)
 - [x] Phase 4: Ancillary Capability Isolation (US2) (T025–T031 complete locally)
-- [ ] Phase 5: Order Capability Isolation (US3) (T032–T038)
-- [ ] Phase 6: Monolith Deletion (US4) (T039–T040)
-- [ ] Phase 7: Neutral Naming & Schema Migration (US5) (T041–T045)
-- [ ] Phase 8: Final Verification & Audit (T046–T050)
+- [ ] Phase 5: Order Capability Isolation (US3) (T032–T043; complete locally through T037)
+- [ ] Phase 6: Neutral Naming & Physical Schema (US4) (T044–T054)
+- [ ] Phase 7: Final Verification & Audit (T055–T057)
 
 Exit gate:
 ```text

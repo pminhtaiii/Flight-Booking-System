@@ -97,9 +97,9 @@
 ### Implementation for User Story 3
 
 - [x] T034 [US3] Extract manual order POST and order/quote/cancel/retrieve SDK operations into `apps/api/src/supplier/order/duffel-order.adapter.ts`, counting each actual attempt and preserving idempotency/request shapes.
-- [ ] T035 [US3] Move Duffel order/itinerary-to-domain mapping into `apps/api/src/supplier/order/order-snapshot.normalizer.ts`; remove Duffel types from `apps/api/src/disruption/domain/itinerary-normalizer.ts` while preserving legacy snapshot reads.
-- [ ] T036 [US3] Move quote/confirm/cancel orchestration into flat `apps/api/src/supplier/order/duffel-cancellation.service.ts` with existing refund amounts and idempotent already-cancelled handling.
-- [ ] T037 [US3] Move retrieve/complete-order and snapshot recovery into flat `apps/api/src/supplier/order/duffel-recovery.service.ts` with existing partial-order/error behavior.
+- [x] T035 [US3] Move Duffel order/itinerary-to-domain mapping into `apps/api/src/supplier/order/order-snapshot.normalizer.ts`; remove Duffel types from `apps/api/src/disruption/domain/itinerary-normalizer.ts` while preserving legacy snapshot reads.
+- [x] T036 [US3] Move quote/confirm/cancel orchestration into flat `apps/api/src/supplier/order/duffel-cancellation.service.ts` with existing refund amounts and idempotent already-cancelled handling.
+- [x] T037 [US3] Move retrieve/complete-order and snapshot recovery into flat `apps/api/src/supplier/order/duffel-recovery.service.ts` with existing partial-order/error behavior.
 - [ ] T038 [US3] Move the fulfillment adapter to `apps/api/src/supplier/order/duffel-fulfillment.adapter.ts` and bind unchanged `FULFILLMENT_GATEWAY_PORT` in `apps/api/src/supplier/order/supplier-order.module.ts`; preserve semaphore, fencing, redaction, and fallback snapshots.
 - [ ] T039 [US3] Rewire order consumers and Nest imports in `apps/api/src/cancellation/cancellation.service.ts`, `apps/api/src/booking-lifecycle/booking-recovery.service.ts`, `apps/api/src/disruption/sync/supplier-sync.service.ts`, `apps/api/src/payment-fulfillment/payment-fulfillment.module.ts`, and `apps/api/src/app.module.ts`; update module-wiring tests.
 - [ ] T040 [US3] Preserve order-created idempotency checkpoint, payment hold, PROCESSING booking, and order evidence on unconfirmed cancellation in both `executeConfirmPayment` and `handleBackgroundError` of `apps/api/src/payment-fulfillment/payment-fulfillment.saga.ts`; do not finalize the key or void/fail until cancellation is confirmed.

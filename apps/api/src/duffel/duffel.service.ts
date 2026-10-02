@@ -1,6 +1,7 @@
 import { Injectable, HttpException, HttpStatus, Logger, Optional, Inject } from '@nestjs/common';
 import { CacheService } from '@/cache/cache.service';
 import { DUFFEL_SDK, DuffelRateBudgetService } from '@/supplier/core/duffel-core.module';
+import { mapDuffelOrderToSnapshots } from '@/supplier/order/order-snapshot.normalizer';
 import { Duffel } from '@duffel/api';
 import {
   DuffelOfferRequest,
@@ -1393,159 +1394,10 @@ export class DuffelService {
     }
   }
 
-  private parseIsoDurationToMinutes(durationStr: string): number {
-    if (!durationStr || typeof durationStr !== 'string') return 0;
-    const matches = durationStr.match(/P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?/);
-    if (!matches) return 0;
-    const days = parseInt(matches[1] || '0', 10);
-    const hours = parseInt(matches[2] || '0', 10);
-    const minutes = parseInt(matches[3] || '0', 10);
-    return days * 24 * 60 + hours * 60 + minutes;
-  }
-
-  private formatMinutesToIsoDuration(totalMinutes: number): string {
-    if (totalMinutes <= 0) return 'PT0H';
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-    let result = 'PT';
-    if (hours > 0) result += `${hours}H`;
-    if (minutes > 0) result += `${minutes}M`;
-    return result;
-  }
-
   mapDuffelOrderToSnapshots(duffelOrder: unknown): {
     flightSnapshot: FlightSnapshot;
     passengerSnapshot: PassengerSnapshot;
   } {
-    const order = duffelOrder as {
-      slices?: Array<{
-        duration?: string;
-        segments?: Array<{
-          id?: string;
-          duration?: string;
-          departing_at?: string;
-          arriving_at?: string;
-          origin?: {
-            name?: string;
-            iata_code?: string;
-            city_name?: string;
-            city?: { name?: string };
-          };
-          destination?: {
-            name?: string;
-            iata_code?: string;
-            city_name?: string;
-            city?: { name?: string };
-          };
-          origin_terminal?: string | null;
-          destination_terminal?: string | null;
-          operating_carrier?: { name?: string; iata_code?: string };
-          marketing_carrier?: { name?: string; iata_code?: string };
-          marketing_carrier_flight_number?: string;
-          aircraft?: { name?: string };
-          passengers?: Array<{ cabin_class?: string }>;
-        }>;
-      }>;
-      passengers?: Array<{
-        id: string;
-        type?: string;
-        title?: string | null;
-        given_name?: string | null;
-        family_name?: string | null;
-        born_on?: string | null;
-        email?: string | null;
-        phone_number?: string | null;
-      }>;
-    };
-
-    let totalDuration = 'PT0H';
-    let stops = 0;
-    let cabinClass = 'economy';
-    const segments: Array<FlightSnapshot['segments'][number]> = [];
-
-    if (order.slices && Array.isArray(order.slices)) {
-      let totalMinutes = 0;
-      let globalOrder = 0;
-      for (let sliceOrder = 0; sliceOrder < order.slices.length; sliceOrder++) {
-        const slice = order.slices[sliceOrder];
-        if (slice?.duration) {
-          totalMinutes += this.parseIsoDurationToMinutes(slice.duration);
-        }
-        if (slice.segments && Array.isArray(slice.segments)) {
-          stops += Math.max(0, slice.segments.length - 1);
-          for (let segmentOrder = 0; segmentOrder < slice.segments.length; segmentOrder++) {
-            const seg = slice.segments[segmentOrder];
-            cabinClass = seg.passengers?.[0]?.cabin_class || cabinClass;
-            segments.push({
-              airline: {
-                name: seg.operating_carrier?.name || seg.marketing_carrier?.name || 'Unknown',
-                iataCode:
-                  seg.operating_carrier?.iata_code || seg.marketing_carrier?.iata_code || 'XX',
-              },
-              flightNumber: seg.marketing_carrier_flight_number || '0000',
-              departureAirport: {
-                iataCode: seg.origin?.iata_code || '',
-                name: seg.origin?.name || '',
-                city: seg.origin?.city_name || seg.origin?.city?.name || seg.origin?.name || '',
-                terminal: seg.origin_terminal ?? undefined,
-              },
-              arrivalAirport: {
-                iataCode: seg.destination?.iata_code || '',
-                name: seg.destination?.name || '',
-                city:
-                  seg.destination?.city_name ||
-                  seg.destination?.city?.name ||
-                  seg.destination?.name ||
-                  '',
-                terminal: seg.destination_terminal ?? undefined,
-              },
-              departureAt: seg.departing_at || '',
-              arrivalAt: seg.arriving_at || '',
-              duration: seg.duration || '',
-              aircraftType: seg.aircraft?.name,
-              duffelSegmentId: seg.id,
-              sliceOrder,
-              segmentOrder,
-              globalOrder: globalOrder++,
-            });
-          }
-        }
-      }
-      totalDuration = this.formatMinutesToIsoDuration(totalMinutes);
-    }
-
-    const flightSnapshot: FlightSnapshot = {
-      segments,
-      totalDuration,
-      stops,
-      cabinClass,
-    };
-
-    const passengers: PassengerSnapshot['passengers'] = [];
-    if (order.passengers && Array.isArray(order.passengers)) {
-      for (const p of order.passengers) {
-        passengers.push({
-          type:
-            p.type === 'infant_without_seat' || p.type === 'infant'
-              ? 'INFANT'
-              : p.type === 'child'
-                ? 'CHILD'
-                : 'ADULT',
-          title: p.title || undefined,
-          firstName: p.given_name || 'Unknown',
-          lastName: p.family_name || 'Unknown',
-          dateOfBirth: p.born_on || '1990-01-01',
-        });
-      }
-    }
-
-    const firstPassenger = order.passengers?.[0];
-    const passengerSnapshot: PassengerSnapshot = {
-      passengers,
-      contactEmail: firstPassenger?.email || null,
-      contactPhone: firstPassenger?.phone_number || null,
-    };
-
-    return { flightSnapshot, passengerSnapshot };
+    return mapDuffelOrderToSnapshots(duffelOrder);
   }
 }

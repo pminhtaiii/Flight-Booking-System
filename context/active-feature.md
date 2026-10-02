@@ -6,14 +6,14 @@ This file tracks the currently active in-flight feature, its checkpoints, and ex
 
 ## Feature 029 — Narrow the Duffel Supplier Boundary
 
-- **Status**: In Progress (Phase 5 In Progress; Completed Locally through T034)
+- **Status**: In Progress (Phase 5 In Progress; Completed Locally through T037)
 - **Branch**: `codex/029-duffel-provider-narrowing`
 - **Specification**: [specs/029-duffel-provider-narrowing/spec.md](../specs/029-duffel-provider-narrowing/spec.md)
 - **Implementation Plan**: [specs/029-duffel-provider-narrowing/plan.md](../specs/029-duffel-provider-narrowing/plan.md)
 - **Tasks**: [specs/029-duffel-provider-narrowing/tasks.md](../specs/029-duffel-provider-narrowing/tasks.md)
 
 ### Current Summary
-Phase 0 (research/ADR), Phase 1 (baseline locks), Phase 2 (core SDK provider & atomic Redis rate budget), and Phase 3 (`FLIGHT_SEARCH_PORT` extraction, normalizer, and consumer rewiring across Flights, BookingIntent, Readiness, and ChatHandoff) are fully implemented and verified (US1 complete). Phase 4 (T025–T031), including `DuffelAncillaryService`, `SupplierAncillaryModule`, consumer rewiring, the ancillary/payment Jest checkpoint (11 suites, 153 tests), API TypeScript check, supplier ancillary module E2E (1 suite, 1 test), and post-T030 network-guard API suite (127 suites, 2,312 tests), is complete locally. Phase 5 has started: T032–T034 are complete with code review and scoped convergence; the latest API unit gate passed (128 suites, 2,359 tests), with typecheck and API/shared lint passing. The two approved E2E fixture corrections are committed as `34b2db3b`, and focused E2Es pass 2/2 against the isolated task database. Standards review has 0 open findings (2 resolved), and Spec review is GO. PR #361 remote CI remains pending push. T035–T043 remain pending, including order consumer rewiring; legacy monolith deletion and Phases 7–8 remain pending.
+Phases 0–4 are complete locally. Phase 5 is complete locally through T037: normalizer extraction is committed as `2223c7c9`, cancellation as `0c28be32`, and recovery plus service-graph E2E as `2a85a113`. Each task passed independent review. Focused checks passed 46 tests for T035, 29 service/adapter tests for T036, and 10 tests plus one Nest E2E for T037. The network-guard API suite passed 131 suites/2,383 tests; API typecheck and full API/shared lint passed. Existing booking/cancellation/compensation E2Es passed 3 suites/39 tests against the separate `feature029_slice2_test` database. Shared contracts passed 110 tests; static CI contracts passed 23 tests. The two new-test fixture refinements were explicitly approved on 2026-10-02 and recorded in comments. Scoped convergence found no gaps. Final Spec review has 0 findings; Standards has 2 optional P3 duplication suggestions and no hard violations or blockers, recorded in [slice-2-verification.md](../specs/029-duffel-provider-narrowing/slice-2-verification.md). Next is T038 fulfillment/module binding; T039–T043 consumer rewiring and remaining order work are pending. Neutral naming/schema (T044–T054) and final audit (T055–T057) remain pending. PR #361 was merged; current remote verification uses a fresh slice PR, whose GitHub checks provide the live CI result.
 
 ---
 
@@ -83,39 +83,31 @@ Exit gate:
 - [x] Lock order-operation parity characterization (T032; commit `93fe963a`, reviewed and approved).
 - [x] Add safe-compensation and recovery-deferral characterization and implementation (T033; commits `1739d209` and `acc77e0b`; focused checks, code review, scoped convergence, and full API gate pass).
 - [x] Extract the metered raw `DuffelOrderAdapter` (T034; commit `2675a0f2`, review GO with no Important/Critical findings).
-- [ ] Complete later order normalization, cancellation/recovery services, fulfillment binding, consumer rewiring, and related work (T035–T043; pending).
+- [x] Extract order/snapshot normalization and remove vendor types from the disruption normalizer (T035; `2223c7c9`; focused checks and independent review passed).
+- [x] Extract cancellation quote/confirm/replay orchestration over the metered order adapter (T036; `0c28be32`; explicit cancelled-order evidence required for replay success).
+- [x] Extract order retrieval and snapshot recovery plus service-graph E2E (T037; `2a85a113`; focused checks and independent review passed).
+- [ ] Complete fulfillment binding, consumer rewiring, and remaining order work (T038–T043; pending).
 
 Exit gate:
 ```text
 unconfirmed cancellations preserve processing/hold; order operations isolated
 ```
 
-### Phase 6 — Monolith Deletion (User Story 4)
-- [ ] Decommission legacy `DuffelService` and `DuffelModule` (T039).
-- [ ] Verify clean architecture boundary census: zero bracket access, zero direct SDK imports (T040).
-
-Exit gate:
-```text
-DuffelService and DuffelModule deleted; zero residual imports across codebase
-```
-
-### Phase 7 — Neutral Naming & Schema Migration (User Story 5)
-- [ ] Rename Nest modules and internal domain types to `Supplier` / `Flight` (T041–T042).
-- [ ] Author forward Prisma physical migration renaming columns and indices (`duffel_` -> `supplier_`) (T043).
-- [ ] Preserve legacy booking snapshot JSON reader compatibility (T044).
-- [ ] Test migration from scratch and against existing schema copies (T045).
+### Phase 6 — Neutral Naming & Physical Schema (User Story 4; T044–T054)
+- [ ] Pin wire/HMAC, legacy snapshots, and provider-ID boundary tests (T044–T046).
+- [ ] Rename internal types and add explicit current-wire compatibility mappings (T047–T051).
+- [ ] Apply forward physical Prisma column/index renames and regenerate the client (T052–T053).
+- [ ] Validate fresh/existing migrations and cross-service compatibility (T054).
 
 Exit gate:
 ```text
 clean migration from scratch; zero orphan duffel database columns; wire compatibility preserved
 ```
 
-### Phase 8 — Final Verification & Audit
-- [ ] Execute quickstart test matrix across all packages (T046).
-- [ ] Perform boundary and naming census allowlist audit (T047).
-- [ ] Execute local security, privacy, and HMAC attestation gates (T048).
-- [ ] Remote CI pipeline convergence and green PR status (T049–T050).
-- [ ] Synchronize context documentation (`context/architecture.md`, `context/progress-checker.md`).
+### Phase 7 — Final Verification & Audit (T055–T057)
+- [ ] Execute full API/shared/web/agent, E2E, security, and remote CI gates (T055).
+- [ ] Audit supplier boundary and provider-name compatibility exceptions (T056).
+- [ ] Synchronize implemented architecture, progress, and relevant library guidance (T057).
 
 Exit gate:
 ```text
