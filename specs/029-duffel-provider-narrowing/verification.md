@@ -176,7 +176,7 @@ Run from `C:\Booking Systems` on 2026-10-01. T030 rewiring and the T031 checkpoi
 | Focused order adapter/fulfillment Jest suites after T034 | **PASS**: 5 suites, 105 tests. |
 | Corrected T033 adapter/recovery/saga Jest suites | **PASS**: 3 suites, 138 tests. |
 | Final order + legacy supplier Jest check | **PASS**: 2 suites, 54 tests. |
-| Payment fulfillment E2E suites (prior checkpoint) | **PASS**: 2 suites, 28 tests, including both safety cases; current PR CI awaits two approved positive-fixture corrections, with assertions unchanged. |
+| Payment fulfillment focused E2Es after fixture correction `34b2db3b` | **PASS**: 2/2 against the isolated task database; assertions unchanged. |
 | API TypeScript check | **PASS**. |
 | All-file API/shared ESLint | **PASS**. |
 | Targeted spec lint | **PASS**. |
@@ -184,4 +184,4 @@ Run from `C:\Booking Systems` on 2026-10-01. T030 rewiring and the T031 checkpoi
 | CI workflow contract tests | **PASS**: 23 tests. |
 | Full API unit run at `f3793c26` | **PASS**: 128 suites, 2,359 tests. TypeScript check and full API/shared ESLint also pass. The earlier 128-suite/2,346-test run in `api-final-signoff.log` remains a valid historical checkpoint. |
 
-These results record local checks only. T032–T034 checks, code review, scoped convergence, and the latest API unit run pass. Standards review has 0 open findings and 2 resolved; Spec review is GO. PR #361 remote CI remains pending while two human-approved E2E positive-fixture corrections are applied without changing assertions. A green CI result on documentation checkpoint `7af33a78` is historical and does not establish CI status for the current PR head. T035–T043 and broader Phase 5 work remain pending.
+These results record local checks only. T032–T034 checks, code review, scoped convergence, the latest API unit run, and focused E2Es pass. Standards review has 0 open findings and 2 resolved; Spec review is GO. The two human-approved E2E fixture corrections are committed as `34b2db3b` without changing assertions. PR #361 remote CI remains pending push; a green CI result on documentation checkpoint `7af33a78` is historical and does not establish CI status for the current PR head. T035–T043 and broader Phase 5 work remain pending.
