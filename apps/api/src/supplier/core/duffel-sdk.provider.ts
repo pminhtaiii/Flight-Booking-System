@@ -2,6 +2,12 @@ import { FactoryProvider } from '@nestjs/common';
 import { Duffel } from '@duffel/api';
 
 export const DUFFEL_SDK = Symbol('DUFFEL_SDK');
+export const DUFFEL_SDK_CONFIGURATION = Symbol('DUFFEL_SDK_CONFIGURATION');
+
+export type DuffelSdkConfiguration = Readonly<{
+  token: string;
+  basePath: string;
+}>;
 
 /**
  * Creates a Duffel SDK client from DUFFEL_ACCESS_TOKEN and optional DUFFEL_API_URL.
@@ -11,7 +17,7 @@ export const DUFFEL_SDK = Symbol('DUFFEL_SDK');
  * @returns A new client configured with the trimmed access token and base URL.
  * @throws If the token is missing or blank, or the URL is invalid or not HTTP(S).
  */
-export function createDuffelSdk(): Duffel {
+export function createDuffelSdkConfiguration(): DuffelSdkConfiguration {
   const token = process.env.DUFFEL_ACCESS_TOKEN;
   if (!token || token.trim() === '') {
     throw new Error('DUFFEL_ACCESS_TOKEN is required');
@@ -32,15 +38,22 @@ export function createDuffelSdk(): Duffel {
     basePath = `${parsed.origin}${path}`.replace(/\/+$/, '');
   }
 
-  return new Duffel({
-    token: token.trim(),
-    basePath,
-  });
+  return { token: token.trim(), basePath };
 }
+
+export function createDuffelSdk(
+  configuration: DuffelSdkConfiguration = createDuffelSdkConfiguration(),
+): Duffel {
+  return new Duffel(configuration);
+}
+
+export const duffelSdkConfigurationProvider: FactoryProvider<DuffelSdkConfiguration> = {
+  provide: DUFFEL_SDK_CONFIGURATION,
+  useFactory: (): DuffelSdkConfiguration => createDuffelSdkConfiguration(),
+};
 
 export const duffelSdkProvider: FactoryProvider<Duffel> = {
   provide: DUFFEL_SDK,
-  useFactory: (): Duffel => {
-    return createDuffelSdk();
-  },
+  inject: [DUFFEL_SDK_CONFIGURATION],
+  useFactory: (configuration: DuffelSdkConfiguration): Duffel => createDuffelSdk(configuration),
 };
