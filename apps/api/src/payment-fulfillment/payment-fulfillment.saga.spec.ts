@@ -1257,7 +1257,7 @@ describe('PaymentFulfillmentSaga', () => {
       );
     });
 
-    it('retains the authorized hold and checkpoint when nested order evidence cancellation is pending', async () => {
+    it('retains the authorized hold and checkpoint when nested order evidence cancellation is pending', async (): Promise<void> => {
       mockPaymentGateway.capturePayment.mockRejectedValueOnce(new Error('Card declined on capture'));
       mockPaymentGateway.authorizeHold
         .mockResolvedValueOnce({ status: 'authorized', intentId: 'pi-123' })
@@ -1285,7 +1285,7 @@ describe('PaymentFulfillmentSaga', () => {
       expect(mockIdempotency.completeSagaKeyAtomic).not.toHaveBeenCalled();
     });
 
-    it('retains recoverable state when inline order evidence has no usable ID', async () => {
+    it('retains recoverable state when inline order evidence has no usable ID', async (): Promise<void> => {
       mockPaymentGateway.capturePayment.mockRejectedValueOnce(new Error('Card declined on capture'));
       mockPaymentGateway.authorizeHold
         .mockResolvedValueOnce({ status: 'authorized', intentId: 'pi-123' })
@@ -1314,7 +1314,7 @@ describe('PaymentFulfillmentSaga', () => {
       expect(mockIdempotency.completeSagaKeyAtomic).not.toHaveBeenCalled();
     });
 
-    it('retains recoverable state when inline order evidence has an empty ID', async () => {
+    it('retains recoverable state when inline order evidence has an empty ID', async (): Promise<void> => {
       mockPaymentGateway.capturePayment.mockRejectedValueOnce(new Error('Card declined on capture'));
       mockPaymentGateway.authorizeHold
         .mockResolvedValueOnce({ status: 'authorized', intentId: 'pi-123' })
@@ -1343,7 +1343,7 @@ describe('PaymentFulfillmentSaga', () => {
       expect(mockIdempotency.completeSagaKeyAtomic).not.toHaveBeenCalled();
     });
 
-    it('retains recoverable state when inline order evidence has a malformed ID', async () => {
+    it('retains recoverable state when inline order evidence has a malformed ID', async (): Promise<void> => {
       mockPaymentGateway.capturePayment.mockRejectedValueOnce(new Error('Card declined on capture'));
       mockPaymentGateway.authorizeHold
         .mockResolvedValueOnce({ status: 'authorized', intentId: 'pi-123' })
@@ -1965,7 +1965,7 @@ describe('PaymentFulfillmentSaga', () => {
       expect(mockPrisma.payment.updateMany).not.toHaveBeenCalled();
     });
 
-    it('retains the authorized hold when background cancellation uses nested order evidence and is pending', async () => {
+    it('retains the authorized hold when background cancellation uses nested order evidence and is pending', async (): Promise<void> => {
       currentPaymentState.status = 'AUTHORIZED';
       mockPrisma.payment.findUnique.mockResolvedValueOnce({
         ...basePayment,
@@ -2001,7 +2001,7 @@ describe('PaymentFulfillmentSaga', () => {
       expect(mockIdempotency.completeSagaKeyAtomic).not.toHaveBeenCalled();
     });
 
-    it('retains recoverable state when background order evidence has no usable ID', async () => {
+    it('retains recoverable state when background order evidence has no usable ID', async (): Promise<void> => {
       currentPaymentState.status = 'AUTHORIZED';
       mockPrisma.payment.findUnique.mockResolvedValueOnce({ ...basePayment, status: 'AUTHORIZED' });
       mockPaymentGateway.authorizeHold.mockResolvedValueOnce({ status: 'authorized', intentId: 'pi-123' });
@@ -2028,7 +2028,7 @@ describe('PaymentFulfillmentSaga', () => {
       expect(mockIdempotency.completeSagaKeyAtomic).not.toHaveBeenCalled();
     });
 
-    it('retains recoverable state when background order evidence has an empty ID', async () => {
+    it('retains recoverable state when background order evidence has an empty ID', async (): Promise<void> => {
       currentPaymentState.status = 'AUTHORIZED';
       mockPrisma.payment.findUnique.mockResolvedValueOnce({ ...basePayment, status: 'AUTHORIZED' });
       mockPaymentGateway.authorizeHold.mockResolvedValueOnce({ status: 'authorized', intentId: 'pi-123' });
@@ -2049,7 +2049,7 @@ describe('PaymentFulfillmentSaga', () => {
       expect(mockIdempotency.completeSagaKeyAtomic).not.toHaveBeenCalled();
     });
 
-    it('retains recoverable state when background order evidence has a malformed ID', async () => {
+    it('retains recoverable state when background order evidence has a malformed ID', async (): Promise<void> => {
       currentPaymentState.status = 'AUTHORIZED';
       mockPrisma.payment.findUnique.mockResolvedValueOnce({ ...basePayment, status: 'AUTHORIZED' });
       mockPaymentGateway.authorizeHold.mockResolvedValueOnce({ status: 'authorized', intentId: 'pi-123' });
@@ -2070,7 +2070,7 @@ describe('PaymentFulfillmentSaga', () => {
       expect(mockIdempotency.completeSagaKeyAtomic).not.toHaveBeenCalled();
     });
 
-    it('retains recoverable state when background cancellation is denied by the Duffel budget', async () => {
+    it('retains recoverable state when background cancellation is denied by the Duffel budget', async (): Promise<void> => {
       currentPaymentState.status = 'AUTHORIZED';
       mockPrisma.payment.findUnique.mockResolvedValueOnce({ ...basePayment, status: 'AUTHORIZED' });
       mockPaymentGateway.authorizeHold.mockResolvedValueOnce({ status: 'authorized', intentId: 'pi-123' });
@@ -2095,7 +2095,7 @@ describe('PaymentFulfillmentSaga', () => {
       expect(mockIdempotency.completeSagaKeyAtomic).not.toHaveBeenCalled();
     });
 
-    it('retains recoverable state when background cancellation times out over the network', async () => {
+    it('retains recoverable state when background cancellation times out over the network', async (): Promise<void> => {
       currentPaymentState.status = 'AUTHORIZED';
       mockPrisma.payment.findUnique.mockResolvedValueOnce({ ...basePayment, status: 'AUTHORIZED' });
       mockPaymentGateway.authorizeHold.mockResolvedValueOnce({ status: 'authorized', intentId: 'pi-123' });

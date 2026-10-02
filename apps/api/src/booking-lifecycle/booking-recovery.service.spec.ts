@@ -687,7 +687,7 @@ describe('BookingRecoveryService', () => {
       expect(result.failureReason).toBe(BookingFailureReason.CAPTURE_FAILED);
     });
 
-    it('does not trust an already_cancelled error without cancellation proof', async () => {
+    it('does not trust an already_cancelled error without cancellation proof', async (): Promise<void> => {
       const bookingId = 'b-unproven-already-cancelled';
       const booking = {
         id: bookingId,
@@ -792,7 +792,7 @@ describe('BookingRecoveryService', () => {
       expect(mockBookingLifecycleService.failBooking).not.toHaveBeenCalled();
     });
 
-    it('resolves a nested created-order ID and defers an unconfirmed cancellation', async () => {
+    it('resolves a nested created-order ID and defers an unconfirmed cancellation', async (): Promise<void> => {
       const bookingId = 'b-nested-order-id';
       const booking = {
         id: bookingId,
@@ -826,7 +826,7 @@ describe('BookingRecoveryService', () => {
       );
     });
 
-    it('keeps recovery non-destructive when writing the cancellation deferral fails', async () => {
+    it('keeps recovery non-destructive when writing the cancellation deferral fails', async (): Promise<void> => {
       const bookingId = 'b-cache-deferral-failed';
       const booking = {
         id: bookingId,
@@ -861,7 +861,7 @@ describe('BookingRecoveryService', () => {
       expect(booking.status).toBe(BookingStatus.PROCESSING);
     });
 
-    it('defers recovery when a created order has no provider ID', async () => {
+    it('defers recovery when a created order has no provider ID', async (): Promise<void> => {
       const bookingId = 'b-missing-order-id';
       const booking = {
         id: bookingId,
@@ -891,7 +891,7 @@ describe('BookingRecoveryService', () => {
       );
     });
 
-    it('defers recovery when a created order has an empty provider ID', async () => {
+    it('defers recovery when a created order has an empty provider ID', async (): Promise<void> => {
       const bookingId = 'b-empty-order-id';
       const booking = {
         id: bookingId,
@@ -921,7 +921,7 @@ describe('BookingRecoveryService', () => {
       );
     });
 
-    it('defers recovery when a created order has a malformed provider ID', async () => {
+    it('defers recovery when a created order has a malformed provider ID', async (): Promise<void> => {
       const bookingId = 'b-malformed-order-id';
       const booking = {
         id: bookingId,
@@ -951,7 +951,7 @@ describe('BookingRecoveryService', () => {
       );
     });
 
-    it('keeps the hold when payment-event lookup fails during stale recovery', async () => {
+    it('keeps the hold when payment-event lookup fails during stale recovery', async (): Promise<void> => {
       const bookingId = 'b-event-lookup-failed';
       const booking = {
         id: bookingId,
@@ -1288,7 +1288,7 @@ describe('BookingRecoveryService', () => {
       expect(booking.status).toBe(BookingStatus.PROCESSING);
     });
 
-    it('defers BUDGET_UNAVAILABLE cancellation until its upstream reset time', async () => {
+    it('defers BUDGET_UNAVAILABLE cancellation until its upstream reset time', async (): Promise<void> => {
       jest.useFakeTimers().setSystemTime(new Date('2026-10-02T01:00:00.000Z'));
       try {
         const bookingId = 'b-budget-unavailable';
@@ -1330,7 +1330,7 @@ describe('BookingRecoveryService', () => {
       }
     });
 
-    it('computes rate-limit retry time when the upstream reset is missing', async () => {
+    it('computes rate-limit retry time when the upstream reset is missing', async (): Promise<void> => {
       jest.useFakeTimers().setSystemTime(new Date('2026-10-02T01:00:00.000Z'));
       try {
         const bookingId = 'b-rate-limit-no-reset';
@@ -1370,7 +1370,7 @@ describe('BookingRecoveryService', () => {
       }
     });
 
-    it('uses bounded retry backoff for invalid rate-limit retry metadata', async () => {
+    it('uses bounded retry backoff for invalid rate-limit retry metadata', async (): Promise<void> => {
       jest.useFakeTimers().setSystemTime(new Date('2026-10-02T01:00:00.000Z'));
       try {
         const bookingId = 'b-invalid-retry-metadata';
