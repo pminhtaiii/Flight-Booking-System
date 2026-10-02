@@ -44,6 +44,18 @@ function isOwnershipLost(error: unknown): boolean {
   return error instanceof ConflictException && error.message.includes('ownership');
 }
 
+function readOrderId(value: unknown): string | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  if ('id' in value && typeof value.id === 'string' && value.id.trim().length > 0) {
+    return value.id;
+  }
+  if (!('data' in value) || typeof value.data !== 'object' || value.data === null) {
+    return undefined;
+  }
+  return 'id' in value.data && typeof value.data.id === 'string' &&
+    value.data.id.trim().length > 0 ? value.data.id : undefined;
+}
+
 function isCancellationConfirmed(outcome: CancelOrderOutcome): boolean {
   return outcome.success && (outcome.status === undefined || outcome.status.toUpperCase() === 'CANCELLED');
 }
@@ -813,8 +825,19 @@ export class PaymentFulfillmentSaga {
               },
               orderBy: { createdAt: 'desc' },
             });
-            const rawOrder = duffelEvent?.metadata as Record<string, unknown> | null;
-            const duffelOrderId = rawOrder?.id as string | undefined;
+            const rawOrder = duffelEvent?.metadata;
+            const duffelOrderId = readOrderId(rawOrder);
+
+            if (duffelEvent && !duffelOrderId) {
+              throw new HttpException(
+                {
+                  success: false,
+                  error: `Stripe capture failed: ${initialCaptureError?.message || 'Unknown error'}. Fulfillment order cancellation is unconfirmed; retry confirmation.`,
+                  bookingStatus: 'PROCESSING',
+                },
+                HttpStatus.BAD_GATEWAY,
+              );
+            }
 
             if (duffelOrderId) {
               try {
@@ -1319,28 +1342,33 @@ export class PaymentFulfillmentSaga {
       if (authOutcome.status === 'authorized' || authOutcome.status === 'voided') {
         if (duffelEvent) {
           const rawOrder = duffelEvent.metadata as Record<string, unknown> | null;
-          const duffelOrderId = rawOrder?.id as string | undefined;
-          if (duffelOrderId) {
-            try {
-              const cancellation = await this.fulfillmentGateway.cancelOrder(
-                duffelOrderId,
-                control,
-              );
-              if (!isCancellationConfirmed(cancellation)) {
-                throw new Error('Fulfillment order cancellation is not confirmed');
-              }
-            } catch (cancelError: unknown) {
-              if (isOwnershipLost(cancelError)) {
-                return;
-              }
-              const err =
-                cancelError instanceof Error ? cancelError : new Error(String(cancelError));
-              this.logger.error(
-                `[handleBackgroundError] Background cancelOrder failed: ${err.message}`,
-                err.stack,
-              );
+          const duffelOrderId = readOrderId(rawOrder);
+          if (!duffelOrderId) {
+            this.logger.error(
+              `[handleBackgroundError] Background cancellation cannot be attempted because the order ID is missing or invalid for payment ${paymentId}.`,
+            );
+            return;
+          }
+
+          try {
+            const cancellation = await this.fulfillmentGateway.cancelOrder(
+              duffelOrderId,
+              control,
+            );
+            if (!isCancellationConfirmed(cancellation)) {
+              throw new Error('Fulfillment order cancellation is not confirmed');
+            }
+          } catch (cancelError: unknown) {
+            if (isOwnershipLost(cancelError)) {
               return;
             }
+            const err =
+              cancelError instanceof Error ? cancelError : new Error(String(cancelError));
+            this.logger.error(
+              `[handleBackgroundError] Background cancelOrder failed: ${err.message}`,
+              err.stack,
+            );
+            return;
           }
         }
 
@@ -1377,12 +1405,13 @@ export class PaymentFulfillmentSaga {
       if (booking && duffelEvent) {
         try {
           const rawOrder = duffelEvent.metadata as Record<string, unknown>;
-          if (rawOrder && rawOrder.id) {
+          const duffelOrderId = readOrderId(rawOrder);
+          if (duffelOrderId) {
             const passengerEnrichment = this.mapPassengerEnrichment(bookingIntent?.passengers);
             const contactEmail = bookingIntent?.user?.email || '';
 
             const snaps = await this.fulfillmentGateway.retrieveOrderSnapshot(
-              rawOrder.id as string,
+              duffelOrderId,
               rawOrder as unknown as PersistedOrderEvidence,
               passengerEnrichment,
               contactEmail,
