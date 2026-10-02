@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaModule } from '@/prisma/prisma.module';
-import { DuffelModule } from '@/duffel/duffel.module';
+import { SupplierOrderModule } from '@/supplier/order/supplier-order.module';
 import { RefundModule } from '@/refund/refund.module';
 import { RefundSettlementModule } from '@/refund-settlement/refund-settlement.module';
 import { StripeModule } from '@/common/stripe.module';
@@ -14,7 +14,7 @@ import { DomainEventsModule } from '@/domain-events/domain-events.module';
   imports: [
     BookingStateModule,
     PrismaModule,
-    DuffelModule,
+    SupplierOrderModule,
     RefundModule,
     RefundSettlementModule,
     ScheduleModule,

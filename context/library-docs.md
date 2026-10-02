@@ -169,8 +169,9 @@ async createOrder(flightOffer: FlightOffer, travelers: Traveler[]): Promise<Orde
 - Trailing slashes are normalized cleanly; manual order requests use the injected configuration's `basePath`.
 - Fully compatible with `mock-server.mjs` on loopback for zero-dependency CI smoke suites.
 - `DuffelRateBudgetService` reserves every actual remote attempt against the atomic daily total; cache hits are free. Supplier adapters own admission and error mapping.
-- Order capability services remain concrete: cancellation and recovery inject `DuffelOrderAdapter`; recovery also injects `OrderSnapshotNormalizer`. They neither expose SDK payload parsing to feature consumers nor introduce generic cancellation/recovery ports. Production order-module binding is T038.
-- Cancellation replay succeeds only after explicit cancelled-order evidence. Unconfirmed or failed reconciliation retains failure; typed budget denial starts no reconciliation. Recovery preserves partial snapshot defaults and uses one complete-order retrieval before local normalization.
+- Order capability services remain concrete: cancellation and recovery inject `DuffelOrderAdapter`; recovery also injects `OrderSnapshotNormalizer`. They neither expose SDK payload parsing to feature consumers nor introduce generic cancellation/recovery ports. `SupplierOrderModule` owns these services and `FULFILLMENT_GATEWAY_PORT`; cancellation, booking recovery, disruption sync, and payment fulfillment import its exports (T038–T039).
+- Cancellation replay succeeds only after explicit cancelled-order evidence. Unconfirmed or failed reconciliation retains failure; typed budget denial starts no reconciliation. Remote recovery preserves partial snapshot defaults and uses one complete-order retrieval before local normalization. `DuffelRecoveryService.mapOrderToSnapshots` reuses that normalizer for already-persisted order evidence without issuing another remote request.
+- `DuffelModule` temporarily re-exports `SupplierOrderModule` and remains registered in `AppModule` while unrelated legacy consumers migrate in later tasks.
 
 ---
 

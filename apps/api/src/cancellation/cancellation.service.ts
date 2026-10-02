@@ -15,7 +15,8 @@ import {
   RefundStatus,
 } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
-import { DuffelService } from '@/duffel/duffel.service';
+import { DuffelCancellationService } from '@/supplier/order/duffel-cancellation.service';
+import { DuffelRecoveryService } from '@/supplier/order/duffel-recovery.service';
 import { PaymentRefundService } from '@/payment/payment-refund.service';
 import { BookingLifecycleService } from '@/booking-lifecycle/booking-lifecycle.service';
 import { BookingEventPublisherService, PublishableEvent } from '@/domain-events';
@@ -33,7 +34,8 @@ export class CancellationService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly duffelService: DuffelService,
+    private readonly duffelCancellationService: DuffelCancellationService,
+    private readonly duffelRecoveryService: DuffelRecoveryService,
     private readonly paymentRefundService: PaymentRefundService,
     private readonly bookingLifecycleService: BookingLifecycleService,
     private readonly publisher: BookingEventPublisherService,
@@ -253,7 +255,7 @@ export class CancellationService {
     }
 
     try {
-      const quote = await this.duffelService.createCancellationQuote(booking.duffelOrderId);
+      const quote = await this.duffelCancellationService.createCancellationQuote(booking.duffelOrderId);
 
       const quoteId = quote.id;
       const duffelOrderId = quote.order_id || booking.duffelOrderId;
@@ -384,7 +386,7 @@ export class CancellationService {
       return this.toCancellationResponse(canonical);
     }
 
-    const recoveredOrder = await this.duffelService.retrieveOrder(booking.duffelOrderId);
+    const recoveredOrder = await this.duffelRecoveryService.retrieveOrder(booking.duffelOrderId);
     let refundAmount = booking.customerRefundAmount?.toString() ?? '0.00';
     let refundable = booking.cancellationRefundable;
     if (recoveredOrder.status !== 'CANCELLED') {
@@ -533,11 +535,11 @@ export class CancellationService {
 
   async confirmCancellationWithRetries(
     quoteId: string,
-  ): Promise<Awaited<ReturnType<DuffelService['confirmCancellationQuote']>>> {
+  ): Promise<Awaited<ReturnType<DuffelCancellationService['confirmCancellationQuote']>>> {
     const retryDelays = [1_000, 3_000, 5_000, 10_000];
     for (let attempt = 0; attempt <= retryDelays.length; attempt += 1) {
       try {
-        return await this.duffelService.confirmCancellationQuote(quoteId);
+        return await this.duffelCancellationService.confirmCancellationQuote(quoteId);
       } catch (error) {
         if (!this.isRetryableSupplierError(error) || attempt === retryDelays.length) {
           throw new BadGatewayException('Supplier cancellation could not be confirmed');

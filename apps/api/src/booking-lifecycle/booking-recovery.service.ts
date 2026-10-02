@@ -13,7 +13,8 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { StripeService } from '@/common/stripe.service';
-import { DuffelService } from '@/duffel/duffel.service';
+import { DuffelCancellationService } from '@/supplier/order/duffel-cancellation.service';
+import { DuffelRecoveryService } from '@/supplier/order/duffel-recovery.service';
 import { isDuffelCancellationConfirmed } from '@/duffel/cancellation-confirmation';
 import { RefundTransactionService } from '@/refund/refund-transaction.service';
 import { RefundSettlementService } from '@/refund-settlement/refund-settlement.service';
@@ -113,7 +114,8 @@ export class BookingRecoveryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly stripeService: StripeService,
-    private readonly duffelService: DuffelService,
+    private readonly duffelCancellationService: DuffelCancellationService,
+    private readonly duffelRecoveryService: DuffelRecoveryService,
     private readonly refundTransactionService: RefundTransactionService,
     private readonly refundSettlementService: RefundSettlementService,
     private readonly bookingLifecycleService: BookingLifecycleService,
@@ -335,7 +337,7 @@ export class BookingRecoveryService {
             if (duffelOrder && typeof duffelOrder.id === 'string') {
               let wasCancelledOrAlreadyCancelled = false;
               try {
-                const cancellation = await this.duffelService.cancelOrder(duffelOrder.id);
+                const cancellation = await this.duffelCancellationService.cancelOrder(duffelOrder.id);
                 if (!isDuffelCancellationConfirmed(cancellation)) {
                   throw new Error('Duffel order cancellation is not confirmed');
                 }
@@ -499,7 +501,7 @@ export class BookingRecoveryService {
             : rawOrder;
 
         const { flightSnapshot, passengerSnapshot } =
-          this.duffelService.mapDuffelOrderToSnapshots(order);
+          this.duffelRecoveryService.mapOrderToSnapshots(order);
         const orderRecord = isRecord(order) ? order : rawOrder;
         const bookingReference =
           typeof orderRecord.booking_reference === 'string' ? orderRecord.booking_reference : null;

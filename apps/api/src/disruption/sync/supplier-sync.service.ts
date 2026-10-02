@@ -1,6 +1,6 @@
 import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
-import { DuffelService } from '@/duffel/duffel.service';
+import { DuffelRecoveryService } from '@/supplier/order/duffel-recovery.service';
 import { SyncClaimService } from './sync-claim.service';
 import { BookingEventPublisherService } from '@/domain-events/booking-event-publisher.service';
 import { BookingDisruptionSyncedEvent } from '@/domain-events/booking.events';
@@ -26,6 +26,10 @@ export type SyncResult =
   | { status: 'SKIPPED_INELIGIBLE' }
   | { status: 'SKIPPED_LOCKED' }
   | { status: 'CONVERGED_DUPLICATE' };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
 interface DbSegment {
   sliceOrder: number;
@@ -121,7 +125,7 @@ export class SupplierSyncService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly duffelService: DuffelService,
+    private readonly duffelRecoveryService: DuffelRecoveryService,
     private readonly syncClaimService: SyncClaimService,
     private readonly publisher: BookingEventPublisherService,
   ) {}
@@ -185,13 +189,14 @@ export class SupplierSyncService {
       }
 
       // 3. Fetch Full Duffel Order outside the transaction
-      const order = await this.duffelService.retrieveCompleteOrder(booking.duffelOrderId);
-      if (!order) {
+      const order = await this.duffelRecoveryService.retrieveCompleteOrder(booking.duffelOrderId);
+      if (!isRecord(order)) {
         throw new Error(`Duffel order not found for orderId ${booking.duffelOrderId}`);
       }
 
       // Check if order is cancelled on Duffel
-      const isDuffelCancelled = !!order.cancelled_at || order.cancellation?.confirmed_at != null;
+      const cancellation = isRecord(order.cancellation) ? order.cancellation : undefined;
+      const isDuffelCancelled = !!order.cancelled_at || cancellation?.confirmed_at != null;
 
       // 4. Normalize itinerary and calculate fingerprint
       const normalizedSegments = normalizeDuffelOrder(order);

@@ -10,7 +10,8 @@ import request from 'supertest';
 import { AppModule } from '@/app.module';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { StripeService } from '@/common/stripe.service';
-import { DuffelService } from '@/duffel/duffel.service';
+import { DuffelCancellationService } from '@/supplier/order/duffel-cancellation.service';
+import { DuffelRecoveryService } from '@/supplier/order/duffel-recovery.service';
 import { PaymentCronService } from '@/payment/payment-cron.service';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -33,7 +34,8 @@ describe('Cancellation and refund recovery (E2E)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let jwtService: JwtService;
-  let duffelService: DuffelService;
+  let duffelCancellationService: DuffelCancellationService;
+  let duffelRecoveryService: DuffelRecoveryService;
   let stripeService: StripeService;
   let paymentCronService: PaymentCronService;
   let owner: TestUser;
@@ -58,7 +60,8 @@ describe('Cancellation and refund recovery (E2E)', () => {
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
     jwtService = moduleFixture.get<JwtService>(JwtService);
-    duffelService = moduleFixture.get<DuffelService>(DuffelService);
+    duffelCancellationService = moduleFixture.get<DuffelCancellationService>(DuffelCancellationService);
+    duffelRecoveryService = moduleFixture.get<DuffelRecoveryService>(DuffelRecoveryService);
     stripeService = moduleFixture.get<StripeService>(StripeService);
     paymentCronService = moduleFixture.get<PaymentCronService>(PaymentCronService);
   });
@@ -241,7 +244,7 @@ describe('Cancellation and refund recovery (E2E)', () => {
 
   it('returns a stored valid quote without calling Duffel and rejects an expired quote before supplier work', async (): Promise<void> => {
     const validBooking = await createCancellationBooking(owner.id);
-    const quoteSpy = jest.spyOn(duffelService, 'createCancellationQuote');
+    const quoteSpy = jest.spyOn(duffelCancellationService, 'createCancellationQuote');
 
     const quoteResponse = await request(app.getHttpServer())
       .post(`/api/bookings/${validBooking.id}/cancellation/quote`)
@@ -259,7 +262,7 @@ describe('Cancellation and refund recovery (E2E)', () => {
     const expiredBooking = await createCancellationBooking(owner.id, {
       deadline: new Date(Date.now() - 1_000),
     });
-    const confirmSpy = jest.spyOn(duffelService, 'confirmCancellationQuote');
+    const confirmSpy = jest.spyOn(duffelCancellationService, 'confirmCancellationQuote');
     await request(app.getHttpServer())
       .post(`/api/bookings/${expiredBooking.id}/cancellation`)
       .set('Authorization', `Bearer ${owner.token}`)
@@ -271,7 +274,7 @@ describe('Cancellation and refund recovery (E2E)', () => {
   it('converges concurrent cancellation confirmations on one supplier cancellation and refund', async (): Promise<void> => {
     const booking = await createCancellationBooking(owner.id);
     const retrieveSpy = jest
-      .spyOn(duffelService, 'retrieveOrder')
+      .spyOn(duffelRecoveryService, 'retrieveOrder')
       .mockResolvedValue({
         id: 'ord-id',
         order_id: 'ord-id',
@@ -279,7 +282,7 @@ describe('Cancellation and refund recovery (E2E)', () => {
         cancelled_at: null,
         cancellation_id: null,
       });
-    const confirmSpy = jest.spyOn(duffelService, 'confirmCancellationQuote').mockResolvedValue({
+    const confirmSpy = jest.spyOn(duffelCancellationService, 'confirmCancellationQuote').mockResolvedValue({
       id: `cancel-${crypto.randomUUID()}`,
       order_id: `order-${crypto.randomUUID()}`,
       status: 'CONFIRMED',
@@ -340,14 +343,14 @@ describe('Cancellation and refund recovery (E2E)', () => {
       refundable: false,
       confirmed_at: new Date().toISOString(),
     };
-    jest.spyOn(duffelService, 'retrieveOrder').mockResolvedValue({
+    jest.spyOn(duffelRecoveryService, 'retrieveOrder').mockResolvedValue({
       id: booking.id,
       order_id: booking.id,
       status: 'ACTIVE',
       cancelled_at: null,
       cancellation_id: null,
     });
-    jest.spyOn(duffelService, 'confirmCancellationQuote').mockResolvedValue(supplierCancellation);
+    jest.spyOn(duffelCancellationService, 'confirmCancellationQuote').mockResolvedValue(supplierCancellation);
     const stripeSpy = jest.spyOn(stripeService, 'createRefund');
 
     const response = await request(app.getHttpServer())
@@ -404,7 +407,7 @@ describe('Cancellation and refund recovery (E2E)', () => {
   it('uses remote supplier state during recovery instead of confirming the quote again', async (): Promise<void> => {
     const booking = await createCancellationBooking(owner.id);
     jest
-      .spyOn(duffelService, 'retrieveOrder')
+      .spyOn(duffelRecoveryService, 'retrieveOrder')
       .mockResolvedValue({
         id: 'ord-id',
         order_id: 'ord-id',
@@ -412,7 +415,7 @@ describe('Cancellation and refund recovery (E2E)', () => {
         cancelled_at: new Date().toISOString(),
         cancellation_id: `cancel-${crypto.randomUUID()}`,
       });
-    const confirmSpy = jest.spyOn(duffelService, 'confirmCancellationQuote');
+    const confirmSpy = jest.spyOn(duffelCancellationService, 'confirmCancellationQuote');
     jest
       .spyOn(stripeService, 'createRefund')
       .mockResolvedValue({ id: `re-${crypto.randomUUID()}` } as never);
@@ -433,7 +436,7 @@ describe('Cancellation and refund recovery (E2E)', () => {
   it('does not start a Stripe refund when supplier cancellation cannot be confirmed', async (): Promise<void> => {
     const booking = await createCancellationBooking(owner.id);
     jest
-      .spyOn(duffelService, 'retrieveOrder')
+      .spyOn(duffelRecoveryService, 'retrieveOrder')
       .mockResolvedValue({
         id: 'ord-id',
         order_id: 'ord-id',
@@ -442,7 +445,7 @@ describe('Cancellation and refund recovery (E2E)', () => {
         cancellation_id: null,
       });
     jest
-      .spyOn(duffelService, 'confirmCancellationQuote')
+      .spyOn(duffelCancellationService, 'confirmCancellationQuote')
       .mockRejectedValue({ statusCode: 400, code: 'QUOTE_INVALID' });
     const stripeSpy = jest.spyOn(stripeService, 'createRefund');
 
@@ -461,7 +464,7 @@ describe('Cancellation and refund recovery (E2E)', () => {
   it('retries a transient Stripe failure and settles the cancellation exactly once', async (): Promise<void> => {
     const booking = await createCancellationBooking(owner.id);
     jest
-      .spyOn(duffelService, 'retrieveOrder')
+      .spyOn(duffelRecoveryService, 'retrieveOrder')
       .mockResolvedValue({
         id: 'ord-id',
         order_id: 'ord-id',
@@ -469,7 +472,7 @@ describe('Cancellation and refund recovery (E2E)', () => {
         cancelled_at: null,
         cancellation_id: null,
       });
-    jest.spyOn(duffelService, 'confirmCancellationQuote').mockResolvedValue({
+    jest.spyOn(duffelCancellationService, 'confirmCancellationQuote').mockResolvedValue({
       id: `cancel-${crypto.randomUUID()}`,
       order_id: `order-${crypto.randomUUID()}`,
       status: 'CONFIRMED',
@@ -535,7 +538,7 @@ describe('Cancellation and refund recovery (E2E)', () => {
     });
 
     jest
-      .spyOn(duffelService, 'retrieveOrder')
+      .spyOn(duffelRecoveryService, 'retrieveOrder')
       .mockResolvedValue({
         id: 'ord-id',
         order_id: 'ord-id',
@@ -543,7 +546,7 @@ describe('Cancellation and refund recovery (E2E)', () => {
         cancelled_at: null,
         cancellation_id: null,
       });
-    jest.spyOn(duffelService, 'confirmCancellationQuote').mockResolvedValue({
+    jest.spyOn(duffelCancellationService, 'confirmCancellationQuote').mockResolvedValue({
       id: `cancel-${crypto.randomUUID()}`,
       order_id: `order-${crypto.randomUUID()}`,
       status: 'CONFIRMED',

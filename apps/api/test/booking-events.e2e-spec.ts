@@ -13,7 +13,7 @@ import { BookingEventPublisherService } from '@/domain-events/booking-event-publ
 import { BookingEventHydratorService } from '@/domain-events/booking-event-hydrator.service';
 import { DisruptionService } from '@/disruption/api/disruption.service';
 import { SupplierSyncService } from '@/disruption/sync/supplier-sync.service';
-import { DuffelService } from '@/duffel/duffel.service';
+import { DuffelRecoveryService } from '@/supplier/order/duffel-recovery.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   BookingStatus,
@@ -66,7 +66,7 @@ describe('Booking Events & Projection Updates E2E (US2 - T033)', () => {
   let hydrator: BookingEventHydratorService;
   let disruptionService: DisruptionService;
   let supplierSyncService: SupplierSyncService;
-  let duffelService: DuffelService;
+  let duffelRecoveryService: DuffelRecoveryService;
 
   const createdUserIds: string[] = [];
   const createdIntentIds: string[] = [];
@@ -118,7 +118,7 @@ describe('Booking Events & Projection Updates E2E (US2 - T033)', () => {
     hydrator = moduleFixture.get<BookingEventHydratorService>(BookingEventHydratorService);
     disruptionService = moduleFixture.get<DisruptionService>(DisruptionService);
     supplierSyncService = moduleFixture.get<SupplierSyncService>(SupplierSyncService);
-    duffelService = moduleFixture.get<DuffelService>(DuffelService);
+    duffelRecoveryService = moduleFixture.get<DuffelRecoveryService>(DuffelRecoveryService);
   });
 
   afterAll(async () => {
@@ -555,30 +555,32 @@ describe('Booking Events & Projection Updates E2E (US2 - T033)', () => {
 
       const newDeparture = new Date(Date.now() + 172800000);
       const newArrival = new Date(Date.now() + 172800000 + 8 * 3600000);
-      const duffelSpy = jest.spyOn(duffelService, 'retrieveCompleteOrder').mockResolvedValueOnce({
-        id: 'ORD_DISR',
-        slices: [
-          {
-            id: 'sli_disr',
-            duration: 'PT8H',
-            segments: [
-              {
-                id: 'seg_disr',
-                departing_at: newDeparture.toISOString(),
-                arriving_at: newArrival.toISOString(),
-                origin: { iata_code: 'JFK', name: 'John F Kennedy Intl', city_name: 'New York' },
-                destination: { iata_code: 'CDG', name: 'Charles de Gaulle', city_name: 'Paris' },
-                operating_carrier: { iata_code: 'DL', name: 'Delta Air Lines' },
-                marketing_carrier: { iata_code: 'DL', name: 'Delta Air Lines' },
-                marketing_carrier_flight_number: '100',
-                duration: 'PT8H',
-                passengers: [{ cabin_class: 'economy' }],
-              },
-            ],
-          },
-        ],
-        passengers: [],
-      } as any);
+      const duffelSpy = jest
+        .spyOn(duffelRecoveryService, 'retrieveCompleteOrder')
+        .mockResolvedValueOnce({
+          id: 'ORD_DISR',
+          slices: [
+            {
+              id: 'sli_disr',
+              duration: 'PT8H',
+              segments: [
+                {
+                  id: 'seg_disr',
+                  departing_at: newDeparture.toISOString(),
+                  arriving_at: newArrival.toISOString(),
+                  origin: { iata_code: 'JFK', name: 'John F Kennedy Intl', city_name: 'New York' },
+                  destination: { iata_code: 'CDG', name: 'Charles de Gaulle', city_name: 'Paris' },
+                  operating_carrier: { iata_code: 'DL', name: 'Delta Air Lines' },
+                  marketing_carrier: { iata_code: 'DL', name: 'Delta Air Lines' },
+                  marketing_carrier_flight_number: '100',
+                  duration: 'PT8H',
+                  passengers: [{ cabin_class: 'economy' }],
+                },
+              ],
+            },
+          ],
+          passengers: [],
+        });
 
       const syncResult = await supplierSyncService.syncBooking(bookingId, 'WEBHOOK');
       expect(syncResult.status).toBe('REVISION_CREATED');

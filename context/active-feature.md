@@ -6,14 +6,14 @@ This file tracks the currently active in-flight feature, its checkpoints, and ex
 
 ## Feature 029 — Narrow the Duffel Supplier Boundary
 
-- **Status**: In Progress (Phase 5 In Progress; Completed Locally through T037)
+- **Status**: In Progress (Phase 5; T032–T039 complete locally; T040–T043 next)
 - **Branch**: `codex/029-duffel-provider-narrowing`
 - **Specification**: [specs/029-duffel-provider-narrowing/spec.md](../specs/029-duffel-provider-narrowing/spec.md)
 - **Implementation Plan**: [specs/029-duffel-provider-narrowing/plan.md](../specs/029-duffel-provider-narrowing/plan.md)
 - **Tasks**: [specs/029-duffel-provider-narrowing/tasks.md](../specs/029-duffel-provider-narrowing/tasks.md)
 
 ### Current Summary
-Phases 0–4 are complete locally. Phase 5 is complete locally through T037: normalizer extraction is committed as `2223c7c9`, cancellation as `0c28be32`, and recovery plus service-graph E2E as `2a85a113`. Each task passed independent review. Focused checks passed 46 tests for T035, 29 service/adapter tests for T036, and 10 tests plus one Nest E2E for T037. The network-guard API suite passed 131 suites/2,383 tests; API typecheck and full API/shared lint passed. Existing booking/cancellation/compensation E2Es passed 3 suites/39 tests against the separate `feature029_slice2_test` database. Shared contracts passed 110 tests; static CI contracts passed 23 tests. The two new-test fixture refinements were explicitly approved on 2026-10-02 and recorded in comments. Scoped convergence found no gaps. Final Spec review has 0 findings; Standards has 2 optional P3 duplication suggestions and no hard violations or blockers, recorded in [slice-2-verification.md](../specs/029-duffel-provider-narrowing/slice-2-verification.md). Next is T038 fulfillment/module binding; T039–T043 consumer rewiring and remaining order work are pending. Neutral naming/schema (T044–T054) and final audit (T055–T057) remain pending. PR #361 was merged; current remote verification uses a fresh slice PR, whose GitHub checks provide the live CI result.
+Phases 0–4 are complete locally. Phase 5 is complete locally through T039: fulfillment now lives in `SupplierOrderModule`, and cancellation, booking recovery, disruption sync, and payment fulfillment consume its exports. T038 is committed as `df56f6a6`; both task reviews passed after scoped fixes. The network-guard API suite passed 132 suites/2,384 tests on an isolated retry after an earlier concurrent run exceeded the existing performance threshold; neither code nor threshold was changed for that retry. Focused order/consumer tests passed 481 tests, module composition passed 29, five consumer E2E suites passed 34, and four migrated compensation/idempotency/passenger/event E2E suites passed 59. Booking-events passed another 18 tests after removing an unnecessary type assertion. Database checks used the disposable `feature029_slice2_test` database. API typecheck, full API/shared lint, shared contracts (110 tests), and static CI contracts (23 tests) passed. Fixture corrections were explicitly approved on 2026-10-02 and documented in comments. Slice 3 convergence passed with zero gaps. Final Spec review has zero findings; Standards has one low-severity duplication suggestion and no hard violations or blockers. The [slice verification record](../specs/029-duffel-provider-narrowing/slice-3-verification.md) preserves both reports and local evidence; remote CI is checked on the draft PR. T040–T043, neutral naming/schema (T044–T054), and final audit (T055–T057) remain pending; Feature 029 is not complete.
 
 ---
 
@@ -86,7 +86,9 @@ Exit gate:
 - [x] Extract order/snapshot normalization and remove vendor types from the disruption normalizer (T035; `2223c7c9`; focused checks and independent review passed).
 - [x] Extract cancellation quote/confirm/replay orchestration over the metered order adapter (T036; `0c28be32`; explicit cancelled-order evidence required for replay success).
 - [x] Extract order retrieval and snapshot recovery plus service-graph E2E (T037; `2a85a113`; focused checks and independent review passed).
-- [ ] Complete fulfillment binding, consumer rewiring, and remaining order work (T038–T043; pending).
+- [x] Add `SupplierOrderModule` and bind fulfillment capability (T038; present on the current base).
+- [x] Rewire cancellation, booking recovery, sync, fulfillment modules, and AppModule to supplier order boundaries (T039; task review and local gates passed).
+- [ ] Complete remaining order work (T040–T043; pending).
 
 Exit gate:
 ```text
