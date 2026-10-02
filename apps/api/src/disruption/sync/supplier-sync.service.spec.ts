@@ -8,7 +8,7 @@ import { AppModule } from '@/app.module';
 
 jest.setTimeout(30000);
 import { PrismaService } from '@/prisma/prisma.service';
-import { DuffelService } from '@/duffel/duffel.service';
+import { DuffelRecoveryService } from '@/supplier/order/duffel-recovery.service';
 import { SyncClaimService } from './sync-claim.service';
 import { SupplierSyncService } from './supplier-sync.service';
 import { BookingEventPublisherService } from '@/domain-events';
@@ -20,7 +20,7 @@ describe('SupplierSyncService unit/integration tests', () => {
   let prisma: PrismaService;
   let syncClaimService: SyncClaimService;
   let supplierSyncService: SupplierSyncService;
-  let mockDuffelService: { retrieveCompleteOrder: jest.Mock };
+  let mockDuffelRecoveryService: { retrieveCompleteOrder: jest.Mock };
   let mockPublisher: {
     createContext: jest.Mock;
     publish: jest.Mock;
@@ -33,7 +33,7 @@ describe('SupplierSyncService unit/integration tests', () => {
   let suffix: string;
 
   beforeAll(async () => {
-    mockDuffelService = {
+    mockDuffelRecoveryService = {
       retrieveCompleteOrder: jest.fn(),
     };
     mockPublisher = {
@@ -45,8 +45,8 @@ describe('SupplierSyncService unit/integration tests', () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
-      .overrideProvider(DuffelService)
-      .useValue(mockDuffelService)
+      .overrideProvider(DuffelRecoveryService)
+      .useValue(mockDuffelRecoveryService)
       .overrideProvider(BookingEventPublisherService)
       .useValue(mockPublisher)
       .compile();
@@ -179,7 +179,7 @@ describe('SupplierSyncService unit/integration tests', () => {
 
   describe('SupplierSyncService Core Synchronization', () => {
     it('should return NO_CHANGE and update lastDuffelSyncedAt if itinerary is unchanged', async () => {
-      mockDuffelService.retrieveCompleteOrder.mockResolvedValue({
+      mockDuffelRecoveryService.retrieveCompleteOrder.mockResolvedValue({
         id: `ord_fake_${suffix}`,
         cancelled_at: null,
         slices: [
@@ -220,7 +220,7 @@ describe('SupplierSyncService unit/integration tests', () => {
 
     it('should create a non-material revision for minor changes (<120m later)', async () => {
       // Move departure by 30 mins later
-      mockDuffelService.retrieveCompleteOrder.mockResolvedValue({
+      mockDuffelRecoveryService.retrieveCompleteOrder.mockResolvedValue({
         id: `ord_fake_${suffix}`,
         cancelled_at: null,
         slices: [
@@ -266,7 +266,7 @@ describe('SupplierSyncService unit/integration tests', () => {
 
     it('should create a material revision and transition disruption status for material changes (>120m later)', async () => {
       // Move departure by 150 mins later
-      mockDuffelService.retrieveCompleteOrder.mockResolvedValue({
+      mockDuffelRecoveryService.retrieveCompleteOrder.mockResolvedValue({
         id: `ord_fake_${suffix}`,
         cancelled_at: null,
         slices: [
@@ -315,7 +315,7 @@ describe('SupplierSyncService unit/integration tests', () => {
 
     it('should detect material changes cumulatively from multiple minor shifts', async () => {
       // 1. Shift 1: +40 mins (minor)
-      mockDuffelService.retrieveCompleteOrder.mockResolvedValue({
+      mockDuffelRecoveryService.retrieveCompleteOrder.mockResolvedValue({
         id: `ord_fake_${suffix}`,
         cancelled_at: null,
         slices: [
@@ -351,7 +351,7 @@ describe('SupplierSyncService unit/integration tests', () => {
       // Original: 2026-08-01T12:00:00Z
       // Shift 1: 2026-08-01T12:40:00Z
       // Shift 2: 2026-08-01T10:40:00Z (-80 mins cumulative)
-      mockDuffelService.retrieveCompleteOrder.mockResolvedValue({
+      mockDuffelRecoveryService.retrieveCompleteOrder.mockResolvedValue({
         id: `ord_fake_${suffix}`,
         cancelled_at: null,
         slices: [
@@ -396,7 +396,7 @@ describe('SupplierSyncService unit/integration tests', () => {
     });
 
     it('should rollback transaction atomically on write failures', async () => {
-      mockDuffelService.retrieveCompleteOrder.mockResolvedValue({
+      mockDuffelRecoveryService.retrieveCompleteOrder.mockResolvedValue({
         id: `ord_fake_${suffix}`,
         slices: [
           {
@@ -441,7 +441,7 @@ describe('SupplierSyncService unit/integration tests', () => {
 
   describe('SupplierSyncService Concurrency & Version Collision', () => {
     it('should converge if version unique violation is thrown but fingerprints match', async () => {
-      mockDuffelService.retrieveCompleteOrder.mockResolvedValue({
+      mockDuffelRecoveryService.retrieveCompleteOrder.mockResolvedValue({
         id: `ord_fake_${suffix}`,
         slices: [
           {
@@ -512,7 +512,7 @@ describe('SupplierSyncService unit/integration tests', () => {
     });
 
     it('should retry transaction with version incremented if version unique violation is thrown and fingerprints differ', async () => {
-      mockDuffelService.retrieveCompleteOrder.mockResolvedValue({
+      mockDuffelRecoveryService.retrieveCompleteOrder.mockResolvedValue({
         id: `ord_fake_${suffix}`,
         slices: [
           {
@@ -596,7 +596,7 @@ describe('SupplierSyncService unit/integration tests', () => {
 
   describe('SupplierSyncService Cancellation Races & States', () => {
     it('should abort sync transaction cleanly if booking is concurrently cancelled', async () => {
-      mockDuffelService.retrieveCompleteOrder.mockResolvedValue({
+      mockDuffelRecoveryService.retrieveCompleteOrder.mockResolvedValue({
         id: `ord_fake_${suffix}`,
         slices: [
           {
@@ -618,8 +618,8 @@ describe('SupplierSyncService unit/integration tests', () => {
       });
 
       // Intercept the execution and cancel the booking before database writes
-      const originalRetrieve = mockDuffelService.retrieveCompleteOrder;
-      mockDuffelService.retrieveCompleteOrder = jest.fn().mockImplementation(async (orderId) => {
+      const originalRetrieve = mockDuffelRecoveryService.retrieveCompleteOrder;
+      mockDuffelRecoveryService.retrieveCompleteOrder = jest.fn().mockImplementation(async (orderId) => {
         // Change booking status to CANCELLED_PENDING_REFUND
         await prisma.booking.update({
           where: { id: bookingId },
@@ -639,14 +639,14 @@ describe('SupplierSyncService unit/integration tests', () => {
       expect(dbBooking?.notificationOutbox.length).toBe(0);
       expect(dbBooking?.disruptionStatus).toBe(DisruptionStatus.NONE);
 
-      mockDuffelService.retrieveCompleteOrder = originalRetrieve;
+      mockDuffelRecoveryService.retrieveCompleteOrder = originalRetrieve;
     });
   });
 
   describe('SupplierSyncService Notification Outbox Throttling', () => {
     it('should handle daily outbox throttling levels (1st/2nd/3rd with warning/4th suppressed)', async () => {
       const mockDuffelWithDeparture = (depTime: string) => {
-        mockDuffelService.retrieveCompleteOrder.mockResolvedValue({
+        mockDuffelRecoveryService.retrieveCompleteOrder.mockResolvedValue({
           id: `ord_fake_${suffix}`,
           slices: [
             {
@@ -764,7 +764,7 @@ describe('SupplierSyncService unit/integration tests', () => {
       });
 
       // Shift departure by 30 mins (minor change)
-      mockDuffelService.retrieveCompleteOrder.mockResolvedValue({
+      mockDuffelRecoveryService.retrieveCompleteOrder.mockResolvedValue({
         id: `ord_fake_${suffix}`,
         slices: [
           {
@@ -801,7 +801,7 @@ describe('SupplierSyncService unit/integration tests', () => {
   describe('SupplierSyncService Cancellation Masking Prevention', () => {
     it('should create a cancellation revision even if segments fingerprint matches previous material revision', async () => {
       // 1. First sync: material schedule change (shifted by 180 mins)
-      mockDuffelService.retrieveCompleteOrder.mockResolvedValue({
+      mockDuffelRecoveryService.retrieveCompleteOrder.mockResolvedValue({
         id: `ord_fake_${suffix}`,
         slices: [
           {
@@ -839,7 +839,7 @@ describe('SupplierSyncService unit/integration tests', () => {
       });
 
       // 2. Second sync: order is cancelled but retains same segment times (masking scenario)
-      mockDuffelService.retrieveCompleteOrder.mockResolvedValue({
+      mockDuffelRecoveryService.retrieveCompleteOrder.mockResolvedValue({
         id: `ord_fake_${suffix}`,
         cancelled_at: '2026-08-01T16:00:00Z', // Cancelled!
         slices: [
@@ -880,7 +880,7 @@ describe('SupplierSyncService unit/integration tests', () => {
       const initialBooking = await prisma.booking.findUnique({ where: { id: bookingId } });
       expect(initialBooking?.version).toBe(1);
 
-      mockDuffelService.retrieveCompleteOrder.mockResolvedValue({
+      mockDuffelRecoveryService.retrieveCompleteOrder.mockResolvedValue({
         id: `ord_fake_${suffix}`,
         slices: [
           {
@@ -925,7 +925,7 @@ describe('SupplierSyncService unit/integration tests', () => {
     });
 
     it('should isolate event collectors across retried transactions and not emit phantom events from failed attempts', async () => {
-      mockDuffelService.retrieveCompleteOrder.mockResolvedValue({
+      mockDuffelRecoveryService.retrieveCompleteOrder.mockResolvedValue({
         id: `ord_fake_${suffix}`,
         slices: [
           {
@@ -1006,7 +1006,7 @@ describe('SupplierSyncService unit/integration tests', () => {
 
     it('should not emit events or increment version on bookkeeping touches (fingerprint unchanged, skipped ineligible, and errors)', async () => {
       // 1. Unchanged fingerprint
-      mockDuffelService.retrieveCompleteOrder.mockResolvedValue({
+      mockDuffelRecoveryService.retrieveCompleteOrder.mockResolvedValue({
         id: `ord_fake_${suffix}`,
         cancelled_at: null,
         slices: [
@@ -1044,7 +1044,7 @@ describe('SupplierSyncService unit/integration tests', () => {
       expect(bookingNoChange?.version).toBe(1);
 
       // 2. Duffel failure (triggers error backoff touch)
-      mockDuffelService.retrieveCompleteOrder.mockRejectedValue(new Error('Duffel API timeout'));
+      mockDuffelRecoveryService.retrieveCompleteOrder.mockRejectedValue(new Error('Duffel API timeout'));
       await expect(supplierSyncService.syncBooking(bookingId, 'RECONCILIATION')).rejects.toThrow('Duffel API timeout');
       expect(mockPublisher.publish).not.toHaveBeenCalled();
 
@@ -1077,7 +1077,7 @@ describe('SupplierSyncService unit/integration tests', () => {
         HttpStatus.TOO_MANY_REQUESTS,
       );
 
-      mockDuffelService.retrieveCompleteOrder.mockRejectedValue(budgetBlockedError);
+      mockDuffelRecoveryService.retrieveCompleteOrder.mockRejectedValue(budgetBlockedError);
 
       await expect(
         supplierSyncService.syncBooking(bookingId, 'RECONCILIATION'),
@@ -1096,7 +1096,7 @@ describe('SupplierSyncService unit/integration tests', () => {
     });
 
     it('should discard events and not publish if transaction rolls back', async () => {
-      mockDuffelService.retrieveCompleteOrder.mockResolvedValue({
+      mockDuffelRecoveryService.retrieveCompleteOrder.mockResolvedValue({
         id: `ord_fake_${suffix}`,
         slices: [
           {

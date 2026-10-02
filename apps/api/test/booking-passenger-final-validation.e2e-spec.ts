@@ -11,7 +11,7 @@ import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { StripeService } from '@/common/stripe.service';
-import { DuffelService } from '@/duffel/duffel.service';
+import { DuffelOrderAdapter } from '@/supplier/order/duffel-order.adapter';
 import { EncryptionService } from '@/common/encryption.service';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { PassengerType, Prisma, PaymentStatus, BookingStatus } from '@prisma/client';
@@ -53,7 +53,7 @@ describe('Booking Passenger Final Validation (E2E) - Task T068', () => {
   let prisma: PrismaService;
   let jwtService: JwtService;
   let stripeService: StripeService;
-  let duffelService: DuffelService;
+  let duffelOrderAdapter: DuffelOrderAdapter;
   let encryptionService: EncryptionService;
 
   let testUser: { id: string; email: string };
@@ -80,7 +80,7 @@ describe('Booking Passenger Final Validation (E2E) - Task T068', () => {
     prisma = moduleFixture.get<PrismaService>(PrismaService);
     jwtService = moduleFixture.get<JwtService>(JwtService);
     stripeService = moduleFixture.get<StripeService>(StripeService);
-    duffelService = moduleFixture.get<DuffelService>(DuffelService);
+    duffelOrderAdapter = moduleFixture.get<DuffelOrderAdapter>(DuffelOrderAdapter);
     encryptionService = moduleFixture.get<EncryptionService>(EncryptionService);
   });
 
@@ -90,6 +90,11 @@ describe('Booking Passenger Final Validation (E2E) - Task T068', () => {
   });
 
   beforeEach(async () => {
+    // Human approval 2026-10-02: supply the existing adult fixture at the new offer boundary.
+    jest.spyOn(duffelOrderAdapter, 'getOfferById').mockResolvedValue({
+      passengers: [{ id: 'pas_1', type: 'adult' }],
+    });
+
     // Clean tables in FK dependency order
     await prisma.chatHandoff.deleteMany({});
     await prisma.chatSession.deleteMany({});
@@ -324,7 +329,7 @@ describe('Booking Passenger Final Validation (E2E) - Task T068', () => {
       const stripePiId = `pi_dom_${crypto.randomUUID()}`;
       mockStripeServices(stripePiId);
 
-      const duffelCreateOrderSpy = jest.spyOn(duffelService, 'createOrder').mockResolvedValue({
+      const duffelCreateOrderSpy = jest.spyOn(duffelOrderAdapter, 'createOrder').mockResolvedValue({
         id: `ord_${crypto.randomUUID()}`,
         booking_reference: 'DOM123',
         slices: (flightOffer.rawOffer as any).slices,
@@ -354,7 +359,7 @@ describe('Booking Passenger Final Validation (E2E) - Task T068', () => {
       expect(confirmRes.body.status).toBe('SUCCEEDED');
       expect(confirmRes.body.bookingReference).toBe('DOM123');
 
-      // Assert DuffelService.createOrder was called exactly 1 time
+      // Assert DuffelOrderAdapter.createOrder was called exactly 1 time
       expect(duffelCreateOrderSpy).toHaveBeenCalledTimes(1);
 
       // Assert Payment status is SUCCEEDED in DB
@@ -450,17 +455,19 @@ describe('Booking Passenger Final Validation (E2E) - Task T068', () => {
       const stripePiId = `pi_intl_${crypto.randomUUID()}`;
       mockStripeServices(stripePiId);
 
-      let passedDuffelPassengers: any = null;
+      const capturedPassengerInput: { passengers: Array<Record<string, unknown>> | null } = {
+        passengers: null,
+      };
       const duffelCreateOrderSpy = jest
-        .spyOn(duffelService, 'createOrder')
-        .mockImplementation(async (...args: any[]) => {
-          passedDuffelPassengers = args[1];
+        .spyOn(duffelOrderAdapter, 'createOrder')
+        .mockImplementation(async (input) => {
+          capturedPassengerInput.passengers = input.passengers;
           return {
             id: `ord_${crypto.randomUUID()}`,
             booking_reference: 'INTL123',
             slices: (flightOffer.rawOffer as any).slices,
             passengers: [{ id: 'pas_duffel_1', given_name: 'Ada', family_name: 'Lovelace' }],
-          } as any;
+          };
         });
 
       // Step 1: Create Payment
@@ -484,11 +491,15 @@ describe('Booking Passenger Final Validation (E2E) - Task T068', () => {
       expect([200, 202]).toContain(confirmRes.status);
       expect(confirmRes.body.status).toBe('SUCCEEDED');
 
-      // Assert DuffelService.createOrder was called exactly 1 time
+      // Assert the raw supplier order adapter was called exactly 1 time
       expect(duffelCreateOrderSpy).toHaveBeenCalledTimes(1);
 
       // Verify the decrypted ephemeral passenger DTO passed to Duffel
+      const passedDuffelPassengers = capturedPassengerInput.passengers;
       expect(passedDuffelPassengers).toBeDefined();
+      if (passedDuffelPassengers === null) {
+        throw new Error('The supplier order adapter did not receive passenger data.');
+      }
       expect(passedDuffelPassengers.length).toBe(1);
       const duffelPassenger = passedDuffelPassengers[0];
       expect(duffelPassenger.given_name).toBe('Ada');
@@ -586,7 +597,7 @@ describe('Booking Passenger Final Validation (E2E) - Task T068', () => {
       const stripePiId = `pi_aad_${crypto.randomUUID()}`;
       mockStripeServices(stripePiId);
 
-      const duffelCreateOrderSpy = jest.spyOn(duffelService, 'createOrder');
+      const duffelCreateOrderSpy = jest.spyOn(duffelOrderAdapter, 'createOrder');
       const stripeCancelSpy = jest.spyOn(stripeService, 'cancelPaymentIntent');
 
       // Step 1: Create Payment
@@ -614,7 +625,7 @@ describe('Booking Passenger Final Validation (E2E) - Task T068', () => {
       expect([422, 502]).toContain(confirmRes.status);
       expect(confirmRes.body.code || confirmRes.body.message).toBeDefined();
 
-      // Assert DuffelService.createOrder was called exactly 0 times
+      // Assert DuffelOrderAdapter.createOrder was called exactly 0 times
       expect(duffelCreateOrderSpy).toHaveBeenCalledTimes(0);
 
       // Assert Stripe authorization hold cancelled
@@ -691,7 +702,7 @@ describe('Booking Passenger Final Validation (E2E) - Task T068', () => {
       const stripePiId = `pi_corrupt_${crypto.randomUUID()}`;
       mockStripeServices(stripePiId);
 
-      const duffelCreateOrderSpy = jest.spyOn(duffelService, 'createOrder');
+      const duffelCreateOrderSpy = jest.spyOn(duffelOrderAdapter, 'createOrder');
       const stripeCancelSpy = jest.spyOn(stripeService, 'cancelPaymentIntent');
 
       // Step 1: Create Payment
@@ -802,7 +813,7 @@ describe('Booking Passenger Final Validation (E2E) - Task T068', () => {
       const stripePiId = `pi_expired_${crypto.randomUUID()}`;
       mockStripeServices(stripePiId);
 
-      const duffelCreateOrderSpy = jest.spyOn(duffelService, 'createOrder');
+      const duffelCreateOrderSpy = jest.spyOn(duffelOrderAdapter, 'createOrder');
       const stripeCancelSpy = jest.spyOn(stripeService, 'cancelPaymentIntent');
 
       // Step 1: Create Payment
@@ -880,7 +891,7 @@ describe('Booking Passenger Final Validation (E2E) - Task T068', () => {
       const stripePiId = `pi_incomp_${crypto.randomUUID()}`;
       mockStripeServices(stripePiId);
 
-      const duffelCreateOrderSpy = jest.spyOn(duffelService, 'createOrder');
+      const duffelCreateOrderSpy = jest.spyOn(duffelOrderAdapter, 'createOrder');
       const stripeCancelSpy = jest.spyOn(stripeService, 'cancelPaymentIntent');
 
       // Step 1: Create Payment
@@ -987,7 +998,7 @@ describe('Booking Passenger Final Validation (E2E) - Task T068', () => {
 
       const piId1 = `pi_audit_succ_${crypto.randomUUID()}`;
       mockStripeServices(piId1);
-      jest.spyOn(duffelService, 'createOrder').mockResolvedValue({
+      jest.spyOn(duffelOrderAdapter, 'createOrder').mockResolvedValue({
         id: `ord_${crypto.randomUUID()}`,
         booking_reference: 'PII123',
         slices: (flightOffer1.rawOffer as any).slices,

@@ -51,9 +51,11 @@ describe('CancellationService', () => {
     };
 
     mockDuffelService = {
-      createCancellationQuote: jest.fn(),
-      confirmCancellationQuote: jest.fn(),
-      retrieveOrder: jest.fn(),
+      cancellation: {
+        createCancellationQuote: jest.fn(),
+        confirmCancellationQuote: jest.fn(),
+      },
+      recovery: { retrieveOrder: jest.fn() },
     };
 
     mockPaymentRefundService = {
@@ -82,7 +84,8 @@ describe('CancellationService', () => {
 
     service = new CancellationService(
       mockPrisma,
-      mockDuffelService,
+      mockDuffelService.cancellation,
+      mockDuffelService.recovery,
       mockPaymentRefundService,
       mockBookingLifecycleService as unknown as BookingLifecycleService,
       mockPublisher,
@@ -471,7 +474,7 @@ describe('CancellationService', () => {
       };
       mockPrisma.booking.findUnique.mockResolvedValue(booking);
       mockPrisma.booking.updateMany.mockResolvedValue({ count: 1 });
-      mockDuffelService.createCancellationQuote.mockResolvedValue({
+      mockDuffelService.cancellation.createCancellationQuote.mockResolvedValue({
         id: 'quote-new',
         refund_amount: '100.00',
         refund_currency: 'GBP',
@@ -521,7 +524,7 @@ describe('CancellationService', () => {
       };
       mockPrisma.booking.findUnique.mockResolvedValue(booking);
       mockPrisma.booking.updateMany.mockResolvedValue({ count: 1 });
-      mockDuffelService.createCancellationQuote.mockResolvedValue({
+      mockDuffelService.cancellation.createCancellationQuote.mockResolvedValue({
         id: 'quote-new',
         refund_amount: '80.00',
         refund_currency: 'GBP',
@@ -553,7 +556,7 @@ describe('CancellationService', () => {
       };
       mockPrisma.booking.findUnique.mockResolvedValue(booking);
       mockPrisma.booking.updateMany.mockResolvedValue({ count: 1 });
-      mockDuffelService.createCancellationQuote.mockRejectedValue(new Error('Duffel API error'));
+      mockDuffelService.cancellation.createCancellationQuote.mockRejectedValue(new Error('Duffel API error'));
 
       await expect(service.getCancellationQuote('b-1', 'u-1')).rejects.toThrow('Duffel API error');
       expect(mockPrisma.booking.updateMany).toHaveBeenNthCalledWith(2, {
@@ -635,7 +638,7 @@ describe('CancellationService', () => {
       mockPrisma.booking.updateMany
         .mockResolvedValueOnce({ count: 1 }) // Claim successful
         .mockResolvedValueOnce({ count: 0 }); // Finalize failed
-      mockDuffelService.createCancellationQuote.mockResolvedValue({
+      mockDuffelService.cancellation.createCancellationQuote.mockResolvedValue({
         id: 'quote-new',
         refund_amount: '100.00',
         currency: 'GBP',
@@ -742,8 +745,8 @@ describe('CancellationService', () => {
 
     it('confirms cancellation with Duffel if not already CANCELLED', async () => {
       mockPrisma.booking.findUnique.mockResolvedValue(booking);
-      mockDuffelService.retrieveOrder.mockResolvedValue({ status: 'CONFIRMED' });
-      mockDuffelService.confirmCancellationQuote.mockResolvedValue({
+      mockDuffelService.recovery.retrieveOrder.mockResolvedValue({ status: 'CONFIRMED' });
+      mockDuffelService.cancellation.confirmCancellationQuote.mockResolvedValue({
         status: 'CONFIRMED',
         refund_amount: '100.00',
         refundable: true,
@@ -770,7 +773,7 @@ describe('CancellationService', () => {
       });
 
       const result = await service.cancelBooking('booking-1', 'user-1', 'quote-1');
-      expect(mockDuffelService.confirmCancellationQuote).toHaveBeenCalledWith('quote-1');
+      expect(mockDuffelService.cancellation.confirmCancellationQuote).toHaveBeenCalledWith('quote-1');
       expect(mockBookingLifecycleService.cancelBooking).toHaveBeenCalledWith(
         'booking-1',
         BookingStatus.CANCELLED_PENDING_REFUND,
@@ -800,8 +803,8 @@ describe('CancellationService', () => {
 
     it('throws BadGatewayException if supplier confirmation status is not CONFIRMED', async () => {
       mockPrisma.booking.findUnique.mockResolvedValue(booking);
-      mockDuffelService.retrieveOrder.mockResolvedValue({ status: 'CONFIRMED' });
-      mockDuffelService.confirmCancellationQuote.mockResolvedValue({
+      mockDuffelService.recovery.retrieveOrder.mockResolvedValue({ status: 'CONFIRMED' });
+      mockDuffelService.cancellation.confirmCancellationQuote.mockResolvedValue({
         status: 'FAILED',
       });
 
@@ -821,7 +824,7 @@ describe('CancellationService', () => {
         },
       };
       mockPrisma.booking.findUnique.mockResolvedValue(booking);
-      mockDuffelService.retrieveOrder.mockResolvedValue({ status: 'CANCELLED' });
+      mockDuffelService.recovery.retrieveOrder.mockResolvedValue({ status: 'CANCELLED' });
       mockPrisma.$transaction.mockImplementation(async (callback: any) =>
         callback(transactionClient),
       );
@@ -837,7 +840,7 @@ describe('CancellationService', () => {
 
     it('resolves active disruption and logs disruption audit event when cancelling disrupted booking', async () => {
       mockPrisma.booking.findUnique.mockResolvedValue(booking);
-      mockDuffelService.retrieveOrder.mockResolvedValue({ status: 'CANCELLED' });
+      mockDuffelService.recovery.retrieveOrder.mockResolvedValue({ status: 'CANCELLED' });
       mockBookingLifecycleService.cancelBooking.mockResolvedValueOnce({
         count: 1,
         hasActiveDisruption: true,
@@ -901,7 +904,7 @@ describe('CancellationService', () => {
         customerRefundAmount: { toString: () => '0.00' },
       };
       mockPrisma.booking.findUnique.mockResolvedValue(noRefundBooking);
-      mockDuffelService.retrieveOrder.mockResolvedValue({ status: 'CANCELLED' });
+      mockDuffelService.recovery.retrieveOrder.mockResolvedValue({ status: 'CANCELLED' });
 
       const transactionClient = {
         cancellationRefundObligation: {
@@ -931,7 +934,7 @@ describe('CancellationService', () => {
         payment: null,
       };
       mockPrisma.booking.findUnique.mockResolvedValue(noPaymentBooking);
-      mockDuffelService.retrieveOrder.mockResolvedValue({ status: 'CANCELLED' });
+      mockDuffelService.recovery.retrieveOrder.mockResolvedValue({ status: 'CANCELLED' });
 
       const transactionClient = {};
       mockPrisma.$transaction.mockImplementation(async (cb: any) => cb(transactionClient));
@@ -952,7 +955,7 @@ describe('CancellationService', () => {
         ...booking,
         status: BookingStatus.CANCELLED_AND_REFUNDED,
       });
-      mockDuffelService.retrieveOrder.mockResolvedValue({ status: 'CANCELLED' });
+      mockDuffelService.recovery.retrieveOrder.mockResolvedValue({ status: 'CANCELLED' });
       mockBookingLifecycleService.cancelBooking.mockResolvedValueOnce({ count: 0 });
 
       const result = await service.cancelBooking('booking-1', 'user-1', 'quote-1');
@@ -984,7 +987,7 @@ describe('CancellationService', () => {
             return { count: 1 };
           },
         );
-        mockDuffelService.retrieveOrder.mockResolvedValue({ status: 'CANCELLED' });
+        mockDuffelService.recovery.retrieveOrder.mockResolvedValue({ status: 'CANCELLED' });
 
         await service.cancelBooking('booking-1', 'user-1', 'quote-1');
 
@@ -1010,7 +1013,7 @@ describe('CancellationService', () => {
         mockPrisma.booking.findUnique.mockResolvedValue(booking);
         // Stale lease refresh: claim succeeded (count: 1) but NO event added to context
         mockBookingLifecycleService.claimCancellation.mockResolvedValueOnce({ count: 1 });
-        mockDuffelService.retrieveOrder.mockResolvedValue({ status: 'CANCELLED' });
+        mockDuffelService.recovery.retrieveOrder.mockResolvedValue({ status: 'CANCELLED' });
 
         await service.cancelBooking('booking-1', 'user-1', 'quote-1');
 
@@ -1024,7 +1027,7 @@ describe('CancellationService', () => {
 
       it('final cancellation: version incremented, BookingCancelledEvent published strictly post-commit', async () => {
         mockPrisma.booking.findUnique.mockResolvedValue(booking);
-        mockDuffelService.retrieveOrder.mockResolvedValue({ status: 'CANCELLED' });
+        mockDuffelService.recovery.retrieveOrder.mockResolvedValue({ status: 'CANCELLED' });
         mockBookingLifecycleService.cancelBooking.mockImplementation(
           async (id: string, status: any, refund: string, disr: any, tx: any, context: any) => {
             if (context) {
@@ -1072,7 +1075,7 @@ describe('CancellationService', () => {
 
       it('final cancellation: obligation and disruption bundle committed atomically in transaction', async () => {
         mockPrisma.booking.findUnique.mockResolvedValue(booking);
-        mockDuffelService.retrieveOrder.mockResolvedValue({ status: 'CANCELLED' });
+        mockDuffelService.recovery.retrieveOrder.mockResolvedValue({ status: 'CANCELLED' });
         mockBookingLifecycleService.cancelBooking.mockResolvedValueOnce({
           count: 1,
           hasActiveDisruption: true,
@@ -1128,7 +1131,7 @@ describe('CancellationService', () => {
 
       it('rollback: zero cancellation events published on final cancellation transaction rollback', async () => {
         mockPrisma.booking.findUnique.mockResolvedValue(booking);
-        mockDuffelService.retrieveOrder.mockResolvedValue({ status: 'CANCELLED' });
+        mockDuffelService.recovery.retrieveOrder.mockResolvedValue({ status: 'CANCELLED' });
 
         mockBookingLifecycleService.cancelBooking.mockImplementation(
           async (id: string, status: any, refund: string, disr: any, tx: any, context: any) => {
@@ -1205,32 +1208,32 @@ describe('CancellationService', () => {
       });
 
       it('retries on retryable supplier error and returns confirmation', async () => {
-        mockDuffelService.confirmCancellationQuote
+        mockDuffelService.cancellation.confirmCancellationQuote
           .mockRejectedValueOnce({ status: 429 })
           .mockRejectedValueOnce({ statusCode: 503 })
           .mockResolvedValueOnce({ id: 'confirmed-quote', status: 'CONFIRMED' });
 
         const result = await service.confirmCancellationWithRetries('quote-1');
         expect(result).toEqual({ id: 'confirmed-quote', status: 'CONFIRMED' });
-        expect(mockDuffelService.confirmCancellationQuote).toHaveBeenCalledTimes(3);
+        expect(mockDuffelService.cancellation.confirmCancellationQuote).toHaveBeenCalledTimes(3);
       });
 
       it('throws BadGatewayException immediately on non-retryable error', async () => {
-        mockDuffelService.confirmCancellationQuote.mockRejectedValueOnce({ status: 400 });
+        mockDuffelService.cancellation.confirmCancellationQuote.mockRejectedValueOnce({ status: 400 });
 
         await expect(service.confirmCancellationWithRetries('quote-1')).rejects.toThrow(
           BadGatewayException,
         );
-        expect(mockDuffelService.confirmCancellationQuote).toHaveBeenCalledTimes(1);
+        expect(mockDuffelService.cancellation.confirmCancellationQuote).toHaveBeenCalledTimes(1);
       });
 
       it('throws BadGatewayException when retries are exhausted', async () => {
-        mockDuffelService.confirmCancellationQuote.mockRejectedValue({ status: 500 });
+        mockDuffelService.cancellation.confirmCancellationQuote.mockRejectedValue({ status: 500 });
 
         await expect(service.confirmCancellationWithRetries('quote-1')).rejects.toThrow(
           BadGatewayException,
         );
-        expect(mockDuffelService.confirmCancellationQuote).toHaveBeenCalledTimes(5);
+        expect(mockDuffelService.cancellation.confirmCancellationQuote).toHaveBeenCalledTimes(5);
       });
     });
 

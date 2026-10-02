@@ -66,8 +66,8 @@ describe('BookingRecoveryService', () => {
     };
 
     mockDuffelService = {
-      cancelOrder: jest.fn(),
-      mapDuffelOrderToSnapshots: jest.fn(),
+      cancellation: { cancelOrder: jest.fn() },
+      recovery: { mapOrderToSnapshots: jest.fn() },
     };
 
     mockRefundTransactionService = {
@@ -118,7 +118,8 @@ describe('BookingRecoveryService', () => {
     service = new BookingRecoveryService(
       mockPrisma,
       mockStripeService,
-      mockDuffelService,
+      mockDuffelService.cancellation,
+      mockDuffelService.recovery,
       mockRefundTransactionService,
       mockRefundSettlementService,
       mockBookingLifecycleService,
@@ -209,13 +210,13 @@ describe('BookingRecoveryService', () => {
         if (where?.eventType === 'duffel_order_created') return { metadata: { id: 'ord_123' } };
         return null;
       });
-      mockDuffelService.cancelOrder.mockResolvedValue({ confirmed_at: '2026-10-02T10:00:00.000Z' });
+      mockDuffelService.cancellation.cancelOrder.mockResolvedValue({ confirmed_at: '2026-10-02T10:00:00.000Z' });
       mockStripeService.cancelPaymentIntent.mockResolvedValue({});
       mockPrisma.payment.updateMany.mockResolvedValue({ count: 1 });
 
       const result = await service.reconcileBookingIfStale(booking);
 
-      expect(mockDuffelService.cancelOrder).toHaveBeenCalledWith('ord_123');
+      expect(mockDuffelService.cancellation.cancelOrder).toHaveBeenCalledWith('ord_123');
       expect(mockPrisma.paymentEvent.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -276,7 +277,7 @@ describe('BookingRecoveryService', () => {
         passengers: [{ givenName: 'John', familyName: 'Doe', duffelPassengerId: 'pas_1' }],
         user: { email: 'john@example.com' },
       });
-      mockDuffelService.mapDuffelOrderToSnapshots.mockReturnValue({
+      mockDuffelService.recovery.mapOrderToSnapshots.mockReturnValue({
         flightSnapshot: {
           segments: [{ departureAt: '2026-09-01T10:00:00.000Z' }],
         },
@@ -346,7 +347,7 @@ describe('BookingRecoveryService', () => {
         ],
         user: { email: 'john@example.com' },
       });
-      mockDuffelService.mapDuffelOrderToSnapshots.mockReturnValue({
+      mockDuffelService.recovery.mapOrderToSnapshots.mockReturnValue({
         flightSnapshot: { segments: [{ departureAt: '2026-09-01T10:00:00.000Z' }] },
         passengerSnapshot: { passengers: [] },
       });
@@ -356,7 +357,7 @@ describe('BookingRecoveryService', () => {
         pnrReference: 'PNR999',
         duffelOrderId: 'ord_123',
       });
-      expect(mockDuffelService.mapDuffelOrderToSnapshots).toHaveBeenCalled();
+      expect(mockDuffelService.recovery.mapOrderToSnapshots).toHaveBeenCalled();
       expect(mockBookingLifecycleService.confirmBooking).toHaveBeenCalledWith(
         'b-1',
         'PNR999',
@@ -542,7 +543,7 @@ describe('BookingRecoveryService', () => {
 
       mockStripeService.retrievePaymentIntent.mockResolvedValue({ status: 'succeeded' });
       mockPrisma.paymentEvent.findFirst.mockResolvedValue({ metadata: { id: 'ord-1' } });
-      mockDuffelService.mapDuffelOrderToSnapshots.mockReturnValue({
+      mockDuffelService.recovery.mapOrderToSnapshots.mockReturnValue({
         flightSnapshot: { segments: [{ departureAt: new Date().toISOString() }] },
         passengerSnapshot: { passengers: [] },
       });
@@ -587,7 +588,7 @@ describe('BookingRecoveryService', () => {
 
       mockStripeService.retrievePaymentIntent.mockResolvedValue({ status: 'succeeded' });
       mockPrisma.paymentEvent.findFirst.mockResolvedValue({ metadata: { id: 'ord-1' } });
-      mockDuffelService.mapDuffelOrderToSnapshots.mockReturnValue({
+      mockDuffelService.recovery.mapOrderToSnapshots.mockReturnValue({
         flightSnapshot: { segments: [{ departureAt: new Date().toISOString() }] },
         passengerSnapshot: { passengers: [] },
       });
@@ -621,11 +622,11 @@ describe('BookingRecoveryService', () => {
         if (where?.eventType === 'duffel_order_created') return { metadata: { id: 'ord_123' } };
         return null;
       });
-      mockDuffelService.cancelOrder.mockResolvedValue({ status: 'confirmed' });
+      mockDuffelService.cancellation.cancelOrder.mockResolvedValue({ status: 'confirmed' });
 
       const result = await service.reconcileBookingIfStale(booking);
 
-      expect(mockDuffelService.cancelOrder).toHaveBeenCalledWith('ord_123');
+      expect(mockDuffelService.cancellation.cancelOrder).toHaveBeenCalledWith('ord_123');
       expect(mockPrisma.paymentEvent.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -661,14 +662,14 @@ describe('BookingRecoveryService', () => {
         return null;
       });
       mockPrisma.paymentEvent.create.mockResolvedValue({ id: BigInt(999) });
-      mockDuffelService.cancelOrder.mockRejectedValue(
+      mockDuffelService.cancellation.cancelOrder.mockRejectedValue(
         new Error('The order has already_cancelled'),
       );
       mockStripeService.cancelPaymentIntent.mockResolvedValue({});
 
       const result = await service.reconcileBookingIfStale(booking);
 
-      expect(mockDuffelService.cancelOrder).toHaveBeenCalledWith('ord_123');
+      expect(mockDuffelService.cancellation.cancelOrder).toHaveBeenCalledWith('ord_123');
       expect(mockPrisma.paymentEvent.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -705,12 +706,12 @@ describe('BookingRecoveryService', () => {
         if (where?.eventType === 'duffel_order_created') return { metadata: { id: 'ord_123' } };
         return null;
       });
-      mockDuffelService.cancelOrder.mockRejectedValue(new Error('Network failure'));
+      mockDuffelService.cancellation.cancelOrder.mockRejectedValue(new Error('Network failure'));
       mockStripeService.cancelPaymentIntent.mockResolvedValue({});
 
       const result = await service.reconcileBookingIfStale(booking);
 
-      expect(mockDuffelService.cancelOrder).toHaveBeenCalledWith('ord_123');
+      expect(mockDuffelService.cancellation.cancelOrder).toHaveBeenCalledWith('ord_123');
       expect(mockPrisma.paymentEvent.create).not.toHaveBeenCalled();
       expect(mockStripeService.cancelPaymentIntent).not.toHaveBeenCalled();
       expect(result.status).toBe(BookingStatus.PROCESSING);
@@ -740,11 +741,11 @@ describe('BookingRecoveryService', () => {
           return null;
         },
       );
-      mockDuffelService.cancelOrder.mockResolvedValue({ id: 'oc_123', status: 'pending' });
+      mockDuffelService.cancellation.cancelOrder.mockResolvedValue({ id: 'oc_123', status: 'pending' });
 
       await service.handleReconciliationRequested({ bookingId: 'b-1' });
 
-      expect(mockDuffelService.cancelOrder).toHaveBeenCalledWith('ord_123');
+      expect(mockDuffelService.cancellation.cancelOrder).toHaveBeenCalledWith('ord_123');
       expect(mockPrisma.paymentEvent.create).not.toHaveBeenCalled();
       expect(mockStripeService.cancelPaymentIntent).not.toHaveBeenCalled();
       expect(mockCacheService.set).toHaveBeenCalledWith(
@@ -790,11 +791,11 @@ describe('BookingRecoveryService', () => {
           return null;
         },
       );
-      mockDuffelService.cancelOrder.mockResolvedValue(result);
+      mockDuffelService.cancellation.cancelOrder.mockResolvedValue(result);
 
       await service.handleReconciliationRequested({ bookingId: 'b-1' });
 
-      expect(mockDuffelService.cancelOrder).toHaveBeenCalledWith('ord_123');
+      expect(mockDuffelService.cancellation.cancelOrder).toHaveBeenCalledWith('ord_123');
       expect(mockPrisma.paymentEvent.create).not.toHaveBeenCalled();
       expect(mockStripeService.cancelPaymentIntent).not.toHaveBeenCalled();
       expect(mockCacheService.set).toHaveBeenCalledWith(
@@ -828,13 +829,13 @@ describe('BookingRecoveryService', () => {
           return null;
         },
       );
-      mockDuffelService.cancelOrder.mockRejectedValue(
+      mockDuffelService.cancellation.cancelOrder.mockRejectedValue(
         new Error('The order cannot be cancelled because the carrier stopped selling it'),
       );
 
       await service.handleReconciliationRequested({ bookingId: 'b-1' });
 
-      expect(mockDuffelService.cancelOrder).toHaveBeenCalledWith('ord_123');
+      expect(mockDuffelService.cancellation.cancelOrder).toHaveBeenCalledWith('ord_123');
       expect(mockPrisma.paymentEvent.create).not.toHaveBeenCalled();
       expect(mockStripeService.cancelPaymentIntent).not.toHaveBeenCalled();
       expect(mockCacheService.set).toHaveBeenCalledWith(
@@ -870,7 +871,7 @@ describe('BookingRecoveryService', () => {
         300,
       );
       expect(mockStripeService.retrievePaymentIntent).not.toHaveBeenCalled();
-      expect(mockDuffelService.cancelOrder).not.toHaveBeenCalled();
+      expect(mockDuffelService.cancellation.cancelOrder).not.toHaveBeenCalled();
       expect(mockPrisma.$transaction).not.toHaveBeenCalled();
       expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
@@ -893,7 +894,7 @@ describe('BookingRecoveryService', () => {
 
       const result = await service.reconcileBookingIfStale(booking);
 
-      expect(mockDuffelService.cancelOrder).not.toHaveBeenCalled();
+      expect(mockDuffelService.cancellation.cancelOrder).not.toHaveBeenCalled();
       expect(mockStripeService.cancelPaymentIntent).not.toHaveBeenCalled();
       expect(mockPrisma.paymentEvent.create).not.toHaveBeenCalled();
       expect(result.status).toBe(BookingStatus.FAILED);
@@ -919,12 +920,12 @@ describe('BookingRecoveryService', () => {
         if (where?.eventType === 'duffel_order_created') return { metadata: { id: 'ord_123' } };
         return null;
       });
-      mockDuffelService.cancelOrder.mockResolvedValue({ status: 'confirmed' });
+      mockDuffelService.cancellation.cancelOrder.mockResolvedValue({ status: 'confirmed' });
       mockPrisma.payment.updateMany.mockResolvedValue({ count: 1 });
 
       const result = await service.reconcileBookingIfStale(booking);
 
-      expect(mockDuffelService.cancelOrder).toHaveBeenCalledWith('ord_123');
+      expect(mockDuffelService.cancellation.cancelOrder).toHaveBeenCalledWith('ord_123');
       expect(mockPrisma.paymentEvent.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -964,7 +965,7 @@ describe('BookingRecoveryService', () => {
 
       const result = await service.reconcileBookingIfStale(booking);
 
-      expect(mockDuffelService.cancelOrder).not.toHaveBeenCalled();
+      expect(mockDuffelService.cancellation.cancelOrder).not.toHaveBeenCalled();
       expect(mockPrisma.paymentEvent.create).not.toHaveBeenCalled();
       expect(mockStripeService.cancelPaymentIntent).toHaveBeenCalledWith('pi_123');
       expect(result.status).toBe(BookingStatus.FAILED);
@@ -1026,7 +1027,7 @@ describe('BookingRecoveryService', () => {
 
       expect(mockCacheService.getTtl).toHaveBeenCalledWith(`booking:recovery:defer:${bookingId}`);
       expect(mockPrisma.booking.findUnique).not.toHaveBeenCalled();
-      expect(mockDuffelService.cancelOrder).not.toHaveBeenCalled();
+      expect(mockDuffelService.cancellation.cancelOrder).not.toHaveBeenCalled();
       expect(mockStripeService.cancelPaymentIntent).not.toHaveBeenCalled();
     });
 
@@ -1049,7 +1050,7 @@ describe('BookingRecoveryService', () => {
       mockPrisma.paymentEvent.findFirst
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce({ metadata: { id: 'ord-budget-denied' } });
-      mockDuffelService.cancelOrder.mockRejectedValueOnce(
+      mockDuffelService.cancellation.cancelOrder.mockRejectedValueOnce(
         new HttpException(
           { code: 'RATE_LIMIT_EXCEEDED', retryAfterSeconds, resetAt },
           HttpStatus.TOO_MANY_REQUESTS,
@@ -1058,7 +1059,7 @@ describe('BookingRecoveryService', () => {
 
       await service.handleReconciliationRequested({ bookingId });
 
-      expect(mockDuffelService.cancelOrder).toHaveBeenCalledWith('ord-budget-denied');
+      expect(mockDuffelService.cancellation.cancelOrder).toHaveBeenCalledWith('ord-budget-denied');
       expect(mockCacheService.set).toHaveBeenCalledWith(
         `booking:recovery:defer:${bookingId}`,
         resetAt,

@@ -9,7 +9,8 @@ import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { StripeService } from '@/common/stripe.service';
-import { DuffelService } from '@/duffel/duffel.service';
+import { DuffelOrderAdapter } from '@/supplier/order/duffel-order.adapter';
+import { DuffelRecoveryService } from '@/supplier/order/duffel-recovery.service';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { Prisma, PaymentStatus } from '@prisma/client';
 import * as crypto from 'crypto';
@@ -20,7 +21,8 @@ describe('Payment Idempotency (E2E)', () => {
   let prisma: PrismaService;
   let jwtService: JwtService;
   let stripeService: StripeService;
-  let duffelService: DuffelService;
+  let duffelOrderAdapter: DuffelOrderAdapter;
+  let duffelRecoveryService: DuffelRecoveryService;
 
   let testUser: { id: string; email: string };
   let testToken: string;
@@ -45,7 +47,8 @@ describe('Payment Idempotency (E2E)', () => {
     prisma = moduleFixture.get<PrismaService>(PrismaService);
     jwtService = moduleFixture.get<JwtService>(JwtService);
     stripeService = moduleFixture.get<StripeService>(StripeService);
-    duffelService = moduleFixture.get<DuffelService>(DuffelService);
+    duffelOrderAdapter = moduleFixture.get<DuffelOrderAdapter>(DuffelOrderAdapter);
+    duffelRecoveryService = moduleFixture.get<DuffelRecoveryService>(DuffelRecoveryService);
   });
 
   afterAll(async () => {
@@ -53,6 +56,11 @@ describe('Payment Idempotency (E2E)', () => {
   });
 
   beforeEach(async () => {
+    // Human approval 2026-10-02: supply the existing adult fixture at the new offer boundary.
+    jest.spyOn(duffelOrderAdapter, 'getOfferById').mockResolvedValue({
+      passengers: [{ id: 'pas_1', type: 'adult' }],
+    });
+
     await prisma.chatHandoff.deleteMany({});
     await prisma.chatSession.deleteMany({});
     await prisma.paymentEvent.deleteMany({});
@@ -343,7 +351,7 @@ describe('Payment Idempotency (E2E)', () => {
         status: 'succeeded',
       } as any);
 
-      jest.spyOn(duffelService, 'createOrder').mockResolvedValue({
+      jest.spyOn(duffelOrderAdapter, 'createOrder').mockResolvedValue({
         id: `order_${Date.now()}`,
         booking_reference: 'ABC123',
         slices: [
@@ -363,7 +371,7 @@ describe('Payment Idempotency (E2E)', () => {
         ],
       } as any);
 
-      jest.spyOn(duffelService, 'retrieveCompleteOrder').mockResolvedValue({
+      jest.spyOn(duffelRecoveryService, 'retrieveCompleteOrder').mockResolvedValue({
         id: `order_${Date.now()}`,
         booking_reference: 'ABC123',
         slices: [
@@ -456,7 +464,7 @@ describe('Payment Idempotency (E2E)', () => {
       });
 
       const stripeSpy = jest.spyOn(stripeService, 'capturePaymentIntent');
-      const duffelSpy = jest.spyOn(duffelService, 'createOrder');
+      const duffelSpy = jest.spyOn(duffelOrderAdapter, 'createOrder');
 
       const res = await request(app.getHttpServer())
         .post('/api/bookings/payment/confirm')

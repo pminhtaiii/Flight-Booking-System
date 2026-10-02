@@ -8,6 +8,7 @@ import 'reflect-metadata';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, Type, ForwardReference } from '@nestjs/common';
 import { AppModule, envSchema } from '@/app.module';
+import { CacheService } from '@/cache/cache.service';
 import { ConfigModule } from '@nestjs/config';
 import { IdempotencyModule } from '@/idempotency/idempotency.module';
 import { PaymentIdempotencyService } from '@/idempotency/payment-idempotency.service';
@@ -23,10 +24,12 @@ import {
 import {
   FULFILLMENT_GATEWAY_PORT,
   FulfillmentGatewayPort,
+  CreateOrderInput,
 } from '@/payment-fulfillment/ports/fulfillment-gateway.port';
 import { StripePaymentAdapter } from '@/common/stripe-payment.adapter';
 import { DuffelFulfillmentAdapter } from '@/supplier/order/duffel-fulfillment.adapter';
 import { BookingRecoveryService } from '@/booking-lifecycle/booking-recovery.service';
+import { CancellationService } from '@/cancellation/cancellation.service';
 import { BookingLifecycleModule } from '@/booking-lifecycle/booking-lifecycle.module';
 import { BookingStateModule } from '@/booking-lifecycle/booking-state.module';
 import { BookingLifecycleService } from '@/booking-lifecycle/booking-lifecycle.service';
@@ -35,8 +38,14 @@ import { DisruptionModule } from '@/disruption/disruption.module';
 import { RefundSettlementModule } from '@/refund-settlement/refund-settlement.module';
 import { StripeService } from '@/common/stripe.service';
 import { DuffelService } from '@/duffel/duffel.service';
+import { DuffelModule } from '@/duffel/duffel.module';
+import { SupplierOrderModule } from '@/supplier/order/supplier-order.module';
+import { DuffelCancellationService } from '@/supplier/order/duffel-cancellation.service';
+import { DuffelRecoveryService } from '@/supplier/order/duffel-recovery.service';
+import { DUFFEL_SDK, DUFFEL_SDK_CONFIGURATION } from '@/supplier/core/duffel-core.module';
+import { SupplierSyncService } from '@/disruption/sync/supplier-sync.service';
 
-import { ScheduleModule } from '@nestjs/schedule';
+import { ScheduleModule, SchedulerRegistry } from '@nestjs/schedule';
 import { PrismaService } from '@/prisma/prisma.service';
 import { BookingProjectionModule } from '@/booking-projection/booking-projection.module';
 import { BookingProjectionListener } from '@/booking-projection/booking-projection.listener';
@@ -346,19 +355,59 @@ describe('Nest Composition Architecture Gate (US1 - T014)', () => {
 
   let app: INestApplication;
   let moduleFixture: TestingModule;
+  let cacheCheck: jest.Mock<
+    Promise<{ allowed: boolean; storeError: boolean }>,
+    [
+      primary: { key: string; limit: number; ttlSeconds: number },
+      secondary?: { key: string; limit: number; ttlSeconds: number },
+    ]
+  >;
+  let offerLookup: jest.Mock<Promise<{ data: unknown }>, [offerId: string]>;
+  let cancellationQuote: jest.Mock<Promise<{ data: unknown }>, [input: { order_id: string }]>;
+  let orderLookup: jest.Mock<Promise<{ data: unknown }>, [orderId: string]>;
 
   beforeAll(async () => {
     assertDisposableDatabase();
 
+    cacheCheck = jest
+      .fn<Promise<{ allowed: boolean; storeError: boolean }>, [
+        primary: { key: string; limit: number; ttlSeconds: number },
+        secondary?: { key: string; limit: number; ttlSeconds: number },
+      ]>()
+      .mockResolvedValue({ allowed: true, storeError: false });
+    offerLookup = jest
+      .fn<Promise<{ data: unknown }>, [offerId: string]>()
+      .mockResolvedValue({ data: { passengers: [{ id: 'pas_graph', type: 'adult' }] } });
+    cancellationQuote = jest.fn<
+      Promise<{ data: unknown }>,
+      [input: { order_id: string }]
+    >();
+    orderLookup = jest.fn<Promise<{ data: unknown }>, [orderId: string]>();
+
     moduleFixture = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(DUFFEL_SDK)
+      .useValue({
+        offers: { get: offerLookup },
+        orderCancellations: { create: cancellationQuote, confirm: jest.fn() },
+        orders: { get: orderLookup },
+      })
+      .overrideProvider(DUFFEL_SDK_CONFIGURATION)
+      .useValue({ token: 'test-token', basePath: 'http://127.0.0.1:4010' })
+      .overrideProvider(CacheService)
+      .useValue({ checkAndIncrement: cacheCheck })
+      .compile();
 
     app = moduleFixture.createNestApplication();
     await app.init();
   });
 
   afterAll(async () => {
+    const schedulerRegistry = moduleFixture?.get<SchedulerRegistry>(SchedulerRegistry, {
+      strict: false,
+    });
+    schedulerRegistry?.getCronJobs().forEach((job) => job.stop());
     if (app) {
       await app.close();
     }
@@ -366,6 +415,114 @@ describe('Nest Composition Architecture Gate (US1 - T014)', () => {
     if (prisma) {
       await prisma.$disconnect();
     }
+  });
+
+  describe('Supplier order consumer boundaries (T039)', () => {
+    it('routes cancellation, recovery, sync, and fulfillment through SupplierOrderModule exports', () => {
+      const consumerModules: readonly Type<unknown>[] = [
+        CancellationModule,
+        BookingLifecycleModule,
+        DisruptionModule,
+        PaymentFulfillmentModule,
+      ];
+
+      for (const consumerModule of consumerModules) {
+        const imports: unknown = Reflect.getMetadata('imports', consumerModule);
+        const moduleImports = Array.isArray(imports) ? imports : [];
+
+        expect(moduleImports).toContain(SupplierOrderModule);
+        expect(moduleImports).not.toContain(DuffelModule);
+      }
+
+      const exports: unknown = Reflect.getMetadata('exports', SupplierOrderModule);
+      const supplierOrderExports = Array.isArray(exports) ? exports : [];
+
+      expect(supplierOrderExports).toEqual(
+        expect.arrayContaining([
+          DuffelCancellationService,
+          DuffelRecoveryService,
+          FULFILLMENT_GATEWAY_PORT,
+        ]),
+      );
+    });
+
+    it('resolves all real consumers and completes a safe order cancellation through external doubles', async () => {
+      const cancellationService = moduleFixture
+        .select(CancellationModule)
+        .get(CancellationService);
+      const bookingRecoveryService = moduleFixture
+        .select(BookingLifecycleModule)
+        .get(BookingRecoveryService);
+      const supplierSyncService = moduleFixture
+        .select(DisruptionModule)
+        .get(SupplierSyncService);
+      const paymentFulfillmentSaga = moduleFixture
+        .select(PaymentFulfillmentModule)
+        .get(PaymentFulfillmentSaga);
+
+      expect(cancellationService).toBeDefined();
+      expect(bookingRecoveryService).toBeDefined();
+      expect(supplierSyncService).toBeDefined();
+      expect(paymentFulfillmentSaga).toBeDefined();
+
+      const fetchDouble = jest.spyOn(global, 'fetch').mockImplementation(async () =>
+        new Response(
+          JSON.stringify({
+            data: { id: 'ord_consumer_graph', booking_reference: 'GRAPH1', passengers: [] },
+          }),
+          { status: 201, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+
+      try {
+        const fulfillmentGateway = moduleFixture
+          .select(PaymentFulfillmentModule)
+          .get<FulfillmentGatewayPort>(FULFILLMENT_GATEWAY_PORT);
+        const input: CreateOrderInput = {
+          offerId: 'off_consumer_graph',
+          passengers: [
+            {
+              type: 'adult',
+              givenName: 'Ada',
+              familyName: 'Lovelace',
+              dateOfBirth: '1990-11-27',
+              gender: 'female',
+              title: 'Ms',
+              phoneNumber: '+12025550199',
+              email: 'ada@example.com',
+            },
+          ],
+          metadata: { bookingIntentId: 'intent_consumer_graph', paymentId: 'pay_consumer_graph' },
+          idempotencyKey: 'idem_consumer_graph',
+        };
+
+        const createdOrder = await fulfillmentGateway.createOrder(input, {
+          beforeInvoke: async () => undefined,
+        });
+        cancellationQuote.mockRejectedValueOnce(new Error('already cancelled'));
+        orderLookup.mockResolvedValueOnce({
+          data: {
+            id: createdOrder.orderId,
+            cancelled_at: '2026-10-02T10:00:00.000Z',
+            cancellation: null,
+          },
+        });
+
+        const cancellationCapability = moduleFixture
+          .select(CancellationModule)
+          .get<DuffelCancellationService>(DuffelCancellationService);
+        await expect(cancellationCapability.cancelOrder(createdOrder.orderId)).resolves.toMatchObject({
+          status: 'CANCELLED',
+        });
+
+        expect(fetchDouble).toHaveBeenCalledTimes(1);
+        expect(cacheCheck).toHaveBeenCalledTimes(4);
+        expect(cancellationQuote).toHaveBeenCalledWith({ order_id: createdOrder.orderId });
+        expect(orderLookup).toHaveBeenCalledWith(createdOrder.orderId);
+      } finally {
+        fetchDouble.mockRestore();
+      }
+    });
   });
 
   describe('1. Gateway Port Resolution to Concrete Adapters', () => {
@@ -573,13 +730,15 @@ describe('Nest Composition Architecture Gate (US1 - T014)', () => {
     });
   });
 
-  describe('4. BookingRecoveryService Retains Direct SDK Wrappers', () => {
-    it('injects direct StripeService and DuffelService into BookingRecoveryService constructor metadata', () => {
+  describe('4. BookingRecoveryService Uses Supplier Capabilities', () => {
+    it('injects recovery and cancellation capabilities into BookingRecoveryService constructor metadata', () => {
       const paramTypes: unknown[] =
         Reflect.getMetadata('design:paramtypes', BookingRecoveryService) || [];
 
       expect(paramTypes).toContain(StripeService);
-      expect(paramTypes).toContain(DuffelService);
+      expect(paramTypes).toContain(DuffelCancellationService);
+      expect(paramTypes).toContain(DuffelRecoveryService);
+      expect(paramTypes).not.toContain(DuffelService);
 
       // Must NOT inject saga port tokens or adapter classes
       expect(paramTypes).not.toContain(StripePaymentAdapter);
@@ -592,7 +751,8 @@ describe('Nest Composition Architecture Gate (US1 - T014)', () => {
 
       const typedService = recoveryService as unknown as {
         stripeService: unknown;
-        duffelService: unknown;
+        duffelCancellationService: unknown;
+        duffelRecoveryService: unknown;
         paymentGateway?: unknown;
         fulfillmentGateway?: unknown;
         saga?: unknown;
@@ -603,9 +763,10 @@ describe('Nest Composition Architecture Gate (US1 - T014)', () => {
       expect(typedService.stripeService).toBeInstanceOf(StripeService);
       expect(typedService.stripeService).not.toBeInstanceOf(StripePaymentAdapter);
 
-      expect(typedService.duffelService).toBeDefined();
-      expect(typedService.duffelService).toBeInstanceOf(DuffelService);
-      expect(typedService.duffelService).not.toBeInstanceOf(DuffelFulfillmentAdapter);
+      expect(typedService.duffelCancellationService).toBeInstanceOf(DuffelCancellationService);
+      expect(typedService.duffelRecoveryService).toBeInstanceOf(DuffelRecoveryService);
+      expect(typedService.duffelCancellationService).not.toBeInstanceOf(DuffelFulfillmentAdapter);
+      expect(typedService.duffelRecoveryService).not.toBeInstanceOf(DuffelFulfillmentAdapter);
 
       // Assert absence of saga ports or saga routing
       expect(typedService.paymentGateway).toBeUndefined();

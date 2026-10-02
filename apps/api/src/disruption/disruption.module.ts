@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '@/prisma/prisma.module';
-import { DuffelModule } from '@/duffel/duffel.module';
+import { SupplierOrderModule } from '@/supplier/order/supplier-order.module';
 import { BookingStateModule } from '@/booking-lifecycle/booking-state.module';
 import { DomainEventsModule } from '@/domain-events/domain-events.module';
 import { SyncClaimService } from './sync/sync-claim.service';
@@ -17,7 +17,7 @@ import { DuffelEventProcessor } from './webhook/duffel-event.processor';
 @Module({
   imports: [
     PrismaModule,
-    DuffelModule,
+    SupplierOrderModule,
     BookingStateModule,
     DomainEventsModule,
   ],

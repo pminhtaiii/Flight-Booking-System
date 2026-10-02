@@ -6,7 +6,8 @@ import { AuditService } from '@/audit/audit.service';
 import { BookingLifecycleService } from '@/booking-lifecycle/booking-lifecycle.service';
 import { BookingRecoveryService } from '@/booking-lifecycle/booking-recovery.service';
 import { CacheService } from '@/cache/cache.service';
-import { DuffelService } from '@/duffel/duffel.service';
+import { DuffelCancellationService } from '@/supplier/order/duffel-cancellation.service';
+import { DuffelRecoveryService } from '@/supplier/order/duffel-recovery.service';
 import { BookingEventPublisherService } from '@/domain-events';
 import { PaymentIdempotencyService } from '@/idempotency/payment-idempotency.service';
 import { PaymentMethodService } from '@/payment/payment-method.service';
@@ -319,7 +320,8 @@ async function createSafetyFixture(): Promise<SafetyFixture> {
     providers: [
       { provide: PrismaService, useValue: fakePrisma },
       { provide: StripeService, useValue: stripe },
-      { provide: DuffelService, useValue: duffel },
+      { provide: DuffelCancellationService, useValue: duffel },
+      { provide: DuffelRecoveryService, useValue: { mapOrderToSnapshots: jest.fn() } },
       { provide: PAYMENT_GATEWAY_PORT, useValue: paymentGateway },
       { provide: FULFILLMENT_GATEWAY_PORT, useValue: fulfillmentGateway },
       PaymentIdempotencyService,

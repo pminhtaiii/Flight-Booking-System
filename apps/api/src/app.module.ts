@@ -17,6 +17,7 @@ import { SafeBookingReadModule } from './agent-gateway/safe-booking-read/safe-bo
 import { TravelerPreferencesModule } from './agent-gateway/traveler-preferences/traveler-preferences.module';
 import { AirportsModule } from './airports/airports.module';
 import { DuffelModule } from './duffel/duffel.module';
+import { SupplierOrderModule } from './supplier/order/supplier-order.module';
 import { SupplierSearchModule } from './supplier/search/supplier-search.module';
 import { FlightsModule } from './flights/flights.module';
 import { BookingIntentModule } from './booking-intent/booking-intent.module';
@@ -135,6 +136,7 @@ export const envSchema = z
     TravelerPreferencesModule,
     AirportsModule,
     DuffelModule,
+    SupplierOrderModule,
     SupplierSearchModule,
     FlightsModule,
     BookingIntentModule,

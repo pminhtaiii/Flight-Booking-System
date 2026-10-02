@@ -9,7 +9,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe, HttpStatus } from '@nestjs/common';
 import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
-import { DuffelService } from '@/duffel/duffel.service';
+import { DuffelRecoveryService } from '@/supplier/order/duffel-recovery.service';
 import { DuffelEventProcessor } from '@/disruption/webhook/duffel-event.processor';
 import { DisruptionStatus, Prisma } from '@prisma/client';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
@@ -23,7 +23,7 @@ describe('Disruption & Flight-Change Management (Webhook & Processor E2E)', () =
   let app: INestApplication;
   let prisma: PrismaService;
   let processor: DuffelEventProcessor;
-  let mockDuffelService: { retrieveCompleteOrder: jest.Mock };
+  let mockDuffelRecoveryService: { retrieveCompleteOrder: jest.Mock };
 
   let userId: string;
   let bookingIntentId: string;
@@ -34,15 +34,15 @@ describe('Disruption & Flight-Change Management (Webhook & Processor E2E)', () =
   const webhookSecret = 'whsec_duffel_test_secret';
 
   beforeAll(async () => {
-    mockDuffelService = {
+    mockDuffelRecoveryService = {
       retrieveCompleteOrder: jest.fn(),
     };
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
-      .overrideProvider(DuffelService)
-      .useValue(mockDuffelService)
+      .overrideProvider(DuffelRecoveryService)
+      .useValue(mockDuffelRecoveryService)
       .compile();
 
     app = moduleFixture.createNestApplication({ rawBody: true });
@@ -300,7 +300,7 @@ describe('Disruption & Flight-Change Management (Webhook & Processor E2E)', () =
         },
       });
 
-      mockDuffelService.retrieveCompleteOrder.mockResolvedValue({
+      mockDuffelRecoveryService.retrieveCompleteOrder.mockResolvedValue({
         id: `ord_fake_${suffix}`,
         slices: [
           {
@@ -352,7 +352,7 @@ describe('Disruption & Flight-Change Management (Webhook & Processor E2E)', () =
       });
 
       // Cause syncBooking to fail
-      mockDuffelService.retrieveCompleteOrder.mockRejectedValue(new Error('Duffel API timeout'));
+      mockDuffelRecoveryService.retrieveCompleteOrder.mockRejectedValue(new Error('Duffel API timeout'));
 
       // Tick 1 (Attempt 1 fails -> RETRY_SCHEDULED)
       await processor.processInboxBatch();

@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { IdempotencyModule } from '@/idempotency/idempotency.module';
 import { StripeModule } from '@/common/stripe.module';
-import { DuffelModule } from '@/duffel/duffel.module';
+import { SupplierOrderModule } from '@/supplier/order/supplier-order.module';
 import { PaymentMethodsModule } from '@/payment/payment-methods.module';
 import { BookingLifecycleModule } from '@/booking-lifecycle/booking-lifecycle.module';
 import { BookingIntentModule } from '@/booking-intent/booking-intent.module';
@@ -14,7 +14,7 @@ import { PaymentFulfillmentSaga } from './payment-fulfillment.saga';
   imports: [
     IdempotencyModule,
     StripeModule,
-    DuffelModule,
+    SupplierOrderModule,
     PaymentMethodsModule,
     BookingLifecycleModule,
     BookingIntentModule,

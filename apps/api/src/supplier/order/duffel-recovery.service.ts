@@ -25,6 +25,13 @@ export class DuffelRecoveryService {
     passengerSnapshot: PassengerSnapshot;
   }> {
     const order = await this.retrieveCompleteOrder(orderId);
+    return this.mapOrderToSnapshots(order);
+  }
+
+  mapOrderToSnapshots(order: unknown): {
+    flightSnapshot: FlightSnapshot;
+    passengerSnapshot: PassengerSnapshot;
+  } {
     return this.normalizer.mapDuffelOrderToSnapshots(order);
   }
 }
