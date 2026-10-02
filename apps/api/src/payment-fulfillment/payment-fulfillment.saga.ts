@@ -31,6 +31,7 @@ import {
   FULFILLMENT_GATEWAY_PORT,
   PaymentGatewayPort,
   FulfillmentGatewayPort,
+  CancelOrderOutcome,
   PortInvocationControl,
   AuthorizeHoldOutcome,
   PassengerEnrichmentInput,
@@ -41,6 +42,10 @@ import {
 
 function isOwnershipLost(error: unknown): boolean {
   return error instanceof ConflictException && error.message.includes('ownership');
+}
+
+function isCancellationConfirmed(outcome: CancelOrderOutcome): boolean {
+  return outcome.success && (outcome.status === undefined || outcome.status.toUpperCase() === 'CANCELLED');
 }
 
 @Injectable()
@@ -813,7 +818,13 @@ export class PaymentFulfillmentSaga {
 
             if (duffelOrderId) {
               try {
-                await this.fulfillmentGateway.cancelOrder(duffelOrderId, control);
+                const cancellation = await this.fulfillmentGateway.cancelOrder(
+                  duffelOrderId,
+                  control,
+                );
+                if (!isCancellationConfirmed(cancellation)) {
+                  throw new Error('Fulfillment order cancellation is not confirmed');
+                }
                 this.logger.log(
                   `[executeConfirmPayment] Successfully cancelled fulfillment order ${duffelOrderId} as compensation.`,
                 );
@@ -821,10 +832,19 @@ export class PaymentFulfillmentSaga {
                 if (isOwnershipLost(cancelError)) {
                   throw cancelError;
                 }
-                const err = cancelError as Error;
+                const err =
+                  cancelError instanceof Error ? cancelError : new Error(String(cancelError));
                 this.logger.error(
                   `[executeConfirmPayment] Fulfillment order cancellation failed during compensation: ${err.message}`,
                   err.stack,
+                );
+                throw new HttpException(
+                  {
+                    success: false,
+                    error: `Stripe capture failed: ${initialCaptureError?.message || 'Unknown error'}. Fulfillment order cancellation is unconfirmed; retry confirmation.`,
+                    bookingStatus: 'PROCESSING',
+                  },
+                  HttpStatus.BAD_GATEWAY,
                 );
               }
             }
@@ -1302,16 +1322,24 @@ export class PaymentFulfillmentSaga {
           const duffelOrderId = rawOrder?.id as string | undefined;
           if (duffelOrderId) {
             try {
-              await this.fulfillmentGateway.cancelOrder(duffelOrderId, control);
+              const cancellation = await this.fulfillmentGateway.cancelOrder(
+                duffelOrderId,
+                control,
+              );
+              if (!isCancellationConfirmed(cancellation)) {
+                throw new Error('Fulfillment order cancellation is not confirmed');
+              }
             } catch (cancelError: unknown) {
               if (isOwnershipLost(cancelError)) {
                 return;
               }
-              const err = cancelError as Error;
+              const err =
+                cancelError instanceof Error ? cancelError : new Error(String(cancelError));
               this.logger.error(
                 `[handleBackgroundError] Background cancelOrder failed: ${err.message}`,
                 err.stack,
               );
+              return;
             }
           }
         }
