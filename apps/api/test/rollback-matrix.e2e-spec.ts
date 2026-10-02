@@ -26,7 +26,8 @@ import { ConfigService } from '@nestjs/config';
 import { SelectionAttestationService } from '@/agent-gateway/selection-attestation.service';
 import { ChatHandoffTokenService } from '@/chat-handoff/chat-handoff-token.service';
 import { ChatMessageCryptoService } from '@/common/chat-message-crypto.service';
-import { DuffelService } from '@/duffel/duffel.service';
+import { Duffel } from '@duffel/api';
+import { DUFFEL_SDK } from '@/supplier/core/duffel-core.module';
 import { JwtService } from '@nestjs/jwt';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import {
@@ -84,7 +85,7 @@ describe('Rollback Matrix & Database Row Integrity (E2E)', () => {
   let attestationService: SelectionAttestationService;
   let tokenService: ChatHandoffTokenService;
   let cryptoService: ChatMessageCryptoService;
-  let duffelService: DuffelService;
+  let duffel: Duffel;
   let jwtService: JwtService;
 
   let validUser: User;
@@ -133,7 +134,7 @@ describe('Rollback Matrix & Database Row Integrity (E2E)', () => {
     );
     tokenService = moduleFixture.get<ChatHandoffTokenService>(ChatHandoffTokenService);
     cryptoService = moduleFixture.get<ChatMessageCryptoService>(ChatMessageCryptoService);
-    duffelService = moduleFixture.get<DuffelService>(DuffelService);
+    duffel = moduleFixture.get<Duffel>(DUFFEL_SDK);
     jwtService = moduleFixture.get<JwtService>(JwtService);
   });
 
@@ -360,7 +361,7 @@ describe('Rollback Matrix & Database Row Integrity (E2E)', () => {
         : [];
       const passengerId = rawPassengers[0]?.id || 'pas_matrix_1';
       // Mock live Duffel offer re-pricing to succeed
-      const duffelGetSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue({
+      const duffelGetSpy = jest.spyOn(duffel.offers, 'get').mockResolvedValue({
         data: {
           id: validFlightOffer.duffelOfferId,
           total_amount: '150.00',

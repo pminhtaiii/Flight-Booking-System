@@ -18,7 +18,8 @@ import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CacheService } from '@/cache/cache.service';
 import { JwtService } from '@nestjs/jwt';
-import { DuffelService } from '@/duffel/duffel.service';
+import { Duffel } from '@duffel/api';
+import { DUFFEL_SDK } from '@/supplier/core/duffel-core.module';
 import { EncryptionService } from '@/common/encryption.service';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import {
@@ -50,7 +51,7 @@ describe('Booking Readiness Observability (E2E) - Tasks T073 & T074', () => {
   let prisma: PrismaService;
   let cacheService: CacheService;
   let jwtService: JwtService;
-  let duffelService: DuffelService;
+  let duffel: Duffel;
   let encryptionService: EncryptionService;
   let metricsService: BookingReadinessMetricsService;
   let backfillService: PassportExpiryBackfillService;
@@ -96,7 +97,7 @@ describe('Booking Readiness Observability (E2E) - Tasks T073 & T074', () => {
     prisma = moduleFixture.get<PrismaService>(PrismaService);
     cacheService = moduleFixture.get<CacheService>(CacheService);
     jwtService = moduleFixture.get<JwtService>(JwtService);
-    duffelService = moduleFixture.get<DuffelService>(DuffelService);
+    duffel = moduleFixture.get<Duffel>(DUFFEL_SDK);
     encryptionService = moduleFixture.get<EncryptionService>(EncryptionService);
     metricsService = moduleFixture.get<BookingReadinessMetricsService>(
       BookingReadinessMetricsService,
@@ -417,7 +418,7 @@ describe('Booking Readiness Observability (E2E) - Tasks T073 & T074', () => {
         },
       });
 
-      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue({
+      const duffelSpy = jest.spyOn(duffel.offers, 'get').mockResolvedValue({
         data: {
           id: intlOffer.duffelOfferId,
           total_amount: '500.00',
@@ -469,7 +470,7 @@ describe('Booking Readiness Observability (E2E) - Tasks T073 & T074', () => {
         BOOKING_READINESS_METRIC_COUNTERS.BOOKING_INTENT_CREATIONS,
       );
 
-      const duffelSpy = jest.spyOn(duffelService['duffel'].offers, 'get').mockResolvedValue({
+      const duffelSpy = jest.spyOn(duffel.offers, 'get').mockResolvedValue({
         data: {
           id: `off_obs_valid`,
           total_amount: '150.00',

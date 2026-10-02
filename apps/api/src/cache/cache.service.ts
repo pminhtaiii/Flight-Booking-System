@@ -494,4 +494,138 @@ end
     }
     return false;
   }
+
+  async checkAndIncrement(
+    primary: { key: string; limit: number; ttlSeconds: number },
+    secondary?: { key: string; limit: number; ttlSeconds: number },
+  ): Promise<{ allowed: boolean; current: number; storeError?: boolean }> {
+    if (this.redisClient) {
+      try {
+        const luaScript = `
+local primaryLimit = tonumber(ARGV[1])
+local primaryTtl = tonumber(ARGV[2])
+local primaryCount = tonumber(redis.call('get', KEYS[1]) or '0')
+
+local hasSecondary = #KEYS > 1
+local secondaryCount = 0
+local secondaryLimit = -1
+local secondaryTtl = -1
+
+if hasSecondary then
+  secondaryLimit = tonumber(ARGV[3])
+  secondaryTtl = tonumber(ARGV[4])
+  secondaryCount = tonumber(redis.call('get', KEYS[2]) or '0')
+end
+
+if primaryCount >= primaryLimit or (hasSecondary and secondaryCount >= secondaryLimit) then
+  return {0, primaryCount}
+end
+
+local new_p = redis.call('incr', KEYS[1])
+if new_p == 1 then
+  redis.call('expire', KEYS[1], primaryTtl)
+end
+
+if hasSecondary then
+  local new_s = redis.call('incr', KEYS[2])
+  if new_s == 1 then
+    redis.call('expire', KEYS[2], secondaryTtl)
+  end
+end
+
+return {1, new_p}
+`;
+
+        const result: unknown = secondary
+          ? await this.redisClient.eval(
+              luaScript,
+              2,
+              primary.key,
+              secondary.key,
+              primary.limit,
+              primary.ttlSeconds,
+              secondary.limit,
+              secondary.ttlSeconds,
+            )
+          : await this.redisClient.eval(
+              luaScript,
+              1,
+              primary.key,
+              primary.limit,
+              primary.ttlSeconds,
+            );
+
+        if (
+          Array.isArray(result) &&
+          typeof result[0] === 'number' &&
+          typeof result[1] === 'number'
+        ) {
+          return {
+            allowed: result[0] === 1,
+            current: result[1],
+          };
+        }
+
+        return { allowed: false, current: 0, storeError: true };
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Redis checkAndIncrement failed: ${errMsg}`);
+        return { allowed: false, current: 0, storeError: true };
+      }
+    }
+
+    const now = Date.now();
+
+    const pItem = this.inMemoryStore.get(primary.key);
+    let primaryCount = 0;
+    let primaryExpiry = now + primary.ttlSeconds * 1000;
+
+    if (pItem) {
+      if (now > pItem.expiry) {
+        this.inMemoryStore.delete(primary.key);
+      } else {
+        primaryCount = parseInt(pItem.value, 10) || 0;
+        primaryExpiry = pItem.expiry;
+      }
+    }
+
+    let secondaryCount = 0;
+    let secondaryExpiry = secondary ? now + secondary.ttlSeconds * 1000 : Infinity;
+
+    if (secondary) {
+      const sItem = this.inMemoryStore.get(secondary.key);
+      if (sItem) {
+        if (now > sItem.expiry) {
+          this.inMemoryStore.delete(secondary.key);
+        } else {
+          secondaryCount = parseInt(sItem.value, 10) || 0;
+          secondaryExpiry = sItem.expiry;
+        }
+      }
+    }
+
+    if (
+      primaryCount >= primary.limit ||
+      (secondary !== undefined && secondaryCount >= secondary.limit)
+    ) {
+      return { allowed: false, current: primaryCount };
+    }
+
+    const nextPrimaryCount = primaryCount + 1;
+    this.inMemoryStore.set(primary.key, {
+      value: String(nextPrimaryCount),
+      expiry: primaryExpiry,
+    });
+
+    if (secondary) {
+      const nextSecondaryCount = secondaryCount + 1;
+      this.inMemoryStore.set(secondary.key, {
+        value: String(nextSecondaryCount),
+        expiry: secondaryExpiry,
+      });
+    }
+
+    return { allowed: true, current: nextPrimaryCount };
+  }
 }
+

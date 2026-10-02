@@ -8,10 +8,10 @@
 
 **Purpose**: Pin current behavior and remove private SDK access before extraction.
 
-- [ ] T001 [P] Characterize raw/cached user and agent search, deterministic offer IDs/order, budget, and 404/410 detail behavior in `apps/api/src/duffel/duffel.service.spec.ts` and `apps/api/src/flights/flights.service.spec.ts`.
-- [ ] T002 [P] Characterize seat-map cache/missing-map and priced-offer validation in `apps/api/src/duffel/duffel-ancillary.service.spec.ts` and `apps/api/src/payment/ancillary-payment-validation.service.spec.ts`.
-- [ ] T003 [P] Characterize create/cancel/retrieve, fencing, redacted evidence, and compensation/replay in `apps/api/src/duffel/duffel-fulfillment.adapter.spec.ts` and `apps/api/src/payment-fulfillment/payment-fulfillment.saga.spec.ts`.
-- [ ] T004 Replace the private `this.duffelService['duffel']` lookup with `getOfferById()` in `apps/api/src/flights/flights.service.ts`; update `apps/api/src/flights/flights.service.spec.ts` and run the baseline commands in `specs/029-duffel-provider-narrowing/quickstart.md`.
+- [x] T001 [P] Characterize raw/cached user and agent search, deterministic offer IDs/order, budget, and 404/410 detail behavior in `apps/api/src/duffel/duffel.service.spec.ts` and `apps/api/src/flights/flights.service.spec.ts`.
+- [x] T002 [P] Characterize seat-map cache/missing-map and priced-offer validation in `apps/api/src/duffel/duffel-ancillary.service.spec.ts` and `apps/api/src/payment/ancillary-payment-validation.service.spec.ts`.
+- [x] T003 [P] Characterize create/cancel/retrieve, fencing, redacted evidence, and compensation/replay in `apps/api/src/duffel/duffel-fulfillment.adapter.spec.ts` and `apps/api/src/payment-fulfillment/payment-fulfillment.saga.spec.ts`.
+- [x] T004 Replace the private `this.duffelService['duffel']` lookup with `getOfferById()` in `apps/api/src/flights/flights.service.ts`; update `apps/api/src/flights/flights.service.spec.ts` and run the baseline commands in `specs/029-duffel-provider-narrowing/quickstart.md`.
 
 ---
 
@@ -19,14 +19,14 @@
 
 **Purpose**: Establish one SDK/config owner and atomic daily attempt accounting before capability extraction.
 
-- [ ] T005 [P] Add tests for one SDK instance, token/basePath validation, mock URL override, and malformed URL fast fail in `apps/api/src/supplier/core/duffel-core.module.spec.ts`.
-- [ ] T006 [P] Add concurrency, UTC expiry, cache-hit, attempted-call, and store-unavailable tests in `apps/api/src/supplier/core/duffel-rate-budget.service.spec.ts` and `apps/api/src/cache/cache.service.spec.ts`.
-- [ ] T007 Implement an atomic Redis check-and-increment operation with total plus optional extra counter/limit and fail-closed budget storage in `apps/api/src/cache/cache.service.ts`.
-- [ ] T008 Extract SDK token/basePath factory and singleton provider into `apps/api/src/supplier/core/duffel-sdk.provider.ts` and `apps/api/src/supplier/core/duffel-core.module.ts`.
-- [ ] T009 Implement total daily budget reservation and typed exhausted/unavailable errors with retry time in `apps/api/src/supplier/core/duffel-rate-budget.service.ts`; keep caller labels/limits in search policy, outside core.
-- [ ] T010 Route each current `DuffelService` SDK/manual HTTP attempt through core reservation, including parallel and retry attempts, in `apps/api/src/duffel/duffel.service.ts`; retain existing mock-server and error behavior.
-- [ ] T011 Remove monthly search charging in `apps/api/src/duffel/duffel.service.ts` and monthly reconciliation precharge/decrement in `apps/api/src/disruption/sync/reconciliation.service.ts`; catch typed budget denial there, preserve `budgetBlocked` and defer without charging skipped syncs; update `apps/api/src/disruption/sync/reconciliation.service.spec.ts`.
-- [ ] T012 Wire `DuffelCoreModule` through the temporary `apps/api/src/duffel/duffel.module.ts`; run core and API typecheck checkpoint from `specs/029-duffel-provider-narrowing/quickstart.md`.
+- [x] T005 [P] Add tests for one SDK instance, token/basePath validation, mock URL override, and malformed URL fast fail in `apps/api/src/supplier/core/duffel-core.module.spec.ts`.
+- [x] T006 [P] Add concurrency, UTC expiry, cache-hit, attempted-call, and store-unavailable tests in `apps/api/src/supplier/core/duffel-rate-budget.service.spec.ts` and `apps/api/src/cache/cache.service.spec.ts`.
+- [x] T007 Implement an atomic Redis check-and-increment operation with total plus optional extra counter/limit and fail-closed budget storage in `apps/api/src/cache/cache.service.ts`.
+- [x] T008 Extract SDK token/basePath factory and singleton provider into `apps/api/src/supplier/core/duffel-sdk.provider.ts` and `apps/api/src/supplier/core/duffel-core.module.ts`.
+- [x] T009 Implement total daily budget reservation and typed exhausted/unavailable errors with retry time in `apps/api/src/supplier/core/duffel-rate-budget.service.ts`; keep caller labels/limits in search policy, outside core.
+- [x] T010 Route each current `DuffelService` SDK/manual HTTP attempt through core reservation, including parallel and retry attempts, in `apps/api/src/duffel/duffel.service.ts`; retain existing mock-server and error behavior.
+- [x] T011 Remove monthly search charging in `apps/api/src/duffel/duffel.service.ts` and monthly reconciliation precharge/decrement in `apps/api/src/disruption/sync/reconciliation.service.ts`; catch typed budget denial there, preserve `budgetBlocked` and defer without charging skipped syncs; update `apps/api/src/disruption/sync/reconciliation.service.spec.ts`.
+- [x] T012 Wire `DuffelCoreModule` through the temporary `apps/api/src/duffel/duffel.module.ts`; run core and API typecheck checkpoint from `specs/029-duffel-provider-narrowing/quickstart.md`.
 
 **Checkpoint**: Current service still works; all actual Duffel attempts now share a daily budget, and no monthly counter remains active.
 
@@ -40,21 +40,21 @@
 
 ### Tests for User Story 1
 
-- [ ] T013 [P] [US1] Add search-port/cache/hash/ranking/rejection and live-offer lookup contract tests in `apps/api/src/supplier/search/duffel-search.service.spec.ts` and `apps/api/src/flights/flight-search-orchestrator.service.spec.ts`.
-- [ ] T014 [P] [US1] Add stored-offer normalization parity tests for passenger IDs, expiry, carriers, segments, cabin, baggage, and malformed snapshots in `apps/api/src/supplier/search/flight-offer.normalizer.spec.ts`.
-- [ ] T015 [P] [US1] Add raw-reader replacement cases in `apps/api/src/booking-intent/booking-readiness.service.spec.ts`, `apps/api/src/agent-gateway/booking-readiness/agent-booking-readiness.service.spec.ts`, and `apps/api/src/chat-handoff/chat-handoff.service.spec.ts`.
+- [x] T013 [P] [US1] Add search-port/cache/hash/ranking/rejection and live-offer lookup contract tests in `apps/api/src/supplier/search/duffel-search.service.spec.ts` and `apps/api/src/flights/flight-search-orchestrator.service.spec.ts`.
+- [x] T014 [P] [US1] Add stored-offer normalization parity tests for passenger IDs, expiry, carriers, segments, cabin, baggage, and malformed snapshots in `apps/api/src/supplier/search/flight-offer.normalizer.spec.ts`.
+- [x] T015 [P] [US1] Add raw-reader replacement cases in `apps/api/src/booking-intent/booking-readiness.service.spec.ts`, `apps/api/src/agent-gateway/booking-readiness/agent-booking-readiness.service.spec.ts`, and `apps/api/src/chat-handoff/chat-handoff.service.spec.ts`.
 
 ### Implementation for User Story 1
 
-- [ ] T016 [US1] Define `FLIGHT_SEARCH_PORT`, complete normalized `FlightOffer`/`FlightSearchResult`, live lookup, and stored-offer normalization signatures in `apps/api/src/supplier/search/flight-search.port.ts` per `specs/029-duffel-provider-narrowing/contracts/supplier-boundaries.md`.
-- [ ] T017 [US1] Move Duffel request mapping, offer search, and live `offers.get` into `apps/api/src/supplier/search/duffel-search.adapter.ts`, reserving each real attempt in core.
-- [ ] T018 [US1] Move and extend Duffel-offer decoding into `apps/api/src/supplier/search/flight-offer.normalizer.ts`; preserve deterministic UUID, original index, rejection counts/order, and normalized stored-offer read behavior from `apps/api/src/flights/flight-offer-normalizer.ts`.
-- [ ] T019 [US1] Implement normalized-query cache/hash and caller sub-allocations in `apps/api/src/supplier/search/duffel-search.service.ts`; return the port envelope with raw payload as write-only persistence evidence.
-- [ ] T020 [US1] Register and export only the search port in `apps/api/src/supplier/search/supplier-search.module.ts`, keeping its normalizer internal; move offer cleanup cron from `apps/api/src/duffel/duffel-cleanup.service.ts` to `apps/api/src/supplier/search/flight-offer-cleanup.service.ts` without duplicate cron registration.
-- [ ] T021 [US1] Rewire search/detail and ranking in `apps/api/src/flights/flights.service.ts`, `apps/api/src/flights/flight-search-orchestrator.service.ts`, and `apps/api/src/flights/flights.module.ts`; preserve DB raw evidence, response DTOs, audits, match order, and expiry outcomes.
-- [ ] T022 [US1] Rewire live offer lookup in `apps/api/src/booking-intent/booking-intent.service.ts` and `apps/api/src/booking-intent/booking-intent.module.ts` to `FLIGHT_SEARCH_PORT`, retaining amount/expiry/passenger validation and existing error mapping.
-- [ ] T023 [US1] Migrate persisted raw-offer readers to `FLIGHT_SEARCH_PORT.normalizeStoredOffer` in `apps/api/src/booking-intent/booking-readiness.service.ts`, `apps/api/src/agent-gateway/booking-readiness/agent-booking-readiness.service.ts`, and `apps/api/src/chat-handoff/chat-handoff.service.ts`; wire `apps/api/src/booking-intent/booking-intent.module.ts`, `apps/api/src/agent-gateway/booking-readiness/agent-booking-readiness.module.ts`, and `apps/api/src/chat-handoff/chat-handoff.module.ts` to the port for neutral passenger, expiry, segment, carrier, and baggage facts.
-- [ ] T024 [US1] Run search/readiness/handoff and API compile checkpoint in `specs/029-duffel-provider-narrowing/quickstart.md`; fix only parity failures in the User Story 1 paths.
+- [x] T016 [US1] Define `FLIGHT_SEARCH_PORT`, complete normalized `FlightOffer`/`FlightSearchResult`, live lookup, and stored-offer normalization signatures in `apps/api/src/supplier/search/flight-search.port.ts` per `specs/029-duffel-provider-narrowing/contracts/supplier-boundaries.md`.
+- [x] T017 [US1] Move Duffel request mapping, offer search, and live `offers.get` into `apps/api/src/supplier/search/duffel-search.adapter.ts`, reserving each real attempt in core.
+- [x] T018 [US1] Move and extend Duffel-offer decoding into `apps/api/src/supplier/search/flight-offer.normalizer.ts`; preserve deterministic UUID, original index, rejection counts/order, and normalized stored-offer read behavior from `apps/api/src/flights/flight-offer-normalizer.ts`.
+- [x] T019 [US1] Implement normalized-query cache/hash and caller sub-allocations in `apps/api/src/supplier/search/duffel-search.service.ts`; return the port envelope with raw payload as write-only persistence evidence.
+- [x] T020 [US1] Register and export only the search port in `apps/api/src/supplier/search/supplier-search.module.ts`, keeping its normalizer internal; move offer cleanup cron from `apps/api/src/duffel/duffel-cleanup.service.ts` to `apps/api/src/supplier/search/flight-offer-cleanup.service.ts` without duplicate cron registration.
+- [x] T021 [US1] Rewire search/detail and ranking in `apps/api/src/flights/flights.service.ts`, `apps/api/src/flights/flight-search-orchestrator.service.ts`, and `apps/api/src/flights/flights.module.ts`; preserve DB raw evidence, response DTOs, audits, match order, and expiry outcomes.
+- [x] T022 [US1] Rewire live offer lookup in `apps/api/src/booking-intent/booking-intent.service.ts` and `apps/api/src/booking-intent/booking-intent.module.ts` to `FLIGHT_SEARCH_PORT`, retaining amount/expiry/passenger validation and existing error mapping.
+- [x] T023 [US1] Migrate persisted raw-offer readers to `FLIGHT_SEARCH_PORT.normalizeStoredOffer` in `apps/api/src/booking-intent/booking-readiness.service.ts`, `apps/api/src/agent-gateway/booking-readiness/agent-booking-readiness.service.ts`, and `apps/api/src/chat-handoff/chat-handoff.service.ts`; wire `apps/api/src/booking-intent/booking-intent.module.ts`, `apps/api/src/agent-gateway/booking-readiness/agent-booking-readiness.module.ts`, and `apps/api/src/chat-handoff/chat-handoff.module.ts` to the port for neutral passenger, expiry, segment, carrier, and baggage facts.
+- [x] T024 [US1] Run search/readiness/handoff and API compile checkpoint in `specs/029-duffel-provider-narrowing/quickstart.md`; fix only parity failures in the User Story 1 paths.
 
 **Checkpoint**: Search and offer detail no longer depend on the Duffel monolith. Booking intent/readiness and handoff use normalized values.
 
@@ -68,16 +68,16 @@
 
 ### Tests for User Story 2
 
-- [ ] T025 [P] [US2] Add adapter/catalog cache and missing-seat-map tests in `apps/api/src/supplier/ancillary/duffel-ancillary.service.spec.ts`.
-- [ ] T026 [P] [US2] Add repricing, currency, selected service, and passenger-scope parity cases in `apps/api/src/payment/ancillary-payment-validation.service.spec.ts` and `apps/api/src/ancillaries/ancillaries.service.spec.ts`.
+- [x] T025 [P] [US2] Add adapter/catalog cache and missing-seat-map tests in `apps/api/src/supplier/ancillary/duffel-ancillary.service.spec.ts`.
+- [x] T026 [P] [US2] Add repricing, currency, selected service, and passenger-scope parity cases in `apps/api/src/payment/ancillary-payment-validation.service.spec.ts` and `apps/api/src/ancillaries/ancillaries.service.spec.ts`.
 
 ### Implementation for User Story 2
 
-- [ ] T027 [US2] Extract seat-map, service, and priced-offer SDK calls with per-attempt budget reservation into `apps/api/src/supplier/ancillary/duffel-ancillary.adapter.ts`.
-- [ ] T028 [US2] Move seat-map/service and price normalization into `apps/api/src/supplier/ancillary/ancillary.normalizer.ts`, retaining existing shared `AncillaryCatalog` and repricing outputs.
-- [ ] T029 [US2] Implement cache/force-refresh/freshness and concrete ancillary operations in `apps/api/src/supplier/ancillary/duffel-ancillary.service.ts` and register them in `apps/api/src/supplier/ancillary/supplier-ancillary.module.ts`.
-- [ ] T030 [US2] Rewire `apps/api/src/ancillaries/ancillary-catalog.service.ts`, `apps/api/src/ancillaries/ancillaries.module.ts`, `apps/api/src/payment/ancillary-payment-validation.service.ts`, and `apps/api/src/payment/payment.module.ts` to the ancillary module; retain request-scoped identity validation.
-- [ ] T031 [US2] Run ancillary/payment and API compile checkpoint in `specs/029-duffel-provider-narrowing/quickstart.md`.
+- [x] T027 [US2] Extract seat-map, service, and priced-offer SDK calls with per-attempt budget reservation into `apps/api/src/supplier/ancillary/duffel-ancillary.adapter.ts`.
+- [x] T028 [US2] Move seat-map/service and price normalization into `apps/api/src/supplier/ancillary/ancillary.normalizer.ts`, retaining existing shared `AncillaryCatalog` and repricing outputs.
+- [x] T029 [US2] Implement cache/force-refresh/freshness and concrete ancillary operations in `apps/api/src/supplier/ancillary/duffel-ancillary.service.ts` and register them in `apps/api/src/supplier/ancillary/supplier-ancillary.module.ts`.
+- [x] T030 [US2] Rewire `apps/api/src/ancillaries/ancillary-catalog.service.ts`, `apps/api/src/ancillaries/ancillaries.module.ts`, `apps/api/src/payment/ancillary-payment-validation.service.ts`, and `apps/api/src/payment/payment.module.ts` to the ancillary module; retain request-scoped identity validation.
+- [x] T031 [US2] Run ancillary/payment and API compile checkpoint in `specs/029-duffel-provider-narrowing/quickstart.md`.
 
 **Checkpoint**: Ancillary flow no longer depends on the Duffel monolith.
 
@@ -91,19 +91,19 @@
 
 ### Tests for User Story 3
 
-- [ ] T032 [P] [US3] Add order adapter, quote, cancellation, retrieval, snapshot, and redaction parity cases in `apps/api/src/supplier/order/duffel-order.adapter.spec.ts` and `apps/api/src/duffel/duffel-fulfillment.adapter.spec.ts`.
-- [ ] T033 [P] [US3] Add last-slot denial in both inline capture-failure and 25-second `handleBackgroundError` compensation, retained checkpoint/hold, sweeper TTL deferral, next-day cancellation, and already-cancelled replay tests in `apps/api/src/payment-fulfillment/payment-fulfillment.saga.spec.ts` and `apps/api/src/booking-lifecycle/booking-recovery.service.spec.ts`.
+- [x] T032 [P] [US3] Add order adapter, quote, cancellation, retrieval, snapshot, and redaction parity cases in `apps/api/src/supplier/order/duffel-order.adapter.spec.ts` and `apps/api/src/duffel/duffel-fulfillment.adapter.spec.ts`.
+- [x] T033 [P] [US3] Add last-slot denial in both inline capture-failure and 25-second `handleBackgroundError` compensation, retained checkpoint/hold, sweeper TTL deferral, next-day cancellation, and already-cancelled replay tests in `apps/api/src/payment-fulfillment/payment-fulfillment.saga.spec.ts` and `apps/api/src/booking-lifecycle/booking-recovery.service.spec.ts`.
 
 ### Implementation for User Story 3
 
-- [ ] T034 [US3] Extract manual order POST and order/quote/cancel/retrieve SDK operations into `apps/api/src/supplier/order/duffel-order.adapter.ts`, counting each actual attempt and preserving idempotency/request shapes.
-- [ ] T035 [US3] Move Duffel order/itinerary-to-domain mapping into `apps/api/src/supplier/order/order-snapshot.normalizer.ts`; remove Duffel types from `apps/api/src/disruption/domain/itinerary-normalizer.ts` while preserving legacy snapshot reads.
-- [ ] T036 [US3] Move quote/confirm/cancel orchestration into flat `apps/api/src/supplier/order/duffel-cancellation.service.ts` with existing refund amounts and idempotent already-cancelled handling.
-- [ ] T037 [US3] Move retrieve/complete-order and snapshot recovery into flat `apps/api/src/supplier/order/duffel-recovery.service.ts` with existing partial-order/error behavior.
-- [ ] T038 [US3] Move the fulfillment adapter to `apps/api/src/supplier/order/duffel-fulfillment.adapter.ts` and bind unchanged `FULFILLMENT_GATEWAY_PORT` in `apps/api/src/supplier/order/supplier-order.module.ts`; preserve semaphore, fencing, redaction, and fallback snapshots.
-- [ ] T039 [US3] Rewire order consumers and Nest imports in `apps/api/src/cancellation/cancellation.service.ts`, `apps/api/src/booking-lifecycle/booking-recovery.service.ts`, `apps/api/src/disruption/sync/supplier-sync.service.ts`, `apps/api/src/payment-fulfillment/payment-fulfillment.module.ts`, and `apps/api/src/app.module.ts`; update module-wiring tests.
-- [ ] T040 [US3] Preserve order-created idempotency checkpoint, payment hold, PROCESSING booking, and order evidence on unconfirmed cancellation in both `executeConfirmPayment` and `handleBackgroundError` of `apps/api/src/payment-fulfillment/payment-fulfillment.saga.ts`; do not finalize the key or void/fail until cancellation is confirmed.
-- [ ] T041 [US3] Defer stale recovery on unconfirmed cancellation via existing `CacheService` key `booking:recovery:defer:{bookingId}` with TTL to budget retry time or bounded backoff, then cancel/confirm before void/fail in `apps/api/src/booking-lifecycle/booking-recovery.service.ts`; missing key causes safe recheck and duplicate remote effects remain blocked.
+- [x] T034 [US3] Extract manual order POST and order/quote/cancel/retrieve SDK operations into `apps/api/src/supplier/order/duffel-order.adapter.ts`, counting each actual attempt and preserving idempotency/request shapes.
+- [x] T035 [US3] Move Duffel order/itinerary-to-domain mapping into `apps/api/src/supplier/order/order-snapshot.normalizer.ts`; remove Duffel types from `apps/api/src/disruption/domain/itinerary-normalizer.ts` while preserving legacy snapshot reads.
+- [x] T036 [US3] Move quote/confirm/cancel orchestration into flat `apps/api/src/supplier/order/duffel-cancellation.service.ts` with existing refund amounts and idempotent already-cancelled handling.
+- [x] T037 [US3] Move retrieve/complete-order and snapshot recovery into flat `apps/api/src/supplier/order/duffel-recovery.service.ts` with existing partial-order/error behavior.
+- [x] T038 [US3] Move the fulfillment adapter to `apps/api/src/supplier/order/duffel-fulfillment.adapter.ts` and bind unchanged `FULFILLMENT_GATEWAY_PORT` in `apps/api/src/supplier/order/supplier-order.module.ts`; preserve semaphore, fencing, redaction, and fallback snapshots.
+- [x] T039 [US3] Rewire order consumers and Nest imports in `apps/api/src/cancellation/cancellation.service.ts`, `apps/api/src/booking-lifecycle/booking-recovery.service.ts`, `apps/api/src/disruption/sync/supplier-sync.service.ts`, `apps/api/src/payment-fulfillment/payment-fulfillment.module.ts`, and `apps/api/src/app.module.ts`; update module-wiring tests.
+- [x] T040 [US3] Preserve order-created idempotency checkpoint, payment hold, PROCESSING booking, and order evidence on unconfirmed cancellation in both `executeConfirmPayment` and `handleBackgroundError` of `apps/api/src/payment-fulfillment/payment-fulfillment.saga.ts`; do not finalize the key or void/fail until cancellation is confirmed.
+- [x] T041 [US3] Defer stale recovery on unconfirmed cancellation via existing `CacheService` key `booking:recovery:defer:{bookingId}` with TTL to budget retry time or bounded backoff, then cancel/confirm before void/fail in `apps/api/src/booking-lifecycle/booking-recovery.service.ts`; missing key causes safe recheck and duplicate remote effects remain blocked.
 - [ ] T042 [US3] Delete `apps/api/src/duffel/duffel.service.ts`, `apps/api/src/duffel/duffel.module.ts`, `apps/api/src/duffel/duffel.service.spec.ts`, and moved duplicate normalizer/cleanup files after equivalent capability tests and all consumers use the new modules.
 - [ ] T043 [US3] Run order/saga/recovery/privacy and API compile checkpoint in `specs/029-duffel-provider-narrowing/quickstart.md`.
 

@@ -1,16 +1,35 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { ServiceUnavailableException } from '@nestjs/common';
-import { ChatHandoffService, ResolvedChatHandoff } from './chat-handoff.service';
+import {
+  ChatHandoffService,
+  ResolvedChatHandoff,
+  firstFlightSegment,
+  lastFlightSegment,
+  handoffPassengers,
+} from './chat-handoff.service';
 import { ChatHandoffTokenService } from './chat-handoff-token.service';
 import { SelectionAttestationService } from '@/agent-gateway/selection-attestation.service';
 import { PrismaService } from '@/prisma/prisma.service';
+import { FlightOfferNormalizer } from '@/supplier/search/flight-offer.normalizer';
+import { FLIGHT_SEARCH_PORT } from '@/supplier/search/flight-search.port';
 import { CreateChatHandoffDto } from './dto/create-chat-handoff.dto';
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
-import { ChatHandoff, Prisma } from '@prisma/client';
+import { ChatHandoff, FlightOffer, Prisma } from '@prisma/client';
 import { AuditService } from '@/audit/audit.service';
 import * as crypto from 'crypto';
+
+function createMockFlightSearchPort() {
+  return {
+    search: jest.fn(),
+    getOfferById: jest.fn(),
+    createOrder: jest.fn(),
+    normalizeStoredOffer: jest.fn((rawOffer: unknown) =>
+      FlightOfferNormalizer.normalizeStoredOffer(rawOffer),
+    ),
+  };
+}
 
 // User approved updating existing tests for Feature 017 T093 security and lifecycle coverage on 2026-08-10.
 
@@ -91,6 +110,10 @@ describe('ChatHandoffService', () => {
           provide: AuditService,
           useValue: { createLog: jest.fn().mockResolvedValue(undefined) },
         },
+        {
+          provide: FLIGHT_SEARCH_PORT,
+          useValue: createMockFlightSearchPort(),
+        },
       ],
     }).compile();
 
@@ -117,6 +140,8 @@ describe('ChatHandoffService', () => {
           {
             segments: [
               {
+                origin: { iata_code: 'SGN' },
+                destination: { iata_code: 'NRT' },
                 departing_at: '2026-09-20T02:00:00.000Z',
                 arriving_at: '2026-09-20T08:30:00.000Z',
                 operating_carrier: { name: 'Vietnam Airlines' },
@@ -739,6 +764,8 @@ describe('ChatHandoffService', () => {
             {
               segments: [
                 {
+                  origin: { iata_code: 'SGN' },
+                  destination: { iata_code: 'HAN' },
                   departing_at: '2026-12-01T08:00:00.000Z',
                   arriving_at: '2026-12-01T10:00:00.000Z',
                   operating_carrier: { name: 'T093 Airways' },
@@ -816,6 +843,8 @@ describe('ChatHandoffService', () => {
             {
               segments: [
                 {
+                  origin: { iata_code: 'SGN' },
+                  destination: { iata_code: 'HAN' },
                   departing_at: '2026-12-01T08:00:00.000Z',
                   arriving_at: '2026-12-01T10:00:00.000Z',
                   operating_carrier: { name: 'T093 Airways' },
@@ -963,3 +992,415 @@ describe('ChatHandoffService', () => {
     });
   });
 });
+
+describe('Raw-Reader Replacement Parity (T015)', () => {
+  let service: ChatHandoffService;
+  let prisma: PrismaService;
+  let configService: ConfigService;
+  let tokenService: ChatHandoffTokenService;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        ChatHandoffService,
+        {
+          provide: PrismaService,
+          useValue: {
+            $transaction: jest.fn(),
+            chatHandoff: {
+              findUnique: jest.fn(),
+              findFirst: jest.fn(),
+              create: jest.fn(),
+              update: jest.fn(),
+              updateMany: jest.fn(),
+            },
+            chatSession: {
+              findUnique: jest.fn(),
+              findFirst: jest.fn().mockResolvedValue({ id: 'cs1', userId: 'u1', deletedAt: null }),
+            },
+            flightOffer: {
+              findUnique: jest.fn(),
+            },
+          },
+        },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn(),
+          },
+        },
+        {
+          provide: ChatHandoffTokenService,
+          useValue: {
+            deriveIdempotencyHash: jest.fn(),
+            computeIdempotencyHash: jest.fn(),
+            generateToken: jest.fn(),
+            verifyToken: jest.fn(),
+            hashToken: jest.fn((token: string) =>
+              token ? crypto.createHash('sha256').update(token).digest('hex') : '',
+            ),
+          },
+        },
+        {
+          provide: SelectionAttestationService,
+          useValue: {
+            verifySelectionAttestation: jest.fn(),
+          },
+        },
+        {
+          provide: AuditService,
+          useValue: { createLog: jest.fn().mockResolvedValue(undefined) },
+        },
+        {
+          provide: FLIGHT_SEARCH_PORT,
+          useValue: createMockFlightSearchPort(),
+        },
+      ],
+    }).compile();
+
+    service = module.get<ChatHandoffService>(ChatHandoffService);
+    prisma = module.get<PrismaService>(PrismaService);
+    configService = module.get<ConfigService>(ConfigService);
+    tokenService = module.get<ChatHandoffTokenService>(ChatHandoffTokenService);
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  const singleSliceOffer: Record<string, unknown> = {
+    id: 'off_handoff_single',
+    total_amount: '220.00',
+    total_currency: 'USD',
+    expires_at: '2030-09-01T10:00:00Z',
+    passengers: [
+      { id: 'pas_1', type: 'adult' },
+      { id: 'pas_2', type: 'child' },
+    ],
+    slices: [
+      {
+        duration: 'PT1H20M',
+        segments: [
+          {
+            id: 'seg_1',
+            origin: { iata_code: 'SGN' },
+            destination: { iata_code: 'DAD' },
+            departing_at: '2030-09-10T06:00:00Z',
+            arriving_at: '2030-09-10T07:20:00Z',
+            duration: 'PT1H20M',
+            marketing_carrier: { iata_code: 'VN', name: 'Vietnam Airlines' },
+            marketing_carrier_flight_number: '123',
+            operating_carrier: { iata_code: 'BL', name: 'Pacific Airlines' },
+          },
+        ],
+      },
+    ],
+  };
+
+  const multiSliceOffer: Record<string, unknown> = {
+    id: 'off_handoff_multi',
+    total_amount: '850.00',
+    total_currency: 'USD',
+    expires_at: '2030-09-01T10:00:00Z',
+    passengers: [
+      { id: 'pas_1', type: 'adult' },
+      { id: 'pas_2', type: 'child' },
+      { id: 'pas_3', type: 'infant' },
+    ],
+    slices: [
+      {
+        duration: 'PT14H',
+        segments: [
+          {
+            id: 'seg_1',
+            origin: { iata_code: 'SGN' },
+            destination: { iata_code: 'NRT' },
+            departing_at: '2030-09-15T00:30:00Z',
+            arriving_at: '2030-09-15T07:45:00Z',
+            duration: 'PT5H15M',
+            marketing_carrier: { iata_code: 'VN', name: 'Vietnam Airlines' },
+            marketing_carrier_flight_number: '300',
+            operating_carrier: { iata_code: 'VN', name: 'Vietnam Airlines' },
+          },
+          {
+            id: 'seg_2',
+            origin: { iata_code: 'NRT' },
+            destination: { iata_code: 'LAX' },
+            departing_at: '2030-09-15T11:00:00Z',
+            arriving_at: '2030-09-15T18:00:00Z',
+            duration: 'PT9H',
+            marketing_carrier: { iata_code: 'VN', name: 'Vietnam Airlines' },
+            marketing_carrier_flight_number: '301',
+            operating_carrier: { iata_code: 'VN', name: 'Vietnam Airlines' },
+          },
+        ],
+      },
+      {
+        duration: 'PT12H',
+        segments: [
+          {
+            id: 'seg_3',
+            origin: { iata_code: 'LAX' },
+            destination: { iata_code: 'SGN' },
+            departing_at: '2030-09-25T23:00:00Z',
+            arriving_at: '2030-09-27T06:00:00Z',
+            duration: 'PT12H',
+            marketing_carrier: { iata_code: 'VN', name: 'Vietnam Airlines' },
+            marketing_carrier_flight_number: '302',
+            operating_carrier: { iata_code: 'VN', name: 'Vietnam Airlines' },
+          },
+        ],
+      },
+    ],
+  };
+
+  it('characterizes firstFlightSegment extraction: airline, flightNumber, origin, departureAt parity', () => {
+    for (const rawOffer of [singleSliceOffer, multiSliceOffer]) {
+      const firstSeg = firstFlightSegment(rawOffer);
+      expect(firstSeg).not.toBeNull();
+
+      const rawMarketingCarrier = firstSeg?.marketing_carrier as
+        | { iata_code?: string; name?: string }
+        | undefined;
+      const rawOperatingCarrier = firstSeg?.operating_carrier as { name?: string } | undefined;
+      const rawOriginObj = firstSeg?.origin as { iata_code?: string } | undefined;
+
+      const rawAirline =
+        rawOperatingCarrier?.name ?? rawMarketingCarrier?.name ?? 'Unknown Airline';
+      const rawFlightNumber =
+        (rawMarketingCarrier?.iata_code ?? '') +
+        String(firstSeg?.marketing_carrier_flight_number ?? '');
+      const rawOrigin = rawOriginObj?.iata_code ?? '';
+      const rawDepartureAt = String(firstSeg?.departing_at ?? '');
+
+      const normalized = FlightOfferNormalizer.normalizeStoredOffer(rawOffer);
+      expect(normalized).not.toBeNull();
+
+      // User-requested correction: handoff prefers the operating carrier; the offer airline prefers marketing.
+      expect(normalized!.segments[0].operatingCarrier).toBe(rawAirline);
+      expect(normalized!.airline).toBe(rawMarketingCarrier?.name ?? rawAirline);
+      expect(normalized!.flightNumber).toBe(rawFlightNumber);
+      expect(normalized!.departureAirport).toBe(rawOrigin);
+      expect(normalized!.departureTime).toBe(rawDepartureAt);
+    }
+  });
+
+  it('characterizes lastFlightSegment extraction: destination and arrivalAt parity', () => {
+    // 1. Single slice (one-way flight)
+    {
+      const lastSeg = lastFlightSegment(singleSliceOffer);
+      expect(lastSeg).not.toBeNull();
+
+      const rawDestObj = lastSeg?.destination as { iata_code?: string } | undefined;
+      const rawDestination = rawDestObj?.iata_code ?? '';
+      const rawArrivalAt = String(lastSeg?.arriving_at ?? '');
+
+      const normalized = FlightOfferNormalizer.normalizeStoredOffer(singleSliceOffer);
+      expect(normalized).not.toBeNull();
+
+      // In single slice, outbound arrival matches the journey arrival
+      expect(normalized!.arrivalAirport).toBe(rawDestination);
+      expect(normalized!.arrivalTime).toBe(rawArrivalAt);
+    }
+
+    // 2. Multi-slice (round-trip flight)
+    {
+      const lastSeg = lastFlightSegment(multiSliceOffer);
+      expect(lastSeg).not.toBeNull();
+
+      const rawDestObj = lastSeg?.destination as { iata_code?: string } | undefined;
+      const rawDestination = rawDestObj?.iata_code ?? '';
+      const rawArrivalAt = String(lastSeg?.arriving_at ?? '');
+
+      const normalized = FlightOfferNormalizer.normalizeStoredOffer(multiSliceOffer);
+      expect(normalized).not.toBeNull();
+
+      // normalized.arrivalAirport reflects the outbound destination ('LAX')
+      expect(normalized!.arrivalAirport).toBe('LAX');
+      // The final return segment of the overall journey reflects the last segment arrival ('SGN')
+      const finalReturnSegment =
+        normalized!.returnSegments![normalized!.returnSegments!.length - 1];
+      expect(finalReturnSegment.arrivalAirport).toBe(rawDestination);
+      expect(finalReturnSegment.arrivalTime).toBe(rawArrivalAt);
+    }
+  });
+
+  it('characterizes handoffPassengers extraction: passenger IDs and types match 100%', () => {
+    for (const rawOffer of [singleSliceOffer, multiSliceOffer]) {
+      const rawPassengers = handoffPassengers(rawOffer);
+      expect(rawPassengers).not.toBeNull();
+
+      const normalized = FlightOfferNormalizer.normalizeStoredOffer(rawOffer);
+      expect(normalized).not.toBeNull();
+
+      const portPassengers = normalized!.passengers.map((p) => ({
+        id: p.supplierPassengerId,
+        type: p.type,
+      }));
+
+      expect(portPassengers).toEqual(rawPassengers);
+    }
+  });
+
+  it('characterizes summary field parity against resolveSafe output', async () => {
+    const rawOffer = singleSliceOffer;
+    const normalized = FlightOfferNormalizer.normalizeStoredOffer(rawOffer);
+    expect(normalized).not.toBeNull();
+
+    jest.spyOn(configService, 'get').mockImplementation((key: string) => {
+      if (key === 'FEATURE_FLAG_CHAT_HANDOFF_ACCEPT') return 'true';
+      return null;
+    });
+
+    jest.spyOn(tokenService, 'verifyToken').mockResolvedValue(true);
+    jest.spyOn(tokenService, 'hashToken').mockImplementation((val: string) => `hash_${val}`);
+
+    const handoffRecord = {
+      id: 'handoff-uuid-1',
+      userId: 'user-1',
+      chatSessionId: 'session-1',
+      flightOfferId: 'fo-1',
+      duffelOfferIdHash: 'hash_off_handoff_single',
+      tokenHash: 'hash_chk_handoff_validtoken',
+      tokenKeyVersion: 1,
+      claimExpiresAt: null,
+      claimRecoverAfter: null,
+      expiresAt: new Date(Date.now() + 600000),
+      consumedAt: null,
+      chatSession: { userId: 'user-1', deletedAt: null },
+    };
+
+    const flightOfferRecord = {
+      id: 'fo-1',
+      duffelOfferId: 'off_handoff_single',
+      rawOffer,
+      origin: 'SGN',
+      destination: 'DAD',
+      price: 220,
+      currency: 'USD',
+      adults: 1,
+      children: 1,
+      infants: 0,
+    };
+
+    jest
+      .spyOn(prisma.chatHandoff, 'findUnique')
+      .mockResolvedValue(handoffRecord as unknown as ChatHandoff);
+    jest
+      .spyOn(prisma.flightOffer, 'findUnique')
+      .mockResolvedValue(flightOfferRecord as unknown as FlightOffer);
+
+    const safeResult = await service.resolveSafe('chk_handoff_validtoken', 'user-1');
+
+    // Preserve the operating-carrier precedence characterized by the corrected parity test.
+    expect(safeResult.offer.airline).toBe(normalized!.segments[0].operatingCarrier);
+    expect(safeResult.offer.departureAt).toBe(normalized!.departureTime);
+    expect(safeResult.offer.arrivalAt).toBe(normalized!.arrivalTime);
+    expect(safeResult.offer.origin).toBe(normalized!.departureAirport);
+    expect(safeResult.offer.destination).toBe(normalized!.arrivalAirport);
+    expect(safeResult.passengers).toEqual(
+      normalized!.passengers.map((p) => ({ id: p.supplierPassengerId, type: p.type })),
+    );
+  });
+
+  it('characterizes malformed raw payloads: normalizeStoredOffer returns null matching existing null parsers', () => {
+    const legacyNullParserPayloads: readonly unknown[] = [
+      null,
+      undefined,
+      {},
+      { slices: 'not-an-array' },
+      { slices: [] },
+      { slices: [{ segments: [] }] },
+      { slices: [{ segments: 'not-an-array' }] },
+      {
+        slices: [
+          {
+            segments: [
+              {
+                origin: { iata_code: 'SGN' },
+                destination: { iata_code: 'HAN' },
+                departing_at: '2030-09-10T08:00:00Z',
+                arriving_at: '2030-09-10T10:00:00Z',
+              },
+            ],
+          },
+        ],
+        passengers: 'not-an-array',
+      },
+      {
+        slices: [
+          {
+            segments: [
+              {
+                origin: { iata_code: 'SGN' },
+                destination: { iata_code: 'HAN' },
+                departing_at: '2030-09-10T08:00:00Z',
+                arriving_at: '2030-09-10T10:00:00Z',
+              },
+            ],
+          },
+        ],
+        passengers: [{ id: 'pas_1', type: 'unknown_type' }],
+      },
+    ];
+
+    for (const malformed of legacyNullParserPayloads) {
+      expect(FlightOfferNormalizer.normalizeStoredOffer(malformed)).toBeNull();
+      expect(createMockFlightSearchPort().normalizeStoredOffer(malformed)).toBeNull();
+
+      const firstSeg = firstFlightSegment(malformed);
+      const pass = handoffPassengers(malformed as Record<string, unknown> | null);
+
+      expect(firstSeg === null || pass === null).toBe(true);
+    }
+
+    const additionalCorruptedPayloads: readonly unknown[] = [
+      {
+        slices: [
+          {
+            segments: [
+              {
+                origin: { iata_code: 'SGN' },
+                destination: { iata_code: 'HAN' },
+                departing_at: '2030-09-10T08:00:00Z',
+                arriving_at: '2030-09-10T10:00:00Z',
+              },
+            ],
+          },
+        ],
+        passengers: [],
+      },
+      {
+        slices: [{ segments: [{ origin: null }] }],
+        passengers: [{ id: 'pas_1', type: 'adult' }],
+      },
+      {
+        slices: [{ segments: [{ destination: null }] }],
+        passengers: [{ id: 'pas_1', type: 'adult' }],
+      },
+      {
+        id: 'bad-iso',
+        total_amount: '100',
+        total_currency: 'USD',
+        slices: [
+          {
+            segments: [
+              {
+                origin: { iata_code: 'SGN' },
+                destination: { iata_code: 'HAN' },
+                departing_at: 'invalid-iso-date',
+                arriving_at: '2030-09-10T10:00:00Z',
+              },
+            ],
+          },
+        ],
+        passengers: [{ id: 'pas_1', type: 'adult' }],
+      },
+    ];
+
+    for (const corrupted of additionalCorruptedPayloads) {
+      expect(FlightOfferNormalizer.normalizeStoredOffer(corrupted)).toBeNull();
+    }
+  });
+});
+

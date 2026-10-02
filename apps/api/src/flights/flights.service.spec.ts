@@ -1,31 +1,54 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, HttpException, HttpStatus } from '@nestjs/common';
 import { FlightsService } from './flights.service';
 import { FlightSearchOrchestratorService } from './flight-search-orchestrator.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CacheService } from '@/cache/cache.service';
-import { DuffelService } from '@/duffel/duffel.service';
+import { DuffelTimeoutError } from '@/supplier/search/duffel-search.adapter';
+import {
+  FLIGHT_SEARCH_PORT,
+  FlightOffer,
+} from '@/supplier/search/flight-search.port';
+import { FlightOfferNormalizer } from '@/supplier/search/flight-offer.normalizer';
 import { AuditService } from '@/audit/audit.service';
 import { DuffelOffer } from '@/duffel/duffel.types';
 import { FlightMatchResult } from '@/flight-match/flight-match.types';
 import { FlightSearchRequestDto } from './dto/search-flight.dto';
+import { generateDeterministicUUID } from './flight-offer-normalizer';
+import { Prisma } from '@prisma/client';
 
 describe('FlightsService (T036)', () => {
   let service: FlightsService;
   let prisma: {
     airport: { findUnique: jest.Mock };
-    searchHistory: { create: jest.Mock };
+    searchHistory: { create: jest.Mock; findFirst: jest.Mock };
     flightOffer: { createMany: jest.Mock; findUnique: jest.Mock; delete: jest.Mock };
     offerRecovery: { createMany: jest.Mock; findUnique: jest.Mock };
     auditLog: { findFirst: jest.Mock };
     $transaction: jest.Mock;
   };
   let cacheService: { get: jest.Mock; set: jest.Mock };
-  let duffelService: { searchFlights: jest.Mock };
+  let flightSearchPort: {
+    search: jest.Mock;
+    getOfferById: jest.Mock;
+    normalizeStoredOffer: jest.Mock;
+  };
   let auditService: { createLog: jest.Mock };
   let orchestratorService: { orchestrateSearch: jest.Mock };
 
   const flushWriteBehind = () => new Promise((resolve) => setImmediate(resolve));
+
+  const createMockNormalizedFlightOffer = (
+    rawOffer: DuffelOffer,
+    overrides: Partial<FlightOffer> = {},
+  ): FlightOffer => {
+    const normalized = FlightOfferNormalizer.normalizeOffer(rawOffer);
+    return {
+      ...normalized,
+      rawSupplierPayload: rawOffer,
+      ...overrides,
+    };
+  };
 
   const createMockDuffelOffer = (id: string, amount = '150.00', airline = 'Vietnam Airlines'): DuffelOffer => ({
     id,
@@ -103,17 +126,17 @@ describe('FlightsService (T036)', () => {
     prisma = {
       airport: {
         findUnique: jest.fn().mockImplementation(({ where }: { where: { iataCode: string } }) => {
-          if (where.iataCode === 'HAN' || where.iataCode === 'SGN') {
+          if (where.iataCode === 'HAN' || where.iataCode === 'SGN' || where.iataCode === 'DAD') {
             return Promise.resolve({ iataCode: where.iataCode, name: `${where.iataCode} Airport` });
           }
           return Promise.resolve(null);
         }),
       },
-      searchHistory: { create: jest.fn().mockResolvedValue({ id: 'hist_1' }) },
+      searchHistory: { create: jest.fn().mockResolvedValue({ id: 'hist_1' }), findFirst: jest.fn() },
       flightOffer: {
         createMany: jest.fn().mockResolvedValue({ count: 1 }),
         findUnique: jest.fn(),
-        delete: jest.fn(),
+        delete: jest.fn().mockResolvedValue({ count: 1 }),
       },
       offerRecovery: {
         createMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -133,8 +156,10 @@ describe('FlightsService (T036)', () => {
       set: jest.fn(),
     };
 
-    duffelService = {
-      searchFlights: jest.fn(),
+    flightSearchPort = {
+      search: jest.fn(),
+      getOfferById: jest.fn(),
+      normalizeStoredOffer: jest.fn(),
     };
 
     auditService = {
@@ -150,7 +175,7 @@ describe('FlightsService (T036)', () => {
         FlightsService,
         { provide: PrismaService, useValue: prisma },
         { provide: CacheService, useValue: cacheService },
-        { provide: DuffelService, useValue: duffelService },
+        { provide: FLIGHT_SEARCH_PORT, useValue: flightSearchPort },
         { provide: AuditService, useValue: auditService },
         { provide: FlightSearchOrchestratorService, useValue: orchestratorService },
       ],
@@ -218,10 +243,12 @@ describe('FlightsService (T036)', () => {
     it('delegates result normalization, scoring, and metadata assembly with expected parameters', async () => {
       const rawOffer1 = createMockDuffelOffer('off_1', '250.00');
       const rawOffer2 = createMockDuffelOffer('off_2', '180.00');
+      const normOffer1 = createMockNormalizedFlightOffer(rawOffer1);
+      const normOffer2 = createMockNormalizedFlightOffer(rawOffer2);
       const searchHash = 'sha256_mock_hash_123';
 
-      duffelService.searchFlights.mockResolvedValue({
-        offerRequest: { id: 'req_1', offers: [rawOffer1, rawOffer2] },
+      flightSearchPort.search.mockResolvedValue({
+        offers: [normOffer1, normOffer2],
         cached: false,
         searchHash,
       });
@@ -230,6 +257,7 @@ describe('FlightsService (T036)', () => {
         mode: 'MATCHED',
         results: [
           {
+            offer: normOffer1,
             rawOffer: rawOffer1,
             scoredOffer: {
               offer: { id: 'uuid-1', originalIndex: 0 },
@@ -237,6 +265,7 @@ describe('FlightsService (T036)', () => {
             },
           },
           {
+            offer: normOffer2,
             rawOffer: rawOffer2,
             scoredOffer: {
               offer: { id: 'uuid-2', originalIndex: 1 },
@@ -272,7 +301,7 @@ describe('FlightsService (T036)', () => {
 
       expect(orchestratorService.orchestrateSearch).toHaveBeenCalledTimes(1);
       expect(orchestratorService.orchestrateSearch).toHaveBeenCalledWith({
-        rawOffers: [rawOffer1, rawOffer2],
+        offers: [normOffer1, normOffer2],
         query: {
           origin: 'HAN',
           destination: 'SGN',
@@ -292,8 +321,8 @@ describe('FlightsService (T036)', () => {
     it('passes empty array when rawResult.offers is undefined', async () => {
       const searchHash = 'sha256_empty_offers';
 
-      duffelService.searchFlights.mockResolvedValue({
-        offerRequest: { id: 'req_empty' },
+      flightSearchPort.search.mockResolvedValue({
+        offers: [],
         cached: false,
         searchHash,
       });
@@ -325,7 +354,7 @@ describe('FlightsService (T036)', () => {
 
       expect(orchestratorService.orchestrateSearch).toHaveBeenCalledWith(
         expect.objectContaining({
-          rawOffers: [],
+          offers: [],
         }),
       );
     });
@@ -335,11 +364,13 @@ describe('FlightsService (T036)', () => {
     it('preserves orchestrator sort order and attaches matchResult and scoredOffer id to each FlightOfferDto', async () => {
       const rawOfferA = createMockDuffelOffer('off_A', '300.00');
       const rawOfferB = createMockDuffelOffer('off_B', '150.00');
+      const normOfferA = createMockNormalizedFlightOffer(rawOfferA);
+      const normOfferB = createMockNormalizedFlightOffer(rawOfferB);
       const matchResultA = createMockMatchResult(60, 'FAIR');
       const matchResultB = createMockMatchResult(95, 'STRONG');
 
-      duffelService.searchFlights.mockResolvedValue({
-        offerRequest: { id: 'req_1', offers: [rawOfferA, rawOfferB] },
+      flightSearchPort.search.mockResolvedValue({
+        offers: [normOfferA, normOfferB],
         cached: false,
         searchHash: 'sha256_order_test',
       });
@@ -349,6 +380,7 @@ describe('FlightsService (T036)', () => {
         mode: 'MATCHED',
         results: [
           {
+            offer: normOfferB,
             rawOffer: rawOfferB,
             scoredOffer: {
               offer: { id: 'deterministic-uuid-b', originalIndex: 1 },
@@ -356,6 +388,7 @@ describe('FlightsService (T036)', () => {
             },
           },
           {
+            offer: normOfferA,
             rawOffer: rawOfferA,
             scoredOffer: {
               offer: { id: 'deterministic-uuid-a', originalIndex: 0 },
@@ -399,11 +432,12 @@ describe('FlightsService (T036)', () => {
   describe('Offer Persistence on Cache-Miss and Cache-Hit', () => {
     it('on cache-miss (cached: false): persists SearchHistory, and missing FlightOffer & OfferRecovery with skipDuplicates: true and zero score fields', async () => {
       const rawOffer = createMockDuffelOffer('off_miss', '199.99');
+      const normOffer = createMockNormalizedFlightOffer(rawOffer, { id: 'uuid-offer-miss' });
       const searchHash = 'sha256_cache_miss';
       const matchResult = createMockMatchResult(82);
 
-      duffelService.searchFlights.mockResolvedValue({
-        offerRequest: { id: 'req_miss', offers: [rawOffer] },
+      flightSearchPort.search.mockResolvedValue({
+        offers: [normOffer],
         cached: false,
         searchHash,
       });
@@ -412,6 +446,7 @@ describe('FlightsService (T036)', () => {
         mode: 'MATCHED',
         results: [
           {
+            offer: normOffer,
             rawOffer,
             scoredOffer: {
               offer: { id: 'uuid-offer-miss', originalIndex: 0 },
@@ -488,11 +523,12 @@ describe('FlightsService (T036)', () => {
 
     it('on cache-hit (cached: true): persists SearchHistory AND upserts missing FlightOffer & OfferRecovery with skipDuplicates: true', async () => {
       const rawOffer = createMockDuffelOffer('off_hit', '140.00');
+      const normOffer = createMockNormalizedFlightOffer(rawOffer, { id: 'uuid-offer-hit' });
       const searchHash = 'sha256_cache_hit';
       const matchResult = createMockMatchResult(91);
 
-      duffelService.searchFlights.mockResolvedValue({
-        offerRequest: { id: 'req_hit', offers: [rawOffer] },
+      flightSearchPort.search.mockResolvedValue({
+        offers: [normOffer],
         cached: true,
         searchHash,
       });
@@ -501,6 +537,7 @@ describe('FlightsService (T036)', () => {
         mode: 'MATCHED',
         results: [
           {
+            offer: normOffer,
             rawOffer,
             scoredOffer: {
               offer: { id: 'uuid-offer-hit', originalIndex: 0 },
@@ -558,8 +595,9 @@ describe('FlightsService (T036)', () => {
 
     it('does not throw when write-behind transaction encounters an error', async () => {
       const rawOffer = createMockDuffelOffer('off_err');
-      duffelService.searchFlights.mockResolvedValue({
-        offerRequest: { id: 'req_err', offers: [rawOffer] },
+      const normOffer = createMockNormalizedFlightOffer(rawOffer, { id: 'uuid-err' });
+      flightSearchPort.search.mockResolvedValue({
+        offers: [normOffer],
         cached: false,
         searchHash: 'sha256_err',
       });
@@ -568,6 +606,7 @@ describe('FlightsService (T036)', () => {
         mode: 'MATCHED',
         results: [
           {
+            offer: normOffer,
             rawOffer,
             scoredOffer: {
               offer: { id: 'uuid-err', originalIndex: 0 },
@@ -607,10 +646,11 @@ describe('FlightsService (T036)', () => {
   describe('Audit Telemetry (T037)', () => {
     it('emits search.completed audit log with safe parameters and strictly zero PII', async () => {
       const rawOffer = createMockDuffelOffer('off_audit');
+      const normOffer = createMockNormalizedFlightOffer(rawOffer);
       const searchHash = 'sha256_audit_hash';
 
-      duffelService.searchFlights.mockResolvedValue({
-        offerRequest: { id: 'req_audit', offers: [rawOffer] },
+      flightSearchPort.search.mockResolvedValue({
+        offers: [normOffer],
         cached: false,
         searchHash,
       });
@@ -619,9 +659,9 @@ describe('FlightsService (T036)', () => {
         mode: 'MATCHED',
         results: [
           {
-            rawOffer,
+            offer: normOffer,
             scoredOffer: {
-              offer: { id: 'uuid-audit', originalIndex: 0 },
+              offer: { id: normOffer.id, originalIndex: 0 },
               matchResult: createMockMatchResult(85),
             },
           },
@@ -695,5 +735,940 @@ describe('FlightsService (T036)', () => {
       expect(metaJson).not.toContain('offers');
     });
   });
+
+  describe('Search Caller Characterization (T001)', () => {
+    it('delegates search for user caller ("user") and handles raw search cache miss', async () => {
+      const rawOffer = createMockDuffelOffer('off_user_call');
+      const normOffer = createMockNormalizedFlightOffer(rawOffer);
+      const searchHash = 'sha256_user_caller_hash';
+
+      flightSearchPort.search.mockResolvedValue({
+        offers: [normOffer],
+        cached: false,
+        searchHash,
+      });
+
+      orchestratorService.orchestrateSearch.mockResolvedValue({
+        mode: 'MATCHED',
+        results: [
+          {
+            offer: normOffer,
+            scoredOffer: {
+              offer: { id: normOffer.id, originalIndex: 0 },
+              matchResult: createMockMatchResult(88),
+            },
+          },
+        ],
+        meta: {
+          totalResults: 1,
+          searchHash,
+          cached: false,
+          requestedCabinClass: 'economy',
+          scoringVersion: 'flight-match-v1',
+          eligibleCount: 1,
+          matchLevelCounts: { STRONG: 1, GOOD: 0, FAIR: 0, WEAK: 0 },
+        },
+        droppedCount: 0,
+        rejectionCounts: {},
+      });
+
+      const query: FlightSearchRequestDto = {
+        origin: 'HAN',
+        destination: 'SGN',
+        departureDate: '2026-10-01',
+        adults: 1,
+      };
+
+      const response = await service.search('user_1', query, undefined, undefined, {
+        caller: 'user',
+      });
+
+      expect(flightSearchPort.search).toHaveBeenCalledWith(
+        expect.objectContaining({
+          origin: 'HAN',
+          destination: 'SGN',
+          departureDate: '2026-10-01',
+          adults: 1,
+        }),
+        'user',
+      );
+      expect(response.meta.cached).toBe(false);
+    });
+
+    it('delegates search for agent caller ("agent") and handles raw search cache miss', async () => {
+      const rawOffer = createMockDuffelOffer('off_agent_call');
+      const normOffer = createMockNormalizedFlightOffer(rawOffer);
+      const searchHash = 'sha256_agent_caller_hash';
+
+      flightSearchPort.search.mockResolvedValue({
+        offers: [normOffer],
+        cached: false,
+        searchHash,
+      });
+
+      orchestratorService.orchestrateSearch.mockResolvedValue({
+        mode: 'MATCHED',
+        results: [
+          {
+            offer: normOffer,
+            scoredOffer: {
+              offer: { id: normOffer.id, originalIndex: 0 },
+              matchResult: createMockMatchResult(85),
+            },
+          },
+        ],
+        meta: {
+          totalResults: 1,
+          searchHash,
+          cached: false,
+          requestedCabinClass: 'economy',
+          scoringVersion: 'flight-match-v1',
+          eligibleCount: 1,
+          matchLevelCounts: { STRONG: 1, GOOD: 0, FAIR: 0, WEAK: 0 },
+        },
+        droppedCount: 0,
+        rejectionCounts: {},
+      });
+
+      const query: FlightSearchRequestDto = {
+        origin: 'HAN',
+        destination: 'SGN',
+        departureDate: '2026-10-01',
+        adults: 2,
+      };
+
+      const response = await service.search('agent_user', query, undefined, undefined, {
+        caller: 'agent',
+      });
+
+      expect(flightSearchPort.search).toHaveBeenCalledWith(
+        expect.objectContaining({
+          origin: 'HAN',
+          destination: 'SGN',
+          departureDate: '2026-10-01',
+          adults: 2,
+        }),
+        'agent',
+      );
+      expect(response.meta.cached).toBe(false);
+    });
+
+    it('defaults caller to "user" when caller option is omitted', async () => {
+      const rawOffer = createMockDuffelOffer('off_default_caller');
+      const normOffer = createMockNormalizedFlightOffer(rawOffer);
+      const searchHash = 'sha256_default_caller_hash';
+
+      flightSearchPort.search.mockResolvedValue({
+        offers: [normOffer],
+        cached: false,
+        searchHash,
+      });
+
+      orchestratorService.orchestrateSearch.mockResolvedValue({
+        mode: 'MATCHED',
+        results: [
+          {
+            offer: normOffer,
+            scoredOffer: {
+              offer: { id: normOffer.id, originalIndex: 0 },
+              matchResult: createMockMatchResult(80),
+            },
+          },
+        ],
+        meta: {
+          totalResults: 1,
+          searchHash,
+          cached: false,
+          requestedCabinClass: 'economy',
+          scoringVersion: 'flight-match-v1',
+          eligibleCount: 1,
+          matchLevelCounts: { STRONG: 1, GOOD: 0, FAIR: 0, WEAK: 0 },
+        },
+        droppedCount: 0,
+        rejectionCounts: {},
+      });
+
+      const query: FlightSearchRequestDto = {
+        origin: 'HAN',
+        destination: 'SGN',
+        departureDate: '2026-10-01',
+        adults: 1,
+      };
+
+      await service.search('user_1', query);
+
+      expect(flightSearchPort.search).toHaveBeenCalledWith(
+        expect.anything(),
+        'user',
+      );
+    });
+
+    it('returns cached result on cache hit with cached: true and 0 additional searches', async () => {
+      const rawOffer = createMockDuffelOffer('off_cached_call');
+      const normOffer = createMockNormalizedFlightOffer(rawOffer);
+      const searchHash = 'sha256_cache_hit_hash';
+
+      flightSearchPort.search.mockResolvedValue({
+        offers: [normOffer],
+        cached: true,
+        searchHash,
+      });
+
+      orchestratorService.orchestrateSearch.mockResolvedValue({
+        mode: 'MATCHED',
+        results: [
+          {
+            offer: normOffer,
+            scoredOffer: {
+              offer: { id: normOffer.id, originalIndex: 0 },
+              matchResult: createMockMatchResult(90),
+            },
+          },
+        ],
+        meta: {
+          totalResults: 1,
+          searchHash,
+          cached: true,
+          requestedCabinClass: 'economy',
+          scoringVersion: 'flight-match-v1',
+          eligibleCount: 1,
+          matchLevelCounts: { STRONG: 1, GOOD: 0, FAIR: 0, WEAK: 0 },
+        },
+        droppedCount: 0,
+        rejectionCounts: {},
+      });
+
+      const query: FlightSearchRequestDto = {
+        origin: 'HAN',
+        destination: 'SGN',
+        departureDate: '2026-10-01',
+        adults: 1,
+      };
+
+      const response = await service.search('user_1', query, undefined, undefined, {
+        caller: 'user',
+      });
+
+      expect(response.meta.cached).toBe(true);
+      expect(flightSearchPort.search).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns cached result on cache hit for agent caller with cached: true and 0 additional searches', async () => {
+      const rawOffer = createMockDuffelOffer('off_cached_agent_call');
+      const normOffer = createMockNormalizedFlightOffer(rawOffer);
+      const searchHash = 'sha256_cache_hit_agent_hash';
+
+      flightSearchPort.search.mockResolvedValue({
+        offers: [normOffer],
+        cached: true,
+        searchHash,
+      });
+
+      orchestratorService.orchestrateSearch.mockResolvedValue({
+        mode: 'MATCHED',
+        results: [
+          {
+            offer: normOffer,
+            scoredOffer: {
+              offer: { id: normOffer.id, originalIndex: 0 },
+              matchResult: createMockMatchResult(91),
+            },
+          },
+        ],
+        meta: {
+          totalResults: 1,
+          searchHash,
+          cached: true,
+          requestedCabinClass: 'economy',
+          scoringVersion: 'flight-match-v1',
+          eligibleCount: 1,
+          matchLevelCounts: { STRONG: 1, GOOD: 0, FAIR: 0, WEAK: 0 },
+        },
+        droppedCount: 0,
+        rejectionCounts: {},
+      });
+
+      const query: FlightSearchRequestDto = {
+        origin: 'HAN',
+        destination: 'SGN',
+        departureDate: '2026-10-01',
+        adults: 2,
+      };
+
+      const response = await service.search('agent_user_1', query, undefined, undefined, {
+        caller: 'agent',
+      });
+
+      expect(response.meta.cached).toBe(true);
+      expect(flightSearchPort.search).toHaveBeenCalledWith(
+        expect.objectContaining({
+          origin: 'HAN',
+          destination: 'SGN',
+          departureDate: '2026-10-01',
+          adults: 2,
+        }),
+        'agent',
+      );
+      expect(flightSearchPort.search).toHaveBeenCalledTimes(1);
+    });
+
+    it('propagates UPSTREAM_UNAVAILABLE 502 when upstream Duffel fails and skips persistence and audit', async () => {
+      flightSearchPort.search.mockRejectedValue(
+        new HttpException(
+          {
+            message: 'Upstream flight search service is temporarily unavailable',
+            code: 'UPSTREAM_UNAVAILABLE',
+          },
+          HttpStatus.BAD_GATEWAY,
+        ),
+      );
+
+      const query: FlightSearchRequestDto = {
+        origin: 'HAN',
+        destination: 'SGN',
+        departureDate: '2026-10-01',
+        adults: 1,
+      };
+
+      await expect(service.search('user_1', query)).rejects.toMatchObject({
+        status: HttpStatus.BAD_GATEWAY,
+        response: {
+          code: 'UPSTREAM_UNAVAILABLE',
+        },
+      });
+
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(auditService.createLog).not.toHaveBeenCalled();
+    });
+
+    it('propagates RATE_LIMIT_EXCEEDED 429 when budget limit is exhausted and skips persistence and audit', async () => {
+      flightSearchPort.search.mockRejectedValue(
+        new HttpException(
+          {
+            message: 'Flight search capacity temporarily reached. Please try again later.',
+            code: 'RATE_LIMIT_EXCEEDED',
+          },
+          HttpStatus.TOO_MANY_REQUESTS,
+        ),
+      );
+
+      const query: FlightSearchRequestDto = {
+        origin: 'HAN',
+        destination: 'SGN',
+        departureDate: '2026-10-01',
+        adults: 1,
+      };
+
+      await expect(service.search('user_1', query)).rejects.toMatchObject({
+        status: HttpStatus.TOO_MANY_REQUESTS,
+        response: {
+          code: 'RATE_LIMIT_EXCEEDED',
+        },
+      });
+
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(auditService.createLog).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Deterministic offer UUID assignment and slice/segment order preservation (T001)', () => {
+    it('assigns deterministic offer UUID and preserves slice and segment index order for multi-leg journeys', async () => {
+      const multiSliceOffer: DuffelOffer = {
+        id: 'off_multi_seg',
+        total_amount: '350.00',
+        total_currency: 'USD',
+        slices: [
+          {
+            id: 'sli_outbound',
+            duration: 'PT3H30M',
+            origin: { id: 'HAN', name: 'Noi Bai', iata_code: 'HAN', type: 'airport' },
+            destination: { id: 'SGN', name: 'Tan Son Nhat', iata_code: 'SGN', type: 'airport' },
+            segments: [
+              {
+                id: 'seg_out_0',
+                duration: 'PT1H20M',
+                departing_at: '2026-10-01T08:00:00',
+                arriving_at: '2026-10-01T09:20:00',
+                origin: { id: 'HAN', name: 'Noi Bai', iata_code: 'HAN', type: 'airport' },
+                destination: { id: 'DAD', name: 'Da Nang', iata_code: 'DAD', type: 'airport' },
+                marketing_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
+                operating_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
+                marketing_carrier_flight_number: '101',
+                aircraft: { id: 'arc_1', name: 'Airbus A321', iata_code: '321' },
+                passengers: [{ passenger_id: 'pas_1', cabin_class: 'economy' }],
+              },
+              {
+                id: 'seg_out_1',
+                duration: 'PT1H30M',
+                departing_at: '2026-10-01T11:00:00',
+                arriving_at: '2026-10-01T12:30:00',
+                origin: { id: 'DAD', name: 'Da Nang', iata_code: 'DAD', type: 'airport' },
+                destination: { id: 'SGN', name: 'Tan Son Nhat', iata_code: 'SGN', type: 'airport' },
+                marketing_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
+                operating_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
+                marketing_carrier_flight_number: '102',
+                aircraft: { id: 'arc_2', name: 'Airbus A321', iata_code: '321' },
+                passengers: [{ passenger_id: 'pas_1', cabin_class: 'economy' }],
+              },
+            ],
+          },
+          {
+            id: 'sli_return',
+            duration: 'PT3H30M',
+            origin: { id: 'SGN', name: 'Tan Son Nhat', iata_code: 'SGN', type: 'airport' },
+            destination: { id: 'HAN', name: 'Noi Bai', iata_code: 'HAN', type: 'airport' },
+            segments: [
+              {
+                id: 'seg_ret_0',
+                duration: 'PT1H30M',
+                departing_at: '2026-10-15T14:00:00',
+                arriving_at: '2026-10-15T15:30:00',
+                origin: { id: 'SGN', name: 'Tan Son Nhat', iata_code: 'SGN', type: 'airport' },
+                destination: { id: 'DAD', name: 'Da Nang', iata_code: 'DAD', type: 'airport' },
+                marketing_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
+                operating_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
+                marketing_carrier_flight_number: '201',
+                aircraft: { id: 'arc_3', name: 'Airbus A321', iata_code: '321' },
+                passengers: [{ passenger_id: 'pas_1', cabin_class: 'economy' }],
+              },
+              {
+                id: 'seg_ret_1',
+                duration: 'PT1H20M',
+                departing_at: '2026-10-15T17:00:00',
+                arriving_at: '2026-10-15T18:20:00',
+                origin: { id: 'DAD', name: 'Da Nang', iata_code: 'DAD', type: 'airport' },
+                destination: { id: 'HAN', name: 'Noi Bai', iata_code: 'HAN', type: 'airport' },
+                marketing_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
+                operating_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
+                marketing_carrier_flight_number: '202',
+                aircraft: { id: 'arc_4', name: 'Airbus A321', iata_code: '321' },
+                passengers: [{ passenger_id: 'pas_1', cabin_class: 'economy' }],
+              },
+            ],
+          },
+        ],
+        passengers: [{ id: 'pas_1', type: 'adult' }],
+        passenger_identity_documents_required: false,
+      };
+
+      const expectedDeterministicUuid = generateDeterministicUUID(multiSliceOffer.id);
+      const searchHash = 'sha256_order_and_uuid_test';
+      const normMultiOffer = createMockNormalizedFlightOffer(multiSliceOffer);
+
+      flightSearchPort.search.mockResolvedValue({
+        offers: [normMultiOffer],
+        cached: false,
+        searchHash,
+      });
+
+      orchestratorService.orchestrateSearch.mockResolvedValue({
+        mode: 'MATCHED',
+        results: [
+          {
+            offer: normMultiOffer,
+            scoredOffer: {
+              offer: { id: expectedDeterministicUuid, originalIndex: 0 },
+              matchResult: createMockMatchResult(92),
+            },
+          },
+        ],
+        meta: {
+          totalResults: 1,
+          searchHash,
+          cached: false,
+          requestedCabinClass: 'economy',
+          scoringVersion: 'flight-match-v1',
+          eligibleCount: 1,
+          matchLevelCounts: { STRONG: 1, GOOD: 0, FAIR: 0, WEAK: 0 },
+        },
+        droppedCount: 0,
+        rejectionCounts: {},
+      });
+
+      const query: FlightSearchRequestDto = {
+        origin: 'HAN',
+        destination: 'SGN',
+        departureDate: '2026-10-01',
+        returnDate: '2026-10-15',
+        adults: 1,
+        cabinClass: 'economy',
+      };
+
+      const response = await service.search('user_test', query, undefined, undefined, {
+        persistence: 'required',
+      });
+
+      expect(response.results).toHaveLength(1);
+      const offerResult = response.results[0];
+
+      // 1. Assert deterministic offer UUID assignment
+      expect(offerResult.id).toBe(expectedDeterministicUuid);
+      expect(offerResult.duffelOfferId).toBe('off_multi_seg');
+
+      // 2. Assert preservation of slice/segment index order
+      // Outbound segments order preserved
+      expect(offerResult.flightNumber).toBe('VN101');
+      expect(offerResult.segments).toHaveLength(2);
+      expect(offerResult.segments[0].departureAirport).toBe('HAN');
+      expect(offerResult.segments[0].arrivalAirport).toBe('DAD');
+      expect(offerResult.segments[0].carrierCode).toBe('VN');
+      expect(offerResult.segments[0].flightNumber).toBe('101');
+      expect(offerResult.segments[1].departureAirport).toBe('DAD');
+      expect(offerResult.segments[1].arrivalAirport).toBe('SGN');
+      expect(offerResult.segments[1].carrierCode).toBe('VN');
+      expect(offerResult.segments[1].flightNumber).toBe('102');
+
+      // Return segments order preserved
+      expect(offerResult.returnSegments).toHaveLength(2);
+      expect(offerResult.returnSegments![0].departureAirport).toBe('SGN');
+      expect(offerResult.returnSegments![0].arrivalAirport).toBe('DAD');
+      expect(offerResult.returnSegments![0].carrierCode).toBe('VN');
+      expect(offerResult.returnSegments![0].flightNumber).toBe('201');
+      expect(offerResult.returnSegments![1].departureAirport).toBe('DAD');
+      expect(offerResult.returnSegments![1].arrivalAirport).toBe('HAN');
+      expect(offerResult.returnSegments![1].carrierCode).toBe('VN');
+      expect(offerResult.returnSegments![1].flightNumber).toBe('202');
+
+      // Stops and endpoints
+      expect(offerResult.departureAirport).toBe('HAN');
+      expect(offerResult.arrivalAirport).toBe('SGN');
+      expect(offerResult.stops).toBe(2);
+
+      // Verify deterministic UUID is persisted in database
+      expect(prisma.flightOffer.createMany).toHaveBeenCalledWith({
+        data: [
+          expect.objectContaining({
+            id: expectedDeterministicUuid,
+            duffelOfferId: 'off_multi_seg',
+            searchHash,
+          }),
+        ],
+        skipDuplicates: true,
+      });
+
+      expect(prisma.offerRecovery.createMany).toHaveBeenCalledWith({
+        data: [{ id: expectedDeterministicUuid, searchHash }],
+        skipDuplicates: true,
+      });
+    });
+
+    it('assigns unique deterministic UUIDs and preserves segment orders across multiple distinct ranked offers', async () => {
+      const offerA: DuffelOffer = {
+        id: 'off_flight_a',
+        total_amount: '200.00',
+        total_currency: 'USD',
+        slices: [
+          {
+            id: 'sli_a_out',
+            duration: 'PT3H0M',
+            origin: { id: 'HAN', name: 'Noi Bai', iata_code: 'HAN', type: 'airport' },
+            destination: { id: 'SGN', name: 'Tan Son Nhat', iata_code: 'SGN', type: 'airport' },
+            segments: [
+              {
+                id: 'seg_a_1',
+                duration: 'PT1H20M',
+                departing_at: '2026-10-01T08:00:00',
+                arriving_at: '2026-10-01T09:20:00',
+                origin: { id: 'HAN', name: 'Noi Bai', iata_code: 'HAN', type: 'airport' },
+                destination: { id: 'DAD', name: 'Da Nang', iata_code: 'DAD', type: 'airport' },
+                marketing_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
+                operating_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
+                marketing_carrier_flight_number: '111',
+                aircraft: { id: 'arc_1', name: 'Airbus A321', iata_code: '321' },
+                passengers: [{ passenger_id: 'pas_1', cabin_class: 'economy' }],
+              },
+              {
+                id: 'seg_a_2',
+                duration: 'PT1H10M',
+                departing_at: '2026-10-01T10:30:00',
+                arriving_at: '2026-10-01T11:40:00',
+                origin: { id: 'DAD', name: 'Da Nang', iata_code: 'DAD', type: 'airport' },
+                destination: { id: 'SGN', name: 'Tan Son Nhat', iata_code: 'SGN', type: 'airport' },
+                marketing_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
+                operating_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
+                marketing_carrier_flight_number: '112',
+                aircraft: { id: 'arc_2', name: 'Airbus A321', iata_code: '321' },
+                passengers: [{ passenger_id: 'pas_1', cabin_class: 'economy' }],
+              },
+            ],
+          },
+        ],
+        passengers: [{ id: 'pas_1', type: 'adult' }],
+        passenger_identity_documents_required: false,
+      };
+
+      const offerB: DuffelOffer = {
+        id: 'off_flight_b',
+        total_amount: '250.00',
+        total_currency: 'USD',
+        slices: [
+          {
+            id: 'sli_b_out',
+            duration: 'PT2H10M',
+            origin: { id: 'HAN', name: 'Noi Bai', iata_code: 'HAN', type: 'airport' },
+            destination: { id: 'SGN', name: 'Tan Son Nhat', iata_code: 'SGN', type: 'airport' },
+            segments: [
+              {
+                id: 'seg_b_1',
+                duration: 'PT2H10M',
+                departing_at: '2026-10-01T14:00:00',
+                arriving_at: '2026-10-01T16:10:00',
+                origin: { id: 'HAN', name: 'Noi Bai', iata_code: 'HAN', type: 'airport' },
+                destination: { id: 'SGN', name: 'Tan Son Nhat', iata_code: 'SGN', type: 'airport' },
+                marketing_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
+                operating_carrier: { id: 'VN', name: 'Vietnam Airlines', iata_code: 'VN' },
+                marketing_carrier_flight_number: '120',
+                aircraft: { id: 'arc_3', name: 'Airbus A350', iata_code: '350' },
+                passengers: [{ passenger_id: 'pas_1', cabin_class: 'economy' }],
+              },
+            ],
+          },
+        ],
+        passengers: [{ id: 'pas_1', type: 'adult' }],
+        passenger_identity_documents_required: false,
+      };
+
+      const uuidA = generateDeterministicUUID(offerA.id);
+      const uuidB = generateDeterministicUUID(offerB.id);
+      const rfc4122Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+      expect(uuidA).not.toBe(uuidB);
+      expect(uuidA).toMatch(rfc4122Regex);
+      expect(uuidB).toMatch(rfc4122Regex);
+
+      const normOfferA = createMockNormalizedFlightOffer(offerA);
+      const normOfferB = createMockNormalizedFlightOffer(offerB);
+
+      const searchHash = 'sha256_multi_offer_hash';
+      flightSearchPort.search.mockResolvedValue({
+        offers: [normOfferA, normOfferB],
+        cached: false,
+        searchHash,
+      });
+
+      orchestratorService.orchestrateSearch.mockResolvedValue({
+        mode: 'MATCHED',
+        results: [
+          {
+            offer: normOfferA,
+            scoredOffer: {
+              offer: { id: uuidA, originalIndex: 0 },
+              matchResult: createMockMatchResult(95),
+            },
+          },
+          {
+            offer: normOfferB,
+            scoredOffer: {
+              offer: { id: uuidB, originalIndex: 1 },
+              matchResult: createMockMatchResult(80),
+            },
+          },
+        ],
+        meta: {
+          totalResults: 2,
+          searchHash,
+          cached: false,
+          requestedCabinClass: 'economy',
+          scoringVersion: 'flight-match-v1',
+          eligibleCount: 2,
+          matchLevelCounts: { STRONG: 2, GOOD: 0, FAIR: 0, WEAK: 0 },
+        },
+        droppedCount: 0,
+        rejectionCounts: {},
+      });
+
+      const query: FlightSearchRequestDto = {
+        origin: 'HAN',
+        destination: 'SGN',
+        departureDate: '2026-10-01',
+        adults: 1,
+        cabinClass: 'economy',
+      };
+
+      const response = await service.search('user_test', query, undefined, undefined, {
+        persistence: 'required',
+      });
+
+      expect(response.results).toHaveLength(2);
+
+      // Offer A assertions (index 0)
+      expect(response.results[0].id).toBe(uuidA);
+      expect(response.results[0].duffelOfferId).toBe('off_flight_a');
+      expect(response.results[0].segments).toHaveLength(2);
+      expect(response.results[0].segments[0].flightNumber).toBe('111');
+      expect(response.results[0].segments[1].flightNumber).toBe('112');
+
+      // Offer B assertions (index 1)
+      expect(response.results[1].id).toBe(uuidB);
+      expect(response.results[1].duffelOfferId).toBe('off_flight_b');
+      expect(response.results[1].segments).toHaveLength(1);
+      expect(response.results[1].segments[0].flightNumber).toBe('120');
+
+      // Assert persistence received both deterministic UUIDs in transaction
+      expect(prisma.flightOffer.createMany).toHaveBeenCalledWith({
+        data: [
+          expect.objectContaining({ id: uuidA, duffelOfferId: 'off_flight_a', searchHash }),
+          expect.objectContaining({ id: uuidB, duffelOfferId: 'off_flight_b', searchHash }),
+        ],
+        skipDuplicates: true,
+      });
+
+      expect(prisma.offerRecovery.createMany).toHaveBeenCalledWith({
+        data: [
+          { id: uuidA, searchHash },
+          { id: uuidB, searchHash },
+        ],
+        skipDuplicates: true,
+      });
+    });
+  });
+
+  describe('Live Offer Detail Characterization (T001)', () => {
+    const offerId = '550e8400-e29b-41d4-a716-446655440000';
+    const userId = 'user_detail_test';
+
+    const createMockStoredFlightOffer = (
+      id = offerId,
+      price = '150.00',
+      duffelOfferId = 'off_stored_123',
+    ) => ({
+      id,
+      searchHash: 'sha256_mock_hash',
+      duffelOfferId,
+      origin: 'HAN',
+      destination: 'SGN',
+      departureDate: new Date('2026-10-01T08:00:00.000Z'),
+      returnDate: new Date('2026-10-15T15:00:00.000Z'),
+      adults: 1,
+      children: 0,
+      infants: 0,
+      cabinClass: 'economy',
+      price: new Prisma.Decimal(price),
+      currency: 'USD',
+      rawOffer: {},
+    });
+
+    const createMockLiveOffer = (
+      duffelOfferId = 'off_stored_123',
+      totalAmount = '150.00',
+    ): FlightOffer => {
+      const rawOffer = createMockDuffelOffer(duffelOfferId, totalAmount);
+      return createMockNormalizedFlightOffer(rawOffer, {
+        conditions: {
+          refundable: true,
+          changeable: false,
+          changeBeforeDeparture: null,
+        },
+      });
+    };
+
+    it('retrieves live detail successfully with confirmed price and availability matching stored offer', async () => {
+      prisma.flightOffer.findUnique.mockResolvedValue(
+        createMockStoredFlightOffer(offerId, '150.00', 'off_stored_123'),
+      );
+      flightSearchPort.getOfferById.mockResolvedValue(
+        createMockLiveOffer('off_stored_123', '150.00'),
+      );
+
+      const detail = await service.getFlightDetail(offerId, userId);
+
+      expect(detail.id).toBe(offerId);
+      expect(detail.originalPrice).toBe(150);
+      expect(detail.confirmedPrice).toBe(150);
+      expect(detail.priceChanged).toBe(false);
+      expect(detail.airline).toBe('Vietnam Airlines');
+      expect(detail.conditions.refundable).toBe(true);
+      expect(detail.conditions.changeable).toBe(false);
+      expect(flightSearchPort.getOfferById).toHaveBeenCalledWith('off_stored_123');
+
+      expect(auditService.createLog).toHaveBeenCalledWith(
+        prisma,
+        expect.objectContaining({
+          userId,
+          action: 'flight_detail_view',
+          resourceType: 'Flight',
+          resourceId: offerId,
+          metadata: expect.objectContaining({
+            flightId: offerId,
+            duffelOfferId: 'off_stored_123',
+            priceChanged: false,
+            originalPrice: 150,
+            confirmedPrice: 150,
+          }),
+        }),
+      );
+    });
+
+    it('detects price drift when live offer price differs from stored price', async () => {
+      prisma.flightOffer.findUnique.mockResolvedValue(
+        createMockStoredFlightOffer(offerId, '150.00', 'off_stored_123'),
+      );
+      flightSearchPort.getOfferById.mockResolvedValue(
+        createMockLiveOffer('off_stored_123', '175.50'),
+      );
+
+      const detail = await service.getFlightDetail(offerId, userId);
+
+      expect(detail.originalPrice).toBe(150);
+      expect(detail.confirmedPrice).toBe(175.5);
+      expect(detail.priceChanged).toBe(true);
+
+      expect(auditService.createLog).toHaveBeenCalledWith(
+        prisma,
+        expect.objectContaining({
+          metadata: expect.objectContaining({
+            priceChanged: true,
+            originalPrice: 150,
+            confirmedPrice: 175.5,
+          }),
+        }),
+      );
+    });
+
+    it('purges DB row and throws HttpException OFFER_EXPIRED (410) when upstream returns 404', async () => {
+      prisma.flightOffer.findUnique.mockResolvedValue(
+        createMockStoredFlightOffer(offerId, '150.00', 'off_stored_123'),
+      );
+      flightSearchPort.getOfferById.mockRejectedValue({ status: 404, message: 'Offer not found' });
+
+      await expect(service.getFlightDetail(offerId, userId)).rejects.toMatchObject({
+        status: HttpStatus.GONE,
+        response: {
+          code: 'OFFER_EXPIRED',
+          recovery: expect.objectContaining({
+            origin: 'HAN',
+            destination: 'SGN',
+            departureDate: '2026-10-01',
+          }),
+        },
+      });
+
+      expect(prisma.flightOffer.delete).toHaveBeenCalledWith({
+        where: { id: offerId },
+      });
+    });
+
+    it('purges DB row and throws HttpException OFFER_EXPIRED (410) when upstream returns 410', async () => {
+      prisma.flightOffer.findUnique.mockResolvedValue(
+        createMockStoredFlightOffer(offerId, '150.00', 'off_stored_123'),
+      );
+      flightSearchPort.getOfferById.mockRejectedValue({ status: 410, message: 'Offer expired' });
+
+      await expect(service.getFlightDetail(offerId, userId)).rejects.toMatchObject({
+        status: HttpStatus.GONE,
+        response: {
+          code: 'OFFER_EXPIRED',
+        },
+      });
+
+      expect(prisma.flightOffer.delete).toHaveBeenCalledWith({
+        where: { id: offerId },
+      });
+    });
+
+    it('catches DB purge error gracefully and still throws OFFER_EXPIRED (410) without an unhandled crash', async () => {
+      prisma.flightOffer.findUnique.mockResolvedValue(
+        createMockStoredFlightOffer(offerId, '150.00', 'off_stored_123'),
+      );
+      flightSearchPort.getOfferById.mockRejectedValue({ status: 404, message: 'Offer not found' });
+      prisma.flightOffer.delete.mockRejectedValue(new Error('DB disconnect during purge'));
+
+      await expect(service.getFlightDetail(offerId, userId)).rejects.toMatchObject({
+        status: HttpStatus.GONE,
+        response: {
+          code: 'OFFER_EXPIRED',
+        },
+      });
+
+      expect(prisma.flightOffer.delete).toHaveBeenCalledWith({
+        where: { id: offerId },
+      });
+    });
+
+    it('translates upstream 500 error into BAD_GATEWAY without DB purge', async () => {
+      prisma.flightOffer.findUnique.mockResolvedValue(
+        createMockStoredFlightOffer(offerId, '150.00', 'off_stored_123'),
+      );
+      flightSearchPort.getOfferById.mockRejectedValue(new Error('Duffel API failure'));
+
+      await expect(service.getFlightDetail(offerId, userId)).rejects.toMatchObject({
+        status: HttpStatus.BAD_GATEWAY,
+        response: {
+          code: 'UPSTREAM_UNAVAILABLE',
+        },
+      });
+
+      expect(prisma.flightOffer.delete).not.toHaveBeenCalled();
+    });
+
+    it('translates DuffelTimeoutError from getOfferById into BAD_GATEWAY without DB purge', async () => {
+      prisma.flightOffer.findUnique.mockResolvedValue(
+        createMockStoredFlightOffer(offerId, '150.00', 'off_stored_123'),
+      );
+      flightSearchPort.getOfferById.mockRejectedValue(new DuffelTimeoutError());
+
+      await expect(service.getFlightDetail(offerId, userId)).rejects.toMatchObject({
+        status: HttpStatus.BAD_GATEWAY,
+        response: {
+          code: 'UPSTREAM_UNAVAILABLE',
+        },
+      });
+
+      expect(prisma.flightOffer.delete).not.toHaveBeenCalled();
+    });
+
+    it('falls back to offerRecovery and searchHistory and throws OFFER_EXPIRED (410) when offer row was purged', async () => {
+      prisma.flightOffer.findUnique.mockResolvedValue(null);
+      prisma.offerRecovery.findUnique.mockResolvedValue({
+        id: offerId,
+        searchHash: 'hash_recovered',
+      });
+      prisma.searchHistory.findFirst.mockResolvedValue({
+        origin: 'HAN',
+        destination: 'SGN',
+        departureDate: new Date('2026-10-01T00:00:00.000Z'),
+        returnDate: null,
+        adults: 1,
+        children: 0,
+        infants: 0,
+        cabinClass: 'economy',
+      });
+
+      await expect(service.getFlightDetail(offerId, userId)).rejects.toMatchObject({
+        status: HttpStatus.GONE,
+        response: {
+          code: 'OFFER_EXPIRED',
+          recovery: expect.objectContaining({
+            origin: 'HAN',
+            destination: 'SGN',
+            departureDate: '2026-10-01',
+          }),
+        },
+      });
+    });
+
+    it('throws NOT_FOUND 404 when offer does not exist in DB or recovery for valid UUID', async () => {
+      prisma.flightOffer.findUnique.mockResolvedValue(null);
+      prisma.offerRecovery.findUnique.mockResolvedValue(null);
+
+      const validUuid = '550e8400-e29b-41d4-a716-446655440099';
+      await expect(service.getFlightDetail(validUuid, userId)).rejects.toMatchObject({
+        status: HttpStatus.NOT_FOUND,
+        response: {
+          code: 'NOT_FOUND',
+        },
+      });
+    });
+
+    it('throws BadRequestException for invalid UUID format when offer not in DB or recovery', async () => {
+      prisma.flightOffer.findUnique.mockResolvedValue(null);
+      prisma.offerRecovery.findUnique.mockResolvedValue(null);
+
+      await expect(service.getFlightDetail('invalid-uuid-format', userId)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+  });
 });
+
 

@@ -9,8 +9,8 @@ import {
 } from '@nestjs/common';
 import { AncillarySelectionStatus, Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
-import { DuffelService } from '@/duffel/duffel.service';
 import { PrismaService } from '@/prisma/prisma.service';
+import { DuffelAncillaryService } from '@/supplier/ancillary/duffel-ancillary.service';
 
 export type ValidateAncillaryPaymentInput = {
   userId: string;
@@ -52,18 +52,18 @@ const REPRICING_TIMEOUT_MS = 15_000;
 export class AncillaryPaymentValidationService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly duffel: DuffelService,
+    private readonly ancillaryService: DuffelAncillaryService,
   ) {}
 
   async validateForPayment(
     input: ValidateAncillaryPaymentInput,
   ): Promise<ValidatedAncillaryPayment> {
     const leased = await this.acquireLease(input);
-    let pricing: Awaited<ReturnType<DuffelService['repriceOffer']>>;
+    let pricing: Awaited<ReturnType<DuffelAncillaryService['repriceOffer']>>;
 
     try {
       pricing = await this.withTimeout(
-        this.duffel.repriceOffer(leased.intent.duffelOfferId, leased.services),
+        this.ancillaryService.repriceOffer(leased.intent.duffelOfferId, leased.services),
         REPRICING_TIMEOUT_MS,
       );
     } catch (error) {

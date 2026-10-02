@@ -1,4 +1,4 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger, Optional } from '@nestjs/common';
 import {
   CancelOrderOutcome,
   CreateOrderInput,
@@ -19,24 +19,20 @@ import {
   BoundedSemaphore,
   parsePositiveIntegerSetting,
 } from '@/payment-fulfillment/utils/bounded-semaphore';
-import { DuffelService } from './duffel.service';
+import { DuffelCancellationService } from './duffel-cancellation.service';
+import { DuffelOrderAdapter } from './duffel-order.adapter';
+import { DuffelRecoveryService } from './duffel-recovery.service';
+import { OrderSnapshotNormalizer } from './order-snapshot.normalizer';
+import { isDuffelCancellationConfirmed } from '@/duffel/cancellation-confirmation';
 
 type UnknownRecord = Record<string, unknown>;
 
-type EnrichmentRecord = PassengerEnrichmentInput & {
-  givenName?: string;
-  familyName?: string;
-  given_name?: string;
-  family_name?: string;
-  bornOn?: string | Date;
-  born_on?: string;
-  phone_number?: string;
-};
+function isRecord(value: unknown): value is UnknownRecord {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
 function asRecord(value: unknown): UnknownRecord | null {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as UnknownRecord)
-    : null;
+  return isRecord(value) ? value : null;
 }
 
 function readString(record: UnknownRecord, key: string): string | undefined {
@@ -52,13 +48,26 @@ function readNullableString(record: UnknownRecord, key: string): string | null |
   return value === null ? null : typeof value === 'string' ? value : undefined;
 }
 
+function readErrorStatus(error: unknown): number | undefined {
+  const record = asRecord(error);
+  return typeof record?.status === 'number' ? record.status : undefined;
+}
+
+function readErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) return error.message;
+  return readString(asRecord(error) ?? {}, 'message') ?? fallback;
+}
+
 @Injectable()
 export class DuffelFulfillmentAdapter implements FulfillmentGatewayPort {
   private readonly logger = new Logger(DuffelFulfillmentAdapter.name);
   readonly semaphore: BoundedSemaphore;
 
   constructor(
-    private readonly duffelService: DuffelService,
+    private readonly orderAdapter: DuffelOrderAdapter,
+    private readonly cancellationService: DuffelCancellationService,
+    private readonly recoveryService: DuffelRecoveryService,
+    private readonly normalizer: OrderSnapshotNormalizer,
     @Optional() semaphore?: BoundedSemaphore,
   ) {
     if (semaphore) {
@@ -131,18 +140,27 @@ export class DuffelFulfillmentAdapter implements FulfillmentGatewayPort {
           passengerEnrichment.find((pe) => pe.id === p.id) ?? passengerEnrichment[index];
 
         if (matched) {
-          const enrichment = matched as EnrichmentRecord;
-          const given = enrichment.givenName || enrichment.given_name || matched.firstName;
+          const enrichment = asRecord(matched) ?? {};
+          const given =
+            readString(enrichment, 'givenName') ||
+            readString(enrichment, 'given_name') ||
+            matched.firstName;
           if (typeof given === 'string') {
             p.given_name = given;
           }
 
-          const family = enrichment.familyName || enrichment.family_name || matched.lastName;
+          const family =
+            readString(enrichment, 'familyName') ||
+            readString(enrichment, 'family_name') ||
+            matched.lastName;
           if (typeof family === 'string') {
             p.family_name = family;
           }
 
-          const dob = enrichment.born_on || enrichment.bornOn || matched.dateOfBirth;
+          const dob =
+            readString(enrichment, 'born_on') ||
+            enrichment.bornOn ||
+            matched.dateOfBirth;
           if (dob instanceof Date) {
             p.born_on = dob.toISOString().split('T')[0];
           } else if (typeof dob === 'string') {
@@ -157,7 +175,7 @@ export class DuffelFulfillmentAdapter implements FulfillmentGatewayPort {
             p.email = matched.email;
           }
 
-          const phone = matched.phoneNumber || enrichment.phone_number;
+          const phone = matched.phoneNumber || readString(enrichment, 'phone_number');
           if (typeof phone === 'string') {
             p.phone_number = phone;
           }
@@ -196,18 +214,27 @@ export class DuffelFulfillmentAdapter implements FulfillmentGatewayPort {
     if (!source) return undefined;
 
     const segment: PersistedOrderSegment = {};
-    for (const field of [
+    const stringFields: Array<
+      keyof Pick<
+        PersistedOrderSegment,
+        'id' | 'duration' | 'departing_at' | 'arriving_at' | 'marketing_carrier_flight_number'
+      >
+    > = [
       'id',
       'duration',
       'departing_at',
       'arriving_at',
       'marketing_carrier_flight_number',
-    ] as const) {
+    ];
+    for (const field of stringFields) {
       const valueAtField = readString(source, field);
       if (valueAtField !== undefined) segment[field] = valueAtField;
     }
 
-    for (const field of ['origin_terminal', 'destination_terminal'] as const) {
+    const nullableStringFields: Array<
+      keyof Pick<PersistedOrderSegment, 'origin_terminal' | 'destination_terminal'>
+    > = ['origin_terminal', 'destination_terminal'];
+    for (const field of nullableStringFields) {
       const valueAtField = readNullableString(source, field);
       if (valueAtField !== undefined) segment[field] = valueAtField;
     }
@@ -242,7 +269,12 @@ export class DuffelFulfillmentAdapter implements FulfillmentGatewayPort {
     if (!source) return undefined;
 
     const location: PersistedOrderLocation = {};
-    for (const field of ['iata_code', 'name', 'city_name'] as const) {
+    const fields: Array<keyof Pick<PersistedOrderLocation, 'iata_code' | 'name' | 'city_name'>> = [
+      'iata_code',
+      'name',
+      'city_name',
+    ];
+    for (const field of fields) {
       const valueAtField = readString(source, field);
       if (valueAtField !== undefined) location[field] = valueAtField;
     }
@@ -259,7 +291,11 @@ export class DuffelFulfillmentAdapter implements FulfillmentGatewayPort {
     if (!source) return undefined;
 
     const carrier: PersistedOrderCarrier = {};
-    for (const field of ['iata_code', 'name'] as const) {
+    const fields: Array<keyof Pick<PersistedOrderCarrier, 'iata_code' | 'name'>> = [
+      'iata_code',
+      'name',
+    ];
+    for (const field of fields) {
       const valueAtField = readString(source, field);
       if (valueAtField !== undefined) carrier[field] = valueAtField;
     }
@@ -288,13 +324,19 @@ export class DuffelFulfillmentAdapter implements FulfillmentGatewayPort {
     const title = readNullableString(source, 'title');
     if (title !== undefined) passenger.title = title;
 
-    for (const field of [
+    const stringFields: Array<
+      keyof Pick<
+        PersistedOrderPassenger,
+        'given_name' | 'family_name' | 'born_on' | 'email' | 'phone_number'
+      >
+    > = [
       'given_name',
       'family_name',
       'born_on',
       'email',
       'phone_number',
-    ] as const) {
+    ];
+    for (const field of stringFields) {
       const valueAtField = readNullableString(source, field);
       if (valueAtField !== undefined) {
         passenger[field] = valueAtField === null ? null : 'REDACTED';
@@ -317,27 +359,50 @@ export class DuffelFulfillmentAdapter implements FulfillmentGatewayPort {
           ? input.services.map((s) => ({ id: s.serviceId, quantity: s.quantity }))
           : undefined;
 
-      const metadata = {
-        bookingIntentId: input.metadata.bookingIntentId,
-        paymentId: input.metadata.paymentId,
-      };
+      const metadata = services
+        ? {
+            bookingIntentId: input.metadata.bookingIntentId,
+            paymentId: input.metadata.paymentId,
+          }
+        : undefined;
 
-      const rawOrder = (await this.duffelService.createOrder(
-        input.offerId,
-        input.passengers as Parameters<DuffelService['createOrder']>[1],
-        services,
-        metadata,
-        input.idempotencyKey,
-      )) as Record<string, unknown>;
+      let rawOrder: unknown;
+      try {
+        const offer = await this.orderAdapter.getOfferById(input.offerId);
+        rawOrder = await this.orderAdapter.createOrder({
+          selected_offers: [input.offerId],
+          passengers: this.normalizer.preparePassengers(input.passengers, offer),
+          services,
+          metadata,
+          idempotencyKey: input.idempotencyKey,
+        });
+      } catch (error: unknown) {
+        if (error instanceof HttpException) throw error;
+        if (readErrorStatus(error) === HttpStatus.TOO_MANY_REQUESTS) {
+          throw new HttpException(
+            {
+              code: 'UPSTREAM_RATE_LIMITED',
+              message: 'Duffel API rate limit exceeded',
+            },
+            HttpStatus.TOO_MANY_REQUESTS,
+          );
+        }
+        throw new HttpException(
+          {
+            code: 'UPSTREAM_UNAVAILABLE',
+            message: readErrorMessage(error, 'Failed to create Duffel order'),
+          },
+          HttpStatus.BAD_GATEWAY,
+        );
+      }
 
       const redactedEvidence = this.redactDuffelOrder(rawOrder);
-      const orderId = typeof rawOrder?.id === 'string' ? rawOrder.id : '';
+      const rawOrderRecord = asRecord(rawOrder);
+      const orderId = readString(rawOrderRecord ?? {}, 'id') ?? '';
       const bookingReference =
-        typeof rawOrder?.booking_reference === 'string'
-          ? rawOrder.booking_reference
-          : typeof rawOrder?.bookingReference === 'string'
-            ? rawOrder.bookingReference
-            : '';
+        readString(rawOrderRecord ?? {}, 'booking_reference') ??
+        readString(rawOrderRecord ?? {}, 'bookingReference') ??
+        '';
 
       return {
         orderId,
@@ -357,12 +422,14 @@ export class DuffelFulfillmentAdapter implements FulfillmentGatewayPort {
     try {
       await control.beforeInvoke();
 
-      await this.duffelService.cancelOrder(orderId);
+      const cancellation = asRecord(await this.cancellationService.cancelOrder(orderId));
+      const status = cancellation ? readString(cancellation, 'status') : undefined;
+      const confirmed = isDuffelCancellationConfirmed(cancellation);
 
       return {
-        success: true,
+        success: confirmed,
         orderId,
-        status: 'CANCELLED',
+        status: confirmed ? 'CANCELLED' : status,
       };
     } finally {
       release();
@@ -382,7 +449,7 @@ export class DuffelFulfillmentAdapter implements FulfillmentGatewayPort {
 
       let completeOrder: unknown;
       try {
-        completeOrder = await this.duffelService.retrieveCompleteOrder(orderId);
+        completeOrder = await this.recoveryService.retrieveCompleteOrder(orderId);
       } catch (err: unknown) {
         this.logger.warn(
           `Failed to retrieve complete Duffel order ${orderId}, falling back to enrichment: ${
@@ -396,7 +463,7 @@ export class DuffelFulfillmentAdapter implements FulfillmentGatewayPort {
         );
       }
 
-      const snaps = this.duffelService.mapDuffelOrderToSnapshots(completeOrder);
+      const snaps = this.normalizer.mapDuffelOrderToSnapshots(completeOrder);
       const departureAtStr = snaps.flightSnapshot?.segments?.[0]?.departureAt;
       const departureAt = departureAtStr ? new Date(departureAtStr) : undefined;
 

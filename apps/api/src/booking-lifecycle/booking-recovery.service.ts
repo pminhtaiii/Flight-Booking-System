@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger, Optional } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { OnEvent } from '@nestjs/event-emitter';
 import {
@@ -13,7 +13,9 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { StripeService } from '@/common/stripe.service';
-import { DuffelService } from '@/duffel/duffel.service';
+import { DuffelCancellationService } from '@/supplier/order/duffel-cancellation.service';
+import { DuffelRecoveryService } from '@/supplier/order/duffel-recovery.service';
+import { isDuffelCancellationConfirmed } from '@/duffel/cancellation-confirmation';
 import { RefundTransactionService } from '@/refund/refund-transaction.service';
 import { RefundSettlementService } from '@/refund-settlement/refund-settlement.service';
 import { CacheService } from '@/cache/cache.service';
@@ -61,6 +63,15 @@ type BookingIntentPassengerDetails = {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function readDuffelOrderId(value: unknown): string | null {
+  if (!isRecord(value)) return null;
+  if (typeof value.id === 'string' && value.id.trim().length > 0) return value.id;
+  if (!isRecord(value.data)) return null;
+  return typeof value.data.id === 'string' && value.data.id.trim().length > 0
+    ? value.data.id
+    : null;
 }
 
 function isUnknownArray(value: unknown): value is unknown[] {
@@ -112,7 +123,8 @@ export class BookingRecoveryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly stripeService: StripeService,
-    private readonly duffelService: DuffelService,
+    private readonly duffelCancellationService: DuffelCancellationService,
+    private readonly duffelRecoveryService: DuffelRecoveryService,
     private readonly refundTransactionService: RefundTransactionService,
     private readonly refundSettlementService: RefundSettlementService,
     private readonly bookingLifecycleService: BookingLifecycleService,
@@ -155,6 +167,14 @@ export class BookingRecoveryService {
       }
 
       try {
+        const deferKey = `booking:recovery:defer:${bookingId}`;
+        if ((await this.cacheService.getTtl(deferKey)) > 0) {
+          this.logger.log(
+            `Booking ${bookingId} is deferred from stale recovery until its retry time; skipping.`,
+          );
+          return;
+        }
+
         const booking = await this.prisma.booking.findUnique({
           where: { id: bookingId },
           include: BOOKING_RECOVERY_INCLUDE,
@@ -312,6 +332,22 @@ export class BookingRecoveryService {
       if (intent.status !== 'succeeded') {
         const isPaymentAlreadyCancelledOrRefunded =
           payment.status === 'CANCELLED' || payment.status === 'REFUNDED';
+        const deferRecovery = async (retryAt: string, retryAfterSeconds: number): Promise<void> => {
+          try {
+            await this.cacheService.set(
+              `booking:recovery:defer:${booking.id}`,
+              retryAt,
+              retryAfterSeconds,
+            );
+          } catch (deferError: unknown) {
+            const deferErr =
+              deferError instanceof Error ? deferError : new Error(String(deferError));
+            this.logger.error(
+              `Failed to defer stale booking ${booking.id} after unconfirmed cancellation: ${deferErr.message}`,
+              deferErr.stack,
+            );
+          }
+        };
 
         try {
           const duffelCancelledEvent = await this.prisma.paymentEvent.findFirst({
@@ -322,32 +358,65 @@ export class BookingRecoveryService {
               where: { paymentId: payment.id, eventType: 'duffel_order_created' },
               orderBy: { createdAt: 'desc' },
             });
-            const duffelOrder = duffelEvent?.metadata as Record<string, unknown> | null;
-            if (duffelOrder && typeof duffelOrder.id === 'string') {
-              let wasCancelledOrAlreadyCancelled = false;
+            const duffelOrderId = readDuffelOrderId(duffelEvent?.metadata);
+            if (duffelEvent && !duffelOrderId) {
+              const retryAfterSeconds = 300;
+              await deferRecovery(
+                new Date(Date.now() + retryAfterSeconds * 1000).toISOString(),
+                retryAfterSeconds,
+              );
+              return booking;
+            }
+            if (duffelOrderId) {
+              let cancellationConfirmed = false;
               try {
-                await this.duffelService.cancelOrder(duffelOrder.id);
+                const cancellation = await this.duffelCancellationService.cancelOrder(duffelOrderId);
+                if (!isDuffelCancellationConfirmed(cancellation)) {
+                  throw new Error('Duffel order cancellation is not confirmed');
+                }
                 this.logger.log(
-                  `Successfully cancelled orphaned Duffel order ${duffelOrder.id} during stale booking sweep.`,
+                  `Successfully cancelled orphaned Duffel order ${duffelOrderId} during stale booking sweep.`,
                 );
-                wasCancelledOrAlreadyCancelled = true;
+                cancellationConfirmed = true;
               } catch (cancelError: unknown) {
                 const err =
                   cancelError instanceof Error ? cancelError : new Error(String(cancelError));
-                if (/already_cancelled|already cancelled|cannot be cancelled/i.test(err.message)) {
-                  this.logger.log(
-                    `Orphaned Duffel order ${duffelOrder.id} already cancelled: ${err.message}. Treating as idempotent success.`,
-                  );
-                  wasCancelledOrAlreadyCancelled = true;
-                } else {
-                  this.logger.error(
-                    `Duffel order cancellation failed during stale booking sweep: ${err.message}`,
-                    err.stack,
-                  );
+                this.logger.error(
+                  `Duffel order cancellation failed during stale booking sweep: ${err.message}`,
+                  err.stack,
+                );
+                let retryAfterSeconds = 300;
+                let retryAt = new Date(Date.now() + retryAfterSeconds * 1000).toISOString();
+                if (
+                  cancelError instanceof HttpException &&
+                  cancelError.getStatus() === HttpStatus.TOO_MANY_REQUESTS
+                ) {
+                  const response = cancelError.getResponse();
+                  if (
+                    typeof response === 'object' &&
+                    response !== null &&
+                    'code' in response &&
+                    (response.code === 'RATE_LIMIT_EXCEEDED' ||
+                      response.code === 'BUDGET_UNAVAILABLE') &&
+                    'retryAfterSeconds' in response &&
+                    typeof response.retryAfterSeconds === 'number' &&
+                    Number.isInteger(response.retryAfterSeconds) &&
+                    response.retryAfterSeconds > 0
+                  ) {
+                    retryAfterSeconds = response.retryAfterSeconds;
+                    retryAt =
+                      'resetAt' in response &&
+                      typeof response.resetAt === 'string' &&
+                      !Number.isNaN(Date.parse(response.resetAt))
+                        ? new Date(response.resetAt).toISOString()
+                        : new Date(Date.now() + retryAfterSeconds * 1000).toISOString();
+                  }
                 }
+                await deferRecovery(retryAt, retryAfterSeconds);
+                return booking;
               }
 
-              if (wasCancelledOrAlreadyCancelled) {
+              if (cancellationConfirmed) {
                 await this.prisma.paymentEvent.create({
                   data: {
                     paymentId: payment.id,
@@ -356,7 +425,7 @@ export class BookingRecoveryService {
                     newStatus: payment.status ?? PaymentStatus.AUTHORIZED,
                     source: PaymentEventSource.SYSTEM,
                     createdBy: 'system',
-                    metadata: { duffelOrderId: duffelOrder.id },
+                    metadata: { duffelOrderId },
                   },
                 });
               }
@@ -371,6 +440,7 @@ export class BookingRecoveryService {
             `Duffel order cancellation failed during stale booking sweep: ${err.message}`,
             err.stack,
           );
+          return booking;
         }
 
         // Release the Stripe authorization hold (cancel intent)
@@ -446,7 +516,7 @@ export class BookingRecoveryService {
             : rawOrder;
 
         const { flightSnapshot, passengerSnapshot } =
-          this.duffelService.mapDuffelOrderToSnapshots(order);
+          this.duffelRecoveryService.mapOrderToSnapshots(order);
         const orderRecord = isRecord(order) ? order : rawOrder;
         const bookingReference =
           typeof orderRecord.booking_reference === 'string' ? orderRecord.booking_reference : null;

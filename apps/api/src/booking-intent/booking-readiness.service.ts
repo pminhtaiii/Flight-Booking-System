@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { HttpException, HttpStatus, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassengerType } from '@prisma/client';
 import { AirportsService } from '@/airports/airports.service';
@@ -16,6 +16,8 @@ import {
   BookingReadinessTravelerProfileSourceDto,
 } from './dto/booking-readiness.dto';
 import { ChatHandoffService } from '@/chat-handoff/chat-handoff.service';
+import { FLIGHT_SEARCH_PORT, type FlightSearchPort } from '@/supplier/search/flight-search.port';
+import { complementStoredOfferPayload } from '@/supplier/search/stored-offer-payload.helper';
 import { BookingReadinessObservability } from './booking-readiness.observability';
 import { BookingReadinessOperation } from '../common/observability/booking-readiness-observability.types';
 import { parseBookingReadinessConfig } from './booking-readiness.config';
@@ -34,12 +36,12 @@ type ReadinessContext = {
 
 type RawRecord = Record<string, unknown>;
 
-type StoredOfferPassenger = {
+export type StoredOfferPassenger = {
   id: string;
   type: PassengerType;
 };
 
-type NormalizedOffer = {
+export type NormalizedOffer = {
   passengers: StoredOfferPassenger[];
   segments: BookingReadinessSegmentInput[];
   airportCodes: string[];
@@ -50,60 +52,8 @@ function isRecord(value: unknown): value is RawRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function isValidDateOnly(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return false;
-  }
-
-  const [year, month, day] = value.split('-').map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return (
-    !Number.isNaN(date.getTime()) &&
-    date.getUTCFullYear() === year &&
-    date.getUTCMonth() === month - 1 &&
-    date.getUTCDate() === day
-  );
-}
-
-function dateOnlyFromRaw(value: unknown): string | null {
-  if (typeof value !== 'string') {
-    return null;
-  }
-
-  const dateOnly = value.slice(0, 10);
-  return isValidDateOnly(dateOnly) ? dateOnly : null;
-}
-
-function iataFromRaw(value: unknown): string | null {
-  if (typeof value !== 'string') {
-    return null;
-  }
-
-  const normalized = value.trim().toUpperCase();
-  return /^[A-Z]{3}$/.test(normalized) ? normalized : null;
-}
-
 function httpError(code: string, message: string, status: HttpStatus): HttpException {
   return new HttpException({ code, message }, status);
-}
-
-function passengerTypeFromRaw(value: unknown): PassengerType | null {
-  if (typeof value !== 'string') {
-    return null;
-  }
-
-  const normalized = value.trim().toLowerCase();
-  if (normalized === 'adult') {
-    return PassengerType.ADULT;
-  }
-  if (normalized === 'child') {
-    return PassengerType.CHILD;
-  }
-  if (normalized === 'infant') {
-    return PassengerType.INFANT;
-  }
-
-  return null;
 }
 
 function currentDateOnly(): string {
@@ -187,6 +137,7 @@ export class BookingReadinessService {
     private readonly bookingReadinessObservability: BookingReadinessObservability,
     private readonly configService: ConfigService,
     private readonly chatHandoffService: ChatHandoffService,
+    @Inject(FLIGHT_SEARCH_PORT) private readonly flightSearchPort: FlightSearchPort,
     @Optional() private readonly metricsService?: BookingReadinessMetricsService,
   ) {}
 
@@ -216,8 +167,8 @@ export class BookingReadinessService {
         throw httpError('OFFER_NOT_FOUND', 'Flight offer not found', HttpStatus.NOT_FOUND);
       }
 
-      this.assertOfferNotExpired(flightOffer.rawOffer);
-      const normalizedOffer = this.normalizeStoredOffer(flightOffer.rawOffer);
+      this.assertOfferNotExpired(flightOffer.rawOffer, flightOffer);
+      const normalizedOffer = this.normalizeStoredOffer(flightOffer.rawOffer, flightOffer);
       this.validatePassengerMappings(dto.passengers, normalizedOffer.passengers);
 
       const passengers = await this.resolvePassengers(
@@ -300,6 +251,15 @@ export class BookingReadinessService {
     rawOffer: unknown,
     passengers: readonly ResolvedPassenger[],
     context?: ReadinessContext,
+    flightOffer?: {
+      duffelOfferId?: string | null;
+      price?: unknown;
+      currency?: string | null;
+      departureDate?: Date | string | null;
+      adults?: number | null;
+      children?: number | null;
+      infants?: number | null;
+    } | null,
   ): Promise<BookingReadinessResponseDto> {
     const startedAt = Date.now();
     this.metricsService?.increment(BOOKING_READINESS_METRIC_COUNTERS.BOOKING_READINESS_CHECKS);
@@ -307,7 +267,7 @@ export class BookingReadinessService {
 
     try {
       this.assertFeatureEnabled();
-      const normalizedOffer = this.normalizeStoredOffer(rawOffer);
+      const normalizedOffer = this.normalizeStoredOffer(rawOffer, flightOffer);
       const storedById = new Map(
         normalizedOffer.passengers.map((passenger) => [passenger.id, passenger]),
       );
@@ -420,71 +380,61 @@ export class BookingReadinessService {
     }
   }
 
-  private normalizeStoredOffer(rawOffer: unknown): NormalizedOffer {
-    if (
-      !isRecord(rawOffer) ||
-      !Array.isArray(rawOffer.passengers) ||
-      !Array.isArray(rawOffer.slices)
-    ) {
+  normalizeStoredOffer(
+    rawOffer: unknown,
+    flightOffer?: {
+      duffelOfferId?: string | null;
+      price?: unknown;
+      currency?: string | null;
+      departureDate?: Date | string | null;
+      adults?: number | null;
+      children?: number | null;
+      infants?: number | null;
+    } | null,
+  ): NormalizedOffer {
+    const payload = complementStoredOfferPayload(rawOffer, flightOffer);
+    const normalized = this.flightSearchPort.normalizeStoredOffer(payload);
+    if (!normalized) {
       throw new Error('Stored offer data is malformed');
     }
 
-    const passengers = rawOffer.passengers.map((passenger): StoredOfferPassenger | null => {
-      if (!isRecord(passenger) || typeof passenger.id !== 'string') {
-        return null;
-      }
-
-      const type = passengerTypeFromRaw(passenger.type);
-      return type ? { id: passenger.id, type } : null;
+    const passengers: StoredOfferPassenger[] = normalized.passengers.map((p) => {
+      let type: PassengerType = PassengerType.ADULT;
+      if (p.type === 'CHILD') type = PassengerType.CHILD;
+      else if (p.type === 'INFANT') type = PassengerType.INFANT;
+      return {
+        id: p.supplierPassengerId,
+        type,
+      };
     });
 
-    if (passengers.some((passenger) => passenger === null) || passengers.length === 0) {
+    if (passengers.length === 0) {
       throw new Error('Stored offer passengers are malformed');
     }
 
-    const typedPassengers = passengers as StoredOfferPassenger[];
-    const passengerIds = new Set(typedPassengers.map((passenger) => passenger.id));
-    if (passengerIds.size !== typedPassengers.length) {
-      throw new Error('Stored offer passenger ids are malformed');
-    }
+    const allSegments = [
+      ...normalized.segments,
+      ...(normalized.returnSegments ?? []),
+    ];
 
-    const segments: BookingReadinessSegmentInput[] = [];
-    for (const slice of rawOffer.slices) {
-      if (!isRecord(slice) || !Array.isArray(slice.segments)) {
-        throw new Error('Stored offer slices are malformed');
-      }
-
-      for (const segment of slice.segments) {
-        if (!isRecord(segment) || !isRecord(segment.origin) || !isRecord(segment.destination)) {
-          throw new Error('Stored offer segments are malformed');
-        }
-
-        const originCode = iataFromRaw(segment.origin.iata_code);
-        const destinationCode = iataFromRaw(segment.destination.iata_code);
-        const arrivalDate = dateOnlyFromRaw(segment.arriving_at);
-        if (!originCode || !destinationCode || !arrivalDate) {
-          throw new Error('Stored offer segment data is malformed');
-        }
-
-        segments.push({
-          originCountryCode: originCode,
-          destinationCountryCode: destinationCode,
-          arrivalDate,
-        });
-      }
-    }
-
-    if (segments.length === 0) {
+    if (allSegments.length === 0) {
       throw new Error('Stored offer contains no segments');
     }
+
+    const segments: BookingReadinessSegmentInput[] = allSegments.map((s) => ({
+      originCountryCode: s.departureAirport,
+      destinationCountryCode: s.arrivalAirport,
+      arrivalDate: s.arrivalTime.slice(0, 10),
+    }));
 
     const airportCodes = [
       ...new Set(
         segments
           .flatMap((segment) => [segment.originCountryCode, segment.destinationCountryCode])
-          .filter((code): code is string => typeof code === 'string'),
+          .filter((code): code is string => typeof code === 'string' && code.length > 0),
       ),
     ];
+
     const tripCompletionDate = segments.reduce<string | null>((latest, segment) => {
       if (!segment.arrivalDate) {
         return latest;
@@ -496,29 +446,31 @@ export class BookingReadinessService {
       throw new Error('Stored offer trip completion is unavailable');
     }
 
-    return { passengers: typedPassengers, segments, airportCodes, tripCompletionDate };
+    return { passengers, segments, airportCodes, tripCompletionDate };
   }
 
-  private assertOfferNotExpired(rawOffer: unknown): void {
-    if (!isRecord(rawOffer) || !Object.prototype.hasOwnProperty.call(rawOffer, 'expires_at')) {
-      return;
-    }
-
-    if (rawOffer.expires_at === null || rawOffer.expires_at === undefined) {
-      return;
-    }
-
-    if (typeof rawOffer.expires_at !== 'string') {
-      throw new Error('Stored offer expiry is malformed');
-    }
-
-    const expiresAt = new Date(rawOffer.expires_at);
-    if (Number.isNaN(expiresAt.getTime())) {
-      throw new Error('Stored offer expiry is malformed');
-    }
-
-    if (expiresAt.getTime() <= Date.now()) {
-      throw httpError('OFFER_EXPIRED', 'Flight offer has expired', HttpStatus.CONFLICT);
+  private assertOfferNotExpired(
+    rawOffer: unknown,
+    flightOffer?: {
+      duffelOfferId?: string | null;
+      price?: unknown;
+      currency?: string | null;
+      departureDate?: Date | string | null;
+      adults?: number | null;
+      children?: number | null;
+      infants?: number | null;
+    } | null,
+  ): void {
+    const payload = complementStoredOfferPayload(rawOffer, flightOffer);
+    const normalized = this.flightSearchPort.normalizeStoredOffer(payload);
+    if (normalized?.offerExpiresAt) {
+      const expiresAt = new Date(normalized.offerExpiresAt);
+      if (Number.isNaN(expiresAt.getTime())) {
+        throw new Error('Stored offer expiry is malformed');
+      }
+      if (expiresAt.getTime() <= Date.now()) {
+        throw httpError('OFFER_EXPIRED', 'Flight offer has expired', HttpStatus.CONFLICT);
+      }
     }
   }
 

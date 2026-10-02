@@ -1,4 +1,5 @@
 import { BookingFailureReason, BookingStatus, RefundStatus, RefundTriggerType } from '@prisma/client';
+import { HttpException, HttpStatus } from '@nestjs/common';
 import { BookingRecoveryService } from './booking-recovery.service';
 import { BookingWithRelations } from './booking-lifecycle.types';
 
@@ -65,8 +66,8 @@ describe('BookingRecoveryService', () => {
     };
 
     mockDuffelService = {
-      cancelOrder: jest.fn(),
-      mapDuffelOrderToSnapshots: jest.fn(),
+      cancellation: { cancelOrder: jest.fn() },
+      recovery: { mapOrderToSnapshots: jest.fn() },
     };
 
     mockRefundTransactionService = {
@@ -81,6 +82,8 @@ describe('BookingRecoveryService', () => {
       acquireLock: jest.fn().mockResolvedValue(true),
       releaseLock: jest.fn().mockResolvedValue(true),
       renewLock: jest.fn().mockResolvedValue(true),
+      getTtl: jest.fn().mockResolvedValue(-2),
+      set: jest.fn().mockResolvedValue(undefined),
     };
 
     mockPublisher = {
@@ -115,7 +118,8 @@ describe('BookingRecoveryService', () => {
     service = new BookingRecoveryService(
       mockPrisma,
       mockStripeService,
-      mockDuffelService,
+      mockDuffelService.cancellation,
+      mockDuffelService.recovery,
       mockRefundTransactionService,
       mockRefundSettlementService,
       mockBookingLifecycleService,
@@ -187,7 +191,7 @@ describe('BookingRecoveryService', () => {
       ]);
     });
 
-    it('handles incomplete Stripe payment: cancels Duffel order, cancels Stripe intent, and marks booking FAILED with CAPTURE_FAILED (Branch 2)', async () => {
+    it('handles incomplete Stripe payment after timestamp confirmation: cancels Stripe intent and marks booking FAILED with CAPTURE_FAILED (Branch 2)', async () => {
       const booking = {
         id: 'b-1',
         status: BookingStatus.PROCESSING,
@@ -206,13 +210,13 @@ describe('BookingRecoveryService', () => {
         if (where?.eventType === 'duffel_order_created') return { metadata: { id: 'ord_123' } };
         return null;
       });
-      mockDuffelService.cancelOrder.mockResolvedValue({});
+      mockDuffelService.cancellation.cancelOrder.mockResolvedValue({ confirmed_at: '2026-10-02T10:00:00.000Z' });
       mockStripeService.cancelPaymentIntent.mockResolvedValue({});
       mockPrisma.payment.updateMany.mockResolvedValue({ count: 1 });
 
       const result = await service.reconcileBookingIfStale(booking);
 
-      expect(mockDuffelService.cancelOrder).toHaveBeenCalledWith('ord_123');
+      expect(mockDuffelService.cancellation.cancelOrder).toHaveBeenCalledWith('ord_123');
       expect(mockPrisma.paymentEvent.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -273,7 +277,7 @@ describe('BookingRecoveryService', () => {
         passengers: [{ givenName: 'John', familyName: 'Doe', duffelPassengerId: 'pas_1' }],
         user: { email: 'john@example.com' },
       });
-      mockDuffelService.mapDuffelOrderToSnapshots.mockReturnValue({
+      mockDuffelService.recovery.mapOrderToSnapshots.mockReturnValue({
         flightSnapshot: {
           segments: [{ departureAt: '2026-09-01T10:00:00.000Z' }],
         },
@@ -343,7 +347,7 @@ describe('BookingRecoveryService', () => {
         ],
         user: { email: 'john@example.com' },
       });
-      mockDuffelService.mapDuffelOrderToSnapshots.mockReturnValue({
+      mockDuffelService.recovery.mapOrderToSnapshots.mockReturnValue({
         flightSnapshot: { segments: [{ departureAt: '2026-09-01T10:00:00.000Z' }] },
         passengerSnapshot: { passengers: [] },
       });
@@ -353,7 +357,7 @@ describe('BookingRecoveryService', () => {
         pnrReference: 'PNR999',
         duffelOrderId: 'ord_123',
       });
-      expect(mockDuffelService.mapDuffelOrderToSnapshots).toHaveBeenCalled();
+      expect(mockDuffelService.recovery.mapOrderToSnapshots).toHaveBeenCalled();
       expect(mockBookingLifecycleService.confirmBooking).toHaveBeenCalledWith(
         'b-1',
         'PNR999',
@@ -539,7 +543,7 @@ describe('BookingRecoveryService', () => {
 
       mockStripeService.retrievePaymentIntent.mockResolvedValue({ status: 'succeeded' });
       mockPrisma.paymentEvent.findFirst.mockResolvedValue({ metadata: { id: 'ord-1' } });
-      mockDuffelService.mapDuffelOrderToSnapshots.mockReturnValue({
+      mockDuffelService.recovery.mapOrderToSnapshots.mockReturnValue({
         flightSnapshot: { segments: [{ departureAt: new Date().toISOString() }] },
         passengerSnapshot: { passengers: [] },
       });
@@ -584,7 +588,7 @@ describe('BookingRecoveryService', () => {
 
       mockStripeService.retrievePaymentIntent.mockResolvedValue({ status: 'succeeded' });
       mockPrisma.paymentEvent.findFirst.mockResolvedValue({ metadata: { id: 'ord-1' } });
-      mockDuffelService.mapDuffelOrderToSnapshots.mockReturnValue({
+      mockDuffelService.recovery.mapOrderToSnapshots.mockReturnValue({
         flightSnapshot: { segments: [{ departureAt: new Date().toISOString() }] },
         passengerSnapshot: { passengers: [] },
       });
@@ -618,11 +622,11 @@ describe('BookingRecoveryService', () => {
         if (where?.eventType === 'duffel_order_created') return { metadata: { id: 'ord_123' } };
         return null;
       });
-      mockDuffelService.cancelOrder.mockResolvedValue({});
+      mockDuffelService.cancellation.cancelOrder.mockResolvedValue({ status: 'confirmed' });
 
       const result = await service.reconcileBookingIfStale(booking);
 
-      expect(mockDuffelService.cancelOrder).toHaveBeenCalledWith('ord_123');
+      expect(mockDuffelService.cancellation.cancelOrder).toHaveBeenCalledWith('ord_123');
       expect(mockPrisma.paymentEvent.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -637,7 +641,7 @@ describe('BookingRecoveryService', () => {
       expect(result.failureReason).toBe(BookingFailureReason.CAPTURE_FAILED);
     });
 
-    it('idempotently treats already_cancelled Duffel error as success and keeps duffel_order_cancelled marker', async () => {
+    it('records confirmed already-cancelled provider evidence and keeps its marker', async () => {
       const booking = {
         id: 'b-1',
         status: BookingStatus.PROCESSING,
@@ -658,14 +662,16 @@ describe('BookingRecoveryService', () => {
         return null;
       });
       mockPrisma.paymentEvent.create.mockResolvedValue({ id: BigInt(999) });
-      mockDuffelService.cancelOrder.mockRejectedValue(
-        new Error('The order has already_cancelled'),
-      );
+      // Human approval 2026-10-02: explicit CANCELLED evidence replaces the unverified error-text fixture.
+      mockDuffelService.cancellation.cancelOrder.mockResolvedValue({
+        id: 'ord_123',
+        status: 'CANCELLED',
+      });
       mockStripeService.cancelPaymentIntent.mockResolvedValue({});
 
       const result = await service.reconcileBookingIfStale(booking);
 
-      expect(mockDuffelService.cancelOrder).toHaveBeenCalledWith('ord_123');
+      expect(mockDuffelService.cancellation.cancelOrder).toHaveBeenCalledWith('ord_123');
       expect(mockPrisma.paymentEvent.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -681,6 +687,41 @@ describe('BookingRecoveryService', () => {
       expect(result.failureReason).toBe(BookingFailureReason.CAPTURE_FAILED);
     });
 
+    it('does not trust an already_cancelled error without cancellation proof', async (): Promise<void> => {
+      const bookingId = 'b-unproven-already-cancelled';
+      const booking = {
+        id: bookingId,
+        status: BookingStatus.PROCESSING,
+        createdAt: staleDate,
+        payment: {
+          id: 'pay-unproven-already-cancelled',
+          status: 'AUTHORIZED',
+          stripePaymentIntentId: 'pi-unproven-already-cancelled',
+        },
+      };
+      mockPrisma.booking.findUnique.mockResolvedValue(booking);
+      mockStripeService.retrievePaymentIntent.mockResolvedValue({ status: 'requires_payment_method' });
+      mockPrisma.paymentEvent.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ metadata: { id: 'ord-unproven-already-cancelled' } });
+      mockDuffelService.cancellation.cancelOrder.mockRejectedValueOnce(
+        new Error('The order has already_cancelled'),
+      );
+
+      await service.handleReconciliationRequested({ bookingId });
+
+      expect(mockPrisma.paymentEvent.create).not.toHaveBeenCalled();
+      expect(mockStripeService.cancelPaymentIntent).not.toHaveBeenCalled();
+      expect(mockBookingLifecycleService.failBooking).not.toHaveBeenCalled();
+      expect(mockCacheService.set).toHaveBeenCalledWith(
+        `booking:recovery:defer:${bookingId}`,
+        expect.any(String),
+        300,
+      );
+      expect(booking.status).toBe(BookingStatus.PROCESSING);
+    });
+
+    // Human approval 2026-10-02: an unconfirmed cancellation keeps the booking processing and the Stripe hold authorized.
     it('does not create duffel_order_cancelled marker when Duffel cancellation fails with unexpected error', async () => {
       const booking = {
         id: 'b-1',
@@ -701,15 +742,326 @@ describe('BookingRecoveryService', () => {
         if (where?.eventType === 'duffel_order_created') return { metadata: { id: 'ord_123' } };
         return null;
       });
-      mockDuffelService.cancelOrder.mockRejectedValue(new Error('Network failure'));
+      mockDuffelService.cancellation.cancelOrder.mockRejectedValue(new Error('Network failure'));
       mockStripeService.cancelPaymentIntent.mockResolvedValue({});
 
       const result = await service.reconcileBookingIfStale(booking);
 
-      expect(mockDuffelService.cancelOrder).toHaveBeenCalledWith('ord_123');
+      expect(mockDuffelService.cancellation.cancelOrder).toHaveBeenCalledWith('ord_123');
       expect(mockPrisma.paymentEvent.create).not.toHaveBeenCalled();
-      expect(mockStripeService.cancelPaymentIntent).toHaveBeenCalledWith('pi_123');
-      expect(result.status).toBe(BookingStatus.FAILED);
+      expect(mockStripeService.cancelPaymentIntent).not.toHaveBeenCalled();
+      expect(result.status).toBe(BookingStatus.PROCESSING);
+    });
+
+    it('keeps the Stripe hold when Duffel returns an explicit pending cancellation status', async () => {
+      mockPrisma.booking.findUnique.mockResolvedValue({
+        id: 'b-1',
+        status: BookingStatus.PROCESSING,
+        createdAt: staleDate,
+        payment: {
+          id: 'pay-1',
+          status: 'AUTHORIZED',
+          stripePaymentIntentId: 'pi_123',
+        },
+      });
+
+      mockStripeService.retrievePaymentIntent.mockResolvedValue({
+        status: 'requires_payment_method',
+      });
+      mockPrisma.paymentEvent.findFirst.mockImplementation(
+        async ({ where }: { where?: { eventType?: string } }) => {
+          if (where?.eventType === 'duffel_order_cancelled') return null;
+          if (where?.eventType === 'duffel_order_created') {
+            return { metadata: { id: 'ord_123' } };
+          }
+          return null;
+        },
+      );
+      mockDuffelService.cancellation.cancelOrder.mockResolvedValue({ id: 'oc_123', status: 'pending' });
+
+      await service.handleReconciliationRequested({ bookingId: 'b-1' });
+
+      expect(mockDuffelService.cancellation.cancelOrder).toHaveBeenCalledWith('ord_123');
+      expect(mockPrisma.paymentEvent.create).not.toHaveBeenCalled();
+      expect(mockStripeService.cancelPaymentIntent).not.toHaveBeenCalled();
+      expect(mockCacheService.set).toHaveBeenCalledWith(
+        'booking:recovery:defer:b-1',
+        expect.any(String),
+        300,
+      );
+      expect(mockBookingLifecycleService.failBooking).not.toHaveBeenCalled();
+    });
+
+    it('resolves a nested created-order ID and defers an unconfirmed cancellation', async (): Promise<void> => {
+      const bookingId = 'b-nested-order-id';
+      const booking = {
+        id: bookingId,
+        status: BookingStatus.PROCESSING,
+        createdAt: staleDate,
+        payment: {
+          id: 'pay-nested-order-id',
+          status: 'AUTHORIZED',
+          stripePaymentIntentId: 'pi-nested-order-id',
+        },
+      };
+      mockPrisma.booking.findUnique.mockResolvedValue(booking);
+      mockStripeService.retrievePaymentIntent.mockResolvedValue({ status: 'requires_payment_method' });
+      mockPrisma.paymentEvent.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ metadata: { data: { id: 'ord_nested' } } });
+      mockDuffelService.cancellation.cancelOrder.mockResolvedValueOnce({
+        id: 'oc_nested',
+        status: 'pending',
+      });
+
+      await service.handleReconciliationRequested({ bookingId });
+
+      expect(mockDuffelService.cancellation.cancelOrder).toHaveBeenCalledWith('ord_nested');
+      expect(mockStripeService.cancelPaymentIntent).not.toHaveBeenCalled();
+      expect(mockBookingLifecycleService.failBooking).not.toHaveBeenCalled();
+      expect(mockCacheService.set).toHaveBeenCalledWith(
+        `booking:recovery:defer:${bookingId}`,
+        expect.any(String),
+        300,
+      );
+    });
+
+    it('keeps recovery non-destructive when writing the cancellation deferral fails', async (): Promise<void> => {
+      const bookingId = 'b-cache-deferral-failed';
+      const booking = {
+        id: bookingId,
+        status: BookingStatus.PROCESSING,
+        createdAt: staleDate,
+        payment: {
+          id: 'pay-cache-deferral-failed',
+          status: 'AUTHORIZED',
+          stripePaymentIntentId: 'pi-cache-deferral-failed',
+        },
+      };
+      mockPrisma.booking.findUnique.mockResolvedValue(booking);
+      mockStripeService.retrievePaymentIntent.mockResolvedValue({ status: 'requires_payment_method' });
+      mockPrisma.paymentEvent.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ metadata: { id: 'ord-cache-deferral-failed' } });
+      mockDuffelService.cancellation.cancelOrder.mockResolvedValueOnce({
+        id: 'oc-cache-deferral-failed',
+        status: 'pending',
+      });
+      mockCacheService.set.mockRejectedValueOnce(new Error('cache unavailable'));
+
+      await service.handleReconciliationRequested({ bookingId });
+
+      expect(mockCacheService.set).toHaveBeenCalledWith(
+        `booking:recovery:defer:${bookingId}`,
+        expect.any(String),
+        300,
+      );
+      expect(mockStripeService.cancelPaymentIntent).not.toHaveBeenCalled();
+      expect(mockBookingLifecycleService.failBooking).not.toHaveBeenCalled();
+      expect(booking.status).toBe(BookingStatus.PROCESSING);
+    });
+
+    it('defers recovery when a created order has no provider ID', async (): Promise<void> => {
+      const bookingId = 'b-missing-order-id';
+      const booking = {
+        id: bookingId,
+        status: BookingStatus.PROCESSING,
+        createdAt: staleDate,
+        payment: {
+          id: 'pay-missing-order-id',
+          status: 'AUTHORIZED',
+          stripePaymentIntentId: 'pi-missing-order-id',
+        },
+      };
+      mockPrisma.booking.findUnique.mockResolvedValue(booking);
+      mockStripeService.retrievePaymentIntent.mockResolvedValue({ status: 'requires_payment_method' });
+      mockPrisma.paymentEvent.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ metadata: {} });
+
+      await service.handleReconciliationRequested({ bookingId });
+
+      expect(mockDuffelService.cancellation.cancelOrder).not.toHaveBeenCalled();
+      expect(mockStripeService.cancelPaymentIntent).not.toHaveBeenCalled();
+      expect(mockBookingLifecycleService.failBooking).not.toHaveBeenCalled();
+      expect(mockCacheService.set).toHaveBeenCalledWith(
+        `booking:recovery:defer:${bookingId}`,
+        expect.any(String),
+        300,
+      );
+    });
+
+    it('defers recovery when a created order has an empty provider ID', async (): Promise<void> => {
+      const bookingId = 'b-empty-order-id';
+      const booking = {
+        id: bookingId,
+        status: BookingStatus.PROCESSING,
+        createdAt: staleDate,
+        payment: {
+          id: 'pay-empty-order-id',
+          status: 'AUTHORIZED',
+          stripePaymentIntentId: 'pi-empty-order-id',
+        },
+      };
+      mockPrisma.booking.findUnique.mockResolvedValue(booking);
+      mockStripeService.retrievePaymentIntent.mockResolvedValue({ status: 'requires_payment_method' });
+      mockPrisma.paymentEvent.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ metadata: { id: '' } });
+
+      await service.handleReconciliationRequested({ bookingId });
+
+      expect(mockDuffelService.cancellation.cancelOrder).not.toHaveBeenCalled();
+      expect(mockStripeService.cancelPaymentIntent).not.toHaveBeenCalled();
+      expect(mockBookingLifecycleService.failBooking).not.toHaveBeenCalled();
+      expect(mockCacheService.set).toHaveBeenCalledWith(
+        `booking:recovery:defer:${bookingId}`,
+        expect.any(String),
+        300,
+      );
+    });
+
+    it('defers recovery when a created order has a malformed provider ID', async (): Promise<void> => {
+      const bookingId = 'b-malformed-order-id';
+      const booking = {
+        id: bookingId,
+        status: BookingStatus.PROCESSING,
+        createdAt: staleDate,
+        payment: {
+          id: 'pay-malformed-order-id',
+          status: 'AUTHORIZED',
+          stripePaymentIntentId: 'pi-malformed-order-id',
+        },
+      };
+      mockPrisma.booking.findUnique.mockResolvedValue(booking);
+      mockStripeService.retrievePaymentIntent.mockResolvedValue({ status: 'requires_payment_method' });
+      mockPrisma.paymentEvent.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ metadata: { id: 42, data: { id: null } } });
+
+      await service.handleReconciliationRequested({ bookingId });
+
+      expect(mockDuffelService.cancellation.cancelOrder).not.toHaveBeenCalled();
+      expect(mockStripeService.cancelPaymentIntent).not.toHaveBeenCalled();
+      expect(mockBookingLifecycleService.failBooking).not.toHaveBeenCalled();
+      expect(mockCacheService.set).toHaveBeenCalledWith(
+        `booking:recovery:defer:${bookingId}`,
+        expect.any(String),
+        300,
+      );
+    });
+
+    it('keeps the hold when payment-event lookup fails during stale recovery', async (): Promise<void> => {
+      const bookingId = 'b-event-lookup-failed';
+      const booking = {
+        id: bookingId,
+        status: BookingStatus.PROCESSING,
+        createdAt: staleDate,
+        payment: {
+          id: 'pay-event-lookup-failed',
+          status: 'AUTHORIZED',
+          stripePaymentIntentId: 'pi-event-lookup-failed',
+        },
+      };
+      mockPrisma.booking.findUnique.mockResolvedValue(booking);
+      mockStripeService.retrievePaymentIntent.mockResolvedValue({ status: 'requires_payment_method' });
+      mockPrisma.paymentEvent.findFirst.mockRejectedValueOnce(new Error('event store unavailable'));
+
+      await service.handleReconciliationRequested({ bookingId });
+
+      expect(mockStripeService.cancelPaymentIntent).not.toHaveBeenCalled();
+      expect(mockBookingLifecycleService.failBooking).not.toHaveBeenCalled();
+      expect(booking.status).toBe(BookingStatus.PROCESSING);
+    });
+
+    it.each([
+      { name: 'null', result: null },
+      { name: 'undefined', result: undefined },
+      { name: 'primitive', result: false },
+      { name: 'status-less object', result: { id: 'oc_123' } },
+      { name: 'empty timestamp', result: { confirmed_at: '' } },
+      { name: 'blank timestamp', result: { confirmed_at: '  ' } },
+      { name: 'null timestamp', result: { confirmed_at: null } },
+      {
+        name: 'explicitly negative with confirmation',
+        result: { success: false, status: 'confirmed', confirmed_at: '2026-10-02T10:00:00.000Z' },
+      },
+    ])('keeps the Stripe hold when cancellation resolves to $name', async ({ result }) => {
+      mockPrisma.booking.findUnique.mockResolvedValue({
+        id: 'b-1',
+        status: BookingStatus.PROCESSING,
+        createdAt: staleDate,
+        payment: {
+          id: 'pay-1',
+          status: 'AUTHORIZED',
+          stripePaymentIntentId: 'pi_123',
+        },
+      });
+      mockStripeService.retrievePaymentIntent.mockResolvedValue({
+        status: 'requires_payment_method',
+      });
+      mockPrisma.paymentEvent.findFirst.mockImplementation(
+        async ({ where }: { where?: { eventType?: string } }) => {
+          if (where?.eventType === 'duffel_order_cancelled') return null;
+          if (where?.eventType === 'duffel_order_created') {
+            return { metadata: { id: 'ord_123' } };
+          }
+          return null;
+        },
+      );
+      mockDuffelService.cancellation.cancelOrder.mockResolvedValue(result);
+
+      await service.handleReconciliationRequested({ bookingId: 'b-1' });
+
+      expect(mockDuffelService.cancellation.cancelOrder).toHaveBeenCalledWith('ord_123');
+      expect(mockPrisma.paymentEvent.create).not.toHaveBeenCalled();
+      expect(mockStripeService.cancelPaymentIntent).not.toHaveBeenCalled();
+      expect(mockCacheService.set).toHaveBeenCalledWith(
+        'booking:recovery:defer:b-1',
+        expect.any(String),
+        300,
+      );
+      expect(mockBookingLifecycleService.failBooking).not.toHaveBeenCalled();
+    });
+
+    it('keeps the Stripe hold when a generic cannot-be-cancelled denial has no cancellation proof', async () => {
+      mockPrisma.booking.findUnique.mockResolvedValue({
+        id: 'b-1',
+        status: BookingStatus.PROCESSING,
+        createdAt: staleDate,
+        payment: {
+          id: 'pay-1',
+          status: 'AUTHORIZED',
+          stripePaymentIntentId: 'pi_123',
+        },
+      });
+      mockStripeService.retrievePaymentIntent.mockResolvedValue({
+        status: 'requires_payment_method',
+      });
+      mockPrisma.paymentEvent.findFirst.mockImplementation(
+        async ({ where }: { where?: { eventType?: string } }) => {
+          if (where?.eventType === 'duffel_order_cancelled') return null;
+          if (where?.eventType === 'duffel_order_created') {
+            return { metadata: { id: 'ord_123' } };
+          }
+          return null;
+        },
+      );
+      mockDuffelService.cancellation.cancelOrder.mockRejectedValue(
+        new Error('The order cannot be cancelled because the carrier stopped selling it'),
+      );
+
+      await service.handleReconciliationRequested({ bookingId: 'b-1' });
+
+      expect(mockDuffelService.cancellation.cancelOrder).toHaveBeenCalledWith('ord_123');
+      expect(mockPrisma.paymentEvent.create).not.toHaveBeenCalled();
+      expect(mockStripeService.cancelPaymentIntent).not.toHaveBeenCalled();
+      expect(mockCacheService.set).toHaveBeenCalledWith(
+        'booking:recovery:defer:b-1',
+        expect.any(String),
+        300,
+      );
+      expect(mockBookingLifecycleService.failBooking).not.toHaveBeenCalled();
     });
 
     it('aborts reconcileBookingIfStale before provider calls if lock renewal fails (lease expired or lost)', async () => {
@@ -737,7 +1089,7 @@ describe('BookingRecoveryService', () => {
         300,
       );
       expect(mockStripeService.retrievePaymentIntent).not.toHaveBeenCalled();
-      expect(mockDuffelService.cancelOrder).not.toHaveBeenCalled();
+      expect(mockDuffelService.cancellation.cancelOrder).not.toHaveBeenCalled();
       expect(mockPrisma.$transaction).not.toHaveBeenCalled();
       expect(mockPublisher.publish).not.toHaveBeenCalled();
     });
@@ -760,7 +1112,7 @@ describe('BookingRecoveryService', () => {
 
       const result = await service.reconcileBookingIfStale(booking);
 
-      expect(mockDuffelService.cancelOrder).not.toHaveBeenCalled();
+      expect(mockDuffelService.cancellation.cancelOrder).not.toHaveBeenCalled();
       expect(mockStripeService.cancelPaymentIntent).not.toHaveBeenCalled();
       expect(mockPrisma.paymentEvent.create).not.toHaveBeenCalled();
       expect(result.status).toBe(BookingStatus.FAILED);
@@ -786,12 +1138,12 @@ describe('BookingRecoveryService', () => {
         if (where?.eventType === 'duffel_order_created') return { metadata: { id: 'ord_123' } };
         return null;
       });
-      mockDuffelService.cancelOrder.mockResolvedValue({});
+      mockDuffelService.cancellation.cancelOrder.mockResolvedValue({ status: 'confirmed' });
       mockPrisma.payment.updateMany.mockResolvedValue({ count: 1 });
 
       const result = await service.reconcileBookingIfStale(booking);
 
-      expect(mockDuffelService.cancelOrder).toHaveBeenCalledWith('ord_123');
+      expect(mockDuffelService.cancellation.cancelOrder).toHaveBeenCalledWith('ord_123');
       expect(mockPrisma.paymentEvent.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -831,7 +1183,7 @@ describe('BookingRecoveryService', () => {
 
       const result = await service.reconcileBookingIfStale(booking);
 
-      expect(mockDuffelService.cancelOrder).not.toHaveBeenCalled();
+      expect(mockDuffelService.cancellation.cancelOrder).not.toHaveBeenCalled();
       expect(mockPrisma.paymentEvent.create).not.toHaveBeenCalled();
       expect(mockStripeService.cancelPaymentIntent).toHaveBeenCalledWith('pi_123');
       expect(result.status).toBe(BookingStatus.FAILED);
@@ -883,6 +1235,179 @@ describe('BookingRecoveryService', () => {
       await service.handleReconciliationRequested({ bookingId: 'booking-123' });
 
       expect(lockSpy).toHaveBeenCalledWith('booking-123');
+    });
+
+    it('skips locked recovery while a cancellation deferral TTL is active', async () => {
+      const bookingId = 'b-deferred';
+      mockCacheService.getTtl.mockResolvedValueOnce(120);
+
+      await service.handleReconciliationRequested({ bookingId });
+
+      expect(mockCacheService.getTtl).toHaveBeenCalledWith(`booking:recovery:defer:${bookingId}`);
+      expect(mockPrisma.booking.findUnique).not.toHaveBeenCalled();
+      expect(mockDuffelService.cancellation.cancelOrder).not.toHaveBeenCalled();
+      expect(mockStripeService.cancelPaymentIntent).not.toHaveBeenCalled();
+    });
+
+    it('defers budget-denied order cancellation until the typed retry time', async () => {
+      const bookingId = 'b-budget-denied';
+      const retryAfterSeconds = 3600;
+      const resetAt = '2026-10-03T00:00:00.000Z';
+      const booking = {
+        id: bookingId,
+        status: BookingStatus.PROCESSING,
+        createdAt: new Date(Date.now() - 20 * 60 * 1000),
+        payment: {
+          id: 'pay-budget-denied',
+          status: 'AUTHORIZED',
+          stripePaymentIntentId: 'pi_budget-denied',
+        },
+      };
+      mockPrisma.booking.findUnique.mockResolvedValue(booking);
+      mockStripeService.retrievePaymentIntent.mockResolvedValue({ status: 'requires_payment_method' });
+      mockPrisma.paymentEvent.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ metadata: { id: 'ord-budget-denied' } });
+      mockDuffelService.cancellation.cancelOrder.mockRejectedValueOnce(
+        new HttpException(
+          { code: 'RATE_LIMIT_EXCEEDED', retryAfterSeconds, resetAt },
+          HttpStatus.TOO_MANY_REQUESTS,
+        ),
+      );
+
+      await service.handleReconciliationRequested({ bookingId });
+
+      expect(mockDuffelService.cancellation.cancelOrder).toHaveBeenCalledWith('ord-budget-denied');
+      expect(mockCacheService.set).toHaveBeenCalledWith(
+        `booking:recovery:defer:${bookingId}`,
+        resetAt,
+        retryAfterSeconds,
+      );
+      expect(mockStripeService.cancelPaymentIntent).not.toHaveBeenCalled();
+      expect(mockBookingLifecycleService.failBooking).not.toHaveBeenCalled();
+      expect(booking.status).toBe(BookingStatus.PROCESSING);
+    });
+
+    it('defers BUDGET_UNAVAILABLE cancellation until its upstream reset time', async (): Promise<void> => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-10-02T01:00:00.000Z'));
+      try {
+        const bookingId = 'b-budget-unavailable';
+        const retryAfterSeconds = 60;
+        const resetAt = '2026-10-02T01:01:00.000Z';
+        const booking = {
+          id: bookingId,
+          status: BookingStatus.PROCESSING,
+          createdAt: new Date(Date.now() - 20 * 60 * 1000),
+          payment: {
+            id: 'pay-budget-unavailable',
+            status: 'AUTHORIZED',
+            stripePaymentIntentId: 'pi-budget-unavailable',
+          },
+        };
+        mockPrisma.booking.findUnique.mockResolvedValue(booking);
+        mockStripeService.retrievePaymentIntent.mockResolvedValue({ status: 'requires_payment_method' });
+        mockPrisma.paymentEvent.findFirst
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce({ metadata: { id: 'ord-budget-unavailable' } });
+        mockDuffelService.cancellation.cancelOrder.mockRejectedValueOnce(
+          new HttpException(
+            { code: 'BUDGET_UNAVAILABLE', retryAfterSeconds, resetAt },
+            HttpStatus.TOO_MANY_REQUESTS,
+          ),
+        );
+
+        await service.handleReconciliationRequested({ bookingId });
+
+        expect(mockCacheService.set).toHaveBeenCalledWith(
+          'booking:recovery:defer:b-budget-unavailable',
+          '2026-10-02T01:01:00.000Z',
+          60,
+        );
+        expect(mockStripeService.cancelPaymentIntent).not.toHaveBeenCalled();
+        expect(mockBookingLifecycleService.failBooking).not.toHaveBeenCalled();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('computes rate-limit retry time when the upstream reset is missing', async (): Promise<void> => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-10-02T01:00:00.000Z'));
+      try {
+        const bookingId = 'b-rate-limit-no-reset';
+        const booking = {
+          id: bookingId,
+          status: BookingStatus.PROCESSING,
+          createdAt: new Date(Date.now() - 20 * 60 * 1000),
+          payment: {
+            id: 'pay-rate-limit-no-reset',
+            status: 'AUTHORIZED',
+            stripePaymentIntentId: 'pi-rate-limit-no-reset',
+          },
+        };
+        mockPrisma.booking.findUnique.mockResolvedValue(booking);
+        mockStripeService.retrievePaymentIntent.mockResolvedValue({ status: 'requires_payment_method' });
+        mockPrisma.paymentEvent.findFirst
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce({ metadata: { id: 'ord-rate-limit-no-reset' } });
+        mockDuffelService.cancellation.cancelOrder.mockRejectedValueOnce(
+          new HttpException(
+            { code: 'RATE_LIMIT_EXCEEDED', retryAfterSeconds: 60 },
+            HttpStatus.TOO_MANY_REQUESTS,
+          ),
+        );
+
+        await service.handleReconciliationRequested({ bookingId });
+
+        expect(mockCacheService.set).toHaveBeenCalledWith(
+          `booking:recovery:defer:${bookingId}`,
+          '2026-10-02T01:01:00.000Z',
+          60,
+        );
+        expect(mockStripeService.cancelPaymentIntent).not.toHaveBeenCalled();
+        expect(mockBookingLifecycleService.failBooking).not.toHaveBeenCalled();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('uses bounded retry backoff for invalid rate-limit retry metadata', async (): Promise<void> => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-10-02T01:00:00.000Z'));
+      try {
+        const bookingId = 'b-invalid-retry-metadata';
+        const booking = {
+          id: bookingId,
+          status: BookingStatus.PROCESSING,
+          createdAt: new Date(Date.now() - 20 * 60 * 1000),
+          payment: {
+            id: 'pay-invalid-retry-metadata',
+            status: 'AUTHORIZED',
+            stripePaymentIntentId: 'pi-invalid-retry-metadata',
+          },
+        };
+        mockPrisma.booking.findUnique.mockResolvedValue(booking);
+        mockStripeService.retrievePaymentIntent.mockResolvedValue({ status: 'requires_payment_method' });
+        mockPrisma.paymentEvent.findFirst
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce({ metadata: { id: 'ord-invalid-retry-metadata' } });
+        mockDuffelService.cancellation.cancelOrder.mockRejectedValueOnce(
+          new HttpException(
+            { code: 'RATE_LIMIT_EXCEEDED', retryAfterSeconds: 0 },
+            HttpStatus.TOO_MANY_REQUESTS,
+          ),
+        );
+
+        await service.handleReconciliationRequested({ bookingId });
+
+        expect(mockCacheService.set).toHaveBeenCalledWith(
+          `booking:recovery:defer:${bookingId}`,
+          '2026-10-02T01:05:00.000Z',
+          300,
+        );
+        expect(mockStripeService.cancelPaymentIntent).not.toHaveBeenCalled();
+        expect(mockBookingLifecycleService.failBooking).not.toHaveBeenCalled();
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     it('executes real lock flow (acquireLock with 300s and releaseLock) end-to-end without mocking reconcileBookingWithLock', async () => {

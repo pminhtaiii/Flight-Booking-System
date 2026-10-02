@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { MODULE_METADATA } from '@nestjs/common/constants';
 import { Test } from '@nestjs/testing';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { FlightMatchModule } from '../flight-match/flight-match.module';
 import { FlightMatchScorerService } from '../flight-match/flight-match-scorer.service';
@@ -13,8 +14,8 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { PrismaService } from '../prisma/prisma.service';
 import { CacheModule } from '../cache/cache.module';
 import { CacheService } from '../cache/cache.service';
-import { DuffelModule } from '../duffel/duffel.module';
-import { DuffelService } from '../duffel/duffel.service';
+import { SupplierSearchModule } from '../supplier/search/supplier-search.module';
+import { FLIGHT_SEARCH_PORT } from '../supplier/search/flight-search.port';
 import { AuditModule } from '../audit/audit.module';
 import { AuditService } from '../audit/audit.service';
 
@@ -41,7 +42,7 @@ describe('FlightsModule Wiring (T035)', () => {
     expect(imports).toContain(ProfileModule);
     expect(imports).toContain(PrismaModule);
     expect(imports).toContain(CacheModule);
-    expect(imports).toContain(DuffelModule);
+    expect(imports).toContain(SupplierSearchModule);
     expect(imports).toContain(AuditModule);
   });
 
@@ -61,6 +62,7 @@ describe('FlightsModule Dependency Graph & Cycle Avoidance (T035)', () => {
     const moduleRef = await Test.createTestingModule({
       imports: [
         ConfigModule.forRoot({ isGlobal: true }),
+        ScheduleModule.forRoot(),
         FlightsModule,
       ],
     })
@@ -68,8 +70,12 @@ describe('FlightsModule Dependency Graph & Cycle Avoidance (T035)', () => {
       .useValue({})
       .overrideProvider(CacheService)
       .useValue({})
-      .overrideProvider(DuffelService)
-      .useValue({})
+      .overrideProvider(FLIGHT_SEARCH_PORT)
+      .useValue({
+        search: jest.fn(),
+        getOfferById: jest.fn(),
+        normalizeStoredOffer: jest.fn(),
+      })
       .overrideProvider(AuditService)
       .useValue({ createLog: jest.fn() })
       .overrideProvider(ConfigService)

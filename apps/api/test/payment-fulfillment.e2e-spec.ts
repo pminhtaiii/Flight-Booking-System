@@ -10,8 +10,9 @@ import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { StripeService } from '@/common/stripe.service';
-import { DuffelService } from '@/duffel/duffel.service';
-import { DuffelOrder } from '@/duffel/duffel.types';
+import { DuffelOrderAdapter } from '@/supplier/order/duffel-order.adapter';
+import { DuffelCancellationService } from '@/supplier/order/duffel-cancellation.service';
+import { DuffelRecoveryService } from '@/supplier/order/duffel-recovery.service';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { PaymentIdempotencyService } from '@/idempotency/payment-idempotency.service';
 import { BookingLifecycleService } from '@/booking-lifecycle/booking-lifecycle.service';
@@ -83,7 +84,9 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
   let prisma: PrismaService;
   let jwtService: JwtService;
   let stripeService: StripeService;
-  let duffelService: DuffelService;
+  let duffelOrderAdapter: DuffelOrderAdapter;
+  let duffelCancellationService: DuffelCancellationService;
+  let duffelRecoveryService: DuffelRecoveryService;
   let idempotencyService: PaymentIdempotencyService;
   let bookingLifecycleService: BookingLifecycleService;
 
@@ -112,7 +115,9 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
     prisma = moduleFixture.get<PrismaService>(PrismaService);
     jwtService = moduleFixture.get<JwtService>(JwtService);
     stripeService = moduleFixture.get<StripeService>(StripeService);
-    duffelService = moduleFixture.get<DuffelService>(DuffelService);
+    duffelOrderAdapter = moduleFixture.get<DuffelOrderAdapter>(DuffelOrderAdapter);
+    duffelCancellationService = moduleFixture.get<DuffelCancellationService>(DuffelCancellationService);
+    duffelRecoveryService = moduleFixture.get<DuffelRecoveryService>(DuffelRecoveryService);
     idempotencyService = moduleFixture.get<PaymentIdempotencyService>(PaymentIdempotencyService);
     bookingLifecycleService = moduleFixture.get<BookingLifecycleService>(BookingLifecycleService);
   });
@@ -124,6 +129,11 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
 
   beforeEach(async () => {
     assertDisposableDatabase();
+
+    // Human approval 2026-10-02: supply the existing adult fixture at the new offer boundary.
+    jest.spyOn(duffelOrderAdapter, 'getOfferById').mockResolvedValue({
+      passengers: [{ id: 'pas_1', type: 'adult' }],
+    });
 
     await prisma.chatHandoff.deleteMany({});
     await prisma.chatSession.deleteMany({});
@@ -340,11 +350,11 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
 
       // Mock Duffel createOrder and retrieveCompleteOrder with required slice/segment snapshot fields
       jest
-        .spyOn(duffelService, 'createOrder')
-        .mockResolvedValue(mockOrder as unknown as Record<string, unknown>);
+        .spyOn(duffelOrderAdapter, 'createOrder')
+        .mockResolvedValue(mockOrder);
       jest
-        .spyOn(duffelService, 'retrieveCompleteOrder')
-        .mockResolvedValue(mockOrder as unknown as DuffelOrder);
+        .spyOn(duffelRecoveryService, 'retrieveCompleteOrder')
+        .mockResolvedValue(mockOrder);
 
       // Mock Stripe capturePaymentIntent with succeeded status
       jest.spyOn(stripeService, 'capturePaymentIntent').mockResolvedValue({
@@ -391,8 +401,8 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
 
       // Mock Duffel retrieveCompleteOrder with required snapshot fields
       jest
-        .spyOn(duffelService, 'retrieveCompleteOrder')
-        .mockResolvedValue(mockOrder as unknown as DuffelOrder);
+        .spyOn(duffelRecoveryService, 'retrieveCompleteOrder')
+        .mockResolvedValue(mockOrder);
 
       // Mock Stripe capturePaymentIntent with succeeded status
       jest.spyOn(stripeService, 'capturePaymentIntent').mockResolvedValue({
@@ -411,11 +421,11 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
         });
 
       // Make createOrder hang for 50ms so the 10ms Tier-2 handoff threshold fires first
-      jest.spyOn(duffelService, 'createOrder').mockImplementation(
+      jest.spyOn(duffelOrderAdapter, 'createOrder').mockImplementation(
         () =>
           new Promise((resolve) =>
             origSetTimeout(
-              () => resolve(mockOrder as unknown as Record<string, unknown>),
+              () => resolve(mockOrder),
               50,
             ),
           ),
@@ -479,12 +489,12 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
 
       // Mock Duffel createOrder and retrieveCompleteOrder with required snapshot fields
       const createOrderSpy = jest
-        .spyOn(duffelService, 'createOrder')
-        .mockResolvedValue(mockOrder as unknown as Record<string, unknown>);
+        .spyOn(duffelOrderAdapter, 'createOrder')
+        .mockResolvedValue(mockOrder);
 
       jest
-        .spyOn(duffelService, 'retrieveCompleteOrder')
-        .mockResolvedValue(mockOrder as unknown as DuffelOrder);
+        .spyOn(duffelRecoveryService, 'retrieveCompleteOrder')
+        .mockResolvedValue(mockOrder);
 
       // Mock Stripe capturePaymentIntent with succeeded status
       const captureSpy = jest
@@ -548,7 +558,7 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
         } as unknown as Stripe.PaymentIntent);
 
       const duffelSpy = jest
-        .spyOn(duffelService, 'createOrder')
+        .spyOn(duffelOrderAdapter, 'createOrder')
         .mockRejectedValue(new Error('Duffel booking failed'));
 
       const cancelSpy = jest
@@ -778,7 +788,7 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
       } as unknown as Stripe.PaymentIntent);
 
       jest
-        .spyOn(duffelService, 'createOrder')
+        .spyOn(duffelOrderAdapter, 'createOrder')
         .mockRejectedValue(new Error('Duffel booking failed'));
 
       // Mock Stripe cancelPaymentIntent on Duffel failure compensation
@@ -854,11 +864,11 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
 
       const retrieveSpy = jest.spyOn(stripeService, 'retrievePaymentIntent');
       const createOrderSpy = jest
-        .spyOn(duffelService, 'createOrder')
-        .mockResolvedValue(mockOrder as unknown as Record<string, unknown>);
+        .spyOn(duffelOrderAdapter, 'createOrder')
+        .mockResolvedValue(mockOrder);
       jest
-        .spyOn(duffelService, 'retrieveCompleteOrder')
-        .mockResolvedValue(mockOrder as unknown as DuffelOrder);
+        .spyOn(duffelRecoveryService, 'retrieveCompleteOrder')
+        .mockResolvedValue(mockOrder);
       const captureSpy = jest.spyOn(stripeService, 'capturePaymentIntent').mockResolvedValue({
         id: payment.stripePaymentIntentId,
         status: 'succeeded',
@@ -948,10 +958,10 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
       });
 
       const retrieveSpy = jest.spyOn(stripeService, 'retrievePaymentIntent');
-      const createOrderSpy = jest.spyOn(duffelService, 'createOrder');
+      const createOrderSpy = jest.spyOn(duffelOrderAdapter, 'createOrder');
       jest
-        .spyOn(duffelService, 'retrieveCompleteOrder')
-        .mockResolvedValue(mockOrder as unknown as DuffelOrder);
+        .spyOn(duffelRecoveryService, 'retrieveCompleteOrder')
+        .mockResolvedValue(mockOrder);
       const captureSpy = jest.spyOn(stripeService, 'capturePaymentIntent').mockResolvedValue({
         id: payment.stripePaymentIntentId,
         status: 'succeeded',
@@ -1041,12 +1051,12 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
       });
 
       const retrieveSpy = jest.spyOn(stripeService, 'retrievePaymentIntent');
-      const createOrderSpy = jest.spyOn(duffelService, 'createOrder');
+      const createOrderSpy = jest.spyOn(duffelOrderAdapter, 'createOrder');
       const captureSpy = jest.spyOn(stripeService, 'capturePaymentIntent');
 
       jest
-        .spyOn(duffelService, 'retrieveCompleteOrder')
-        .mockResolvedValue(mockOrder as unknown as DuffelOrder);
+        .spyOn(duffelRecoveryService, 'retrieveCompleteOrder')
+        .mockResolvedValue(mockOrder);
 
       const res = await request(app.getHttpServer())
         .post('/api/bookings/payment/confirm')
@@ -1105,7 +1115,7 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
       });
 
       const retrieveSpy = jest.spyOn(stripeService, 'retrievePaymentIntent');
-      const createOrderSpy = jest.spyOn(duffelService, 'createOrder');
+      const createOrderSpy = jest.spyOn(duffelOrderAdapter, 'createOrder');
       const captureSpy = jest.spyOn(stripeService, 'capturePaymentIntent');
 
       const res = await request(app.getHttpServer())
@@ -1136,11 +1146,11 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
       } as unknown as Stripe.PaymentIntent);
 
       jest
-        .spyOn(duffelService, 'createOrder')
-        .mockResolvedValue(mockOrder as unknown as Record<string, unknown>);
+        .spyOn(duffelOrderAdapter, 'createOrder')
+        .mockResolvedValue(mockOrder);
       jest
-        .spyOn(duffelService, 'retrieveCompleteOrder')
-        .mockResolvedValue(mockOrder as unknown as DuffelOrder);
+        .spyOn(duffelRecoveryService, 'retrieveCompleteOrder')
+        .mockResolvedValue(mockOrder);
       jest.spyOn(stripeService, 'capturePaymentIntent').mockResolvedValue({
         id: payment.stripePaymentIntentId,
         status: 'succeeded',
@@ -1197,11 +1207,11 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
       } as unknown as Stripe.PaymentIntent);
 
       jest
-        .spyOn(duffelService, 'createOrder')
-        .mockResolvedValue(mockOrder as unknown as Record<string, unknown>);
+        .spyOn(duffelOrderAdapter, 'createOrder')
+        .mockResolvedValue(mockOrder);
       jest
-        .spyOn(duffelService, 'retrieveCompleteOrder')
-        .mockResolvedValue(mockOrder as unknown as DuffelOrder);
+        .spyOn(duffelRecoveryService, 'retrieveCompleteOrder')
+        .mockResolvedValue(mockOrder);
       jest.spyOn(stripeService, 'capturePaymentIntent').mockResolvedValue({
         id: payment.stripePaymentIntentId,
         status: 'succeeded',
@@ -1236,7 +1246,7 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
       });
 
       const cancelHoldSpy = jest.spyOn(stripeService, 'cancelPaymentIntent');
-      const cancelOrderSpy = jest.spyOn(duffelService, 'cancelOrder');
+      const cancelOrderSpy = jest.spyOn(duffelCancellationService, 'cancelOrder');
 
       await request(app.getHttpServer())
         .post('/api/bookings/payment/confirm')
@@ -1353,7 +1363,7 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
         return result;
       });
 
-      const createOrderSpy = jest.spyOn(duffelService, 'createOrder');
+      const createOrderSpy = jest.spyOn(duffelOrderAdapter, 'createOrder');
       const cancelHoldSpy = jest.spyOn(stripeService, 'cancelPaymentIntent');
 
       const res = await request(app.getHttpServer())
@@ -1456,7 +1466,7 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
         status: 'requires_capture',
       } as unknown as Stripe.PaymentIntent);
 
-      jest.spyOn(duffelService, 'createOrder').mockImplementation(async () => {
+      jest.spyOn(duffelOrderAdapter, 'createOrder').mockImplementation(async () => {
         await prisma.idempotencyKey.update({
           where: { key: idempotencyKey },
           data: { lockedAt: new Date(Date.now() + 60000) },
@@ -1509,7 +1519,7 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
         resolveOrderStolen = resolve;
       });
 
-      jest.spyOn(duffelService, 'createOrder').mockImplementation(
+      jest.spyOn(duffelOrderAdapter, 'createOrder').mockImplementation(
         () =>
           new Promise((resolve) => {
             origSetTimeout(async () => {
@@ -1522,7 +1532,7 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
                 // Ignore teardown races
               } finally {
                 resolveOrderStolen();
-                resolve(mockOrder as unknown as Record<string, unknown>);
+                resolve(mockOrder);
               }
             }, 50);
           }),
@@ -1573,18 +1583,18 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
         } as unknown as Stripe.PaymentIntent);
 
       jest
-        .spyOn(duffelService, 'createOrder')
-        .mockResolvedValue(mockOrder as unknown as Record<string, unknown>);
+        .spyOn(duffelOrderAdapter, 'createOrder')
+        .mockResolvedValue(mockOrder);
       jest
-        .spyOn(duffelService, 'retrieveCompleteOrder')
-        .mockResolvedValue(mockOrder as unknown as DuffelOrder);
+        .spyOn(duffelRecoveryService, 'retrieveCompleteOrder')
+        .mockResolvedValue(mockOrder);
 
       jest
         .spyOn(stripeService, 'capturePaymentIntent')
         .mockRejectedValue(new Error('Network socket hangup during capture'));
 
       const cancelHoldSpy = jest.spyOn(stripeService, 'cancelPaymentIntent');
-      const cancelOrderSpy = jest.spyOn(duffelService, 'cancelOrder');
+      const cancelOrderSpy = jest.spyOn(duffelCancellationService, 'cancelOrder');
 
       const res = await request(app.getHttpServer())
         .post('/api/bookings/payment/confirm')
@@ -1631,17 +1641,21 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
         } as unknown as Stripe.PaymentIntent);
 
       jest
-        .spyOn(duffelService, 'createOrder')
-        .mockResolvedValue(mockOrder as unknown as Record<string, unknown>);
+        .spyOn(duffelOrderAdapter, 'createOrder')
+        .mockResolvedValue(mockOrder);
       jest
-        .spyOn(duffelService, 'retrieveCompleteOrder')
-        .mockResolvedValue(mockOrder as unknown as DuffelOrder);
+        .spyOn(duffelRecoveryService, 'retrieveCompleteOrder')
+        .mockResolvedValue(mockOrder);
 
       jest
         .spyOn(stripeService, 'capturePaymentIntent')
         .mockRejectedValue(new Error('Card declined on capture'));
 
-      const cancelOrderSpy = jest.spyOn(duffelService, 'cancelOrder').mockResolvedValue({});
+      // Human approval 2026-10-02: return an explicit provider confirmation for the successful-cancellation assertions.
+      const cancelOrderSpy = jest.spyOn(duffelCancellationService, 'cancelOrder').mockResolvedValue({
+        id: 'cancel_confirmed',
+        status: 'confirmed',
+      });
       const cancelHoldSpy = jest.spyOn(stripeService, 'cancelPaymentIntent').mockResolvedValue({
         id: payment.stripePaymentIntentId,
         status: 'canceled',
@@ -1686,17 +1700,21 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
         } as unknown as Stripe.PaymentIntent);
 
       jest
-        .spyOn(duffelService, 'createOrder')
-        .mockResolvedValue(mockOrder as unknown as Record<string, unknown>);
+        .spyOn(duffelOrderAdapter, 'createOrder')
+        .mockResolvedValue(mockOrder);
       jest
-        .spyOn(duffelService, 'retrieveCompleteOrder')
-        .mockResolvedValue(mockOrder as unknown as DuffelOrder);
+        .spyOn(duffelRecoveryService, 'retrieveCompleteOrder')
+        .mockResolvedValue(mockOrder);
 
       jest
         .spyOn(stripeService, 'capturePaymentIntent')
         .mockRejectedValue(new Error('Card declined on capture'));
 
-      const cancelOrderSpy = jest.spyOn(duffelService, 'cancelOrder').mockResolvedValue({});
+      // Human approval 2026-10-02: return an explicit provider confirmation for the successful-cancellation assertions.
+      const cancelOrderSpy = jest.spyOn(duffelCancellationService, 'cancelOrder').mockResolvedValue({
+        id: 'cancel_confirmed',
+        status: 'confirmed',
+      });
       const cancelHoldSpy = jest.spyOn(stripeService, 'cancelPaymentIntent').mockResolvedValue({
         id: payment.stripePaymentIntentId,
         status: 'canceled',
@@ -1738,17 +1756,17 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
         .mockRejectedValueOnce(new Error('Stripe API unavailable during status check'));
 
       jest
-        .spyOn(duffelService, 'createOrder')
-        .mockResolvedValue(mockOrder as unknown as Record<string, unknown>);
+        .spyOn(duffelOrderAdapter, 'createOrder')
+        .mockResolvedValue(mockOrder);
       jest
-        .spyOn(duffelService, 'retrieveCompleteOrder')
-        .mockResolvedValue(mockOrder as unknown as DuffelOrder);
+        .spyOn(duffelRecoveryService, 'retrieveCompleteOrder')
+        .mockResolvedValue(mockOrder);
 
       jest
         .spyOn(stripeService, 'capturePaymentIntent')
         .mockRejectedValue(new Error('Capture socket dropped'));
 
-      const cancelOrderSpy = jest.spyOn(duffelService, 'cancelOrder');
+      const cancelOrderSpy = jest.spyOn(duffelCancellationService, 'cancelOrder');
       const cancelHoldSpy = jest.spyOn(stripeService, 'cancelPaymentIntent');
 
       const res = await request(app.getHttpServer())
@@ -1791,7 +1809,7 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
       } as unknown as Stripe.PaymentIntent);
 
       jest
-        .spyOn(duffelService, 'createOrder')
+        .spyOn(duffelOrderAdapter, 'createOrder')
         .mockRejectedValue(new Error('Duffel route unavailable'));
 
       jest
@@ -1830,11 +1848,11 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
       } as unknown as Stripe.PaymentIntent);
 
       jest
-        .spyOn(duffelService, 'createOrder')
-        .mockResolvedValue(mockOrder as unknown as Record<string, unknown>);
+        .spyOn(duffelOrderAdapter, 'createOrder')
+        .mockResolvedValue(mockOrder);
       jest
-        .spyOn(duffelService, 'retrieveCompleteOrder')
-        .mockResolvedValue(mockOrder as unknown as DuffelOrder);
+        .spyOn(duffelRecoveryService, 'retrieveCompleteOrder')
+        .mockResolvedValue(mockOrder);
       jest.spyOn(stripeService, 'capturePaymentIntent').mockResolvedValue({
         id: payment.stripePaymentIntentId,
         status: 'succeeded',
@@ -1845,7 +1863,7 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
         .mockRejectedValue(new Error('Disk I/O failure during updateToConfirmed'));
 
       const cancelHoldSpy = jest.spyOn(stripeService, 'cancelPaymentIntent');
-      const cancelOrderSpy = jest.spyOn(duffelService, 'cancelOrder');
+      const cancelOrderSpy = jest.spyOn(duffelCancellationService, 'cancelOrder');
 
       await request(app.getHttpServer())
         .post('/api/bookings/payment/confirm')

@@ -5,7 +5,8 @@ import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CacheService } from '@/cache/cache.service';
 import { JwtService } from '@nestjs/jwt';
-import { DuffelService } from '@/duffel/duffel.service';
+import { Duffel } from '@duffel/api';
+import { DUFFEL_SDK } from '@/supplier/core/duffel-core.module';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { DuffelOfferRequest } from '@/duffel/duffel.types';
 
@@ -439,11 +440,11 @@ describe('Flights Search (E2E)', () => {
       ],
     };
 
-    let duffelService: DuffelService;
+    let duffel: Duffel;
 
     beforeEach(() => {
-      duffelService = app.get<DuffelService>(DuffelService);
-      sdkSpy = jest.spyOn(duffelService['duffel'].offerRequests, 'create').mockResolvedValue({
+      duffel = app.get<Duffel>(DUFFEL_SDK);
+      sdkSpy = jest.spyOn(duffel.offerRequests, 'create').mockResolvedValue({
         data: mockDuffelResponse,
       } as unknown as { data: DuffelOfferRequest });
     });
@@ -591,9 +592,11 @@ describe('Flights Search (E2E)', () => {
       expect(rawCached).toBeDefined();
 
       // Get budget key value
-      const year = new Date().getFullYear();
-      const month = String(new Date().getMonth() + 1).padStart(2, '0');
-      const budgetKey = `budget:duffel:${year}-${month}`;
+      const now = new Date();
+      const yyyy = now.getUTCFullYear();
+      const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(now.getUTCDate()).padStart(2, '0');
+      const budgetKey = `budget:duffel:daily:user:${yyyy}-${mm}-${dd}`;
       const budgetValBefore = await cacheService.get(budgetKey);
 
       // Clear spy
@@ -642,11 +645,13 @@ describe('Flights Search (E2E)', () => {
     });
 
     it('should return 429 TOO MANY REQUESTS when the search budget is exhausted', async () => {
-      // Exhaust the budget key in Redis (Default limit is 1800 for user caller)
-      const year = new Date().getFullYear();
-      const month = String(new Date().getMonth() + 1).padStart(2, '0');
-      const budgetKey = `budget:duffel:${year}-${month}`;
-      await cacheService.set(budgetKey, '1800');
+      // Exhaust the budget key in Redis (Default limit is 1000 for user caller)
+      const now = new Date();
+      const yyyy = now.getUTCFullYear();
+      const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(now.getUTCDate()).padStart(2, '0');
+      const budgetKey = `budget:duffel:daily:user:${yyyy}-${mm}-${dd}`;
+      await cacheService.set(budgetKey, '1000');
 
       const res = await request(app.getHttpServer())
         .post('/api/flights/search')

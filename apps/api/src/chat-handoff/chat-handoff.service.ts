@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   GoneException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -12,6 +13,12 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuditService } from '@/audit/audit.service';
+import {
+  FLIGHT_SEARCH_PORT,
+  type FlightSearchPort,
+  type FlightSegment,
+} from '@/supplier/search/flight-search.port';
+import { complementStoredOfferPayload } from '@/supplier/search/stored-offer-payload.helper';
 import {
   createChatTelemetryEvent,
   emitChatTelemetry,
@@ -24,6 +31,16 @@ import { ChatHandoffTokenService } from './chat-handoff-token.service';
 import { SelectionAttestationService } from '@/agent-gateway/selection-attestation.service';
 import { FlightOffer, Prisma } from '@prisma/client';
 import * as crypto from 'crypto';
+
+function resolveLastSegment(offer: {
+  readonly segments: readonly FlightSegment[];
+  readonly returnSegments?: readonly FlightSegment[] | null;
+}): FlightSegment | undefined {
+  if (offer.returnSegments && offer.returnSegments.length > 0) {
+    return offer.returnSegments[offer.returnSegments.length - 1];
+  }
+  return offer.segments[offer.segments.length - 1];
+}
 
 type JsonRecord = Record<string, unknown>;
 
@@ -108,7 +125,7 @@ function isoDateValue(value: unknown): string | null {
   return date && !Number.isNaN(date.getTime()) ? date.toISOString() : null;
 }
 
-function firstFlightSegment(rawOffer: unknown): JsonRecord | null {
+export function firstFlightSegment(rawOffer: unknown): JsonRecord | null {
   if (!isJsonRecord(rawOffer) || !Array.isArray(rawOffer.slices)) {
     return null;
   }
@@ -122,7 +139,7 @@ function firstFlightSegment(rawOffer: unknown): JsonRecord | null {
   return isJsonRecord(firstSegment) ? firstSegment : null;
 }
 
-function lastFlightSegment(rawOffer: unknown): JsonRecord | null {
+export function lastFlightSegment(rawOffer: unknown): JsonRecord | null {
   if (!isJsonRecord(rawOffer) || !Array.isArray(rawOffer.slices)) {
     return null;
   }
@@ -136,7 +153,7 @@ function lastFlightSegment(rawOffer: unknown): JsonRecord | null {
   return isJsonRecord(lastSegment) ? lastSegment : null;
 }
 
-function handoffPassengers(
+export function handoffPassengers(
   rawOffer: JsonRecord | null,
 ): Array<{ id: string; type: 'ADULT' | 'CHILD' | 'INFANT' }> | null {
   if (!rawOffer || !Array.isArray(rawOffer.passengers)) return null;
@@ -170,6 +187,7 @@ export class ChatHandoffService {
     private readonly configService: ConfigService,
     private readonly tokenService: ChatHandoffTokenService,
     private readonly selectionAttestationService: SelectionAttestationService,
+    @Inject(FLIGHT_SEARCH_PORT) private readonly flightSearchPort: FlightSearchPort,
     @Optional() private readonly auditService?: AuditService,
   ) {}
 
@@ -540,37 +558,50 @@ export class ChatHandoffService {
     flightOffer: FlightOffer | null,
     selectedOffer: AttestationOffer,
   ): ChatHandoffDisplayDto | undefined {
-    const rawOffer = isJsonRecord(flightOffer?.rawOffer) ? flightOffer.rawOffer : null;
-    const firstSegment = firstFlightSegment(rawOffer);
-    const lastSegment = lastFlightSegment(rawOffer);
-    const operatingCarrier =
-      firstSegment && isJsonRecord(firstSegment.operating_carrier)
-        ? firstSegment.operating_carrier
-        : null;
-    const marketingCarrier =
-      firstSegment && isJsonRecord(firstSegment.marketing_carrier)
-        ? firstSegment.marketing_carrier
-        : null;
+    const payload = complementStoredOfferPayload(flightOffer?.rawOffer, flightOffer);
+    const normalizedOffer = payload
+      ? this.flightSearchPort.normalizeStoredOffer(payload)
+      : null;
+
+    const firstSegment = normalizedOffer?.segments[0];
+    const lastSegment = normalizedOffer ? resolveLastSegment(normalizedOffer) : null;
+
     const airline =
-      stringValue(operatingCarrier?.name) ??
-      stringValue(marketingCarrier?.name) ??
-      stringValue(selectedOffer?.airline) ??
+      firstSegment?.operatingCarrier ||
+      normalizedOffer?.airline ||
+      stringValue(selectedOffer?.airline) ||
       'Unknown Airline';
 
-    const origin = flightOffer?.origin ?? stringValue(selectedOffer?.origin);
-    const destination = flightOffer?.destination ?? stringValue(selectedOffer?.destination);
-    const departureAt = firstSegment
-      ? stringValue(firstSegment.departing_at)
-      : stringValue(selectedOffer?.departureAt);
-    const arrivalAt = lastSegment
-      ? stringValue(lastSegment.arriving_at)
-      : stringValue(selectedOffer?.arrivalAt);
-    const price = flightOffer
-      ? String(flightOffer.price)
-      : selectedOffer?.price !== undefined
-        ? String(selectedOffer.price)
-        : undefined;
-    const currency = flightOffer?.currency ?? stringValue(selectedOffer?.currency);
+    const origin =
+      normalizedOffer?.departureAirport ||
+      flightOffer?.origin ||
+      stringValue(selectedOffer?.origin);
+
+    const destination =
+      normalizedOffer?.arrivalAirport ||
+      flightOffer?.destination ||
+      stringValue(selectedOffer?.destination);
+
+    const departureAt =
+      firstSegment?.departureTime ||
+      stringValue(selectedOffer?.departureAt);
+
+    const arrivalAt =
+      lastSegment?.arrivalTime ||
+      stringValue(selectedOffer?.arrivalAt);
+
+    const price =
+      normalizedOffer?.totalAmount ??
+      (flightOffer
+        ? String(flightOffer.price)
+        : selectedOffer?.price !== undefined
+          ? String(selectedOffer.price)
+          : undefined);
+
+    const currency =
+      normalizedOffer?.currency ??
+      flightOffer?.currency ??
+      stringValue(selectedOffer?.currency);
 
     if (!origin && !destination && !departureAt) {
       return undefined;
@@ -753,44 +784,56 @@ export class ChatHandoffService {
       });
     }
 
-    const rawOffer = isJsonRecord(flightOffer.rawOffer) ? flightOffer.rawOffer : null;
-    const passengers = handoffPassengers(rawOffer);
-    const offerExpiresAt = isoDateValue(rawOffer?.expires_at);
-    if (!offerExpiresAt || new Date(offerExpiresAt) <= new Date()) {
+    const hadOriginalPassengers =
+      isJsonRecord(flightOffer.rawOffer) &&
+      Array.isArray((flightOffer.rawOffer as Record<string, unknown>).passengers) &&
+      ((flightOffer.rawOffer as Record<string, unknown>).passengers as unknown[]).length > 0;
+    const payload = complementStoredOfferPayload(flightOffer.rawOffer, flightOffer);
+    const normalizedOffer = this.flightSearchPort.normalizeStoredOffer(payload);
+    if (
+      !normalizedOffer ||
+      !normalizedOffer.offerExpiresAt ||
+      new Date(normalizedOffer.offerExpiresAt) <= new Date()
+    ) {
       throw new GoneException({
         code: 'HANDOFF_OFFER_STALE',
         message: 'Handoff offer is stale',
       });
     }
 
-    const firstSegment = firstFlightSegment(rawOffer);
-    const lastSegment = lastFlightSegment(rawOffer);
-    const departureAt = firstSegment ? stringValue(firstSegment.departing_at) : null;
-    const arrivalAt = lastSegment ? stringValue(lastSegment.arriving_at) : null;
+    const firstSegment = normalizedOffer.segments[0];
+    const lastSegment = resolveLastSegment(normalizedOffer);
+
+    if (!firstSegment || !lastSegment) {
+      throw new NotFoundException('Handoff offer unavailable');
+    }
+
+    const departureAt = firstSegment.departureTime;
+    const arrivalAt = lastSegment.arrivalTime;
     if (!departureAt || !arrivalAt) {
       throw new NotFoundException('Handoff offer unavailable');
     }
 
-    const operatingCarrier =
-      firstSegment && isJsonRecord(firstSegment.operating_carrier)
-        ? firstSegment.operating_carrier
-        : null;
-    const marketingCarrier =
-      firstSegment && isJsonRecord(firstSegment.marketing_carrier)
-        ? firstSegment.marketing_carrier
-        : null;
     const airline =
-      stringValue(operatingCarrier?.name) ??
-      stringValue(marketingCarrier?.name) ??
+      firstSegment.operatingCarrier ||
+      normalizedOffer.airline ||
       'Unknown Airline';
+
+    const origin = normalizedOffer.departureAirport || flightOffer.origin;
+    const destination = normalizedOffer.arrivalAirport || flightOffer.destination;
+
+    const passengers = normalizedOffer.passengers.map((p) => ({
+      id: p.supplierPassengerId,
+      type: p.type,
+    }));
 
     return {
       status: 'ACTIVE',
       expiresAt,
       offer: {
         airline,
-        origin: flightOffer.origin,
-        destination: flightOffer.destination,
+        origin,
+        destination,
         departureAt,
         arrivalAt,
         price: String(flightOffer.price),
@@ -799,7 +842,7 @@ export class ChatHandoffService {
         children: flightOffer.children,
         infants: flightOffer.infants,
       },
-      ...(passengers && passengers.length > 0 ? { passengers } : {}),
+      ...(hadOriginalPassengers && passengers.length > 0 ? { passengers } : {}),
     };
   }
 

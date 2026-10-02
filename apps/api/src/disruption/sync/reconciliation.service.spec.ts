@@ -1,4 +1,5 @@
 import { ReconciliationService } from './reconciliation.service';
+import { HttpException, HttpStatus } from '@nestjs/common';
 import { BookingLifecycleService } from '@/booking-lifecycle/booking-lifecycle.service';
 import { BookingWithRelations } from '@/booking-lifecycle/booking-lifecycle.types';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -144,34 +145,103 @@ describe('ReconciliationService & Booking Completion', () => {
       delete process.env.DUFFEL_RECONCILIATION_BATCH_SIZE;
     });
 
-    it('should defer processing and log metrics if budget is exhausted before start', async () => {
+    it('should defer processing and increment budgetBlocked when syncBooking rejects with HttpException 429 RATE_LIMIT_EXCEEDED', async () => {
       mockPrisma.booking.findMany
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([{ id: 'b-1', status: 'CONFIRMED', duffelOrderId: 'ord-1' }]);
-      // Budget limit is 2000, mock CacheService to return 2000 (fully exhausted)
-      mockCacheService.get.mockResolvedValue('2000');
+      mockSupplierSyncService.syncBooking.mockRejectedValue(
+        new HttpException(
+          {
+            message: 'Daily Duffel API rate limit exceeded',
+            code: 'RATE_LIMIT_EXCEEDED',
+          },
+          HttpStatus.TOO_MANY_REQUESTS,
+        ),
+      );
 
       const result = await reconciliationService.reconcile();
 
-      expect(mockSupplierSyncService.syncBooking).not.toHaveBeenCalled();
+      expect(mockSupplierSyncService.syncBooking).toHaveBeenCalledWith('b-1', 'RECONCILIATION');
       expect(mockCacheService.incr).not.toHaveBeenCalled();
+      expect(mockCacheService.decr).not.toHaveBeenCalled();
+      expect(mockCacheService.set).not.toHaveBeenCalled();
+      expect(mockPrisma.booking.updateMany).toHaveBeenCalledWith({
+        where: { id: 'b-1' },
+        data: { syncLockedAt: null, syncLockToken: null },
+      });
       expect(result.budgetBlocked).toBe(1);
+      expect(result.failed).toBe(0);
       expect(result.processed).toBe(0);
     });
 
-    it('should defer processing if budget is exhausted during increment', async () => {
+    it('should defer processing and increment budgetBlocked when syncBooking rejects with 429 / RATE_LIMIT_EXCEEDED', async () => {
       mockPrisma.booking.findMany
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([{ id: 'b-1', status: 'CONFIRMED', duffelOrderId: 'ord-1' }]);
-      mockCacheService.get.mockResolvedValue('1999');
-      // Incremented value exceeds the limit (e.g. 2001)
-      mockCacheService.incr.mockResolvedValue(2001);
+      mockSupplierSyncService.syncBooking.mockRejectedValue({
+        status: 429,
+        response: { code: 'RATE_LIMIT_EXCEEDED' },
+      });
 
       const result = await reconciliationService.reconcile();
 
-      expect(mockSupplierSyncService.syncBooking).not.toHaveBeenCalled();
-      expect(mockCacheService.decr).toHaveBeenCalled();
+      expect(mockSupplierSyncService.syncBooking).toHaveBeenCalledWith('b-1', 'RECONCILIATION');
+      expect(mockCacheService.incr).not.toHaveBeenCalled();
+      expect(mockCacheService.decr).not.toHaveBeenCalled();
+      expect(mockCacheService.set).not.toHaveBeenCalled();
+      expect(mockPrisma.booking.updateMany).toHaveBeenCalledWith({
+        where: { id: 'b-1' },
+        data: { syncLockedAt: null, syncLockToken: null },
+      });
       expect(result.budgetBlocked).toBe(1);
+      expect(result.failed).toBe(0);
+      expect(result.processed).toBe(0);
+    });
+
+    it('should defer processing and increment budgetBlocked when syncBooking rejects with BUDGET_UNAVAILABLE', async () => {
+      mockPrisma.booking.findMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ id: 'b-1', status: 'CONFIRMED', duffelOrderId: 'ord-1' }]);
+      mockSupplierSyncService.syncBooking.mockRejectedValue(
+        new HttpException(
+          {
+            message: 'Duffel rate budget store temporarily unavailable',
+            code: 'BUDGET_UNAVAILABLE',
+            retryAfterSeconds: 30,
+          },
+          HttpStatus.TOO_MANY_REQUESTS,
+        ),
+      );
+
+      const result = await reconciliationService.reconcile();
+
+      expect(mockSupplierSyncService.syncBooking).toHaveBeenCalledWith('b-1', 'RECONCILIATION');
+      expect(mockPrisma.booking.updateMany).toHaveBeenCalledWith({
+        where: { id: 'b-1' },
+        data: { syncLockedAt: null, syncLockToken: null },
+      });
+      expect(result.budgetBlocked).toBe(1);
+      expect(result.failed).toBe(0);
+      expect(result.processed).toBe(0);
+    });
+
+    it('should defer processing and increment budgetBlocked when syncBooking rejects with UPSTREAM_UNAVAILABLE', async () => {
+      mockPrisma.booking.findMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ id: 'b-1', status: 'CONFIRMED', duffelOrderId: 'ord-1' }]);
+      mockSupplierSyncService.syncBooking.mockRejectedValue({
+        code: 'UPSTREAM_UNAVAILABLE',
+      });
+
+      const result = await reconciliationService.reconcile();
+
+      expect(mockSupplierSyncService.syncBooking).toHaveBeenCalledWith('b-1', 'RECONCILIATION');
+      expect(mockPrisma.booking.updateMany).toHaveBeenCalledWith({
+        where: { id: 'b-1' },
+        data: { syncLockedAt: null, syncLockToken: null },
+      });
+      expect(result.budgetBlocked).toBe(1);
+      expect(result.failed).toBe(0);
       expect(result.processed).toBe(0);
     });
 
@@ -204,16 +274,22 @@ describe('ReconciliationService & Booking Completion', () => {
       expect(result.processed).toBe(1);
     });
 
-    it('should decrement budget back if sync result is SKIPPED_LOCKED or SKIPPED_INELIGIBLE', async () => {
+    it('should defer processing without decrementing budget if sync result is SKIPPED_LOCKED or SKIPPED_INELIGIBLE', async () => {
       mockPrisma.booking.findMany
         .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([{ id: 'b-1', status: 'CONFIRMED', duffelOrderId: 'ord-1' }]);
-      mockSupplierSyncService.syncBooking.mockResolvedValue({ status: 'SKIPPED_LOCKED' });
+        .mockResolvedValueOnce([
+          { id: 'b-1', status: 'CONFIRMED', duffelOrderId: 'ord-1' },
+          { id: 'b-2', status: 'CONFIRMED', duffelOrderId: 'ord-2' },
+        ]);
+      mockSupplierSyncService.syncBooking
+        .mockResolvedValueOnce({ status: 'SKIPPED_LOCKED' })
+        .mockResolvedValueOnce({ status: 'SKIPPED_INELIGIBLE' });
 
       const result = await reconciliationService.reconcile();
 
-      expect(mockCacheService.decr).toHaveBeenCalled();
-      expect(result.deferred).toBe(1);
+      expect(mockCacheService.incr).not.toHaveBeenCalled();
+      expect(mockCacheService.decr).not.toHaveBeenCalled();
+      expect(result.deferred).toBe(2);
       expect(result.processed).toBe(0);
     });
 

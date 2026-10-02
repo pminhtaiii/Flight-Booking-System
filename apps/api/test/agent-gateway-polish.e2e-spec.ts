@@ -4,8 +4,7 @@ import request from 'supertest';
 import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CacheService } from '@/cache/cache.service';
-import { DuffelService } from '@/duffel/duffel.service';
-import { DuffelOfferRequest } from '@/duffel/duffel.types';
+import { DuffelSearchAdapter } from '@/supplier/search/duffel-search.adapter';
 import * as crypto from 'crypto';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { User } from '@prisma/client';
@@ -27,7 +26,7 @@ describe('Agent Gateway Polish (E2E)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let cacheService: CacheService;
-  let duffelService: DuffelService;
+  let searchAdapter: DuffelSearchAdapter;
 
   const apiKey = 'test-agent-api-key';
   let token: string;
@@ -56,7 +55,7 @@ describe('Agent Gateway Polish (E2E)', () => {
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
     cacheService = moduleFixture.get<CacheService>(CacheService);
-    duffelService = moduleFixture.get<DuffelService>(DuffelService);
+    searchAdapter = moduleFixture.get<DuffelSearchAdapter>(DuffelSearchAdapter);
   });
 
   afterAll(async () => {
@@ -196,8 +195,11 @@ describe('Agent Gateway Polish (E2E)', () => {
       await cacheService.set(cacheKey, JSON.stringify(mockCachedResults), 900);
       // An exhausted budget makes a cache miss fail before any supplier request.
       const now = new Date();
-      const budgetKey = `budget:duffel:${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-      await cacheService.set(budgetKey, '2000');
+      const yyyy = now.getUTCFullYear();
+      const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(now.getUTCDate()).padStart(2, '0');
+      const budgetKey = `budget:duffel:daily:agent:${yyyy}-${mm}-${dd}`;
+      await cacheService.set(budgetKey, '500');
 
       // Make search request
       const res = await request(app.getHttpServer())
@@ -251,18 +253,19 @@ describe('Agent Gateway Polish (E2E)', () => {
         personalized.body.results.map((result: { flightNumber: string }) => result.flightNumber),
       ).toEqual(['NH858', 'VN310']);
       expect(personalized.body.results[0].matchResult).not.toBeNull();
-      expect(await cacheService.get(budgetKey)).toBe('2000');
+      expect(await cacheService.get(budgetKey)).toBe('500');
       expect(JSON.parse((await cacheService.get(cacheKey))!)).toEqual(mockCachedResults);
     });
 
     it('should enforce budget limit and return 429 RATE_LIMIT_EXCEEDED if monthly budget is exceeded', async () => {
       const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const budgetKey = `budget:duffel:${year}-${month}`;
+      const yyyy = now.getUTCFullYear();
+      const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(now.getUTCDate()).padStart(2, '0');
+      const budgetKey = `budget:duffel:daily:agent:${yyyy}-${mm}-${dd}`;
 
-      // Seed budget key with 1200 (which is the limit for agent, so any next increment exceeds it)
-      await cacheService.set(budgetKey, '1200');
+      // Seed budget key with 500 (which is the limit for agent, so any next increment exceeds it)
+      await cacheService.set(budgetKey, '500');
 
       // Make search request
       const res = await request(app.getHttpServer())
@@ -276,9 +279,9 @@ describe('Agent Gateway Polish (E2E)', () => {
     });
 
     it('should return 502 UPSTREAM_UNAVAILABLE on any upstream HTTP or Duffel client error', async () => {
-      // Mock DuffelService.searchFlights to reject/throw an error
+      // Mock DuffelSearchAdapter.searchOffers to reject/throw an error
       const searchSpy = jest
-        .spyOn(duffelService, 'searchFlights')
+        .spyOn(searchAdapter, 'searchOffers')
         .mockRejectedValue(new Error('Duffel API down'));
 
       const res = await request(app.getHttpServer())
@@ -345,11 +348,9 @@ describe('Agent Gateway Polish (E2E)', () => {
         ],
       };
 
-      const searchSpy = jest.spyOn(duffelService, 'searchFlights').mockResolvedValue({
-        offerRequest: rawDuffelResponse as unknown as DuffelOfferRequest,
-        cached: false,
-        searchHash: 'mock-hash',
-      });
+      const searchSpy = jest
+        .spyOn(searchAdapter, 'searchOffers')
+        .mockResolvedValue(rawDuffelResponse);
 
       const res = await request(app.getHttpServer())
         .get('/agent-gateway/flights/search')
@@ -384,12 +385,8 @@ describe('Agent Gateway Polish (E2E)', () => {
     });
 
     it('should create an AuditLog with ACTION = AGENT_TOOL_CALL when flight search succeeds', async () => {
-      const searchSpy = jest.spyOn(duffelService, 'searchFlights').mockResolvedValue({
-        offerRequest: {
-          offers: [],
-        } as unknown as DuffelOfferRequest,
-        cached: false,
-        searchHash: 'mock-hash',
+      const searchSpy = jest.spyOn(searchAdapter, 'searchOffers').mockResolvedValue({
+        offers: [],
       });
 
       await request(app.getHttpServer())
@@ -412,7 +409,7 @@ describe('Agent Gateway Polish (E2E)', () => {
 
     it('should create an AuditLog with ACTION = AGENT_TOOL_CALL when flight search fails', async () => {
       const searchSpy = jest
-        .spyOn(duffelService, 'searchFlights')
+        .spyOn(searchAdapter, 'searchOffers')
         .mockRejectedValue(new Error('Duffel API down'));
 
       await request(app.getHttpServer())

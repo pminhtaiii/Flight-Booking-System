@@ -1,14 +1,19 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '@/prisma/prisma.service';
 
+/**
+ * Legacy Duffel cleanup service.
+ * Note: Midnight @Cron has been relocated to FlightOfferCleanupService in SupplierSearchModule (T020).
+ * This service retains handleCleanup() for explicit callers and E2E test harness backward-compatibility.
+ * In accordance with strict port encapsulation, SupplierSearchModule exports strictly FLIGHT_SEARCH_PORT;
+ * DuffelModule does not import internal services. This file will be decommissioned in T042 (monolith deletion).
+ */
 @Injectable()
 export class DuffelCleanupService {
   private readonly logger = new Logger(DuffelCleanupService.name);
 
   constructor(private readonly prisma: PrismaService) {}
 
-  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   async handleCleanup(): Promise<void> {
     this.logger.log('Starting daily cleanup of expired flight offers and recoveries...');
     try {

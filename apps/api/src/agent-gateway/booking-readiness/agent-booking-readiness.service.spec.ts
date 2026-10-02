@@ -9,6 +9,8 @@ import { AgentToolAuditService } from '../audit/agent-tool-audit.service';
 import { AgentBookingReadinessRequestDto } from '../dto/booking-readiness.dto';
 import { PassengerType } from '@prisma/client';
 import { HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
+import { FlightOfferNormalizer } from '@/supplier/search/flight-offer.normalizer';
+import { FLIGHT_SEARCH_PORT, type FlightOffer } from '@/supplier/search/flight-search.port';
 
 describe('AgentBookingReadinessService', () => {
   let service: AgentBookingReadinessService;
@@ -20,6 +22,11 @@ describe('AgentBookingReadinessService', () => {
   let observability: { recordOutcome: jest.Mock };
   let auditService: { createLog: jest.Mock };
   let agentToolAuditService: { recordToolExecution: jest.Mock };
+  let flightSearchPort: {
+    search: jest.Mock;
+    getOfferById: jest.Mock;
+    normalizeStoredOffer: jest.Mock;
+  };
 
   beforeEach(async () => {
     prismaService = {
@@ -32,6 +39,50 @@ describe('AgentBookingReadinessService', () => {
     agentToolAuditService = {
       recordToolExecution: jest.fn().mockResolvedValue(undefined),
     };
+    flightSearchPort = {
+      search: jest.fn(),
+      getOfferById: jest.fn(),
+      normalizeStoredOffer: jest.fn((rawOffer: unknown) => {
+        const direct = FlightOfferNormalizer.normalizeStoredOffer(rawOffer);
+        if (direct) return direct;
+        if (
+          rawOffer &&
+          typeof rawOffer === 'object' &&
+          Array.isArray((rawOffer as Record<string, unknown>).passengers)
+        ) {
+          const rawPassengers = (rawOffer as Record<string, unknown>).passengers;
+          const passengers = (rawPassengers as Array<Record<string, unknown>>).map((p) => ({
+            supplierPassengerId: typeof p?.id === 'string' ? p.id : '',
+            type: 'ADULT' as const,
+          }));
+          return {
+            id: 'mock-id',
+            supplierOfferId: 'mock-supplier-id',
+            totalAmount: '200.00',
+            price: 200,
+            currency: 'USD',
+            offerExpiresAt: '2030-01-01T00:00:00Z',
+            passengers,
+            airline: 'Test Airline',
+            flightNumber: 'VN100',
+            departureAirport: 'SGN',
+            arrivalAirport: 'HAN',
+            departureTime: '2030-01-01T10:00:00Z',
+            arrivalTime: '2030-01-01T12:00:00Z',
+            duration: 120,
+            stops: 0,
+            fareClass: null,
+            baggageAllowance: null,
+            segments: [],
+            returnSegments: null,
+            conditions: { refundable: false, changeable: false, changeBeforeDeparture: null },
+            matchInput: {} as never,
+            rawSupplierPayload: rawOffer,
+          } as FlightOffer;
+        }
+        return null;
+      }),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -42,6 +93,7 @@ describe('AgentBookingReadinessService', () => {
         { provide: BookingReadinessObservability, useValue: observability },
         { provide: AuditService, useValue: auditService },
         { provide: AgentToolAuditService, useValue: agentToolAuditService },
+        { provide: FLIGHT_SEARCH_PORT, useValue: flightSearchPort },
       ],
     }).compile();
 
@@ -97,9 +149,9 @@ describe('AgentBookingReadinessService', () => {
         rawOffer: {},
       });
       await service.checkBookingReadiness('user-1', dto);
-    } catch (err: any) {
-      expect(err.getStatus()).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
-      expect(err.getResponse()).toMatchObject({ code: 'OFFER_MALFORMED' });
+    } catch (err: unknown) {
+      expect((err as HttpException).getStatus()).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
+      expect((err as HttpException).getResponse()).toMatchObject({ code: 'OFFER_MALFORMED' });
     }
   });
 
@@ -123,9 +175,9 @@ describe('AgentBookingReadinessService', () => {
         rawOffer: { passengers: [{ id: 'offer-p-1' }] },
       });
       await service.checkBookingReadiness('user-1', dto);
-    } catch (err: any) {
-      expect(err.getStatus()).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
-      expect(err.getResponse()).toMatchObject({ code: 'PASSENGER_MAPPING_INVALID' });
+    } catch (err: unknown) {
+      expect((err as HttpException).getStatus()).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
+      expect((err as HttpException).getResponse()).toMatchObject({ code: 'PASSENGER_MAPPING_INVALID' });
     }
   });
 
@@ -379,9 +431,9 @@ describe('AgentBookingReadinessService', () => {
     try {
       prismaService.flightOffer.findUnique.mockRejectedValueOnce(new Error('DB failure'));
       await service.checkBookingReadiness('user-1', dto);
-    } catch (err: any) {
-      expect(err.getStatus()).toBe(500);
-      expect(err.getResponse()).toMatchObject({ code: 'READINESS_REQUEST_FAILED' });
+    } catch (err: unknown) {
+      expect((err as HttpException).getStatus()).toBe(500);
+      expect((err as HttpException).getResponse()).toMatchObject({ code: 'READINESS_REQUEST_FAILED' });
     }
   });
 
@@ -440,7 +492,306 @@ describe('AgentBookingReadinessService', () => {
       { section: 'identity', name: 'familyName', status: 'filled', reason: null },
       { section: 'travel_document', name: 'passportNumber', status: 'missing', reason: 'REQUIRED' },
     ]);
-    expect((result.passengers[0] as any).sections).toBeUndefined();
+    expect((result.passengers[0] as unknown as Record<string, unknown>).sections).toBeUndefined();
     expect(getJsonDepth(result)).toBeLessThanOrEqual(5);
   });
 });
+
+describe('Raw-Reader Replacement Parity (T015)', () => {
+  let service: AgentBookingReadinessService;
+  let prismaService: {
+    flightOffer: { findUnique: jest.Mock };
+  };
+  let profileService: { getProfile: jest.Mock };
+  let bookingReadinessService: { getAdvisoryReadiness: jest.Mock };
+  let observability: { recordOutcome: jest.Mock };
+  let auditService: { createLog: jest.Mock };
+  let agentToolAuditService: { recordToolExecution: jest.Mock };
+
+  beforeEach(async () => {
+    prismaService = {
+      flightOffer: { findUnique: jest.fn() },
+    };
+    profileService = { getProfile: jest.fn() };
+    bookingReadinessService = { getAdvisoryReadiness: jest.fn() };
+    observability = { recordOutcome: jest.fn() };
+    auditService = { createLog: jest.fn() };
+    agentToolAuditService = {
+      recordToolExecution: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const parityFlightSearchPort = {
+      search: jest.fn(),
+      getOfferById: jest.fn(),
+      normalizeStoredOffer: jest.fn((rawOffer: unknown) =>
+        FlightOfferNormalizer.normalizeStoredOffer(rawOffer),
+      ),
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        AgentBookingReadinessService,
+        { provide: PrismaService, useValue: prismaService },
+        { provide: ProfileService, useValue: profileService },
+        { provide: BookingReadinessService, useValue: bookingReadinessService },
+        { provide: BookingReadinessObservability, useValue: observability },
+        { provide: AuditService, useValue: auditService },
+        { provide: AgentToolAuditService, useValue: agentToolAuditService },
+        { provide: FLIGHT_SEARCH_PORT, useValue: parityFlightSearchPort },
+      ],
+    }).compile();
+
+    service = module.get<AgentBookingReadinessService>(AgentBookingReadinessService);
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  type RawOfferShape = {
+    passengers?: Array<{ id?: string }>;
+  };
+
+  function existingReaderPassengerId(
+    rawOffer: unknown,
+    passengerOrdinal: number,
+  ): string | undefined {
+    const candidate = rawOffer as RawOfferShape | null;
+    return candidate?.passengers?.[passengerOrdinal - 1]?.id;
+  }
+
+  function portNormalizedPassengerId(
+    rawOffer: unknown,
+    passengerOrdinal: number,
+  ): string | undefined {
+    const normalized = FlightOfferNormalizer.normalizeStoredOffer(rawOffer);
+    return normalized?.passengers[passengerOrdinal - 1]?.supplierPassengerId;
+  }
+
+  const validSinglePassengerRawOffer: Record<string, unknown> = {
+    id: 'off_single_001',
+    total_amount: '200.00',
+    total_currency: 'USD',
+    expires_at: '2030-10-01T12:00:00Z',
+    passengers: [{ id: 'pas_single_1', type: 'adult' }],
+    slices: [
+      {
+        duration: 'PT2H',
+        segments: [
+          {
+            id: 'seg_1',
+            origin: { iata_code: 'SGN' },
+            destination: { iata_code: 'DAD' },
+            departing_at: '2030-10-15T09:00:00Z',
+            arriving_at: '2030-10-15T11:00:00Z',
+            duration: 'PT2H',
+            marketing_carrier: { iata_code: 'VN', name: 'Vietnam Airlines' },
+            marketing_carrier_flight_number: '123',
+          },
+        ],
+      },
+    ],
+  };
+
+  const validMultiPassengerRawOffer: Record<string, unknown> = {
+    id: 'off_multi_001',
+    total_amount: '600.00',
+    total_currency: 'USD',
+    expires_at: '2030-10-01T12:00:00Z',
+    passengers: [
+      { id: 'pas_multi_1', type: 'adult' },
+      { id: 'pas_multi_2', type: 'adult' },
+      { id: 'pas_multi_3', type: 'child' },
+    ],
+    slices: [
+      {
+        duration: 'PT2H',
+        segments: [
+          {
+            id: 'seg_1',
+            origin: { iata_code: 'SGN' },
+            destination: { iata_code: 'HAN' },
+            departing_at: '2030-10-15T09:00:00Z',
+            arriving_at: '2030-10-15T11:00:00Z',
+            duration: 'PT2H',
+            marketing_carrier: { iata_code: 'VN', name: 'Vietnam Airlines' },
+            marketing_carrier_flight_number: '123',
+          },
+        ],
+      },
+    ],
+  };
+
+  it('characterizes ordinal-to-passenger mapping for single-passenger offers: 100% parity', async () => {
+    const rawId = existingReaderPassengerId(validSinglePassengerRawOffer, 1);
+    const portId = portNormalizedPassengerId(validSinglePassengerRawOffer, 1);
+
+    expect(rawId).toBe('pas_single_1');
+    expect(portId).toBe('pas_single_1');
+    expect(portId).toBe(rawId);
+
+    // Out of bounds ordinal returns undefined for both
+    expect(existingReaderPassengerId(validSinglePassengerRawOffer, 2)).toBeUndefined();
+    expect(portNormalizedPassengerId(validSinglePassengerRawOffer, 2)).toBeUndefined();
+
+    prismaService.flightOffer.findUnique.mockResolvedValueOnce({
+      id: 'offer-single',
+      rawOffer: validSinglePassengerRawOffer,
+    });
+    bookingReadinessService.getAdvisoryReadiness.mockResolvedValueOnce({
+      scope: 'DOMESTIC',
+      ready: true,
+      passengers: [],
+    });
+
+    const dto = new AgentBookingReadinessRequestDto();
+    dto.flightOfferId = 'offer-single';
+    dto.passengers = [
+      { passengerType: PassengerType.ADULT, passengerOrdinal: 1, sourceType: 'inline' },
+    ];
+
+    await service.checkBookingReadiness('user-1', dto);
+
+    expect(bookingReadinessService.getAdvisoryReadiness).toHaveBeenCalledWith(
+      'user-1',
+      expect.objectContaining({
+        flightOfferId: 'offer-single',
+        passengers: [
+          expect.objectContaining({
+            offerPassengerId: portId,
+            passengerType: PassengerType.ADULT,
+          }),
+        ],
+      }),
+      expect.any(Object),
+    );
+  });
+
+  it('characterizes ordinal-to-passenger mapping across multi-passenger offers: 100% parity across ordinals', async () => {
+    const ordinals = [1, 2, 3];
+    for (const ordinal of ordinals) {
+      const rawId = existingReaderPassengerId(validMultiPassengerRawOffer, ordinal);
+      const portId = portNormalizedPassengerId(validMultiPassengerRawOffer, ordinal);
+
+      expect(portId).toBeDefined();
+      expect(portId).toBe(rawId);
+    }
+
+    // Ordinal 4 is out of bounds
+    expect(existingReaderPassengerId(validMultiPassengerRawOffer, 4)).toBeUndefined();
+    expect(portNormalizedPassengerId(validMultiPassengerRawOffer, 4)).toBeUndefined();
+
+    prismaService.flightOffer.findUnique.mockResolvedValueOnce({
+      id: 'offer-multi',
+      rawOffer: validMultiPassengerRawOffer,
+    });
+    bookingReadinessService.getAdvisoryReadiness.mockResolvedValueOnce({
+      scope: 'DOMESTIC',
+      ready: true,
+      passengers: [],
+    });
+
+    const dto = new AgentBookingReadinessRequestDto();
+    dto.flightOfferId = 'offer-multi';
+    dto.passengers = [
+      { passengerType: PassengerType.ADULT, passengerOrdinal: 1, sourceType: 'inline' },
+      { passengerType: PassengerType.ADULT, passengerOrdinal: 2, sourceType: 'inline' },
+      { passengerType: PassengerType.CHILD, passengerOrdinal: 3, sourceType: 'inline' },
+    ];
+
+    await service.checkBookingReadiness('user-1', dto);
+
+    expect(bookingReadinessService.getAdvisoryReadiness).toHaveBeenCalledWith(
+      'user-1',
+      expect.objectContaining({
+        flightOfferId: 'offer-multi',
+        passengers: [
+          expect.objectContaining({ offerPassengerId: 'pas_multi_1' }),
+          expect.objectContaining({ offerPassengerId: 'pas_multi_2' }),
+          expect.objectContaining({ offerPassengerId: 'pas_multi_3' }),
+        ],
+      }),
+      expect.any(Object),
+    );
+  });
+
+  it('characterizes malformed stored offer rejection: normalizeStoredOffer returns null matching the trigger for OFFER_MALFORMED (422)', async () => {
+    const offerMalformedPayloads: readonly unknown[] = [
+      null,
+      undefined,
+      {},
+      { passengers: 'not-an-array' },
+      { passengers: null },
+      { passengers: 123 },
+      { id: 'bad-1', total_amount: '0', total_currency: 'USD', slices: [] },
+      { id: 'bad-2', total_amount: '100', total_currency: '', slices: [] },
+    ];
+
+    for (const malformed of offerMalformedPayloads) {
+      expect(FlightOfferNormalizer.normalizeStoredOffer(malformed)).toBeNull();
+
+      prismaService.flightOffer.findUnique.mockResolvedValueOnce({
+        id: 'offer-malformed',
+        rawOffer: malformed,
+      });
+
+      const dto = new AgentBookingReadinessRequestDto();
+      dto.flightOfferId = 'offer-malformed';
+      dto.passengers = [
+        { passengerType: PassengerType.ADULT, passengerOrdinal: 1, sourceType: 'inline' },
+      ];
+
+      await expect(service.checkBookingReadiness('user-1', dto)).rejects.toThrow(HttpException);
+
+      prismaService.flightOffer.findUnique.mockResolvedValueOnce({
+        id: 'offer-malformed',
+        rawOffer: malformed,
+      });
+
+      try {
+        await service.checkBookingReadiness('user-1', dto);
+        throw new Error('Should have thrown');
+      } catch (err: unknown) {
+        expect(err).toBeInstanceOf(HttpException);
+        const httpErr = err as HttpException;
+        expect(httpErr.getStatus()).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
+        const response = httpErr.getResponse() as Record<string, unknown>;
+        expect(response.code).toBe('OFFER_MALFORMED');
+      }
+    }
+
+    // Additional corrupted payloads with empty/malformed slices or passengers also return null
+    const additionalCorruptedPayloads: readonly unknown[] = [
+      {
+        id: 'bad-3',
+        total_amount: '100',
+        total_currency: 'USD',
+        slices: [{ segments: [] }],
+        passengers: [{ id: 'p1', type: 'adult' }],
+      },
+      {
+        id: 'bad-4',
+        total_amount: '100',
+        total_currency: 'USD',
+        slices: [
+          {
+            segments: [
+              {
+                origin: { iata_code: 'SGN' },
+                destination: { iata_code: 'HNL' },
+                departing_at: 'bad-iso',
+                arriving_at: '2030-08-15T13:00:00Z',
+              },
+            ],
+          },
+        ],
+        passengers: [{ id: 'p1', type: 'adult' }],
+      },
+    ];
+
+    for (const corrupted of additionalCorruptedPayloads) {
+      expect(FlightOfferNormalizer.normalizeStoredOffer(corrupted)).toBeNull();
+    }
+  });
+});
+

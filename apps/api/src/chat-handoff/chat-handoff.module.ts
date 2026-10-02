@@ -7,9 +7,10 @@ import { BookingHandoffController } from './booking-handoff.controller';
 import { AgentAuthModule } from '@/agent-gateway/auth/agent-auth.module';
 import { ChatHandoffTokenService } from './chat-handoff-token.service';
 import { SelectionAttestationService } from '@/agent-gateway/selection-attestation.service';
+import { SupplierSearchModule } from '@/supplier/search/supplier-search.module';
 
 @Module({
-  imports: [PrismaModule, ConfigModule, AgentAuthModule],
+  imports: [PrismaModule, ConfigModule, AgentAuthModule, SupplierSearchModule],
   controllers: [ChatHandoffController, BookingHandoffController],
   providers: [ChatHandoffService, ChatHandoffTokenService, SelectionAttestationService],
   exports: [ChatHandoffService, ChatHandoffTokenService],

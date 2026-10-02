@@ -9,7 +9,8 @@ import request from 'supertest';
 import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
-import { DuffelService } from '@/duffel/duffel.service';
+import { Duffel } from '@duffel/api';
+import { DUFFEL_SDK } from '@/supplier/core/duffel-core.module';
 import { PassengerType, Prisma } from '@prisma/client';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 
@@ -18,7 +19,7 @@ describe('Chat Handoff Concurrency (E2E)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let jwtService: JwtService;
-  let duffelService: DuffelService;
+  let duffel: Duffel;
 
   let userA: { id: string; email: string };
   let tokenA: string;
@@ -43,7 +44,7 @@ describe('Chat Handoff Concurrency (E2E)', () => {
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
     jwtService = moduleFixture.get<JwtService>(JwtService);
-    duffelService = moduleFixture.get<DuffelService>(DuffelService);
+    duffel = moduleFixture.get<Duffel>(DUFFEL_SDK);
   });
 
   afterAll(async () => {
@@ -154,7 +155,7 @@ describe('Chat Handoff Concurrency (E2E)', () => {
 
     let duffelCallCount = 0;
     const duffelSpy = jest
-      .spyOn(duffelService['duffel'].offers, 'get')
+      .spyOn(duffel.offers, 'get')
       .mockImplementation(async () => {
         duffelCallCount++;
         return liveOfferResponse();

@@ -7,6 +7,9 @@ import { PassengerType } from '@prisma/client';
 import { plainToInstance } from 'class-transformer';
 import { ValidationError, validate } from 'class-validator';
 import { BookingIntentController } from './booking-intent.controller';
+import { FlightOfferNormalizer } from '@/supplier/search/flight-offer.normalizer';
+import { FLIGHT_SEARCH_PORT, type FlightSearchPort } from '@/supplier/search/flight-search.port';
+import type { NormalizedOffer } from './booking-readiness.service';
 
 type ReadinessPassengerSource =
   | {
@@ -77,6 +80,7 @@ type ServiceHarness = {
       dto: ReadinessRequest,
       context?: { traceId?: string; correlationId?: string },
     ) => Promise<unknown>;
+    normalizeStoredOffer?: (rawOffer: unknown) => NormalizedOffer;
   };
   mocks: {
     prisma: LooseMock;
@@ -87,6 +91,7 @@ type ServiceHarness = {
     configService: LooseMock;
     duffelService: LooseMock;
     auditService: LooseMock;
+    flightSearchPort: FlightSearchPort;
   };
 };
 
@@ -122,7 +127,7 @@ function createLooseMock(): LooseMock {
 
 function instantiateWithNamedMocks<T>(
   ClassRef: new (...args: unknown[]) => T,
-  namedMocks: Record<string, unknown>,
+  namedMocks: Record<string | symbol, unknown>,
 ): T {
   const constructorParamTypes =
     (Reflect.getMetadata('design:paramtypes', ClassRef) as Array<{ name?: string }>) ?? [];
@@ -131,10 +136,20 @@ function instantiateWithNamedMocks<T>(
     throw new Error(`${ClassRef.name} constructor metadata is unavailable for test instantiation`);
   }
 
-  const constructorArgs = constructorParamTypes.map((paramType) => {
+  const selfParamTypes =
+    (Reflect.getMetadata('self:paramtypes', ClassRef) as Array<{ index: number; param: unknown }> | undefined) ?? [];
+
+  const constructorArgs = constructorParamTypes.map((paramType, index) => {
+    const injectToken = selfParamTypes.find((item) => item?.index === index)?.param;
+    if (injectToken && (injectToken as string | symbol) in namedMocks) {
+      return namedMocks[injectToken as string | symbol];
+    }
     const tokenName = paramType?.name;
     if (tokenName && tokenName in namedMocks) {
       return namedMocks[tokenName];
+    }
+    if (tokenName === 'Object' && (FLIGHT_SEARCH_PORT as symbol) in namedMocks) {
+      return namedMocks[FLIGHT_SEARCH_PORT as symbol];
     }
     return createLooseMock();
   });
@@ -219,6 +234,9 @@ function buildStoredOffer(overrides: Record<string, unknown> = {}): Record<strin
   return {
     id: 'offer-11111111-1111-4111-8111-111111111111',
     rawOffer: {
+      id: 'off_001',
+      total_amount: '450.00',
+      total_currency: 'USD',
       expires_at: '2030-08-10T15:45:00Z',
       passengers: [
         { id: 'pas_001', type: 'adult' },
@@ -226,24 +244,32 @@ function buildStoredOffer(overrides: Record<string, unknown> = {}): Record<strin
       ],
       slices: [
         {
+          duration: 'PT8H30M',
           segments: [
             {
+              id: 'seg_001',
               origin: { iata_code: 'sgn' },
               destination: { iata_code: 'hnl' },
+              departing_at: '2030-08-15T08:00:00Z',
               arriving_at: '2030-08-15T13:00:00Z',
             },
             {
+              id: 'seg_002',
               origin: { iata_code: 'HNL' },
               destination: { iata_code: 'LAX' },
+              departing_at: '2030-08-15T16:00:00Z',
               arriving_at: '2030-08-15T22:30:00Z',
             },
           ],
         },
         {
+          duration: 'PT15H',
           segments: [
             {
+              id: 'seg_003',
               origin: { iata_code: 'LAX' },
               destination: { iata_code: 'SGN' },
+              departing_at: '2030-08-20T01:00:00Z',
               arriving_at: '2030-08-20T05:45:00Z',
             },
           ],
@@ -311,6 +337,13 @@ function createServiceHarness(): ServiceHarness {
   const configService = createLooseMock();
   const duffelService = createLooseMock();
   const auditService = createLooseMock();
+  const flightSearchPort = {
+    search: jest.fn(),
+    getOfferById: jest.fn(),
+    normalizeStoredOffer: jest.fn((rawOffer: unknown) =>
+      FlightOfferNormalizer.normalizeStoredOffer(rawOffer),
+    ),
+  };
 
   configService.get.mockImplementation((key: string) => {
     if (key === 'FEATURE_FLAG_BOOKING_READINESS') {
@@ -328,6 +361,8 @@ function createServiceHarness(): ServiceHarness {
     ConfigService: configService,
     DuffelService: duffelService,
     AuditService: auditService,
+    FlightSearchPort: flightSearchPort,
+    [FLIGHT_SEARCH_PORT as symbol]: flightSearchPort,
   });
 
   if (typeof service.getAdvisoryReadiness !== 'function') {
@@ -345,6 +380,7 @@ function createServiceHarness(): ServiceHarness {
       configService,
       duffelService,
       auditService,
+      flightSearchPort: flightSearchPort as unknown as FlightSearchPort,
     },
   };
 }
@@ -908,13 +944,13 @@ describe('BookingReadinessService RED slice', () => {
 
   it('maps stored offer expiry from local raw offer metadata to 409 OFFER_EXPIRED without writes or supplier calls', async () => {
     const { service, mocks } = createServiceHarness();
+    const baseStored = buildStoredOffer();
     mocks.prisma.flightOffer = {
       findUnique: jest.fn().mockResolvedValue(
         buildStoredOffer({
           rawOffer: {
+            ...(baseStored.rawOffer as Record<string, unknown>),
             expires_at: '2026-08-02T12:00:00Z',
-            passengers: [{ id: 'pas_001', type: 'adult' }],
-            slices: [{ segments: [] }],
           },
         }),
       ),
@@ -1086,3 +1122,295 @@ describe('BookingIntentController advisory readiness RED slice', () => {
     expect(response.removeHeader).toHaveBeenCalledWith('ETag');
   });
 });
+
+describe('Raw-Reader Replacement Parity (T015)', () => {
+  const canonicalStoredOffer: Record<string, unknown> = {
+    id: 'off_canonical_001',
+    total_amount: '450.00',
+    total_currency: 'USD',
+    expires_at: '2030-08-10T15:45:00Z',
+    passengers: [
+      { id: 'pas_001', type: 'adult' },
+      { id: 'pas_002', type: 'child' },
+      { id: 'pas_003', type: 'infant' },
+    ],
+    slices: [
+      {
+        duration: 'PT8H30M',
+        segments: [
+          {
+            id: 'seg_001',
+            origin: { iata_code: 'SGN' },
+            destination: { iata_code: 'HNL' },
+            departing_at: '2030-08-15T08:00:00Z',
+            arriving_at: '2030-08-15T13:00:00Z',
+            duration: 'PT5H',
+            marketing_carrier: { iata_code: 'VN', name: 'Vietnam Airlines' },
+            marketing_carrier_flight_number: '123',
+          },
+          {
+            id: 'seg_002',
+            origin: { iata_code: 'HNL' },
+            destination: { iata_code: 'LAX' },
+            departing_at: '2030-08-15T16:00:00Z',
+            arriving_at: '2030-08-15T22:30:00Z',
+            duration: 'PT3H30M',
+            marketing_carrier: { iata_code: 'VN', name: 'Vietnam Airlines' },
+            marketing_carrier_flight_number: '456',
+          },
+        ],
+      },
+      {
+        duration: 'PT15H',
+        segments: [
+          {
+            id: 'seg_003',
+            origin: { iata_code: 'LAX' },
+            destination: { iata_code: 'SGN' },
+            departing_at: '2030-08-20T01:00:00Z',
+            arriving_at: '2030-08-20T16:00:00Z',
+            duration: 'PT15H',
+            marketing_carrier: { iata_code: 'VN', name: 'Vietnam Airlines' },
+            marketing_carrier_flight_number: '789',
+          },
+        ],
+      },
+    ],
+  };
+
+  it('characterizes passenger extraction: port normalization matches existing reader 100%', () => {
+    const { service } = createServiceHarness();
+    expect(service.normalizeStoredOffer).toBeDefined();
+
+    const existingNormalized = service.normalizeStoredOffer!(canonicalStoredOffer);
+    const normalizedPortOffer = FlightOfferNormalizer.normalizeStoredOffer(canonicalStoredOffer);
+
+    expect(normalizedPortOffer).not.toBeNull();
+    const portPassengers = normalizedPortOffer!.passengers.map((p) => ({
+      id: p.supplierPassengerId,
+      type: p.type as PassengerType,
+    }));
+
+    expect(portPassengers).toEqual(existingNormalized.passengers);
+    expect(portPassengers).toEqual([
+      { id: 'pas_001', type: PassengerType.ADULT },
+      { id: 'pas_002', type: PassengerType.CHILD },
+      { id: 'pas_003', type: PassengerType.INFANT },
+    ]);
+  });
+
+  it('characterizes segment extraction and trip completion: port normalization matches existing reader 100%', () => {
+    const { service } = createServiceHarness();
+
+    const existingNormalized = service.normalizeStoredOffer!(canonicalStoredOffer);
+    const normalizedPortOffer = FlightOfferNormalizer.normalizeStoredOffer(canonicalStoredOffer);
+
+    expect(normalizedPortOffer).not.toBeNull();
+    const allPortSegments = [
+      ...normalizedPortOffer!.segments,
+      ...(normalizedPortOffer!.returnSegments ?? []),
+    ];
+
+    const portSegments = allPortSegments.map((s) => ({
+      originCountryCode: s.departureAirport,
+      destinationCountryCode: s.arrivalAirport,
+      arrivalDate: s.arrivalTime.slice(0, 10),
+    }));
+
+    const portTripCompletionDate = portSegments.reduce<string | null>(
+      (latest, segment) =>
+        latest === null || segment.arrivalDate > latest ? segment.arrivalDate : latest,
+      null,
+    );
+
+    const portAirportCodes = [
+      ...new Set(allPortSegments.flatMap((s) => [s.departureAirport, s.arrivalAirport])),
+    ];
+
+    expect(portSegments).toEqual(existingNormalized.segments);
+    expect(portTripCompletionDate).toBe(existingNormalized.tripCompletionDate);
+    expect(portTripCompletionDate).toBe('2030-08-20');
+    expect(portAirportCodes.sort()).toEqual(existingNormalized.airportCodes.sort());
+  });
+
+  it('characterizes evaluation input parity when consuming normalized offer fields', async () => {
+    const { service, mocks } = createServiceHarness();
+    const normalizedPortOffer = FlightOfferNormalizer.normalizeStoredOffer(canonicalStoredOffer);
+    expect(normalizedPortOffer).not.toBeNull();
+
+    mocks.prisma.flightOffer = {
+      findUnique: jest.fn().mockResolvedValue({
+        id: 'offer-1',
+        rawOffer: canonicalStoredOffer,
+      }),
+    } as unknown as jest.Mock;
+    mocks.profileService.getProfile.mockResolvedValue(buildOwnedProfile());
+    mocks.airportsService.findCountriesByIataCodes.mockResolvedValue(
+      new Map([
+        ['SGN', 'VN'],
+        ['HNL', 'US'],
+        ['LAX', 'US'],
+      ]),
+    );
+    mocks.evaluator.evaluate.mockReturnValue(createSuccessReadinessResult(3));
+
+    const request: ReadinessRequest = {
+      flightOfferId: 'offer-1',
+      passengers: [
+        {
+          offerPassengerId: 'pas_001',
+          passengerType: PassengerType.ADULT,
+          source: { type: 'traveler_profile', travelerProfileId: 'profile-owned' },
+        },
+        {
+          offerPassengerId: 'pas_002',
+          passengerType: PassengerType.CHILD,
+          source: { type: 'inline', givenName: 'Child', familyName: 'Traveler' },
+        },
+        {
+          offerPassengerId: 'pas_003',
+          passengerType: PassengerType.INFANT,
+          source: { type: 'inline', givenName: 'Infant', familyName: 'Traveler' },
+        },
+      ],
+    };
+
+    await service.getAdvisoryReadiness('user-1', request);
+
+    expect(mocks.evaluator.evaluate).toHaveBeenCalledTimes(1);
+    const evaluationInput = mocks.evaluator.evaluate.mock.calls[0][0] as {
+      tripCompletionDate: string;
+      segments: Array<{
+        originCountryCode: string | null;
+        destinationCountryCode: string | null;
+        arrivalDate: string;
+      }>;
+      passengers: Array<{ passengerType: PassengerType; passengerOrdinal: number }>;
+    };
+
+    const allPortSegments = [
+      ...normalizedPortOffer!.segments,
+      ...(normalizedPortOffer!.returnSegments ?? []),
+    ];
+    const portTripCompletionDate = allPortSegments.reduce<string | null>((latest, segment) => {
+      const arrivalDate = segment.arrivalTime.slice(0, 10);
+      return latest === null || arrivalDate > latest ? arrivalDate : latest;
+    }, null);
+
+    expect(evaluationInput.tripCompletionDate).toBe(portTripCompletionDate);
+    expect(evaluationInput.passengers.length).toBe(3);
+    expect(evaluationInput.passengers[0].passengerOrdinal).toBe(1);
+    expect(evaluationInput.passengers[1].passengerOrdinal).toBe(2);
+    expect(evaluationInput.passengers[2].passengerOrdinal).toBe(3);
+  });
+
+  it('characterizes malformed stored offer rejection: normalizeStoredOffer returns null matching the error path', async () => {
+    const { service, mocks } = createServiceHarness();
+
+    const legacyMalformedPayloads: readonly unknown[] = [
+      null,
+      undefined,
+      {},
+      { slices: [], passengers: [] },
+      {
+        slices: [{ segments: [] }],
+        passengers: [{ id: 'p1', type: 'adult' }],
+      },
+      {
+        slices: [
+          {
+            segments: [
+              {
+                origin: { iata_code: 'SGN' },
+                destination: { iata_code: 'HNL' },
+                arriving_at: 'not-a-valid-date',
+              },
+            ],
+          },
+        ],
+        passengers: [{ id: 'p1', type: 'adult' }],
+      },
+      {
+        slices: [
+          {
+            segments: [
+              {
+                origin: { iata_code: 'SGN' },
+                destination: { iata_code: 'HNL' },
+                arriving_at: '2030-08-15T13:00:00Z',
+              },
+            ],
+          },
+        ],
+        passengers: [{ id: 'p1', type: 'unknown_type' }],
+      },
+      {
+        slices: [
+          {
+            segments: [
+              {
+                origin: { iata_code: 'SGN' },
+                destination: { iata_code: 'HNL' },
+                arriving_at: '2030-08-15T13:00:00Z',
+              },
+            ],
+          },
+        ],
+        passengers: [],
+      },
+    ];
+
+    for (const corrupted of legacyMalformedPayloads) {
+      expect(FlightOfferNormalizer.normalizeStoredOffer(corrupted)).toBeNull();
+
+      expect(() => service.normalizeStoredOffer!(corrupted)).toThrow();
+
+      mocks.prisma.flightOffer = {
+        findUnique: jest.fn().mockResolvedValue({ id: 'bad-offer', rawOffer: corrupted }),
+      } as unknown as jest.Mock;
+
+      const dummyRequest: ReadinessRequest = {
+        flightOfferId: 'bad-offer',
+        passengers: [
+          {
+            offerPassengerId: 'p1',
+            passengerType: PassengerType.ADULT,
+            source: { type: 'inline', givenName: 'Test' },
+          },
+        ],
+      };
+
+      await expect(service.getAdvisoryReadiness('user-1', dummyRequest)).rejects.toThrow();
+    }
+
+    const supplierCorruptedPayloads: readonly unknown[] = [
+      { id: '' },
+      { id: 'off_bad_1', total_amount: '0', total_currency: 'USD', slices: [] },
+      { id: 'off_bad_2', total_amount: '-50', total_currency: 'USD', slices: [] },
+      { id: 'off_bad_3', total_amount: '100', total_currency: '', slices: [] },
+      {
+        id: 'off_bad_4',
+        total_amount: '100',
+        total_currency: 'USD',
+        slices: [
+          {
+            segments: [
+              {
+                origin: { iata_code: 'SGN' },
+                destination: { iata_code: 'HNL' },
+                departing_at: 'not-an-iso-date',
+                arriving_at: '2030-08-15T13:00:00Z',
+              },
+            ],
+          },
+        ],
+        passengers: [{ id: 'p1', type: 'adult' }],
+      },
+    ];
+
+    for (const corrupted of supplierCorruptedPayloads) {
+      expect(FlightOfferNormalizer.normalizeStoredOffer(corrupted)).toBeNull();
+    }
+  });
+});
+

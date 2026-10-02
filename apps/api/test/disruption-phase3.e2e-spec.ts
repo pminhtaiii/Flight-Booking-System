@@ -6,7 +6,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
-import { DuffelService } from '@/duffel/duffel.service';
+import { DuffelRecoveryService } from '@/supplier/order/duffel-recovery.service';
 import { SupplierSyncService } from '@/disruption/sync/supplier-sync.service';
 import { DisruptionStatus, Prisma } from '@prisma/client';
 import * as crypto from 'crypto';
@@ -15,7 +15,7 @@ describe('Disruption Phase 3 (Sync & Concurrency E2E)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let supplierSyncService: SupplierSyncService;
-  let mockDuffelService: any;
+  let mockDuffelRecoveryService: { retrieveCompleteOrder: jest.Mock };
 
   let userId: string;
   let bookingIntentId: string;
@@ -23,15 +23,15 @@ describe('Disruption Phase 3 (Sync & Concurrency E2E)', () => {
   let suffix: string;
 
   beforeAll(async () => {
-    mockDuffelService = {
+    mockDuffelRecoveryService = {
       retrieveCompleteOrder: jest.fn(),
     };
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
-      .overrideProvider(DuffelService)
-      .useValue(mockDuffelService)
+      .overrideProvider(DuffelRecoveryService)
+      .useValue(mockDuffelRecoveryService)
       .compile();
 
     app = moduleFixture.createNestApplication();
@@ -142,7 +142,7 @@ describe('Disruption Phase 3 (Sync & Concurrency E2E)', () => {
 
   it('should run a complete material sync and create outbox/audit/revision rows end-to-end', async () => {
     // 3 hours later move (material)
-    mockDuffelService.retrieveCompleteOrder.mockResolvedValue({
+    mockDuffelRecoveryService.retrieveCompleteOrder.mockResolvedValue({
       id: `ord_fake_${suffix}`,
       slices: [
         {
