@@ -64,7 +64,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isDuffelCancellationConfirmed(response: unknown): boolean {
-  if (!isRecord(response)) return true;
+  if (!isRecord(response)) return false;
   if (response.success === false) return false;
   if (!Object.prototype.hasOwnProperty.call(response, 'status')) return true;
   if (typeof response.status !== 'string') return false;
@@ -353,7 +353,7 @@ export class BookingRecoveryService {
               } catch (cancelError: unknown) {
                 const err =
                   cancelError instanceof Error ? cancelError : new Error(String(cancelError));
-                if (/already_cancelled|already cancelled|cannot be cancelled/i.test(err.message)) {
+                if (/already[_ ]cancelled/i.test(err.message)) {
                   this.logger.log(
                     `Orphaned Duffel order ${duffelOrder.id} already cancelled: ${err.message}. Treating as idempotent success.`,
                   );

@@ -357,12 +357,21 @@ export class DuffelFulfillmentAdapter implements FulfillmentGatewayPort {
     try {
       await control.beforeInvoke();
 
-      await this.duffelService.cancelOrder(orderId);
+      const cancellation = asRecord(await this.duffelService.cancelOrder(orderId));
+      const status = cancellation ? readString(cancellation, 'status') : undefined;
+      const hasStatus =
+        cancellation !== null && Object.prototype.hasOwnProperty.call(cancellation, 'status');
+      const confirmed =
+        cancellation !== null &&
+        cancellation.success !== false &&
+        (!hasStatus ||
+          (status !== undefined &&
+            ['confirmed', 'cancelled', 'canceled'].includes(status.toLowerCase())));
 
       return {
-        success: true,
+        success: confirmed,
         orderId,
-        status: 'CANCELLED',
+        status: confirmed ? 'CANCELLED' : status,
       };
     } finally {
       release();

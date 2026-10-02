@@ -327,6 +327,48 @@ describe('DuffelFulfillmentAdapter', () => {
       expect(adapter.semaphore.activeCount).toBe(0);
     });
 
+    // Human approval 2026-10-02: use direct mock assignment in these new cases without changing behavioral expectations.
+    it('normalizes Duffel confirmed cancellation response to the port contract', async () => {
+      mockDuffelService.cancelOrder = jest.fn().mockResolvedValue({
+        id: 'cancel_123',
+        status: 'confirmed',
+      });
+
+      await expect(adapter.cancelOrder('ord_123', mockControl)).resolves.toEqual({
+        success: true,
+        orderId: 'ord_123',
+        status: 'CANCELLED',
+      });
+    });
+
+    it('preserves status-less Duffel object compatibility', async () => {
+      mockDuffelService.cancelOrder = jest.fn().mockResolvedValue({ id: 'cancel_123' });
+
+      await expect(adapter.cancelOrder('ord_123', mockControl)).resolves.toEqual({
+        success: true,
+        orderId: 'ord_123',
+        status: 'CANCELLED',
+      });
+    });
+
+    it.each([
+      { name: 'pending', result: { id: 'cancel_123', status: 'pending' }, status: 'pending' },
+      {
+        name: 'explicitly negative',
+        result: { success: false, status: 'CANCELLED' },
+        status: 'CANCELLED',
+      },
+      { name: 'invalid', result: null, status: undefined },
+    ])('returns an unconfirmed outcome for a $name Duffel result', async ({ result, status }) => {
+      mockDuffelService.cancelOrder = jest.fn().mockResolvedValue(result);
+
+      const outcome = await adapter.cancelOrder('ord_123', mockControl);
+
+      expect(outcome.success).toBe(false);
+      expect(outcome.orderId).toBe('ord_123');
+      expect(outcome.status).toBe(status);
+    });
+
     it('releases permit and never calls DuffelService if beforeInvoke fails', async () => {
       mockControl.beforeInvoke = jest.fn().mockRejectedValue(new Error('Pre-flight lock failed'));
 
