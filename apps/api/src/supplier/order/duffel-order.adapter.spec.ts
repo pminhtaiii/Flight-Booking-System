@@ -1,4 +1,5 @@
 import { CacheService } from '@/cache/cache.service';
+import { DuffelError } from '@duffel/api';
 import { DuffelService } from '@/duffel/duffel.service';
 import { DuffelRateBudgetService } from '@/supplier/core/duffel-rate-budget.service';
 import type { BudgetReservationResult } from '@/supplier/core/duffel-rate-budget.service';
@@ -536,5 +537,48 @@ describe('DuffelOrderAdapter', () => {
 
     expect(reserveAttempt).toHaveBeenCalledTimes(2);
     expect(getOrder).not.toHaveBeenCalled();
+  });
+
+  it('returns generic errors for cancellation confirmation and order retrieval failures', async () => {
+    const privateProviderMessage = 'Private Duffel provider response details';
+    const sdkError = new DuffelError({
+      meta: { request_id: 'req_private', status: 502 },
+      errors: [
+        {
+          code: 'private_provider_error',
+          documentation_url: 'https://duffel.com/docs/api/overview/errors',
+          message: privateProviderMessage,
+          title: 'Private provider failure',
+          type: 'invalid_request_error',
+        },
+      ],
+      headers: Object.assign(new Headers(), { raw: () => ({}) }),
+    });
+    sdkError.message = privateProviderMessage;
+    reserveAttempt.mockResolvedValue({ ok: true });
+    confirmCancellation.mockRejectedValue(sdkError);
+    getOrder.mockRejectedValue(sdkError);
+
+    await expect(adapter.confirmCancellationQuote('oc_private')).rejects.toMatchObject({
+      status: 502,
+      response: {
+        code: 'UPSTREAM_CANCELLATION_CONFIRM_FAILED',
+        message: 'Failed to confirm Duffel cancellation quote',
+      },
+    });
+    await expect(adapter.retrieveOrder('ord_private')).rejects.toMatchObject({
+      status: 502,
+      response: {
+        code: 'UPSTREAM_ORDER_RETRIEVAL_FAILED',
+        message: 'Failed to retrieve Duffel order',
+      },
+    });
+    await expect(adapter.retrieveCompleteOrder('ord_private')).rejects.toMatchObject({
+      status: 502,
+      response: {
+        code: 'UPSTREAM_ORDER_RETRIEVAL_FAILED',
+        message: 'Failed to retrieve Duffel order',
+      },
+    });
   });
 });

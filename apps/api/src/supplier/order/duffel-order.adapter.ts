@@ -258,7 +258,7 @@ export class DuffelOrderAdapter {
       throw new HttpException(
         {
           code,
-          message: error instanceof Error ? error.message : fallbackMessage,
+          message: fallbackMessage,
         },
         HttpStatus.BAD_GATEWAY,
       );
