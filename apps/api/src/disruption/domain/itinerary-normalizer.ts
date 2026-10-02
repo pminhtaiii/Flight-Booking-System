@@ -1,5 +1,5 @@
-import { FlightSegmentSnapshot } from '@shared/booking-types';
-import { DuffelOrder, DuffelPlace } from '../../duffel/duffel.types';
+import type { FlightSegmentSnapshot } from '@shared/booking-types';
+import { normalizeDuffelOrder as normalizeOrder } from '@/supplier/order/order-snapshot.normalizer';
 
 export interface NormalizedSegment {
   sliceOrder: number;
@@ -41,60 +41,9 @@ function extractLocalDate(dateTimeStr: string): string {
   return dateTimeStr.split('T')[0];
 }
 
-export function normalizeDuffelOrder(order: DuffelOrder): NormalizedSegment[] {
-  const result: NormalizedSegment[] = [];
-  if (!order || !order.slices || !Array.isArray(order.slices)) {
-    return result;
-  }
-  let globalOrder = 0;
-  for (let sliceOrder = 0; sliceOrder < order.slices.length; sliceOrder++) {
-    const slice = order.slices[sliceOrder];
-    if (!slice || !slice.segments || !Array.isArray(slice.segments)) {
-      continue;
-    }
-    for (let segmentOrder = 0; segmentOrder < slice.segments.length; segmentOrder++) {
-      const seg = slice.segments[segmentOrder];
-      if (!seg) continue;
-
-      const operatingIata =
-        seg.operating_carrier?.iata_code || seg.marketing_carrier?.iata_code || 'XX';
-      const marketingIata = seg.marketing_carrier?.iata_code || 'XX';
-      const airlineName = seg.operating_carrier?.name || seg.marketing_carrier?.name || 'Unknown';
-      const flightNum = seg.marketing_carrier_flight_number || '0000';
-
-      const origin = seg.origin as DuffelPlace & { city_name?: string; city?: { name?: string } };
-      const destination = seg.destination as DuffelPlace & {
-        city_name?: string;
-        city?: { name?: string };
-      };
-
-      result.push({
-        sliceOrder,
-        segmentOrder,
-        globalOrder: globalOrder++,
-        duffelSegmentId: seg.id || null,
-        marketingCarrierIata: marketingIata,
-        operatingCarrierIata: operatingIata,
-        airlineName,
-        flightNumber: flightNum,
-        departureAirportIata: seg.origin?.iata_code || '',
-        departureAirportName: seg.origin?.name || '',
-        departureCity: origin?.city_name || origin?.city?.name || origin?.name || '',
-        departureTerminal: seg.origin_terminal || null,
-        departureAt: seg.departing_at,
-        departureLocalDate: extractLocalDate(seg.departing_at),
-        arrivalAirportIata: seg.destination?.iata_code || '',
-        arrivalAirportName: seg.destination?.name || '',
-        arrivalCity: destination?.city_name || destination?.city?.name || destination?.name || '',
-        arrivalTerminal: seg.destination_terminal || null,
-        arrivalAt: seg.arriving_at,
-        arrivalLocalDate: extractLocalDate(seg.arriving_at),
-        durationMinutes: parseIsoDurationToMinutes(seg.duration),
-        aircraftType: seg.aircraft?.name || null,
-      });
-    }
-  }
-  return result;
+/** @deprecated Use OrderSnapshotNormalizer from the supplier order capability. */
+export function normalizeDuffelOrder(order: unknown): NormalizedSegment[] {
+  return normalizeOrder(order);
 }
 
 export function normalizeFlightSegments(segments: FlightSegmentSnapshot[]): NormalizedSegment[] {

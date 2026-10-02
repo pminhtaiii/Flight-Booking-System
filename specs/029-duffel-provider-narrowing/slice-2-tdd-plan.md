@@ -105,6 +105,6 @@ pnpm --filter @api/backend lint
 
 ## Slice gates
 
-Run order checkpoint from quickstart, API/shared lint, shared tests, API typecheck, network-guard full API test suite, static CI contract, and focused E2E. Assess convergence only for T035–T037, leaving later tasks pending. Final code-review compares baseline...HEAD with separate Standards and Spec agents. Resolve blocking findings, update active-feature/progress/architecture with actual results, commit documentation, push existing feature branch/PR, and use ci-feedback-loop to verify HEAD. Never claim remote CI passed without success evidence.
+Run order checkpoint from quickstart, API/shared lint, shared tests, API typecheck, network-guard full API test suite, static CI contract, and focused E2E. Assess convergence only for T035–T037, leaving later tasks pending. Final code-review compares baseline...HEAD with separate Standards and Spec agents. Resolve blocking findings, update active-feature/progress/architecture with actual results, and commit documentation. User clarification on 2026-10-02: the previous PR was closed; pushing and remote CI are authorized. Inspect the workflow triggers and open a fresh slice PR if required for CI; do not merge.
 
 Self-review: all three tasks mapped to exact files, interfaces and executable checks; behavior tests precede implementation; no placeholders or new framework; existing task IDs/order unchanged.
