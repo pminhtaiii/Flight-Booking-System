@@ -157,54 +157,20 @@ async createOrder(flightOffer: FlightOffer, travelers: Traveler[]): Promise<Orde
 
 ## Duffel API (@duffel/api)
 
-### Service Setup & Provider Override
+### Supplier Setup & Provider Override
 
-```typescript
-// src/duffel/duffel.service.ts
-import { Duffel } from '@duffel/api';
-import { Injectable, Logger } from '@nestjs/common';
-import { CacheService } from '@/cache/cache.service';
-
-@Injectable()
-export class DuffelService {
-  private readonly logger = new Logger(DuffelService.name);
-  private readonly duffel: Duffel;
-  private readonly basePath: string;
-
-  constructor(private readonly cacheService: CacheService) {
-    const token = process.env.DUFFEL_ACCESS_TOKEN || '';
-    const rawApiUrl = process.env.DUFFEL_API_URL;
-
-    if (rawApiUrl && rawApiUrl.trim() !== '') {
-      const parsed = new URL(rawApiUrl.trim());
-      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-        throw new Error(
-          `Unsupported DUFFEL_API_URL protocol: ${parsed.protocol}. Only http: and https: are allowed.`,
-        );
-      }
-      this.basePath = `${parsed.origin}${parsed.pathname === '/' ? '' : parsed.pathname}`.replace(
-        /\/+$/,
-        '',
-      );
-    } else {
-      this.basePath = 'https://api.duffel.com';
-    }
-
-    this.duffel = new Duffel({
-      token,
-      basePath: this.basePath,
-    });
-  }
-}
-```
+`DuffelCoreModule` owns the configured SDK singleton. The factory in `apps/api/src/supplier/core/duffel-sdk.provider.ts` validates `DUFFEL_ACCESS_TOKEN` and `DUFFEL_API_URL`, then supplies `DUFFEL_SDK` and `DUFFEL_SDK_CONFIGURATION` to supplier adapters. New capability code uses constructor injection rather than constructing SDK clients in feature services. The legacy `DuffelService` remains during consumer migration and is scheduled for deletion in T042.
 
 **Rules:**
 
 - Default endpoint is `https://api.duffel.com` when `DUFFEL_API_URL` is absent or empty.
 - Providing `DUFFEL_API_URL` overrides the SDK endpoint by passing `basePath` to `new Duffel({ token, basePath })`.
-- Constructor performs fast-fail validation using `new URL(rawApiUrl)` and restricts protocol to `http:` or `https:`. Malformed URLs or unsupported protocols fail fast immediately.
-- Trailing slashes are normalized cleanly, and manual fetch calls in `createOrder` prepend `this.basePath`.
+- The configuration factory validates the token and uses `new URL(rawApiUrl)` with protocols restricted to `http:` or `https:`; invalid configuration fails startup.
+- Trailing slashes are normalized cleanly; manual order requests use the injected configuration's `basePath`.
 - Fully compatible with `mock-server.mjs` on loopback for zero-dependency CI smoke suites.
+- `DuffelRateBudgetService` reserves every actual remote attempt against the atomic daily total; cache hits are free. Supplier adapters own admission and error mapping.
+- Order capability services remain concrete: cancellation and recovery inject `DuffelOrderAdapter`; recovery also injects `OrderSnapshotNormalizer`. They neither expose SDK payload parsing to feature consumers nor introduce generic cancellation/recovery ports. Production order-module binding is T038.
+- Cancellation replay succeeds only after explicit cancelled-order evidence. Unconfirmed or failed reconciliation retains failure; typed budget denial starts no reconciliation. Recovery preserves partial snapshot defaults and uses one complete-order retrieval before local normalization.
 
 ---
 
