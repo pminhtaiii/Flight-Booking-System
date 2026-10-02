@@ -11,10 +11,10 @@ Do not mark a capability complete because it appears in architecture or planning
 Overall status:
 
 ```text
-FEATURES 001–028 100% COMPLETE / FEATURE 029 PHASES 0–3 COMPLETE / PHASE 4 US2 COMPLETE LOCALLY (T025–T031) / PHASES 5–8 PENDING
+FEATURES 001–028 100% COMPLETE / FEATURE 029 PHASES 0–3 COMPLETE / PHASE 4 US2 COMPLETE LOCALLY (T025–T031) / PHASE 5 STARTED (T032–T034 COMPLETE; T035–T043 PENDING) / PHASES 6–8 PENDING
 ```
 
-The system operates on branch `codex/029-duffel-provider-narrowing`. Features 001–028 are verified and complete. In Feature 029, Phase 0 (research/ADR), Phase 1 (baseline locks), Phase 2 (core SDK provider & atomic Redis rate budget), and Phase 3 (`FLIGHT_SEARCH_PORT` extraction, normalizer, and consumer rewiring across Flights, BookingIntent, Readiness, and ChatHandoff) are fully implemented and verified (US1 complete). Phase 4 (T025–T031), including `DuffelAncillaryService`, `SupplierAncillaryModule`, consumer rewiring, its focused test/typecheck checkpoint, and post-T030 network-guard API suite (127 suites, 2,312 tests), is complete locally. Order capability isolation (Phase 5), monolith deletion (Phase 6), neutral schema migration (Phase 7), and final audit (Phase 8) remain pending.
+The system operates on branch `codex/029-duffel-provider-narrowing`. Features 001–028 are verified and complete. In Feature 029, Phases 0–3 are fully implemented and verified; Phase 4 (T025–T031), including `DuffelAncillaryService`, `SupplierAncillaryModule`, consumer rewiring, its focused test/typecheck checkpoint, and post-T030 network-guard API suite (127 suites, 2,312 tests), is complete locally. Phase 5 has started: T032–T034 are complete, including T033 code review GO, zero-gap scoped convergence, and the full local API gate. T035–T043 remain pending, including order consumer rewiring. Legacy monolith deletion and Phases 7–8 remain pending; final dual review and remote CI are tracked in the PR.
 
 ---
 

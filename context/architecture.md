@@ -117,6 +117,7 @@ The core flight domain remains strictly vendor-blind. External travel suppliers 
 
 - `SupplierSearchModule` exports solely the `FLIGHT_SEARCH_PORT` injection token (`FlightSearchPort`). Domain consumers (`FlightsService`, `BookingIntentService`, `BookingReadinessService`) consume normalized `FlightOffer` objects.
 - `SupplierAncillaryModule` encapsulates supplier-specific catalog ingestion, seat map availability, and repricing behind `DuffelAncillaryService`.
+- Order calls still flow through the existing `FULFILLMENT_GATEWAY_PORT` binding. T034 adds the reviewed `DuffelOrderAdapter` for metered manual order POST, quote, confirmation, cancellation, and order retrieval operations, using shared configuration from the core provider. Consumer rewiring remains pending.
 - `DuffelCoreModule` isolates the `@duffel/api` SDK singleton (`DUFFEL_SDK`) and config validation. No raw supplier types or SDK instances leak into domain modules.
 
 ```text
@@ -257,7 +258,7 @@ The backend functions as an anti-cyclic modular monolith where all domain intera
 - **`SupplierAncillaryModule`**: Houses `DuffelAncillaryAdapter`, `AncillaryNormalizer`, and `DuffelAncillaryService`. Provides concurrent seat map and ancillary catalog retrieval with a strict 4,500 ms deadline. Safely translates missing seat maps (`meta.status=404`) into empty maps while preserving baggage, aggregates duplicate seat/baggage quantities, and enforces supplier-authoritative repricing totals.
 - **`DuffelCoreModule`**: Hosts the verified `@duffel/api` SDK singleton (`DUFFEL_SDK`), validates URL protocol and environment variables, and exports `DuffelRateBudgetService` for global quota governance.
 - **`AgentGatewayModule`**: Decomposed into capability-local submodules (`AttestedFlightSearchModule`, `AgentBookingReadinessModule`, `SafeBookingReadModule`, `TravelerPreferencesModule`). Authenticates agent requests via `AGENT_SERVICE_API_KEY` and short-lived user-bound HMAC claim tokens. Direct database access from agents is strictly prohibited.
-- **Booking Lifecycle & Projections**: `BookingStateModule` isolates database transitions; `BookingLifecycleModule` manages recovery workflows; `PaymentFulfillmentSaga` drives asynchronous supplier confirmation; `BookingProjectionModule` writes denormalized read-models (`BookingAgentProjection`) asynchronously via `booking.**` domain events.
+- **Booking Lifecycle & Projections**: `BookingStateModule` isolates database transitions; `BookingLifecycleModule` manages recovery workflows; `PaymentFulfillmentSaga` drives asynchronous supplier confirmation; `BookingProjectionModule` writes denormalized read-models (`BookingAgentProjection`) asynchronously via `booking.**` domain events. Cancellation maps pending, negative, and invalid supplier outcomes to `false`, preserving the processing booking, authorized hold, and order evidence. Recovery rejects non-record cancellation responses and generic “cannot be cancelled” errors rather than treating them as confirmation; typed budget denials defer until supplier reset, while untyped failures use a 300-second backoff.
 - **Domain Events Backbone**: Built on `EventEmitterModule.forRoot()` registered once in `AppModule`. Domain events are passive, behavior-free DTO envelopes containing typed primitives. Dispatched strictly after transaction commit; async listeners catch their own failures without invalidating committed database state.
 
 ### 2. Python Agent Service (FastAPI / LangGraph)
@@ -320,6 +321,7 @@ The frontend operates on Next.js 14 App Router, prioritizing React Server Compon
 | `budget:duffel:daily:YYYY-MM-DD`        | Next UTC midnight (00:00:00Z) | Daily rollover                   | Global daily rate budget counter (default 1,500 attempts)           |
 | `budget:duffel:caller:user:YYYY-MM-DD`  | Next UTC midnight (00:00:00Z) | Daily rollover                   | Caller sub-allocation for direct user interactions (1,000 attempts) |
 | `budget:duffel:caller:agent:YYYY-MM-DD` | Next UTC midnight (00:00:00Z) | Daily rollover                   | Caller sub-allocation for AI conversational turns (500 attempts)    |
+| `booking:recovery:defer:{bookingId}`    | Until retry time               | Expires by TTL                    | Stores only the next allowed UTC retry timestamp; positive TTL skips the 10-minute sweeper, and a missing key permits a safe retry |
 | `session:lock:${sessionId}`             | 30 seconds                    | Heartbeat refreshed during turn  | Distributed lock preventing concurrent conflicting turns            |
 | `chat:quota:${userId}:${YYYY-MM-DD}`    | Next UTC midnight (00:00:00Z) | Daily rollover                   | Enforces per-user daily conversational turn limits                  |
 | `agent:search:snapshot:${snapshotId}`   | 30 minutes                    | Natural TTL expiration           | Preserves trusted search context for agent tool flight references   |

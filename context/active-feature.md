@@ -13,7 +13,7 @@ This file tracks the currently active in-flight feature, its checkpoints, and ex
 - **Tasks**: [specs/029-duffel-provider-narrowing/tasks.md](../specs/029-duffel-provider-narrowing/tasks.md)
 
 ### Current Summary
-Phase 0 (research/ADR), Phase 1 (baseline locks), Phase 2 (core SDK provider & atomic Redis rate budget), and Phase 3 (`FLIGHT_SEARCH_PORT` extraction, normalizer, and consumer rewiring across Flights, BookingIntent, Readiness, and ChatHandoff) are fully implemented and verified (US1 complete). Phase 4 (T025–T031), including `DuffelAncillaryService`, `SupplierAncillaryModule`, consumer rewiring, the ancillary/payment Jest checkpoint (11 suites, 153 tests), API TypeScript check, supplier ancillary module E2E (1 suite, 1 test), and post-T030 network-guard API suite (127 suites, 2,312 tests), is complete locally. Order capability isolation (Phase 5), monolith deletion (Phase 6), neutral schema migration (Phase 7), and final audit (Phase 8) remain pending.
+Phase 0 (research/ADR), Phase 1 (baseline locks), Phase 2 (core SDK provider & atomic Redis rate budget), and Phase 3 (`FLIGHT_SEARCH_PORT` extraction, normalizer, and consumer rewiring across Flights, BookingIntent, Readiness, and ChatHandoff) are fully implemented and verified (US1 complete). Phase 4 (T025–T031), including `DuffelAncillaryService`, `SupplierAncillaryModule`, consumer rewiring, the ancillary/payment Jest checkpoint (11 suites, 153 tests), API TypeScript check, supplier ancillary module E2E (1 suite, 1 test), and post-T030 network-guard API suite (127 suites, 2,312 tests), is complete locally. Phase 5 has started: T032–T034 are complete with code review, scoped convergence, and local verification passing. T035–T043 remain pending, including order consumer rewiring; legacy monolith deletion and Phases 7–8 remain pending. Final dual review and remote CI are tracked in the PR.
 
 ---
 
@@ -80,10 +80,10 @@ Exit gate:
 ```
 
 ### Phase 5 — Order Capability Isolation (User Story 3)
-- [ ] Extract `DuffelOrderAdapter` and `DuffelFulfillmentAdapter` preserving `FULFILLMENT_GATEWAY_PORT` (T032–T034).
-- [ ] Extract `DuffelCancellationService` and `DuffelRecoveryService` (T035–T036).
-- [ ] Correct unconfirmed-cancellation compensation in `PaymentFulfillmentSaga` and recovery worker (T037).
-- [ ] Rewire order consumers in cancellation, recovery, disruption sync, and payment (T038).
+- [x] Lock order-operation parity characterization (T032; commit `93fe963a`, reviewed and approved).
+- [x] Add safe-compensation and recovery-deferral characterization and implementation (T033; commits `1739d209` and `acc77e0b`; focused checks, code review, scoped convergence, and full API gate pass).
+- [x] Extract the metered raw `DuffelOrderAdapter` (T034; commit `2675a0f2`, review GO with no Important/Critical findings).
+- [ ] Complete later order normalization, cancellation/recovery services, fulfillment binding, consumer rewiring, and related work (T035–T043; pending).
 
 Exit gate:
 ```text
