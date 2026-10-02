@@ -1,15 +1,26 @@
 import { Global, Module } from '@nestjs/common';
 import { CacheModule } from '@/cache/cache.module';
-import { DUFFEL_SDK, duffelSdkProvider } from './duffel-sdk.provider';
+import {
+  DUFFEL_SDK,
+  DUFFEL_SDK_CONFIGURATION,
+  duffelSdkConfigurationProvider,
+  duffelSdkProvider,
+} from './duffel-sdk.provider';
+import type { DuffelSdkConfiguration } from './duffel-sdk.provider';
 import { DuffelRateBudgetService } from './duffel-rate-budget.service';
 
-export { DUFFEL_SDK, duffelSdkProvider, DuffelRateBudgetService };
+export {
+  DUFFEL_SDK,
+  DUFFEL_SDK_CONFIGURATION,
+  duffelSdkProvider,
+  DuffelRateBudgetService,
+};
+export type { DuffelSdkConfiguration };
 
 @Global()
 @Module({
   imports: [CacheModule],
-  providers: [duffelSdkProvider, DuffelRateBudgetService],
-  exports: [DUFFEL_SDK, DuffelRateBudgetService],
+  providers: [duffelSdkConfigurationProvider, duffelSdkProvider, DuffelRateBudgetService],
+  exports: [DUFFEL_SDK, DUFFEL_SDK_CONFIGURATION, DuffelRateBudgetService],
 })
 export class DuffelCoreModule {}
-

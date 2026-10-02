@@ -1,7 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { Injectable, Inject } from '@nestjs/common';
 import { Duffel } from '@duffel/api';
-import { DuffelCoreModule, DUFFEL_SDK } from './duffel-core.module';
+import {
+  DuffelCoreModule,
+  DUFFEL_SDK,
+  DUFFEL_SDK_CONFIGURATION,
+} from './duffel-core.module';
+import type { DuffelSdkConfiguration } from './duffel-core.module';
 
 @Injectable()
 class ServiceConsumerA {
@@ -43,6 +48,22 @@ describe('DuffelCoreModule', () => {
       expect(consumerA.sdk).toBe(sdkInstance);
       expect(consumerB.sdk).toBe(sdkInstance);
       expect(consumerA.sdk).toBe(consumerB.sdk);
+    });
+
+    it('exports the validated transport configuration used by the SDK', async () => {
+      process.env.DUFFEL_ACCESS_TOKEN = ' test_duffel_token ';
+      process.env.DUFFEL_API_URL = 'http://localhost:4000/v2/';
+
+      const moduleRef: TestingModule = await Test.createTestingModule({
+        imports: [DuffelCoreModule],
+      }).compile();
+
+      expect(moduleRef.get<DuffelSdkConfiguration>(DUFFEL_SDK_CONFIGURATION)).toEqual({
+        token: 'test_duffel_token',
+        basePath: 'http://localhost:4000/v2',
+      });
+      expect(moduleRef.get<Duffel>(DUFFEL_SDK)).toBeInstanceOf(Duffel);
+      await moduleRef.close();
     });
   });
 

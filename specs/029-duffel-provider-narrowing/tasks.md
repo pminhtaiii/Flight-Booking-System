@@ -91,12 +91,12 @@
 
 ### Tests for User Story 3
 
-- [ ] T032 [P] [US3] Add order adapter, quote, cancellation, retrieval, snapshot, and redaction parity cases in `apps/api/src/supplier/order/duffel-order.adapter.spec.ts` and `apps/api/src/duffel/duffel-fulfillment.adapter.spec.ts`.
-- [ ] T033 [P] [US3] Add last-slot denial in both inline capture-failure and 25-second `handleBackgroundError` compensation, retained checkpoint/hold, sweeper TTL deferral, next-day cancellation, and already-cancelled replay tests in `apps/api/src/payment-fulfillment/payment-fulfillment.saga.spec.ts` and `apps/api/src/booking-lifecycle/booking-recovery.service.spec.ts`.
+- [x] T032 [P] [US3] Add order adapter, quote, cancellation, retrieval, snapshot, and redaction parity cases in `apps/api/src/supplier/order/duffel-order.adapter.spec.ts` and `apps/api/src/duffel/duffel-fulfillment.adapter.spec.ts`.
+- [x] T033 [P] [US3] Add last-slot denial in both inline capture-failure and 25-second `handleBackgroundError` compensation, retained checkpoint/hold, sweeper TTL deferral, next-day cancellation, and already-cancelled replay tests in `apps/api/src/payment-fulfillment/payment-fulfillment.saga.spec.ts` and `apps/api/src/booking-lifecycle/booking-recovery.service.spec.ts`.
 
 ### Implementation for User Story 3
 
-- [ ] T034 [US3] Extract manual order POST and order/quote/cancel/retrieve SDK operations into `apps/api/src/supplier/order/duffel-order.adapter.ts`, counting each actual attempt and preserving idempotency/request shapes.
+- [x] T034 [US3] Extract manual order POST and order/quote/cancel/retrieve SDK operations into `apps/api/src/supplier/order/duffel-order.adapter.ts`, counting each actual attempt and preserving idempotency/request shapes.
 - [ ] T035 [US3] Move Duffel order/itinerary-to-domain mapping into `apps/api/src/supplier/order/order-snapshot.normalizer.ts`; remove Duffel types from `apps/api/src/disruption/domain/itinerary-normalizer.ts` while preserving legacy snapshot reads.
 - [ ] T036 [US3] Move quote/confirm/cancel orchestration into flat `apps/api/src/supplier/order/duffel-cancellation.service.ts` with existing refund amounts and idempotent already-cancelled handling.
 - [ ] T037 [US3] Move retrieve/complete-order and snapshot recovery into flat `apps/api/src/supplier/order/duffel-recovery.service.ts` with existing partial-order/error behavior.

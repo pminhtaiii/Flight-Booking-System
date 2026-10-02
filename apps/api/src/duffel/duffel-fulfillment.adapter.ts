@@ -20,6 +20,7 @@ import {
   parsePositiveIntegerSetting,
 } from '@/payment-fulfillment/utils/bounded-semaphore';
 import { DuffelService } from './duffel.service';
+import { isDuffelCancellationConfirmed } from './cancellation-confirmation';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -357,12 +358,14 @@ export class DuffelFulfillmentAdapter implements FulfillmentGatewayPort {
     try {
       await control.beforeInvoke();
 
-      await this.duffelService.cancelOrder(orderId);
+      const cancellation = asRecord(await this.duffelService.cancelOrder(orderId));
+      const status = cancellation ? readString(cancellation, 'status') : undefined;
+      const confirmed = isDuffelCancellationConfirmed(cancellation);
 
       return {
-        success: true,
+        success: confirmed,
         orderId,
-        status: 'CANCELLED',
+        status: confirmed ? 'CANCELLED' : status,
       };
     } finally {
       release();

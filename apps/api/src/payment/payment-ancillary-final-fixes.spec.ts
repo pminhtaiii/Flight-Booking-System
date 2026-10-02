@@ -401,6 +401,8 @@ describe('PaymentService - Final Fixes Spec', () => {
       });
       stripe.retrievePaymentIntent.mockResolvedValue({ status: 'requires_capture' });
       idempotency.getResumePoint.mockResolvedValue('started');
+      // Human approval 2026-10-02: provide the explicit provider confirmation expected by the safe cancellation guard.
+      duffel.cancelOrder.mockResolvedValue({ id: 'cancel-123', status: 'confirmed' });
       prisma.paymentEvent.findFirst.mockResolvedValue({
         eventType: 'duffel_order_created',
         metadata: { id: 'ord-123' },

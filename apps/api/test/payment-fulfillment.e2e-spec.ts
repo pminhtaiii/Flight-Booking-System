@@ -1641,7 +1641,11 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
         .spyOn(stripeService, 'capturePaymentIntent')
         .mockRejectedValue(new Error('Card declined on capture'));
 
-      const cancelOrderSpy = jest.spyOn(duffelService, 'cancelOrder').mockResolvedValue({});
+      // Human approval 2026-10-02: return an explicit provider confirmation for the successful-cancellation assertions.
+      const cancelOrderSpy = jest.spyOn(duffelService, 'cancelOrder').mockResolvedValue({
+        id: 'cancel_confirmed',
+        status: 'confirmed',
+      });
       const cancelHoldSpy = jest.spyOn(stripeService, 'cancelPaymentIntent').mockResolvedValue({
         id: payment.stripePaymentIntentId,
         status: 'canceled',
@@ -1696,7 +1700,11 @@ describe('Payment Fulfillment (E2E Characterization)', () => {
         .spyOn(stripeService, 'capturePaymentIntent')
         .mockRejectedValue(new Error('Card declined on capture'));
 
-      const cancelOrderSpy = jest.spyOn(duffelService, 'cancelOrder').mockResolvedValue({});
+      // Human approval 2026-10-02: return an explicit provider confirmation for the successful-cancellation assertions.
+      const cancelOrderSpy = jest.spyOn(duffelService, 'cancelOrder').mockResolvedValue({
+        id: 'cancel_confirmed',
+        status: 'confirmed',
+      });
       const cancelHoldSpy = jest.spyOn(stripeService, 'cancelPaymentIntent').mockResolvedValue({
         id: payment.stripePaymentIntentId,
         status: 'canceled',

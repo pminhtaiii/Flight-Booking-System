@@ -159,3 +159,29 @@ Run from `C:\Booking Systems` on 2026-10-01. T030 rewiring and the T031 checkpoi
 - Ran the exact Phase 4 checkpoint and TypeScript command from `specs/029-duffel-provider-narrowing/quickstart.md`; both exited 0.
 - Ran the supplier ancillary module E2E with mocked SDK/cache boundaries as an additional check.
 - Confirmed no production `DuffelService` or `DuffelModule` references remain in the ancillary consumers or ancillary payment validation service. The Phase 4 checkpoint is complete locally.
+
+## Phase 5 Slice 1: Order Capability (T032–T034)
+
+### Current status
+
+- **T032 — Complete:** Order-operation parity characterization, including the manual order POST request shape, was committed as `93fe963a` (`test(supplier): lock order operation parity`) and reviewed/approved.
+- **T033 — Complete:** Original implementation commit `1739d209`, correction commit `acc77e0b`, privacy-parity fix `164af26d`, and human-approved type-only fixture annotation `25ff5e60`. Commit `164af26d` restored generic legacy confirmation/retrieval messages; `25ff5e60` changes fixture types only. The user-approved strict confirmation and non-JSON handling is preserved in current head `f3793c26`. Code review returned GO after three fixes. The legacy fulfillment adapter maps pending, negative, and invalid cancellation outcomes to `false`, so the saga retains the hold, processing state, checkpoint, and order evidence. Recovery rejects non-record responses and generic “cannot be cancelled” errors instead of treating them as already cancelled. Scoped convergence across T032–T034 found zero gaps across 3 FRs, 3 US3 acceptance criteria, 2 success criteria, 4 boundary edges, 5 plan decisions, and 5 constitution requirements.
+- **T034 — Complete:** The metered `DuffelOrderAdapter` and shared core configuration provider were committed as `2675a0f2`; review returned GO with no Important or Critical findings. It covers manual order POST, quote creation, quote confirmation, cancellation, active-order retrieval, and complete-order retrieval.
+- T035–T043 remain pending, including order consumer rewiring. No remote CI status is claimed.
+
+### Local verification recorded for this slice
+
+| Check | Result |
+| --- | --- |
+| Focused order adapter/fulfillment Jest suites after T034 | **PASS**: 5 suites, 105 tests. |
+| Corrected T033 adapter/recovery/saga Jest suites | **PASS**: 3 suites, 138 tests. |
+| Final order + legacy supplier Jest check | **PASS**: 2 suites, 54 tests. |
+| Payment fulfillment focused E2Es after fixture correction `34b2db3b` | **PASS**: 2/2 against the isolated task database; assertions unchanged. |
+| API TypeScript check | **PASS**. |
+| All-file API/shared ESLint | **PASS**. |
+| Targeted spec lint | **PASS**. |
+| Shared types tests | **PASS**: 110 tests. |
+| CI workflow contract tests | **PASS**: 23 tests. |
+| Full API unit run at `f3793c26` | **PASS**: 128 suites, 2,359 tests. TypeScript check and full API/shared ESLint also pass. The earlier 128-suite/2,346-test run in `api-final-signoff.log` remains a valid historical checkpoint. |
+
+These results record local checks only. T032–T034 checks, code review, scoped convergence, the latest API unit run, and focused E2Es pass. Standards review has 0 open findings and 2 resolved; Spec review is GO. The two human-approved E2E fixture corrections are committed as `34b2db3b` without changing assertions. PR #361 remote CI remains pending push; a green CI result on documentation checkpoint `7af33a78` is historical and does not establish CI status for the current PR head. T035–T043 and broader Phase 5 work remain pending.
