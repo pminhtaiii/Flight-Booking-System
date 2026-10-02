@@ -22,6 +22,41 @@ type QueryArgs = {
   data?: Record<string, unknown>;
 };
 
+// Human approval for explicit fixture typing recorded 2026-10-02.
+type SafetyFixture = {
+  module: TestingModule;
+  saga: PaymentFulfillmentSaga;
+  recovery: BookingRecoveryService;
+  lifecycle: BookingLifecycleService;
+  cache: CacheService;
+  stripe: { cancelPaymentIntent: jest.Mock<Promise<{ status: string }>, []> };
+  duffel: { cancelOrder: jest.Mock<Promise<unknown>, []> };
+  fulfillmentGateway: unknown;
+  paymentGateway: {
+    voidHold: jest.Mock<
+      Promise<{ success: boolean; intentId: string; status: string }>,
+      [intentId: string, control: PortInvocationControl]
+    >;
+  };
+  state: {
+    paymentRow: Record<string, unknown>;
+    paymentEvents: Record<string, unknown>[];
+    timeline: string[];
+    getBooking: () => Record<string, unknown> | undefined;
+    getIdempotency: () => Record<string, unknown> | undefined;
+    getCancellationEffects: () => number;
+  };
+  duffelCancellationResults: unknown[];
+  fakePrisma: {
+    paymentEvent: {
+      create: jest.Mock<
+        Promise<Record<string, unknown> | undefined>,
+        [args: QueryArgs]
+      >;
+    };
+  };
+};
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -50,7 +85,7 @@ function applyUpdate(row: Record<string, unknown>, data: Record<string, unknown>
   }
 }
 
-async function createSafetyFixture() {
+async function createSafetyFixture(): Promise<SafetyFixture> {
   const timeline: string[] = [];
   const paymentEvents: Record<string, unknown>[] = [];
   const duffelCancellationResults: unknown[] = [];
