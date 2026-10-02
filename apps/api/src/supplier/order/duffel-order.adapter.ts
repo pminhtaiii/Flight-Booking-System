@@ -60,7 +60,11 @@ export class DuffelOrderAdapter {
           },
         }),
       });
-      const body: unknown = await response.json();
+      const body: unknown = await response.json().catch(() => {
+        throw Object.assign(new Error('Failed to create Duffel order'), {
+          status: response.status,
+        });
+      });
       if (!response.ok || this.hasErrors(body)) {
         throw Object.assign(new Error(this.errorMessage(body)), { status: response.status });
       }

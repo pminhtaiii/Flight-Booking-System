@@ -341,8 +341,21 @@ describe('DuffelFulfillmentAdapter', () => {
       });
     });
 
-    it('preserves status-less Duffel object compatibility', async () => {
+    it('does not confirm a status-less Duffel object', async () => {
       mockDuffelService.cancelOrder = jest.fn().mockResolvedValue({ id: 'cancel_123' });
+
+      await expect(adapter.cancelOrder('ord_123', mockControl)).resolves.toEqual({
+        success: false,
+        orderId: 'ord_123',
+        status: undefined,
+      });
+    });
+
+    it('confirms a status-less cancellation with a non-empty confirmed_at', async () => {
+      mockDuffelService.cancelOrder = jest.fn().mockResolvedValue({
+        id: 'cancel_123',
+        confirmed_at: '2026-10-02T10:00:00.000Z',
+      });
 
       await expect(adapter.cancelOrder('ord_123', mockControl)).resolves.toEqual({
         success: true,
@@ -359,6 +372,14 @@ describe('DuffelFulfillmentAdapter', () => {
         status: 'CANCELLED',
       },
       { name: 'invalid', result: null, status: undefined },
+      { name: 'empty timestamp', result: { confirmed_at: '' }, status: undefined },
+      { name: 'blank timestamp', result: { confirmed_at: '  ' }, status: undefined },
+      { name: 'null timestamp', result: { confirmed_at: null }, status: undefined },
+      {
+        name: 'explicitly negative with timestamp',
+        result: { success: false, confirmed_at: '2026-10-02T10:00:00.000Z' },
+        status: undefined,
+      },
     ])('returns an unconfirmed outcome for a $name Duffel result', async ({ result, status }) => {
       mockDuffelService.cancelOrder = jest.fn().mockResolvedValue(result);
 

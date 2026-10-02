@@ -302,6 +302,46 @@ describe('DuffelOrderAdapter', () => {
     expect(reserveAttempt).toHaveBeenCalledTimes(1);
   });
 
+  it.each([
+    {
+      upstreamStatus: 429,
+      status: 429,
+      code: 'UPSTREAM_RATE_LIMITED',
+      message: 'Duffel API rate limit exceeded',
+    },
+    {
+      upstreamStatus: 502,
+      status: 502,
+      code: 'UPSTREAM_UNAVAILABLE',
+      message: 'Failed to create Duffel order',
+    },
+    {
+      upstreamStatus: 201,
+      status: 502,
+      code: 'UPSTREAM_UNAVAILABLE',
+      message: 'Failed to create Duffel order',
+    },
+  ])(
+    'safely maps a non-JSON $upstreamStatus order response',
+    async ({ upstreamStatus, status, code, message }) => {
+      reserveAttempt.mockResolvedValueOnce({ ok: true });
+      jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response('<html>private upstream details</html>', {
+          status: upstreamStatus,
+          headers: { 'content-type': 'text/html' },
+        }),
+      );
+
+      await expect(
+        adapter.createOrder({ selected_offers: ['off_1'], passengers: [] }),
+      ).rejects.toMatchObject({
+        status,
+        response: { code, message },
+      });
+      expect(reserveAttempt).toHaveBeenCalledTimes(1);
+    },
+  );
+
   it('aborts a stalled manual order request after 30 seconds', async () => {
     jest.useFakeTimers();
     reserveAttempt.mockResolvedValueOnce({ ok: true });

@@ -6,7 +6,7 @@ This file tracks the currently active in-flight feature, its checkpoints, and ex
 
 ## Feature 029 — Narrow the Duffel Supplier Boundary
 
-- **Status**: In Progress (Phase 4 Complete Locally through T031)
+- **Status**: In Progress (Phase 5 In Progress; Completed Locally through T034)
 - **Branch**: `codex/029-duffel-provider-narrowing`
 - **Specification**: [specs/029-duffel-provider-narrowing/spec.md](../specs/029-duffel-provider-narrowing/spec.md)
 - **Implementation Plan**: [specs/029-duffel-provider-narrowing/plan.md](../specs/029-duffel-provider-narrowing/plan.md)

@@ -14,6 +14,7 @@ import {
 import { PrismaService } from '@/prisma/prisma.service';
 import { StripeService } from '@/common/stripe.service';
 import { DuffelService } from '@/duffel/duffel.service';
+import { isDuffelCancellationConfirmed } from '@/duffel/cancellation-confirmation';
 import { RefundTransactionService } from '@/refund/refund-transaction.service';
 import { RefundSettlementService } from '@/refund-settlement/refund-settlement.service';
 import { CacheService } from '@/cache/cache.service';
@@ -61,14 +62,6 @@ type BookingIntentPassengerDetails = {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isDuffelCancellationConfirmed(response: unknown): boolean {
-  if (!isRecord(response)) return false;
-  if (response.success === false) return false;
-  if (!Object.prototype.hasOwnProperty.call(response, 'status')) return true;
-  if (typeof response.status !== 'string') return false;
-  return ['confirmed', 'cancelled', 'canceled'].includes(response.status.toLowerCase());
 }
 
 function isUnknownArray(value: unknown): value is unknown[] {

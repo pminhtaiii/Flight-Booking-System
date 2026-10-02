@@ -190,7 +190,7 @@ describe('BookingRecoveryService', () => {
       ]);
     });
 
-    it('handles incomplete Stripe payment: cancels Duffel order, cancels Stripe intent, and marks booking FAILED with CAPTURE_FAILED (Branch 2)', async () => {
+    it('handles incomplete Stripe payment after timestamp confirmation: cancels Stripe intent and marks booking FAILED with CAPTURE_FAILED (Branch 2)', async () => {
       const booking = {
         id: 'b-1',
         status: BookingStatus.PROCESSING,
@@ -209,7 +209,7 @@ describe('BookingRecoveryService', () => {
         if (where?.eventType === 'duffel_order_created') return { metadata: { id: 'ord_123' } };
         return null;
       });
-      mockDuffelService.cancelOrder.mockResolvedValue({});
+      mockDuffelService.cancelOrder.mockResolvedValue({ confirmed_at: '2026-10-02T10:00:00.000Z' });
       mockStripeService.cancelPaymentIntent.mockResolvedValue({});
       mockPrisma.payment.updateMany.mockResolvedValue({ count: 1 });
 
@@ -621,7 +621,7 @@ describe('BookingRecoveryService', () => {
         if (where?.eventType === 'duffel_order_created') return { metadata: { id: 'ord_123' } };
         return null;
       });
-      mockDuffelService.cancelOrder.mockResolvedValue({});
+      mockDuffelService.cancelOrder.mockResolvedValue({ status: 'confirmed' });
 
       const result = await service.reconcileBookingIfStale(booking);
 
@@ -759,6 +759,14 @@ describe('BookingRecoveryService', () => {
       { name: 'null', result: null },
       { name: 'undefined', result: undefined },
       { name: 'primitive', result: false },
+      { name: 'status-less object', result: { id: 'oc_123' } },
+      { name: 'empty timestamp', result: { confirmed_at: '' } },
+      { name: 'blank timestamp', result: { confirmed_at: '  ' } },
+      { name: 'null timestamp', result: { confirmed_at: null } },
+      {
+        name: 'explicitly negative with confirmation',
+        result: { success: false, status: 'confirmed', confirmed_at: '2026-10-02T10:00:00.000Z' },
+      },
     ])('keeps the Stripe hold when cancellation resolves to $name', async ({ result }) => {
       mockPrisma.booking.findUnique.mockResolvedValue({
         id: 'b-1',
@@ -911,7 +919,7 @@ describe('BookingRecoveryService', () => {
         if (where?.eventType === 'duffel_order_created') return { metadata: { id: 'ord_123' } };
         return null;
       });
-      mockDuffelService.cancelOrder.mockResolvedValue({});
+      mockDuffelService.cancelOrder.mockResolvedValue({ status: 'confirmed' });
       mockPrisma.payment.updateMany.mockResolvedValue({ count: 1 });
 
       const result = await service.reconcileBookingIfStale(booking);
