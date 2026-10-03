@@ -164,9 +164,15 @@ test('Duffel webhook schema and historical migration chain remain outside the re
   assert.doesNotMatch(migration, /duffel_webhook_events|duffelOrderId_createdAt/);
 
   // Human approval (2026-10-03): exclude Prisma metadata and enumerate only migrations; all other assertions stay unchanged.
-  const precedingMigrations = readdirSync(migrationsPath, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && entry.name !== migrationName)
+  const migrationDirectories = readdirSync(migrationsPath, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort();
-  assert.equal(precedingMigrations.at(-1), '20260915000000_booking_projection_versions');
+  // Human approval (2026-10-03): check the immediate predecessor so later migrations can be appended.
+  const migrationIndex = migrationDirectories.indexOf(migrationName);
+  assert.ok(migrationIndex > 0, `${migrationName} appears after a predecessor`);
+  assert.equal(
+    migrationDirectories[migrationIndex - 1],
+    '20260915000000_booking_projection_versions',
+  );
 });
