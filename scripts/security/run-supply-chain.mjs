@@ -445,9 +445,12 @@ function workspaceAuditIgnoreMatches(content) {
     /^\s{2}ignoreGhas:\s*$/.test(line) ? [index] : [],
   );
   if (ignoreHeaders.length !== 1) return false;
-  return section.slice(ignoreHeaders[0] + 1).some((line) =>
-    /^\s{4}-\s*['"]?GHSA-vfj7-8cjw-p6xm['"]?\s*(?:#.*)?$/i.test(line),
-  );
+  for (const line of section.slice(ignoreHeaders[0] + 1)) {
+    const indentation = line.length - line.trimStart().length;
+    if (line.trim() && indentation <= 2) return false;
+    if (/^\s{4}-\s*['"]?GHSA-vfj7-8cjw-p6xm['"]?\s*(?:#.*)?$/i.test(line)) return true;
+  }
+  return false;
 }
 
 function lockPatchRegistrationMatches(content) {
