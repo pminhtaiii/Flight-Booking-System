@@ -53,7 +53,7 @@ The migration path `20260929000000_supplier_identifiers` is absent and follows l
 
 ## Ownership and execution order
 
-Execute T049 → T050 → T047 → T048 → T051 → T052 → T053 → T054. One fresh implementer owns each task, with task review after each and a separate commit. No simultaneous edits to the same file. API/shared domain renames and Prisma schema/client consumers form one coordinated checkpoint: intermediate compiler failures caused only by pending matrix changes are recorded and cannot be called passing. Task checkboxes remain open until their required checks pass. No partial checkpoint is pushed.
+Execute T049 → T050 → T047 → T051 → T052 → T053 → T048 → T054. One fresh implementer owns each task (the T047 implementer resumes for T048, at most two tasks), with task review after each and a separate commit. The order was refined during read-only preflight because current shared snapshot and ancillary shapes also serve as public wire DTOs. Finish wire projections after neutral schema consumers exist. No simultaneous edits to the same file. API/shared domain renames and Prisma schema/client consumers form one coordinated checkpoint: intermediate compiler failures caused only by pending matrix changes are recorded and cannot be called passing. Task checkboxes remain open until their required checks pass. No partial checkpoint is pushed.
 
 Root owns task checkboxes, context synchronization, verification record, and final PR/CI. Implementers own task production/new regression files and report all test adaptation needs before touching existing tests.
 
