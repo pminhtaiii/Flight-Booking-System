@@ -1,6 +1,6 @@
 # Phase 6 Slice 1 — Compatibility Baselines (T044–T046)
 
-Date: 2026-10-03. Branch: `codex/029-duffel-provider-narrowing`. Review baseline: `640a4cbe50f3cb791d3e4588d3d37d16c088ad02`. Existing PR: #366, targeting `development`.
+Date: 2026-10-03. Branch: `codex/029-duffel-provider-narrowing`. Review baseline: `640a4cbe50f3cb791d3e4588d3d37d16c088ad02`. Prior checkpoint PR: #366, already merged to `development`; this slice opens a new PR.
 
 ## Scope and approvals
 
@@ -121,7 +121,7 @@ node node_modules/next/dist/bin/next build
 - Use native PowerShell equivalents for unavailable bash artifact scripts; artifact extraction requires manual verification.
 - Review against the explicit feature spec/GOAL without unrelated issue-tracker scaffolding; tracker setup remains separate work.
 
-The final two-axis code review compares the complete slice against `640a4cbe50f3cb791d3e4588d3d37d16c088ad02`. Remote CI results belong to the final pushed HEAD of [PR #366](https://github.com/pminhtaiii/wayfinder/pull/366); this local record does not claim remote success in advance. No merge is authorized or performed.
+The final two-axis code review compares the complete slice against `640a4cbe50f3cb791d3e4588d3d37d16c088ad02`. Remote CI results belong to the final pushed HEAD of the new slice PR targeting development; [prior checkpoint PR #366](https://github.com/pminhtaiii/wayfinder/pull/366) is already merged; this local record does not claim remote success in advance. No merge is authorized or performed.
 ## Final two-axis review
 
 Compared against baseline 640a4cbe50f3cb791d3e4588d3d37d16c088ad02. Reviewed implementation and checkpoint docs; the final amendment only preserves these reviewed reports.
