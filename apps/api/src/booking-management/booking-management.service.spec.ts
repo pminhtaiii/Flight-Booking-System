@@ -1,5 +1,9 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { Test } from '@nestjs/testing';
 import { BookingStatus, DisruptionStatus } from '@prisma/client';
+import { BookingLifecycleService } from '@/booking-lifecycle/booking-lifecycle.service';
+import { PrismaService } from '@/prisma/prisma.service';
 import {
   BookingManagementService,
   parseDuffelCancellationQuoteId,
@@ -385,6 +389,64 @@ describe('BookingManagementService', () => {
       await expect(service.getBookingDetail('booking-1', 'user-1')).rejects.toBeInstanceOf(
         ForbiddenException,
       );
+    });
+
+    it('preserves legacy snapshot identity in the original itinerary', async (): Promise<void> => {
+      process.env.FEATURE_FLAG_DISRUPTION_SURFACING = 'false';
+
+      const legacySnapshot = {
+        segments: [
+          {
+            airline: { name: 'Northwind Air', iataCode: 'NW' },
+            flightNumber: 'NW42',
+            departureAirport: {
+              iataCode: 'SGN',
+              name: 'Tan Son Nhat International Airport',
+              city: 'Ho Chi Minh City',
+            },
+            arrivalAirport: {
+              iataCode: 'HAN',
+              name: 'Noi Bai International Airport',
+              city: 'Hanoi',
+            },
+            departureAt: '2026-10-10T08:00:00+07:00',
+            arrivalAt: '2026-10-10T10:00:00+07:00',
+            duration: 'PT2H',
+            duffelSegmentId: 'seg_legacy_42',
+            sliceOrder: 0,
+            segmentOrder: 0,
+            globalOrder: 0,
+          },
+        ],
+      };
+      const storedSnapshot = {
+        segments: legacySnapshot.segments.map((segment) => ({
+          ...segment,
+          airline: { ...segment.airline },
+          departureAirport: { ...segment.departureAirport },
+          arrivalAirport: { ...segment.arrivalAirport },
+        })),
+      };
+      const testModule = await Test.createTestingModule({
+        providers: [
+          BookingManagementService,
+          { provide: PrismaService, useValue: prisma },
+          { provide: BookingLifecycleService, useValue: bookingLifecycleService },
+          { provide: EventEmitter2, useValue: eventEmitter },
+        ],
+      }).compile();
+      prisma.booking.findUnique.mockResolvedValue(
+        mockDetailBooking({ flightSnapshot: storedSnapshot }),
+      );
+
+      const injectedService = testModule.get(BookingManagementService);
+      const result = await injectedService.getBookingDetail('booking-1', 'user-1');
+
+      expect(result.flightSnapshot).toEqual(storedSnapshot);
+      expect(result.currentItinerary.source).toBe('ORIGINAL');
+      expect(result.currentItinerary.segments).toEqual(storedSnapshot.segments);
+      expect(result.currentItinerary.segments[0].duffelSegmentId).toBe('seg_legacy_42');
+      await testModule.close();
     });
 
     it('correctly maps ancillary summaries (seats, baggage) with passenger names', async () => {

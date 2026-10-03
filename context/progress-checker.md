@@ -11,7 +11,7 @@ Do not mark a capability complete because it appears in architecture or planning
 Overall status:
 
 ```text
-FEATURES 001–028 100% COMPLETE / FEATURE 029 PHASES 0–5 COMPLETE LOCALLY (T032–T043; T058 CONVERGENCE CLOSED) / PHASES 6–7 PENDING
+FEATURES 001–028 100% COMPLETE / FEATURE 029 PHASES 0–5 COMPLETE LOCALLY (T032–T043; T058 CONVERGENCE CLOSED) / PHASE 6 T044–T046 COMPLETE LOCALLY / T047–T057 PENDING
 ```
 
 The system operates on branch `codex/029-duffel-provider-narrowing`. Features 001–028 and Feature 029 Phases 0–5 are complete locally. T042 removed the legacy Duffel monolith; T058 removed global SDK/configuration/budget visibility and added a negative Nest module-composition regression. T043 passed the guarded API suite (130 suites/2,326 tests), all affected database E2Es (16 suites/145 tests), shared/static contracts, typecheck, and lint. The [Slice 5 verification record](../specs/029-duffel-provider-narrowing/slice-5-verification.md) has exact commands, exits, counts, and the scoped convergence recheck. Phases 6–7 remain pending; no remote CI success is claimed. Slice 4 and earlier history is preserved in the linked [Slice 4](../specs/029-duffel-provider-narrowing/slice-4-verification.md) and [Slice 3](../specs/029-duffel-provider-narrowing/slice-3-verification.md) records.
@@ -19,6 +19,8 @@ The system operates on branch `codex/029-duffel-provider-narrowing`. Features 00
 ---
 
 ## Feature 029 — Narrow the Duffel Supplier Boundary (Active)
+
+Phase 6 compatibility slice T044–T046 is complete locally within the approved T049/T051 deferrals. Independent task reviews and scoped convergence passed; the [Slice 6.1 verification record](../specs/029-duffel-provider-narrowing/slice-6-1-verification.md) records API 2,331, shared 111, focused web 120, and agent 1,291 passing tests. Remaining T047–T057 are pending; Feature 029 is incomplete.
 
 Detailed phase-by-phase execution, live task checklists, and exit gates are tracked in [active-feature.md](./active-feature.md).
 

@@ -6,13 +6,15 @@ This file tracks the currently active in-flight feature, its checkpoints, and ex
 
 ## Feature 029 — Narrow the Duffel Supplier Boundary
 
-- **Status**: Phase 5 complete locally (T032–T043); Phases 6–7 pending
+- **Status**: Phases 0–5 and Phase 6 compatibility slice (T044–T046) complete locally; T047–T057 pending
 - **Branch**: `codex/029-duffel-provider-narrowing`
 - **Specification**: [specs/029-duffel-provider-narrowing/spec.md](../specs/029-duffel-provider-narrowing/spec.md)
 - **Implementation Plan**: [specs/029-duffel-provider-narrowing/plan.md](../specs/029-duffel-provider-narrowing/plan.md)
 - **Tasks**: [specs/029-duffel-provider-narrowing/tasks.md](../specs/029-duffel-provider-narrowing/tasks.md)
 
 ### Current Summary
+T044–T046 now pin signed bytes, legacy snapshots, strict agent state, and web provider-ID boundaries. Independent task reviews and scoped convergence passed. Local validation includes guarded API 130 suites/2,331 tests, shared 111 tests, web 120 focused tests/build, and agent 1,291 non-Redis tests. See the [Slice 6.1 verification record](../specs/029-duffel-provider-narrowing/slice-6-1-verification.md) for approvals, mutations, environment retries, and exact commands. T047–T057 remain pending; Feature 029 is incomplete. Remote CI must match the final pushed HEAD of the new slice PR; prior checkpoint PR #366 is already merged.
+
 Phases 0–5 are complete locally. T042 removed the legacy `DuffelService`/`DuffelModule` monolith. T058 removed global visibility from `DuffelCoreModule`, and its negative Nest composition regression proves an unrelated module cannot resolve `DUFFEL_SDK`. T043 passed the guarded API suite (130 suites/2,326 tests), all 16 affected database E2E suites (145 tests), order and ancillary capability checkpoints, shared/static contracts, TypeScript, and lint. The final local evidence and scoped convergence recheck are in the [Slice 5 verification record](../specs/029-duffel-provider-narrowing/slice-5-verification.md). Phases 6–7 remain pending and Feature 029 is not complete; no remote CI success is claimed. Historical T040/T041 evidence is in the [Slice 4 verification record](../specs/029-duffel-provider-narrowing/slice-4-verification.md); earlier T039 validation and Slice 3 findings are in the [Slice 3 verification record](../specs/029-duffel-provider-narrowing/slice-3-verification.md).
 
 ---
@@ -100,7 +102,7 @@ unconfirmed cancellations preserve processing/hold; order operations isolated; S
 ```
 
 ### Phase 6 — Neutral Naming & Physical Schema (User Story 4; T044–T054)
-- [ ] Pin wire/HMAC, legacy snapshots, and provider-ID boundary tests (T044–T046).
+- [x] Pin wire/HMAC, legacy snapshots, and provider-ID boundary tests (T044–T046), within the approved T049/T051 deferrals.
 - [ ] Rename internal types and add explicit current-wire compatibility mappings (T047–T051).
 - [ ] Apply forward physical Prisma column/index renames and regenerate the client (T052–T053).
 - [ ] Validate fresh/existing migrations and cross-service compatibility (T054).
