@@ -119,9 +119,11 @@
 
 ### Tests for User Story 4
 
-- [ ] T044 [P] [US4] Pin current API JSON keys and `sel_v1_` signed payload bytes in `apps/api/src/agent-gateway/selection-attestation.service.spec.ts`, `apps/api/src/agent-gateway/attested-flight-search/attested-flight-search.service.spec.ts`, and `packages/shared/src/types/flight-search.types.spec.ts`.
-- [ ] T045 [P] [US4] Add legacy/new booking snapshot and strict stale-agent-snapshot behavior in `apps/api/src/disruption/domain/itinerary-normalizer.spec.ts`, `apps/api/src/booking-management/booking-management.service.spec.ts`, and `apps/agent/tests/test_trusted_search_snapshot.py`.
-- [ ] T046 [P] [US4] Extend web provider-ID stripping and checkout-injection tests in `apps/web/lib/server/flight-search.spec.ts`, `apps/web/lib/server/booking-management.spec.ts`, and `apps/web/tests/handoff-checkout-proxy.unit.ts`.
+Approved Slice 6.1 scope: T045 pins legacy reads and strict stale-agent state; neutral segment/new-write coverage remains T051. T046 pins both root identity names and nested legacy rejection; nested supplierOfferId rejection remains T049. See [Slice 6.1 verification](./slice-6-1-verification.md).
+
+- [X] T044 [P] [US4] Pin current API JSON keys and `sel_v1_` signed payload bytes in `apps/api/src/agent-gateway/selection-attestation.service.spec.ts`, `apps/api/src/agent-gateway/attested-flight-search/attested-flight-search.service.spec.ts`, and `packages/shared/src/types/flight-search.types.spec.ts`.
+- [X] T045 [P] [US4] Add legacy/new booking snapshot and strict stale-agent-snapshot behavior in `apps/api/src/disruption/domain/itinerary-normalizer.spec.ts`, `apps/api/src/booking-management/booking-management.service.spec.ts`, and `apps/agent/tests/test_trusted_search_snapshot.py`.
+- [X] T046 [P] [US4] Extend web provider-ID stripping and checkout-injection tests in `apps/web/lib/server/flight-search.spec.ts`, `apps/web/lib/server/booking-management.spec.ts`, and `apps/web/tests/handoff-checkout-proxy.unit.ts`.
 
 ### Implementation for User Story 4
 
