@@ -214,6 +214,8 @@ ALTER INDEX "bookings_duffelOrderId_idx" RENAME TO "bookings_supplierOrderId_idx
 
 ## Plan self-review
 
+Execution refinement after T051 commit: reuse the T051 worker for T048 (two feature tasks total). T054 may implement its independent `tests/ci/`, web package script, and CI wiring while T053 updates API consumers; no source ownership overlaps. T054 database, package and E2E execution still waits for T053/T048 to close the coordinated dependencies. Root serializes task commits and keeps intermediate checkboxes open.
+
 Coverage: matrix names implement FR-009/T047/T052/T053; explicit wire and signed bytes implement FR-010/T048/T049/T050; legacy JSON and strict state implement FR-010a/T050/T051; webhook exception implements FR-011; migrations and package gates implement scoped FR-012/T054. No new endpoint, module, library, or budget changes.
 
 Shared boundaries are serialized: T047 produces domain identities consumed by T048/T051/T053; T052 produces schema consumed by T053; T053 closes compiler dependencies before T054. Public/signed types are deliberately legacy; strict Redis canonical types deliberately neutral. Interim dependency errors never count as passing validation or task completion.
