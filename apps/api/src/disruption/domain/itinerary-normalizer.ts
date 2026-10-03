@@ -5,7 +5,7 @@ export interface NormalizedSegment {
   sliceOrder: number;
   segmentOrder: number;
   globalOrder: number;
-  duffelSegmentId: string | null;
+  supplierSegmentId: string | null;
   marketingCarrierIata: string;
   operatingCarrierIata: string | null;
   airlineName: string;
@@ -59,7 +59,7 @@ export function normalizeFlightSegments(segments: FlightSegmentSnapshot[]): Norm
       sliceOrder,
       segmentOrder,
       globalOrder,
-      duffelSegmentId: seg.duffelSegmentId || null,
+      supplierSegmentId: seg.supplierSegmentId || null,
       marketingCarrierIata: seg.airline.iataCode,
       operatingCarrierIata: seg.airline.iataCode,
       airlineName: seg.airline.name,
