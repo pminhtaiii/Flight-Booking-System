@@ -9,6 +9,8 @@ import {
   BookingIntentForValidation,
 } from './booking-passenger-final-validator.service';
 
+// Approved 2026-10-03: fixtures model the neutral Prisma passenger identity while preserving the Duffel DTO id assertion.
+
 const INTENT_ID = 'intent-val-123';
 const ENCRYPTION_KEY = 'a'.repeat(64);
 
@@ -34,7 +36,7 @@ function buildDomesticPassenger(
     issuingCountry: null,
     nationality: 'US',
     travelerProfileId: null,
-    duffelPassengerId: 'pas_duffel_001',
+    supplierPassengerId: 'pas_duffel_001',
     snapshotVersion: 1,
     ...overrides,
   };
@@ -90,7 +92,7 @@ function buildInternationalPassenger(
     issuingCountry: 'GB',
     nationality: 'GB',
     travelerProfileId: 'profile-ada-1',
-    duffelPassengerId: 'pas_duffel_002',
+    supplierPassengerId: 'pas_duffel_002',
     snapshotVersion,
     ...(options.overrides ?? {}),
   };

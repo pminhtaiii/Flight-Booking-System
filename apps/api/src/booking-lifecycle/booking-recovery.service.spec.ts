@@ -3,6 +3,8 @@ import { HttpException, HttpStatus } from '@nestjs/common';
 import { BookingRecoveryService } from './booking-recovery.service';
 import { BookingWithRelations } from './booking-lifecycle.types';
 
+// Approved 2026-10-03: align these Prisma booking/passenger fixtures with neutral columns; keep event metadata keys unchanged.
+
 type InternalLockRecoveryService = {
   reconcileBookingWithLock: (bookingId: string) => Promise<void>;
 };
@@ -101,7 +103,7 @@ describe('BookingRecoveryService', () => {
             eventName: 'booking.confirmed',
           });
         }
-        return { id, status: BookingStatus.CONFIRMED, pnrReference: pnr, duffelOrderId: orderId };
+        return { id, status: BookingStatus.CONFIRMED, pnrReference: pnr, supplierOrderId: orderId };
       }),
       failBooking: jest.fn().mockImplementation(async (id, reason, flight, passenger, dep, tx, eventContext) => {
         if (eventContext?.events) {
@@ -274,7 +276,7 @@ describe('BookingRecoveryService', () => {
       });
       mockPrisma.bookingIntent.findUnique.mockResolvedValue({
         id: 'intent-1',
-        passengers: [{ givenName: 'John', familyName: 'Doe', duffelPassengerId: 'pas_1' }],
+        passengers: [{ givenName: 'John', familyName: 'Doe', supplierPassengerId: 'pas_1' }],
         user: { email: 'john@example.com' },
       });
       mockDuffelService.recovery.mapOrderToSnapshots.mockReturnValue({
@@ -291,7 +293,7 @@ describe('BookingRecoveryService', () => {
 
       expect(result.status).toBe(BookingStatus.CONFIRMED);
       expect(result.pnrReference).toBe('PNR999');
-      expect(result.duffelOrderId).toBe('ord_123');
+      expect(result.supplierOrderId).toBe('ord_123');
       expect(mockPrisma.$transaction).toHaveBeenCalled();
       expect(mockBookingLifecycleService.confirmBooking).toHaveBeenCalledWith(
         'b-1',
@@ -342,7 +344,7 @@ describe('BookingRecoveryService', () => {
             givenName: 'John',
             familyName: 'Doe',
             dateOfBirth: new Date('1980-01-01T00:00:00.000Z'),
-            duffelPassengerId: null,
+            supplierPassengerId: null,
           },
         ],
         user: { email: 'john@example.com' },
@@ -355,7 +357,7 @@ describe('BookingRecoveryService', () => {
       await expect(service.reconcileBookingIfStale(booking)).resolves.toMatchObject({
         status: BookingStatus.CONFIRMED,
         pnrReference: 'PNR999',
-        duffelOrderId: 'ord_123',
+        supplierOrderId: 'ord_123',
       });
       expect(mockDuffelService.recovery.mapOrderToSnapshots).toHaveBeenCalled();
       expect(mockBookingLifecycleService.confirmBooking).toHaveBeenCalledWith(

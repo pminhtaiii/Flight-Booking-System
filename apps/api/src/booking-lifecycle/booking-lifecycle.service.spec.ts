@@ -26,6 +26,8 @@ import { BookingLifecycleService } from './booking-lifecycle.service';
 import { BookingPipelineOutcome } from './booking-lifecycle.types';
 import { FlightSnapshot, PassengerSnapshot } from '@shared/booking-types';
 
+// Approved 2026-10-03: update only lifecycle Prisma fields and the internal supplier outcome field; preserve external keys and values.
+
 describe('BookingLifecycleService', () => {
   let service: BookingLifecycleService;
   let mockPrisma: any;
@@ -535,7 +537,7 @@ describe('BookingLifecycleService', () => {
         id: 'b-1',
         status: BookingStatus.CONFIRMED,
         pnrReference: 'PNR1',
-        duffelOrderId: 'ord-1',
+        supplierOrderId: 'ord-1',
         version: 2,
       });
 
@@ -555,7 +557,7 @@ describe('BookingLifecycleService', () => {
           status: BookingStatus.CONFIRMED,
           failureReason: null,
           pnrReference: 'PNR1',
-          duffelOrderId: 'ord-1',
+          supplierOrderId: 'ord-1',
           flightSnapshot: flightSnapshot as any,
           passengerSnapshot: passengerSnapshot as any,
           departureAt: new Date('2026-09-01T10:00:00.000Z'),
@@ -584,7 +586,7 @@ describe('BookingLifecycleService', () => {
         id: 'b-1',
         status: BookingStatus.CONFIRMED,
         pnrReference: 'PNR1',
-        duffelOrderId: 'ord-1',
+        supplierOrderId: 'ord-1',
         version: 2,
       });
 
@@ -827,7 +829,7 @@ describe('BookingLifecycleService', () => {
         bookingId: 'b-1',
         paymentId: 'p-1',
         pnrReference: 'PNR123',
-        duffelOrderId: 'ord-123',
+        supplierOrderId: 'ord-123',
         flightSnapshot,
         passengerSnapshot,
         occurredAt: '2026-08-23T10:00:00.000Z',
