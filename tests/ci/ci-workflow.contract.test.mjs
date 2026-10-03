@@ -777,6 +777,17 @@ test('security-sast and security-supply-chain jobs meet strict CI guidelines', (
   assertContains(sc, /actions\/upload-artifact@[a-f0-9]{40}/, 'must upload artifacts always');
 });
 
+test('local dependency patch changes route through API, web, and security checks', () => {
+  const detect = jobBlock(workflow(), 'detect-changes');
+
+  for (const service of ['api', 'web', 'security']) {
+    assert.ok(
+      filterBlock(detect, service).includes('patches/**'),
+      `${service} filter must include local dependency patches`,
+    );
+  }
+});
+
 test('ci-status processes security aggregates correctly', () => {
   const source = workflow();
   const summary = jobBlock(source, 'ci-status');

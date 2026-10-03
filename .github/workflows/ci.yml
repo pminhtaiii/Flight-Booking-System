@@ -63,6 +63,7 @@ jobs:
               - 'package.json'
               - 'pnpm-lock.yaml'
               - 'pnpm-workspace.yaml'
+              - 'patches/**'
               - 'tsconfig.json'
               - '.eslintrc.json'
             web:
@@ -78,6 +79,7 @@ jobs:
               - 'package.json'
               - 'pnpm-lock.yaml'
               - 'pnpm-workspace.yaml'
+              - 'patches/**'
               - 'tsconfig.json'
               - '.eslintrc.json'
             agent:
@@ -102,6 +104,7 @@ jobs:
               - 'tests/security/toolchain.json'
               - 'tests/security/exceptions.json'
               - 'docs/security/**'
+              - 'patches/**'
               - 'package.json'
               - 'pnpm-lock.yaml'
               - 'pyproject.toml'
@@ -534,6 +537,10 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 20
+      - name: Install patched Node dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Verify braces patch behavior and supply chain policy
+        run: node --test tests/security/braces-patch.test.mjs tests/security/supply-chain.test.mjs
       - name: Set up uv 0.12.0 and Python 3.11
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
