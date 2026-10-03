@@ -1034,6 +1034,8 @@ All security scanners, linters, container images, and audit drivers are pinned i
 - **Advisory Deferral Policy**: Stored in `docs/security/dependency-advisories.md` with strict expiry (`Policy-Expires-At <= 30 days`), required owner, rationale, and CVE tracking.
 - **Locally patched braces 3.0.3**: `patches/braces@3.0.3.patch` backports upstream PR #72 nesting guards while no fixed release is available. Keep the package/workspace registrations, pnpm 10 lock metadata, and scanner's pinned SHA-256 synchronized. The GHSA-vfj7-8cjw-p6xm exception fails closed without verified patch evidence and expires on 2026-10-12; frozen CI installation and `tests/security/braces-patch.test.mjs` verify the applied behavior before auditing. Replace this local patch and remove the exception when an upstream fixed release passes compatibility checks.
 
+- **Patch review follow-up (2026-10-03)**: Workspace patch registration changes must route through the CI security filter. Workspace advisory verification searches only auditConfig.ignoreGhas, stopping at the next nonblank sibling or parent line (indentation two spaces or less), so later auditConfig lists cannot authorize a patch exception.
+
 ### 5. pytest-cov (Coverage Enforcement)
 - **Pinned Version**: `pytest-cov>=5.0.0` (installed `7.1.0`).
 - **Thresholds**: Strictly enforced by `tests/security/coverage-policy.json`: `>=95.0%` statement coverage and `>=90.0%` branch coverage across changed security modules.
