@@ -151,3 +151,45 @@ The tests cover the approved slice: exact `sel_v1_` JSON/HMAC bytes, ordering, l
 The final task and verification documents accurately record the approved adjustments: neutral segment/new-write coverage remains T051, and nested `supplierOfferId` rejection remains T049. The T046 search test records the current strict-schema `UPSTREAM_UNAVAILABLE` result. These deferrals match the slice boundary and the spec’s compatibility requirements: “Existing `sel_v1_` attestations must keep the signed JSON byte shape” and stale snapshots “may fail closed to a fresh search” (spec.md:82); current HTTP/SSE keys remain compatible (spec.md:98–99).
 
 **Assessment: Spec compliant; approved.** This is a scoped slice review. Feature 029 remains incomplete; T047–T057 are pending.
+
+## CI correction — approved HMAC fixture configuration lookup
+
+The new slice PR is [#367](https://github.com/pminhtaiii/wayfinder/pull/367). First final-HEAD run [37118928496](https://github.com/pminhtaiii/wayfinder/actions/runs/37118928496), commit bbe24647, passed ten jobs including API unit/database E2E, web build, agent tests, smoke/sanity and supply chain. SAST step 10 flagged the new test's duplicated literal HMAC key; aggregate status consequently failed.
+
+The user explicitly approved changing only the new test to obtain the same synthetic key from its injected ConfigService. An unknown value is narrowed to string. The expected complete token, serialized JSON, signature and all assertions remain unchanged; the approval/reason is documented in the test. No production change, security baseline exception or scanner suppression was added.
+
+Correction validation: attestation 27/27, API/shared no-emit typechecks, combined API/shared ESLint, and full network-guarded API 130 suites/2,331 tests passed (exit 0, 295.313 seconds). The worker initially invoked pnpm, which stopped at package-manager reconciliation before Jest; no lockfile change was present, and all successful checks used direct installed Node entrypoints. Further pnpm use was stopped.
+
+Exact strict local SAST command was attempted with process permission, but the Windows Semgrep wrapper lacked its executable. The 824-file census is not a completed scan or clean result. Strict remote SAST remains required on the corrective final HEAD. No local scanner install or dependency change was made.
+
+### Correction Standards review
+
+# Standards Review — Approved CI Correction
+
+Baseline `bbe24647`; reviewed `d1c0c64a` plus the uncommitted verification appendix. Scope is the HMAC fixture lookup in `apps/api/src/agent-gateway/selection-attestation.service.spec.ts` and its documentation.
+
+**Documented-standard findings: 0.** The test reads the configured fixture as `unknown` and narrows it before use; no `any` or assertion is introduced. `expectedHmacKey` is clear, and the failure message identifies a missing test fixture. The expected token, JSON, signature, and existing assertions are preserved. The recorded user approval and rationale in the test comment and verification appendix satisfy workflow Rule 2’s approval and documentation requirements (`context/workflow.md:222–231`; `slice-6-1-verification.md:155–163`). This follows the TypeScript typing rules and behavior-focused test guidance (`context/code-standards.md:23–28, 560–565`; `context/workflow.md:233–240`).
+
+**Heuristic smell findings: 0 actionable.** No Mysterious Name, duplicated logic, Feature Envy, Data Clumps, domain Primitive Obsession, Repeated Switches, Shotgun Surgery, Divergent Change, speculative abstraction, problematic Message Chain, Middle Man, or Refused Bequest is introduced. The lookup and narrow guard are local to the one oracle assertion; extracting them would add indirection without reuse.
+
+**Severity:** Critical 0 · Important 0 · Minor 0.
+
+### Correction Spec review
+
+# Spec Review — HMAC fixture CI correction
+
+Baseline: `bbe24647`
+Reviewed HEAD: `d1c0c64add71bd2a5373798e1e7f3341f7211fa1`
+Scope: the committed HMAC test correction and the unstaged CI-correction appendix.
+
+## Findings
+
+None. **Critical: 0 · Important: 0 · Minor: 0.** Missing: 0 · Partial: 0 · Wrong: 0 · Scope creep: 0.
+
+The governing requirement says: “Selection-attestation HMAC payloads MUST retain their current serialized key order and values” (spec.md, FR-010a). The correction changes only the new test's digest-oracle key lookup: it reads the existing synthetic `ATTESTATION_SECRET` fixture through injected `ConfigService`, stores the result as `unknown`, and narrows it with a runtime string check. It preserves the literal complete expected token, decoded serialized JSON assertion, and digest assertion. The pinned token still fixes the exact digest independently of the derived fixture key.
+
+This also matches the plan's goal, “Test-only characterization through current public interfaces. No production behavior or persistence changes.” The diff contains no production behavior, task, schema, dependency, or unrelated test changes. The earlier clean T044–T046 reviews remain applicable to the unchanged slice; this review covers the corrective delta.
+
+The appendix accurately records the 130-suite / 2,331-test API pass and other stated checks. Exact strict local SAST did not run because the Windows scanner wrapper lacked its executable; the census is correctly not called a clean scan. Strict remote SAST on this corrective HEAD remains pending and is not counted as passing. No suppression is claimed.
+
+**Assessment: Spec compliant; approved.**
