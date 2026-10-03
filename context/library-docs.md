@@ -159,7 +159,7 @@ async createOrder(flightOffer: FlightOffer, travelers: Traveler[]): Promise<Orde
 
 ### Supplier Setup & Provider Override
 
-`DuffelCoreModule` owns the configured SDK singleton. The factory in `apps/api/src/supplier/core/duffel-sdk.provider.ts` validates `DUFFEL_ACCESS_TOKEN` and `DUFFEL_API_URL`, then supplies `DUFFEL_SDK` and `DUFFEL_SDK_CONFIGURATION` to supplier adapters. New capability code uses constructor injection rather than constructing SDK clients in feature services. The legacy `DuffelService` remains during consumer migration and is scheduled for deletion in T042.
+`DuffelCoreModule` owns the configured SDK singleton. The factory in `apps/api/src/supplier/core/duffel-sdk.provider.ts` validates `DUFFEL_ACCESS_TOKEN` and `DUFFEL_API_URL`, then supplies `DUFFEL_SDK` and `DUFFEL_SDK_CONFIGURATION` to supplier adapters. Capability code uses constructor injection rather than constructing SDK clients in feature services. T042 removed the legacy `DuffelService`/`DuffelModule` monolith. T058 removed global visibility; only supplier capability modules that explicitly import the core can resolve its SDK, configuration, and budget providers. A negative Nest module-composition test verifies unrelated modules cannot resolve `DUFFEL_SDK`.
 
 **Rules:**
 
@@ -171,7 +171,7 @@ async createOrder(flightOffer: FlightOffer, travelers: Traveler[]): Promise<Orde
 - `DuffelRateBudgetService` reserves every actual remote attempt against the atomic daily total; cache hits are free. Supplier adapters own admission and error mapping.
 - Order capability services remain concrete: cancellation and recovery inject `DuffelOrderAdapter`; recovery also injects `OrderSnapshotNormalizer`. They neither expose SDK payload parsing to feature consumers nor introduce generic cancellation/recovery ports. `SupplierOrderModule` owns these services and `FULFILLMENT_GATEWAY_PORT`; cancellation, booking recovery, disruption sync, and payment fulfillment import its exports (T038–T039).
 - Cancellation replay succeeds only after explicit cancelled-order evidence. Unconfirmed or failed reconciliation retains failure; typed budget denial starts no reconciliation. Remote recovery preserves partial snapshot defaults and uses one complete-order retrieval before local normalization. `DuffelRecoveryService.mapOrderToSnapshots` reuses that normalizer for already-persisted order evidence without issuing another remote request.
-- `DuffelModule` temporarily re-exports `SupplierOrderModule` and remains registered in `AppModule` while unrelated legacy consumers migrate in later tasks.
+- `AppModule` imports the supplier capability modules directly; there is no `DuffelModule` runtime bridge.
 
 ---
 

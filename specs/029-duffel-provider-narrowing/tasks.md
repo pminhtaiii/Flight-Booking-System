@@ -105,7 +105,7 @@
 - [x] T040 [US3] Preserve order-created idempotency checkpoint, payment hold, PROCESSING booking, and order evidence on unconfirmed cancellation in both `executeConfirmPayment` and `handleBackgroundError` of `apps/api/src/payment-fulfillment/payment-fulfillment.saga.ts`; do not finalize the key or void/fail until cancellation is confirmed.
 - [x] T041 [US3] Defer stale recovery on unconfirmed cancellation via existing `CacheService` key `booking:recovery:defer:{bookingId}` with TTL to budget retry time or bounded backoff, then cancel/confirm before void/fail in `apps/api/src/booking-lifecycle/booking-recovery.service.ts`; missing key causes safe recheck and duplicate remote effects remain blocked.
 - [x] T042 [US3] Delete `apps/api/src/duffel/duffel.service.ts`, `apps/api/src/duffel/duffel.module.ts`, `apps/api/src/duffel/duffel.service.spec.ts`, and moved duplicate normalizer/cleanup files after equivalent capability tests and all consumers use the new modules.
-- [ ] T043 [US3] Run order/saga/recovery/privacy and API compile checkpoint in `specs/029-duffel-provider-narrowing/quickstart.md`.
+- [x] T043 [US3] Run order/saga/recovery/privacy and API compile checkpoint in `specs/029-duffel-provider-narrowing/quickstart.md`.
 
 **Checkpoint**: The monolith is gone, and money-path replay/compensation is recoverable under budget denial.
 
