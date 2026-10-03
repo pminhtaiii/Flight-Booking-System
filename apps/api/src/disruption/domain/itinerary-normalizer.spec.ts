@@ -221,9 +221,9 @@ describe('ItineraryNormalizer', () => {
           arrivalAt: '2026-10-10T10:00:00+07:00',
           duration: 'PT2H',
           duffelSegmentId: 'seg_legacy_42',
-          sliceOrder: 0,
-          segmentOrder: 0,
-          globalOrder: 0,
+          sliceOrder: 1,
+          segmentOrder: 2,
+          globalOrder: 3,
         },
       ];
 
@@ -231,9 +231,9 @@ describe('ItineraryNormalizer', () => {
 
       expect(result[0]).toMatchObject({
         duffelSegmentId: 'seg_legacy_42',
-        sliceOrder: 0,
-        segmentOrder: 0,
-        globalOrder: 0,
+        sliceOrder: 1,
+        segmentOrder: 2,
+        globalOrder: 3,
         flightNumber: 'NW42',
         departureAirportIata: 'SGN',
         arrivalAirportIata: 'HAN',
