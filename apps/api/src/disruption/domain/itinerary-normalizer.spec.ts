@@ -202,7 +202,7 @@ describe('ItineraryNormalizer', () => {
       });
     });
 
-    it('preserves legacy Duffel segment identity and ordering', () => {
+    it('preserves legacy Duffel segment identity and ordering', (): void => {
       const legacySegments: FlightSegmentSnapshot[] = [
         {
           airline: { name: 'Northwind Air', iataCode: 'NW' },

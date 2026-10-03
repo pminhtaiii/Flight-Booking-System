@@ -1,5 +1,9 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { Test } from '@nestjs/testing';
 import { BookingStatus, DisruptionStatus } from '@prisma/client';
+import { BookingLifecycleService } from '@/booking-lifecycle/booking-lifecycle.service';
+import { PrismaService } from '@/prisma/prisma.service';
 import {
   BookingManagementService,
   parseDuffelCancellationQuoteId,
@@ -387,7 +391,7 @@ describe('BookingManagementService', () => {
       );
     });
 
-    it('preserves a legacy flight snapshot and segment identity in the original itinerary', async () => {
+    it('preserves legacy snapshot identity in the original itinerary', async (): Promise<void> => {
       process.env.FEATURE_FLAG_DISRUPTION_SURFACING = 'false';
 
       const legacySnapshot = {
@@ -423,16 +427,26 @@ describe('BookingManagementService', () => {
           arrivalAirport: { ...segment.arrivalAirport },
         })),
       };
+      const testModule = await Test.createTestingModule({
+        providers: [
+          BookingManagementService,
+          { provide: PrismaService, useValue: prisma },
+          { provide: BookingLifecycleService, useValue: bookingLifecycleService },
+          { provide: EventEmitter2, useValue: eventEmitter },
+        ],
+      }).compile();
       prisma.booking.findUnique.mockResolvedValue(
         mockDetailBooking({ flightSnapshot: storedSnapshot }),
       );
 
-      const result = await service.getBookingDetail('booking-1', 'user-1');
+      const injectedService = testModule.get(BookingManagementService);
+      const result = await injectedService.getBookingDetail('booking-1', 'user-1');
 
       expect(result.flightSnapshot).toEqual(storedSnapshot);
       expect(result.currentItinerary.source).toBe('ORIGINAL');
       expect(result.currentItinerary.segments).toEqual(storedSnapshot.segments);
       expect(result.currentItinerary.segments[0].duffelSegmentId).toBe('seg_legacy_42');
+      await testModule.close();
     });
 
     it('correctly maps ancillary summaries (seats, baggage) with passenger names', async () => {
