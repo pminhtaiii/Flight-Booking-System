@@ -11,10 +11,10 @@ Do not mark a capability complete because it appears in architecture or planning
 Overall status:
 
 ```text
-FEATURES 001–028 100% COMPLETE / FEATURE 029 PHASES 0–4 COMPLETE LOCALLY / PHASE 5 IN PROGRESS (T032–T041 COMPLETE LOCALLY; T042–T043 PENDING) / PHASES 6–7 PENDING
+FEATURES 001–028 100% COMPLETE / FEATURE 029 PHASES 0–5 COMPLETE LOCALLY (T032–T043; T058 CONVERGENCE CLOSED) / PHASES 6–7 PENDING
 ```
 
-The system operates on branch `codex/029-duffel-provider-narrowing`. Features 001–028 and Feature 029 Phases 0–4 are complete locally. Phase 5 is complete locally through T041: supplier order module/fulfillment binding, order-consumer rewiring, safe saga compensation (T040), and stale recovery deferral (T041) are implemented. Both independent task reviews had zero findings. Current Slice 4 validation passed 132 API suites/2,404 tests with the network guard, 59 broader transactional E2E tests, shared contracts (110), and static CI contracts (23). Scoped T040/T041 convergence and final Spec review passed with zero findings. Final Standards review found a test annotation issue fixed in ed24a4c0 and independently rechecked with zero open findings and a nonblocking local helper duplication smell. Evidence is in the [Slice 4 verification record](../specs/029-duffel-provider-narrowing/slice-4-verification.md). Previous local checks through T039 remain recorded here: 132 API suites/2,384 tests, 481 focused order/consumer tests, module composition (29 tests), five consumer E2E suites (34 tests), four migrated transactional E2E suites (59 tests), API typecheck, and API/shared lint. The first broader API run exceeded an existing 10 ms p95 threshold under concurrent test load; the isolated retry passed without changing code or the threshold. Database checks used `feature029_slice2_test`; fixture corrections have explicit human approval comments. T041 validation on 2026-10-02 passed the recovery suite (55/55), payment safety E2E (2/2), API TypeScript check, and API lint. Slice 3 convergence and review findings remain recorded in the [slice verification record](../specs/029-duffel-provider-narrowing/slice-3-verification.md); remote CI is checked on the draft PR. T042–T043, neutral naming/schema (T044–T054), and final audit (T055–T057) remain pending.
+The system operates on branch `codex/029-duffel-provider-narrowing`. Features 001–028 and Feature 029 Phases 0–5 are complete locally. T042 removed the legacy Duffel monolith; T058 removed global SDK/configuration/budget visibility and added a negative Nest module-composition regression. T043 passed the guarded API suite (130 suites/2,326 tests), all affected database E2Es (16 suites/145 tests), shared/static contracts, typecheck, and lint. The [Slice 5 verification record](../specs/029-duffel-provider-narrowing/slice-5-verification.md) has exact commands, exits, counts, and the scoped convergence recheck. Phases 6–7 remain pending; no remote CI success is claimed. Slice 4 and earlier history is preserved in the linked [Slice 4](../specs/029-duffel-provider-narrowing/slice-4-verification.md) and [Slice 3](../specs/029-duffel-provider-narrowing/slice-3-verification.md) records.
 
 ---
 
@@ -27,13 +27,13 @@ Detailed phase-by-phase execution, live task checklists, and exit gates are trac
 - [x] Phase 2: Core Foundation & Shared Rate Budget (T005–T012)
 - [x] Phase 3: Search Capability Isolation (US1 Complete 🎯) (T013–T024)
 - [x] Phase 4: Ancillary Capability Isolation (US2) (T025–T031 complete locally)
-- [ ] Phase 5: Order Capability Isolation (US3) (T032–T043; complete locally through T041)
+- [x] Phase 5: Order Capability Isolation (US3) (T032–T043; locally complete, including T058 convergence)
 - [ ] Phase 6: Neutral Naming & Physical Schema (US4) (T044–T054)
 - [ ] Phase 7: Final Verification & Audit (T055–T057)
 
 Exit gate:
 ```text
-all 8 phases pass required exit gates; see active-feature.md for live checkpoints
+all planned feature phases and convergence tasks pass required exit gates; see active-feature.md for live checkpoints
 ```
 
 ---

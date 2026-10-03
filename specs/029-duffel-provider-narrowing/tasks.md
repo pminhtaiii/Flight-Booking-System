@@ -104,8 +104,8 @@
 - [x] T039 [US3] Rewire order consumers and Nest imports in `apps/api/src/cancellation/cancellation.service.ts`, `apps/api/src/booking-lifecycle/booking-recovery.service.ts`, `apps/api/src/disruption/sync/supplier-sync.service.ts`, `apps/api/src/payment-fulfillment/payment-fulfillment.module.ts`, and `apps/api/src/app.module.ts`; update module-wiring tests.
 - [x] T040 [US3] Preserve order-created idempotency checkpoint, payment hold, PROCESSING booking, and order evidence on unconfirmed cancellation in both `executeConfirmPayment` and `handleBackgroundError` of `apps/api/src/payment-fulfillment/payment-fulfillment.saga.ts`; do not finalize the key or void/fail until cancellation is confirmed.
 - [x] T041 [US3] Defer stale recovery on unconfirmed cancellation via existing `CacheService` key `booking:recovery:defer:{bookingId}` with TTL to budget retry time or bounded backoff, then cancel/confirm before void/fail in `apps/api/src/booking-lifecycle/booking-recovery.service.ts`; missing key causes safe recheck and duplicate remote effects remain blocked.
-- [ ] T042 [US3] Delete `apps/api/src/duffel/duffel.service.ts`, `apps/api/src/duffel/duffel.module.ts`, `apps/api/src/duffel/duffel.service.spec.ts`, and moved duplicate normalizer/cleanup files after equivalent capability tests and all consumers use the new modules.
-- [ ] T043 [US3] Run order/saga/recovery/privacy and API compile checkpoint in `specs/029-duffel-provider-narrowing/quickstart.md`.
+- [x] T042 [US3] Delete `apps/api/src/duffel/duffel.service.ts`, `apps/api/src/duffel/duffel.module.ts`, `apps/api/src/duffel/duffel.service.spec.ts`, and moved duplicate normalizer/cleanup files after equivalent capability tests and all consumers use the new modules.
+- [x] T043 [US3] Run order/saga/recovery/privacy and API compile checkpoint in `specs/029-duffel-provider-narrowing/quickstart.md`.
 
 **Checkpoint**: The monolith is gone, and money-path replay/compensation is recoverable under budget denial.
 
@@ -163,3 +163,9 @@ US1 is the MVP search/detail/readiness slice. US2 and US3 share the old monolith
 ## Implementation strategy
 
 Complete setup and foundation, ship the US1 search boundary checkpoint first, then ancillary and order extraction. Stop at each checkpoint until focused tests and API compile pass. Delete the monolith before neutral renaming. Finish with the physical migration, byte-compatible external contracts, full security/CI gates, and context documentation sync. No second supplier, new public endpoint, or speculative port is part of this work.
+
+## Phase 8: Convergence (Phase 5 checkpoint)
+
+- [x] T058 Remove `@Global()` from `apps/api/src/supplier/core/duffel-core.module.ts` so SDK/configuration/budget providers resolve only through explicit supplier capability-module imports, and add a negative Nest composition test in `apps/api/src/supplier/core/duffel-core.module.spec.ts` per the Structure Decision in `specs/029-duffel-provider-narrowing/plan.md` and the Nest module dependencies in `specs/029-duffel-provider-narrowing/contracts/supplier-boundaries.md` (`contradicts`).
+
+Dependency: T058 gates T043 and must finish before US4 tasks T044–T054.

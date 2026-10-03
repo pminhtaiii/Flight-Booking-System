@@ -5,7 +5,6 @@ import {
 } from '@/payment-fulfillment/utils/bounded-semaphore';
 import {
   CreateOrderInput,
-  FULFILLMENT_GATEWAY_PORT,
   FulfillmentGatewayPort,
   PassengerEnrichmentInput,
   PersistedOrderEvidence,
@@ -15,7 +14,6 @@ import { HttpException, HttpStatus } from '@nestjs/common';
 import type { Provider } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { CacheService } from '@/cache/cache.service';
-import { PrismaService } from '@/prisma/prisma.service';
 import { DUFFEL_SDK, DUFFEL_SDK_CONFIGURATION } from '@/supplier/core/duffel-core.module';
 import { DuffelRateBudgetService } from '@/supplier/core/duffel-rate-budget.service';
 import { DuffelCancellationService } from './duffel-cancellation.service';
@@ -23,7 +21,6 @@ import { DuffelFulfillmentAdapter } from './duffel-fulfillment.adapter';
 import { DuffelOrderAdapter } from './duffel-order.adapter';
 import { DuffelRecoveryService } from './duffel-recovery.service';
 import { OrderSnapshotNormalizer } from './order-snapshot.normalizer';
-import { DuffelModule } from '@/duffel/duffel.module';
 
 type SdkResponse = { data: unknown };
 type DuffelSdkDouble = {
@@ -349,7 +346,7 @@ describe('DuffelFulfillmentAdapter', () => {
       expect(parsedRequestBody()).toMatchObject({ data: { selected_offers: ['off_test_123'] } });
     });
 
-    it('releases permit and never calls DuffelService if beforeInvoke fails', async () => {
+    it('releases permit and never calls the SDK if beforeInvoke fails', async () => {
       mockControl.beforeInvoke = jest.fn().mockRejectedValue(new Error('Pre-flight lock failed'));
 
       await expect(adapter.createOrder(validCreateOrderInput, mockControl)).rejects.toThrow(
@@ -481,7 +478,7 @@ describe('DuffelFulfillmentAdapter', () => {
       expect(outcome.status).toBe(status);
     });
 
-    it('releases permit and never calls DuffelService if beforeInvoke fails', async () => {
+    it('releases permit and never calls the SDK if beforeInvoke fails', async () => {
       mockControl.beforeInvoke = jest.fn().mockRejectedValue(new Error('Pre-flight lock failed'));
 
       await expect(adapter.cancelOrder('ord_123', mockControl)).rejects.toThrow(
@@ -626,7 +623,7 @@ describe('DuffelFulfillmentAdapter', () => {
       expect(adapter.semaphore.activeCount).toBe(0);
     });
 
-    it('releases permit and never calls DuffelService if beforeInvoke fails', async () => {
+    it('releases permit and never calls the SDK if beforeInvoke fails', async () => {
       mockControl.beforeInvoke = jest.fn().mockRejectedValue(new Error('Pre-flight lock failed'));
 
       await expect(
@@ -1025,39 +1022,4 @@ describe('DuffelFulfillmentAdapter', () => {
     });
   });
 
-  describe('Module Wiring (DuffelModule)', () => {
-    it('binds and exports FULFILLMENT_GATEWAY_PORT as a singleton alias of DuffelFulfillmentAdapter', async () => {
-      const moduleRef: TestingModule = await Test.createTestingModule({
-        imports: [DuffelModule],
-      })
-        .overrideProvider(DUFFEL_SDK)
-        .useValue({
-          offers: { get: mockOffersGet },
-          orders: { get: mockOrdersGet },
-          orderCancellations: {
-            create: mockCancellationCreate,
-            confirm: mockCancellationConfirm,
-          },
-        })
-        .overrideProvider(DUFFEL_SDK_CONFIGURATION)
-        .useValue({ token: 'test-token', basePath: 'http://127.0.0.1:4010' })
-        .overrideProvider(CacheService)
-        .useValue({ checkAndIncrement: cacheCheck })
-        .overrideProvider(PrismaService)
-        .useValue({})
-        .compile();
-      testModules.push(moduleRef);
-
-      const gatewayPort = moduleRef.get<FulfillmentGatewayPort>(FULFILLMENT_GATEWAY_PORT);
-      const adapterInstance = moduleRef.get(DuffelFulfillmentAdapter, { strict: false });
-
-      expect(gatewayPort).toBeDefined();
-      expect(adapterInstance).toBeDefined();
-      expect(gatewayPort).toBeInstanceOf(DuffelFulfillmentAdapter);
-      expect(adapterInstance).toBeInstanceOf(DuffelFulfillmentAdapter);
-      expect(moduleRef.get(FULFILLMENT_GATEWAY_PORT)).toBe(
-        moduleRef.get(DuffelFulfillmentAdapter, { strict: false }),
-      );
-    });
-  });
 });

@@ -159,7 +159,7 @@ async createOrder(flightOffer: FlightOffer, travelers: Traveler[]): Promise<Orde
 
 ### Supplier Setup & Provider Override
 
-`DuffelCoreModule` owns the configured SDK singleton. The factory in `apps/api/src/supplier/core/duffel-sdk.provider.ts` validates `DUFFEL_ACCESS_TOKEN` and `DUFFEL_API_URL`, then supplies `DUFFEL_SDK` and `DUFFEL_SDK_CONFIGURATION` to supplier adapters. New capability code uses constructor injection rather than constructing SDK clients in feature services. The legacy `DuffelService` remains during consumer migration and is scheduled for deletion in T042.
+`DuffelCoreModule` owns the configured SDK singleton. The factory in `apps/api/src/supplier/core/duffel-sdk.provider.ts` validates `DUFFEL_ACCESS_TOKEN` and `DUFFEL_API_URL`, then supplies `DUFFEL_SDK` and `DUFFEL_SDK_CONFIGURATION` to supplier adapters. Capability code uses constructor injection rather than constructing SDK clients in feature services. T042 removed the legacy `DuffelService`/`DuffelModule` monolith. T058 removed global visibility; only supplier capability modules that explicitly import the core can resolve its SDK, configuration, and budget providers. A negative Nest module-composition test verifies unrelated modules cannot resolve `DUFFEL_SDK`.
 
 **Rules:**
 
@@ -171,7 +171,7 @@ async createOrder(flightOffer: FlightOffer, travelers: Traveler[]): Promise<Orde
 - `DuffelRateBudgetService` reserves every actual remote attempt against the atomic daily total; cache hits are free. Supplier adapters own admission and error mapping.
 - Order capability services remain concrete: cancellation and recovery inject `DuffelOrderAdapter`; recovery also injects `OrderSnapshotNormalizer`. They neither expose SDK payload parsing to feature consumers nor introduce generic cancellation/recovery ports. `SupplierOrderModule` owns these services and `FULFILLMENT_GATEWAY_PORT`; cancellation, booking recovery, disruption sync, and payment fulfillment import its exports (T038–T039).
 - Cancellation replay succeeds only after explicit cancelled-order evidence. Unconfirmed or failed reconciliation retains failure; typed budget denial starts no reconciliation. Remote recovery preserves partial snapshot defaults and uses one complete-order retrieval before local normalization. `DuffelRecoveryService.mapOrderToSnapshots` reuses that normalizer for already-persisted order evidence without issuing another remote request.
-- `DuffelModule` temporarily re-exports `SupplierOrderModule` and remains registered in `AppModule` while unrelated legacy consumers migrate in later tasks.
+- `AppModule` imports the supplier capability modules directly; there is no `DuffelModule` runtime bridge.
 
 ---
 
@@ -1030,8 +1030,11 @@ All security scanners, linters, container images, and audit drivers are pinned i
 
 ### 4. pip-audit & pnpm audit (Supply Chain / SCA)
 - **pip-audit**: CLI `2.7.3`, PyPI advisory service, maximum advisory age 24 hours. Scans frozen locked requirements exported from `apps/agent/uv.lock` via `uv export --package agent --locked --no-dev`.
-- **pnpm audit**: CLI `9.15.4` / `11.9.0`, live npm registry query, audit level `moderate`.
+- **pnpm audit**: CI CLI `10.34.5`, aligned across Node validation and security jobs; live npm registry query, audit level `moderate`.
 - **Advisory Deferral Policy**: Stored in `docs/security/dependency-advisories.md` with strict expiry (`Policy-Expires-At <= 30 days`), required owner, rationale, and CVE tracking.
+- **Locally patched braces 3.0.3**: `patches/braces@3.0.3.patch` backports upstream PR #72 nesting guards while no fixed release is available. Keep the package/workspace registrations, pnpm 10 lock metadata, and scanner's pinned SHA-256 synchronized. The GHSA-vfj7-8cjw-p6xm exception fails closed without verified patch evidence and expires on 2026-10-12; frozen CI installation and `tests/security/braces-patch.test.mjs` verify the applied behavior before auditing. Replace this local patch and remove the exception when an upstream fixed release passes compatibility checks.
+
+- **Patch review follow-up (2026-10-03)**: Workspace patch registration changes must route through the CI security filter. Workspace advisory verification searches only auditConfig.ignoreGhas, stopping at the next nonblank sibling or parent line (indentation two spaces or less), so later auditConfig lists cannot authorize a patch exception.
 
 ### 5. pytest-cov (Coverage Enforcement)
 - **Pinned Version**: `pytest-cov>=5.0.0` (installed `7.1.0`).
