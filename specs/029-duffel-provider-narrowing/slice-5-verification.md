@@ -4,7 +4,7 @@ Date: 2026-10-03. Scope: T043 checkpoint and scoped T042–T043 / US3 convergenc
 
 ## Status
 
-T043's local verification gates pass, including the provider-visibility requirement closed by T058. The independent T058 source/test review and final T043 evidence/context review both returned GO with zero findings. No remote CI result is claimed.
+T043's local verification gates pass, including the provider-visibility requirement closed by T058. The independent T058 source/test review and final T043 evidence/context review both returned GO with zero findings. Remote CI results and outstanding gates are recorded below.
 
 ## Verification gates
 
@@ -55,6 +55,12 @@ Pnpm 9.15.4 generated the patch metadata, and its frozen lockfile-only validatio
 Independent corrective review: Standards initially found one P2 stale summary count; corrected and rechecked with zero remaining findings. Spec initially found one P2 missing malformed/raised-limit regression coverage; added and rechecked with zero remaining findings. No other source finding was reported. Remote convergence is pending the pushed remediation HEAD.
 
 Final independent Standards and Spec reviews assessed the committed `4809eff9...HEAD` remediation through `d8d92a1d`, including patch-only routing and final verification evidence: **0 findings on each axis; worst severity none**. Patch implementation is committed separately as `923ffc2c`; scanner/CI enforcement and docs as `d8d92a1d`.
+
+### Corrective package-manager alignment
+
+Remote run `37093918369` on `e2912e98` passed SAST, supply-chain scanning, and agent validation. The security job proved the full frozen pnpm 9 install and applied patch regressions on Linux. Regular API/web jobs instead use pnpm 10.34.5 and failed frozen installation because its patch hash uses SHA-256 rather than pnpm 9's base32 algorithm. The initial verification selected the security jobs' older CLI and missed this existing mixed-version setup; patch bytes were identical in the working tree and committed blob, both LF.
+
+The user explicitly approved updating existing pinned-version and patch-lock fixture expectations to pnpm 10.34.5 on 2026-10-03. The correction aligns the security jobs and toolchain inventory with the existing regular-job pin; retains object-form `hash`/`path` checks; and replaces only the lock patch hash, snapshot key, and two consumer references (4 insertions/4 deletions, committed as `4c870daf`). The exact pnpm 10.34.5 CLI reproduced the original frozen mismatch, then passed frozen lockfile-only validation after correction; unchanged behavioral regressions remain 7/7. No dependency version or source-patch byte changed. Scanner tests passed 18/18 and CI contracts passed 24/24, including consistent pins across all frozen-install Node jobs and missing/incorrect lock hash/path rejection. Scanner/security-test lint, syntax, and diff checks passed; the CI contract file's 19 existing `no-regex-spaces` lint issues were unchanged. The corrective remote rerun remains pending.
 
 ## Final dual-axis review
 

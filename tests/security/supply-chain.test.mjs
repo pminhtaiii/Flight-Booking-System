@@ -804,7 +804,29 @@ function replaceWorkspacePatchPath(content, replacement) {
 function replaceLockPatchHash(content) {
   return content.replace(
     /(^patchedDependencies:\r?\n[\s\S]*?^\s{2}['"]?braces@3\.0\.3['"]?:\r?\n\s{4}hash:\s*)[^\r\n]+/m,
-    `$1${'0'.repeat(128)}`,
+    // Human-approved 2026-10-03: pnpm 10 lock hashes use SHA-256 hex.
+    `$1${'0'.repeat(64)}`,
+  );
+}
+
+function removeLockPatchHash(content) {
+  return content.replace(
+    /(^patchedDependencies:\r?\n[\s\S]*?^\s{2}['"]?braces@3\.0\.3['"]?:\r?\n)\s{4}hash:[^\r\n]*\r?\n/m,
+    '$1',
+  );
+}
+
+function replaceLockPatchPath(content, replacement) {
+  return content.replace(
+    /(^patchedDependencies:\r?\n[\s\S]*?^\s{2}['"]?braces@3\.0\.3['"]?:\r?\n\s{4}hash:\s*[^\r\n]+\r?\n\s{4}path:\s*)[^\r\n]+/m,
+    `$1${replacement}`,
+  );
+}
+
+function removeLockPatchPath(content) {
+  return content.replace(
+    /(^patchedDependencies:\r?\n[\s\S]*?^\s{2}['"]?braces@3\.0\.3['"]?:\r?\n\s{4}hash:\s*[^\r\n]+\r?\n)\s{4}path:[^\r\n]*\r?\n/m,
+    '$1',
   );
 }
 
@@ -872,6 +894,36 @@ test('ignores the braces advisory only when its reviewed patch and registrations
         const lock = readFileSync(lockPath, 'utf8');
         const changed = replaceLockPatchHash(lock);
         assert.notEqual(changed, lock, 'lock patch hash must exist in fixture');
+        writeFileSync(lockPath, changed, 'utf8');
+      },
+    ],
+    [
+      'missing lock hash',
+      (rootDir) => {
+        const lockPath = join(rootDir, 'pnpm-lock.yaml');
+        const lock = readFileSync(lockPath, 'utf8');
+        const changed = removeLockPatchHash(lock);
+        assert.notEqual(changed, lock, 'lock patch hash must exist in fixture');
+        writeFileSync(lockPath, changed, 'utf8');
+      },
+    ],
+    [
+      'lock path binding',
+      (rootDir) => {
+        const lockPath = join(rootDir, 'pnpm-lock.yaml');
+        const lock = readFileSync(lockPath, 'utf8');
+        const changed = replaceLockPatchPath(lock, 'patches/unregistered.patch');
+        assert.notEqual(changed, lock, 'lock patch path must exist in fixture');
+        writeFileSync(lockPath, changed, 'utf8');
+      },
+    ],
+    [
+      'missing lock path',
+      (rootDir) => {
+        const lockPath = join(rootDir, 'pnpm-lock.yaml');
+        const lock = readFileSync(lockPath, 'utf8');
+        const changed = removeLockPatchPath(lock);
+        assert.notEqual(changed, lock, 'lock patch path must exist in fixture');
         writeFileSync(lockPath, changed, 'utf8');
       },
     ],

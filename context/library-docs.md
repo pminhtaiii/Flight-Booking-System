@@ -1030,9 +1030,9 @@ All security scanners, linters, container images, and audit drivers are pinned i
 
 ### 4. pip-audit & pnpm audit (Supply Chain / SCA)
 - **pip-audit**: CLI `2.7.3`, PyPI advisory service, maximum advisory age 24 hours. Scans frozen locked requirements exported from `apps/agent/uv.lock` via `uv export --package agent --locked --no-dev`.
-- **pnpm audit**: CLI `9.15.4` / `11.9.0`, live npm registry query, audit level `moderate`.
+- **pnpm audit**: CI CLI `10.34.5`, aligned across Node validation and security jobs; live npm registry query, audit level `moderate`.
 - **Advisory Deferral Policy**: Stored in `docs/security/dependency-advisories.md` with strict expiry (`Policy-Expires-At <= 30 days`), required owner, rationale, and CVE tracking.
-- **Locally patched braces 3.0.3**: `patches/braces@3.0.3.patch` backports upstream PR #72 nesting guards while no fixed release is available. Keep the package/workspace registrations, pnpm 9 lock metadata, and scanner's pinned SHA-256 synchronized. The GHSA-vfj7-8cjw-p6xm exception fails closed without verified patch evidence and expires on 2026-10-12; frozen CI installation and `tests/security/braces-patch.test.mjs` verify the applied behavior before auditing. Replace this local patch and remove the exception when an upstream fixed release passes compatibility checks.
+- **Locally patched braces 3.0.3**: `patches/braces@3.0.3.patch` backports upstream PR #72 nesting guards while no fixed release is available. Keep the package/workspace registrations, pnpm 10 lock metadata, and scanner's pinned SHA-256 synchronized. The GHSA-vfj7-8cjw-p6xm exception fails closed without verified patch evidence and expires on 2026-10-12; frozen CI installation and `tests/security/braces-patch.test.mjs` verify the applied behavior before auditing. Replace this local patch and remove the exception when an upstream fixed release passes compatibility checks.
 
 ### 5. pytest-cov (Coverage Enforcement)
 - **Pinned Version**: `pytest-cov>=5.0.0` (installed `7.1.0`).

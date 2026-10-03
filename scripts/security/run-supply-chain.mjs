@@ -28,7 +28,6 @@ const VERIFIED_BRACES_PACKAGE = 'braces@3.0.3';
 const VERIFIED_BRACES_PATCH_PATH = 'patches/braces@3.0.3.patch';
 const VERIFIED_BRACES_PATCH_SHA256 =
   '795ff4ec62054830af82791060bccad7e6b551a7399488cbbd5dcb6017931861';
-const VERIFIED_BRACES_LOCK_HASH = 'wdbddy4mt5aotj5jwldlwcoqua';
 const VERIFIED_BRACES_PATCH_ERROR = `[Supply Chain Exception Error] ${VERIFIED_BRACES_ADVISORY} requires the registered, SHA-256-pinned reviewed braces patch`;
 
 function emptyCounts() {
@@ -459,7 +458,7 @@ function lockPatchRegistrationMatches(content) {
   if (entryIndexes.length !== 1) return false;
   const entry = section.slice(entryIndexes[0] + 1, entryIndexes[0] + 3);
   return (
-    entry[0] === `    hash: ${VERIFIED_BRACES_LOCK_HASH}` &&
+    entry[0] === `    hash: ${VERIFIED_BRACES_PATCH_SHA256}` &&
     entry[1] === `    path: ${VERIFIED_BRACES_PATCH_PATH}`
   );
 }
