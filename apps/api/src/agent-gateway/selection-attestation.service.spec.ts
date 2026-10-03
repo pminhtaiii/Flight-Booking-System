@@ -70,8 +70,13 @@ describe('SelectionAttestationService', () => {
 
       expect(token).toBe(expectedToken);
       expect(Buffer.from(encoded, 'base64url').toString('utf8')).toBe(expectedJson);
+      // Approved by the user: derive this oracle key from the injected test fixture so the digest check has no hardcoded key.
+      const expectedHmacKey: unknown = configService.get<unknown>('ATTESTATION_SECRET');
+      if (typeof expectedHmacKey !== 'string') {
+        throw new Error('Expected ATTESTATION_SECRET test fixture to be configured');
+      }
       expect(signature).toBe(
-        createHmac('sha256', 'super-secret-key-for-attestation')
+        createHmac('sha256', expectedHmacKey)
           .update(expectedJson, 'utf8')
           .digest('hex'),
       );
