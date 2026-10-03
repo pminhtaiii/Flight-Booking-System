@@ -163,3 +163,9 @@ US1 is the MVP search/detail/readiness slice. US2 and US3 share the old monolith
 ## Implementation strategy
 
 Complete setup and foundation, ship the US1 search boundary checkpoint first, then ancillary and order extraction. Stop at each checkpoint until focused tests and API compile pass. Delete the monolith before neutral renaming. Finish with the physical migration, byte-compatible external contracts, full security/CI gates, and context documentation sync. No second supplier, new public endpoint, or speculative port is part of this work.
+
+## Phase 8: Convergence (Phase 5 checkpoint)
+
+- [x] T058 Remove `@Global()` from `apps/api/src/supplier/core/duffel-core.module.ts` so SDK/configuration/budget providers resolve only through explicit supplier capability-module imports, and add a negative Nest composition test in `apps/api/src/supplier/core/duffel-core.module.spec.ts` per the Structure Decision in `specs/029-duffel-provider-narrowing/plan.md` and the Nest module dependencies in `specs/029-duffel-provider-narrowing/contracts/supplier-boundaries.md` (`contradicts`).
+
+Dependency: T058 gates T043 and must finish before US4 tasks T044–T054.
