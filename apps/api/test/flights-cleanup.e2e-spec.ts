@@ -2,13 +2,13 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
-import { DuffelCleanupService } from '@/duffel/duffel-cleanup.service';
+import { FlightOfferCleanupService } from '@/supplier/search/flight-offer-cleanup.service';
 
-describe('Duffel Cleanup Service (E2E)', () => {
+describe('Flight Offer Cleanup Service (E2E)', () => {
   jest.setTimeout(30000);
   let app: INestApplication;
   let prisma: PrismaService;
-  let cleanupService: DuffelCleanupService;
+  let cleanupService: FlightOfferCleanupService;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -19,7 +19,7 @@ describe('Duffel Cleanup Service (E2E)', () => {
     await app.init();
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
-    cleanupService = moduleFixture.get<DuffelCleanupService>(DuffelCleanupService);
+    cleanupService = moduleFixture.get<FlightOfferCleanupService>(FlightOfferCleanupService);
   });
 
   afterAll(async () => {

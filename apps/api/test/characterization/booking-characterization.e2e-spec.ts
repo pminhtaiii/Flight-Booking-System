@@ -18,7 +18,6 @@ import { AppModule } from '@/app.module';
 import { PrismaService } from '@/prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { StripeService } from '@/common/stripe.service';
-import { DuffelService } from '@/duffel/duffel.service';
 import { BookingLifecycleService } from '@/booking-lifecycle/booking-lifecycle.service';
 import { BookingRecoveryService } from '@/booking-lifecycle/booking-recovery.service';
 import { BookingManagementService } from '@/booking-management/booking-management.service';
@@ -54,7 +53,6 @@ describe('Booking Characterization (E2E)', () => {
   let prisma: PrismaService;
   let jwtService: JwtService;
   let stripeService: StripeService;
-  let duffelService: DuffelService;
   let bookingLifecycleService: BookingLifecycleService;
   let bookingRecoveryService: BookingRecoveryService;
   let bookingManagementService: BookingManagementService;
@@ -84,7 +82,6 @@ describe('Booking Characterization (E2E)', () => {
     prisma = moduleFixture.get<PrismaService>(PrismaService);
     jwtService = moduleFixture.get<JwtService>(JwtService);
     stripeService = moduleFixture.get<StripeService>(StripeService);
-    duffelService = moduleFixture.get<DuffelService>(DuffelService);
     bookingLifecycleService = moduleFixture.get<BookingLifecycleService>(BookingLifecycleService);
     bookingRecoveryService = moduleFixture.get<BookingRecoveryService>(BookingRecoveryService);
     bookingManagementService =
