@@ -201,5 +201,43 @@ describe('ItineraryNormalizer', () => {
         aircraftType: null,
       });
     });
+
+    it('preserves legacy Duffel segment identity and ordering', () => {
+      const legacySegments: FlightSegmentSnapshot[] = [
+        {
+          airline: { name: 'Northwind Air', iataCode: 'NW' },
+          flightNumber: 'NW42',
+          departureAirport: {
+            iataCode: 'SGN',
+            name: 'Tan Son Nhat International Airport',
+            city: 'Ho Chi Minh City',
+          },
+          arrivalAirport: {
+            iataCode: 'HAN',
+            name: 'Noi Bai International Airport',
+            city: 'Hanoi',
+          },
+          departureAt: '2026-10-10T08:00:00+07:00',
+          arrivalAt: '2026-10-10T10:00:00+07:00',
+          duration: 'PT2H',
+          duffelSegmentId: 'seg_legacy_42',
+          sliceOrder: 0,
+          segmentOrder: 0,
+          globalOrder: 0,
+        },
+      ];
+
+      const result = normalizeFlightSegments(legacySegments);
+
+      expect(result[0]).toMatchObject({
+        duffelSegmentId: 'seg_legacy_42',
+        sliceOrder: 0,
+        segmentOrder: 0,
+        globalOrder: 0,
+        flightNumber: 'NW42',
+        departureAirportIata: 'SGN',
+        arrivalAirportIata: 'HAN',
+      });
+    });
   });
 });

@@ -387,6 +387,54 @@ describe('BookingManagementService', () => {
       );
     });
 
+    it('preserves a legacy flight snapshot and segment identity in the original itinerary', async () => {
+      process.env.FEATURE_FLAG_DISRUPTION_SURFACING = 'false';
+
+      const legacySnapshot = {
+        segments: [
+          {
+            airline: { name: 'Northwind Air', iataCode: 'NW' },
+            flightNumber: 'NW42',
+            departureAirport: {
+              iataCode: 'SGN',
+              name: 'Tan Son Nhat International Airport',
+              city: 'Ho Chi Minh City',
+            },
+            arrivalAirport: {
+              iataCode: 'HAN',
+              name: 'Noi Bai International Airport',
+              city: 'Hanoi',
+            },
+            departureAt: '2026-10-10T08:00:00+07:00',
+            arrivalAt: '2026-10-10T10:00:00+07:00',
+            duration: 'PT2H',
+            duffelSegmentId: 'seg_legacy_42',
+            sliceOrder: 0,
+            segmentOrder: 0,
+            globalOrder: 0,
+          },
+        ],
+      };
+      const storedSnapshot = {
+        segments: legacySnapshot.segments.map((segment) => ({
+          ...segment,
+          airline: { ...segment.airline },
+          departureAirport: { ...segment.departureAirport },
+          arrivalAirport: { ...segment.arrivalAirport },
+        })),
+      };
+      prisma.booking.findUnique.mockResolvedValue(
+        mockDetailBooking({ flightSnapshot: storedSnapshot }),
+      );
+
+      const result = await service.getBookingDetail('booking-1', 'user-1');
+
+      expect(result.flightSnapshot).toEqual(storedSnapshot);
+      expect(result.currentItinerary.source).toBe('ORIGINAL');
+      expect(result.currentItinerary.segments).toEqual(storedSnapshot.segments);
+      expect(result.currentItinerary.segments[0].duffelSegmentId).toBe('seg_legacy_42');
+    });
+
     it('correctly maps ancillary summaries (seats, baggage) with passenger names', async () => {
       const bookingWithAncillaries = mockDetailBooking({
         payment: {
