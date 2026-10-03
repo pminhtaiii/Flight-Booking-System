@@ -26,6 +26,10 @@ export interface NormalizedSegment {
   aircraftType: string | null;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 function parseIsoDurationToMinutes(durationStr: string | null | undefined): number {
   if (!durationStr || typeof durationStr !== 'string') return 0;
   const matches = durationStr.match(/P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?/);
@@ -54,12 +58,15 @@ export function normalizeFlightSegments(segments: FlightSegmentSnapshot[]): Norm
     const sliceOrder = seg.sliceOrder ?? 0;
     const segmentOrder = seg.segmentOrder ?? index;
     const globalOrder = seg.globalOrder ?? index;
+    const legacySegmentId = isRecord(seg) ? seg['duffelSegmentId'] : undefined;
 
     return {
       sliceOrder,
       segmentOrder,
       globalOrder,
-      supplierSegmentId: seg.supplierSegmentId || null,
+      supplierSegmentId:
+        seg.supplierSegmentId ||
+        (typeof legacySegmentId === 'string' && legacySegmentId ? legacySegmentId : null),
       marketingCarrierIata: seg.airline.iataCode,
       operatingCarrierIata: seg.airline.iataCode,
       airlineName: seg.airline.name,

@@ -1154,8 +1154,9 @@ export class BookingLifecycleService {
             (typeof seg.aircraftType === 'string' && seg.aircraftType) ||
             undefined;
 
-          const duffelSegmentId =
+          const supplierSegmentId =
             (typeof seg.id === 'string' && seg.id) ||
+            (typeof seg.supplierSegmentId === 'string' && seg.supplierSegmentId) ||
             (typeof seg.duffelSegmentId === 'string' && seg.duffelSegmentId) ||
             undefined;
 
@@ -1181,7 +1182,7 @@ export class BookingLifecycleService {
             arrivalAt,
             duration,
             aircraftType,
-            duffelSegmentId,
+            supplierSegmentId,
             sliceOrder,
             segmentOrder,
             globalOrder: globalOrder++,
@@ -1222,4 +1223,3 @@ export class BookingLifecycleService {
     return result;
   }
 }
-
