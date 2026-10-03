@@ -37,7 +37,7 @@ jobs:
         with:
           node-version: 20
       - name: Verify workflow contract
-        run: node --test tests/ci/ci-workflow.contract.test.mjs
+        run: node --test tests/ci/ci-workflow.contract.test.mjs tests/ci/security-change-filter.test.mjs
       - name: Install checksum-verified actionlint
         run: |
           curl --fail --location --silent --show-error --output actionlint.tar.gz https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
@@ -107,6 +107,7 @@ jobs:
               - 'patches/**'
               - 'package.json'
               - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
               - 'pyproject.toml'
               - 'apps/agent/pyproject.toml'
               - 'uv.lock'
