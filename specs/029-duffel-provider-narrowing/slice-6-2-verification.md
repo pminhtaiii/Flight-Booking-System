@@ -75,3 +75,25 @@ uv run --no-sync pytest -p no:cacheprovider -m 'not redis_integration' -q
 ## Checkpoint status
 
 T049 is complete and reviewed. T050 is uncommitted and blocked by the repeated timing gate; T047–T048 and T051–T054 implementation has not started. Read-only contract/schema/migration preparations are complete. No scoped convergence, final two-axis code-review, migration proof, new PR, or remote success is claimed for this slice. T055–T057 remain the subsequent slice.
+
+## Approved diagnostic resume
+
+User explicitly selected investigation and correction of the benchmark before continuing, including restoration of the removed negative test and verification of the network guard. The exact preserved stale-handoff regression has been restored without assertion changes and passes (1/1); changed-file Ruff check/format pass. The required Python sitecustomize guard was verified loaded and rejected a non-loopback connection before network activity.
+
+The unchanged guarded benchmark passes in isolation: input.injection p50/p95/p99 0.2809/0.5743/0.6889 ms, turn p95 1.9006 ms. Direct benchmark implementation dependencies are unchanged by T050. This does not establish a cause for the earlier full-suite failures; process-state/profiling diagnosis and the guarded full-suite gate remain pending. No performance threshold or skip is changed.
+
+The first guarded full diagnostic run reproduced the timing failure: **1,298 passed, 1 failed, 4 skipped, 12 deselected**, 143.62 seconds. input.injection p50/p95/p99 were **0.6029/3.0562/13.3282 ms**; input.length p99 was 3.1509 ms and turn p95 11.6201 ms. The guard path and socket hook were verified before pytest. The exact documented root command used `--capture=tee-sys` to preserve benchmark JSON in the ignored `guarded-agent-full.log`. No threshold/skip changes or additional full retry were made. Diagnosis continues with smaller CPU/wall-time probes; other implementation remains pending.
+
+T050 independent review found two valid identity gaps: a missing wire supplier ID fell back to the application flight ID, and graph conversion stringified non-string supplier IDs. Both were fixed with sequential public-seam RED/GREEN regressions. User approved adding only `duffelOfferId: duffel-fresh-029` to the FreshSearchGateway fixture. Focused guarded checks pass **14/14**; independent scoped re-review approves both Spec and Quality with no further findings. Full package Ruff check/format pass (**168 files formatted**).
+
+The single process-priority correction verified the guard and set only the running Python process to Windows AboveNormal. The unchanged benchmark passed with injection p50/p95/p99 **0.2930/0.5370/0.7149 ms**, turn p95 **1.4857 ms**. This is successful mitigation evidence, not proof of the historical scheduling cause; no production optimization, threshold, skip, CI runner change, or OS-global setting was applied.
+
+That full run had **1,301 passed, 1 failed, 4 skipped, 12 deselected**, 95.18 seconds. A different existing Redis rate-limit test expected 429 but received 200 during its ten-rejection loop. Its synthetic user timestamp `1791036239` is at second 59 of the fixed 60-second window; the middleware computes the window from epoch seconds. Investigation/retest of this distinct boundary failure is pending. Rate-limit behavior and existing assertions remain unchanged; no shared Redis database is flushed.
+
+## T050 completed local gate
+
+User explicitly approved stabilization of only `test_accepted_only_non_charging` by adding pytest monkeypatch and freezing middleware time at the current value after token creation. Existing assertions, production policy, and accounting are unchanged; fixture teardown restores the clock. Focused pre-fix and post-fix retests both passed, so no isolated RED is claimed. Independent re-review approves this addition.
+
+Final guarded full non-Redis run at process-only AboveNormal: **1,302 passed, 4 skipped, 12 deselected, 9 pre-existing warnings**, 96.73 seconds; exit 0. Guard socket hook and priority were verified before invoking pytest in the same Python process. Unchanged input.injection p50/p95/p99 **0.5300/1.9169/4.1979 ms**, turn p95 **5.0964 ms**. The nine warnings concern existing synthetic short JWT keys. No performance tolerance or skip changed. The same documented root command was invoked through `runpy.run_module('pytest')`, with `SetPriorityClass(GetCurrentProcess(), 0x8000)` applying only to that process. Logs are preserved in the ignored SDD workspace; normal remote CI remains required on final HEAD.
+
+T050 is committed as `db4fde82` (`refactor(agent): enforce neutral supplier snapshot identities`), with Spec/Quality findings closed. T047 starts next; T048 and T051–T054 remain pending. The earlier stopped checkpoint is historical evidence, not current blocking status. T055–T057 remain the subsequent slice.

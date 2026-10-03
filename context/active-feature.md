@@ -6,14 +6,14 @@ This file tracks the currently active in-flight feature, its checkpoints, and ex
 
 ## Feature 029 — Narrow the Duffel Supplier Boundary
 
-- **Status**: Phases 0–5, Phase 6 compatibility slice (T044–T046), and T049 complete locally; T050 working tree blocked by repeated timing gate; T047–T048 and T051–T057 pending
+- **Status**: Phases 0–5, Phase 6 compatibility slice (T044–T046), and T049–T050 complete locally; T047–T048 and T051–T057 pending
 - **Branch**: `codex/029-duffel-provider-narrowing`
 - **Specification**: [specs/029-duffel-provider-narrowing/spec.md](../specs/029-duffel-provider-narrowing/spec.md)
 - **Implementation Plan**: [specs/029-duffel-provider-narrowing/plan.md](../specs/029-duffel-provider-narrowing/plan.md)
 - **Tasks**: [specs/029-duffel-provider-narrowing/tasks.md](../specs/029-duffel-provider-narrowing/tasks.md)
 
 ### Current Summary
-Slice 6.2 is in progress. T049 committed as `57760555` and passed independent spec/quality review, with 122 focused web tests plus typecheck/lint. T050 changes remain uncommitted: 1,297 agent tests passed on the isolated corrective retry, but the same unchanged security timing benchmark failed at 2.271 ms versus its 2.000 ms ceiling. The fail-fast rule stopped implementation pending user guidance; T050 is not checked off. T047–T048 and T051–T054 have only read-only preparation. See [Slice 6.2 verification](../specs/029-duffel-provider-narrowing/slice-6-2-verification.md) for approvals and evidence. Starting PR #367 is merged with green CI at `76145bd1`; no new-slice PR/CI success is claimed.
+Slice 6.2 is in progress. T049 committed as `57760555` and T050 as `db4fde82`; both passed independent task review. T050 guarded full validation passed 1,302 tests (4 skips, 12 deselected), with unchanged performance limits at Windows process-only AboveNormal priority. Approved rate-limit test clock stabilization preserves all assertions and production accounting. T047 is starting; T048 and T051–T054 remain pending. See [Slice 6.2 verification](../specs/029-duffel-provider-narrowing/slice-6-2-verification.md) for approvals, process deviations, diagnostic uncertainty, and exact evidence. Starting PR #367 is merged with green CI at `76145bd1`; no new-slice PR/CI success is claimed.
 
 T044–T046 pin signed bytes, legacy snapshots, strict agent state, and web provider-ID boundaries. Independent task reviews and scoped convergence passed at the Slice 6.1 checkpoint. Its local validation included guarded API 130 suites/2,331 tests, shared 111 tests, web 120 focused tests/build, and agent 1,291 non-Redis tests. See the [Slice 6.1 verification record](../specs/029-duffel-provider-narrowing/slice-6-1-verification.md) for approvals, mutations, environment retries, and exact commands. At that checkpoint T047–T057 remained pending; current slice status is recorded above. Feature 029 remains incomplete, and remote CI must match the final pushed HEAD of each new slice PR.
 
