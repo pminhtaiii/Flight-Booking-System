@@ -41,7 +41,6 @@ export function LoginForm(): JSX.Element {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberDevice, setRememberDevice] = useState(true);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lockoutSeconds, setLockoutSeconds] = useState(0);
@@ -136,7 +135,6 @@ export function LoginForm(): JSX.Element {
             aria-label={showPassword ? 'Hide password' : 'Show password'}
             className={styles.passwordToggle}
             onClick={() => setShowPassword((prev) => !prev)}
-            tabIndex={-1}
             type="button"
           >
             {showPassword ? (
@@ -146,22 +144,6 @@ export function LoginForm(): JSX.Element {
             )}
           </button>
         </div>
-      </div>
-
-      <div className={styles.optionsRow}>
-        <label className={styles.rememberLabel}>
-          <input
-            checked={rememberDevice}
-            className={styles.checkbox}
-            name="remember"
-            onChange={(event) => setRememberDevice(event.target.checked)}
-            type="checkbox"
-          />
-          <span>Remember this device</span>
-        </label>
-        <a className={styles.forgotLink} href="#">
-          Forgot password?
-        </a>
       </div>
 
       <div className={styles.submitWrapper}>
@@ -180,7 +162,7 @@ export function LoginForm(): JSX.Element {
 
       <div className={styles.securityNote}>
         <Lock className={styles.securityIcon} aria-hidden="true" />
-        <span>Protected by enterprise end-to-end encryption</span>
+        <span>Secured with enterprise TLS encryption</span>
       </div>
     </form>
   );
