@@ -1,39 +1,110 @@
 import Link from 'next/link';
 import { RegisterForm } from '@/components/auth/RegisterForm';
-import styles from '@/components/auth/auth-form.module.css';
+import styles from './register.module.css';
 
 export default function RegisterPage(): JSX.Element {
   return (
-    <main className={styles.registerShell}>
-      <section className={styles.registerCard} aria-labelledby="register-title">
-        <div className={styles.registerContent}>
-          <Link className={styles.brand} href="/">
-            wayfinder<span>°</span>
+    <div className={styles.page}>
+      {/* Background Pure CSS Atmospheric Viewport */}
+      <div className={styles.backgroundViewport} aria-hidden="true">
+        <div className={styles.glowTopRight} />
+        <div className={styles.glowBottomLeft} />
+      </div>
+
+      {/* Top Global Bar */}
+      <header className={styles.header}>
+        <Link href="/" className={styles.brandLink}>
+          <div className={styles.brandIconBox}>
+            <svg viewBox="0 0 40 40" className={styles.brandIcon} fill="none" aria-hidden="true">
+              <circle cx="20" cy="20" r="17" className={styles.compassCircle} />
+              <path d="M20 5 L24 17 L35 20 L24 23 L20 35 L16 23 L5 20 L16 17 Z" className={styles.compassStar} />
+              <circle cx="20" cy="20" r="2.5" className={styles.compassDot} />
+            </svg>
+          </div>
+          <div className={styles.brandText}>
+            <span className={styles.brandName}>Wayfinder</span>
+            <span className={styles.brandDot} />
+          </div>
+        </Link>
+
+        {/* Top Telemetry Status Chip */}
+        <div className={styles.telemetryChip}>
+          <span className={styles.telemetryLive}>
+            <span className={styles.pulseDot}>
+              <span className={styles.pulseDotPing} />
+              <span className={styles.pulseDotStatic} />
+            </span>
+            ADS-B LIVE 1090MHz
+          </span>
+          <span className={styles.telemetryDivider}>|</span>
+          <span className={styles.telemetryNode}>NODE US-WEST-01</span>
+          <span className={styles.telemetryDivider}>|</span>
+          <span className={styles.telemetryAccuracy}>99.8% GDS ACCURACY</span>
+        </div>
+
+        {/* Navigation Actions */}
+        <div className={styles.headerActions}>
+          <Link href="/" className={styles.headerLinkHome}>
+            Home
           </Link>
-          <div className={styles.registerCopy}>
-            <p className={styles.registerKicker}>Wayfinder passport</p>
-            <h1 className={styles.title} id="register-title">
-              Your passport to better travel.
+        </div>
+      </header>
+
+      {/* Central Floating Glassmorphism Authentication Card */}
+      <main className={styles.main}>
+        <section className={styles.card} aria-labelledby="register-title">
+          <div className={styles.cardHeader}>
+            <svg viewBox="0 0 200 48" className={styles.cardLogoSvg} fill="none" aria-label="Wayfinder Logo">
+              <defs>
+                <linearGradient id="cardWfGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="var(--wf-primary-container)" />
+                  <stop offset="100%" stopColor="var(--wf-secondary-container)" />
+                </linearGradient>
+                <linearGradient id="cardWfRing" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="var(--wf-primary-container)" stopOpacity="0.8" />
+                  <stop offset="100%" stopColor="var(--wf-sky-glow)" stopOpacity="0.2" />
+                </linearGradient>
+              </defs>
+              <g transform="translate(4, 4)">
+                <circle cx="20" cy="20" r="18" stroke="url(#cardWfRing)" strokeWidth="2.5" fill="var(--wf-surface-subtle)" />
+                <path d="M20 5 L24 18 L34 20 L24 22 L20 35 L16 22 L6 20 L16 18 Z" fill="url(#cardWfGrad)" />
+                <circle cx="20" cy="20" r="3" fill="var(--wf-surface-solid)" />
+                <circle cx="20" cy="20" r="1.5" fill="var(--wf-primary-container)" />
+              </g>
+              <text x="56" y="29" fontFamily="'Outfit', sans-serif" fontWeight="700" fontSize="22" letterSpacing="-0.5" fill="var(--wf-on-surface)">
+                Wayfinder
+              </text>
+              <circle cx="178" cy="24" r="2.5" fill="var(--wf-primary-container)" />
+            </svg>
+            <h1 className={styles.cardTitle} id="register-title">
+              Create an account
             </h1>
-            <p className={styles.subtitle}>Begin with a travel profile shaped around you.</p>
-            <RegisterForm />
-            <p className={styles.footer}>
+            <p className={styles.cardSubtitle}>
+              Begin with a travel profile shaped around you
+            </p>
+          </div>
+
+          <RegisterForm />
+
+          <div className={styles.cardFooter}>
+            <p className={styles.cardFooterText}>
               Already have an account?{' '}
-              <Link className={styles.footerLink} href="/login">
-                Log in
+              <Link className={styles.cardFooterLink} href="/login">
+                Sign in
               </Link>
             </p>
           </div>
+        </section>
+      </main>
+
+      {/* Bottom Page Footer */}
+      <footer className={styles.footer}>
+        <div className={styles.footerTelemetry}>
+          <span>© 2026 Wayfinder Aero Intelligence Inc.</span>
+          <span>•</span>
+          <span>FAA Telemetry Protocol v2.8</span>
         </div>
-        <aside className={styles.passportPanel} aria-hidden="true">
-          <div className={styles.passportMarker} />
-          <div className={styles.passportCard}>
-            <span>Departure: wherever</span>
-            <strong>The world feels closer from here.</strong>
-            <p>Personal travel intelligence, built around you.</p>
-          </div>
-        </aside>
-      </section>
-    </main>
+      </footer>
+    </div>
   );
 }
