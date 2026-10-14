@@ -640,7 +640,7 @@ test('report.exceptions contains structured exception objects with valid expiry 
         exc.compensatingControl,
         'Documented in docs/security/dependency-advisories.md',
       );
-      assert.equal(exc.expiry, '2026-10-12T00:00:00.000Z');
+      assert.equal(exc.expiry, '2026-11-15T00:00:00.000Z');
       assert.ok(!Number.isNaN(Date.parse(exc.expiry)));
     }
   } finally {
@@ -655,7 +655,7 @@ test('an expired advisory register (Policy-Expires-At in the past) causes runSup
       rootDir: process.cwd(),
       output: join(tempDir, 'supply-chain.json'),
       strict: false,
-      now: () => new Date('2026-10-15T00:00:00.000Z'),
+      now: () => new Date('2026-11-16T00:00:00.000Z'),
       execFn: (command, args) => {
         if (command === 'pnpm')
           return {
@@ -674,7 +674,7 @@ test('an expired advisory register (Policy-Expires-At in the past) causes runSup
     assert.equal(result.passed, false);
     assert.ok(
       result.errors.some((err) =>
-        err.includes('[Supply Chain Exception Error] Dependency advisory deferral policy expired on 2026-10-12T00:00:00.000Z'),
+        err.includes('[Supply Chain Exception Error] Dependency advisory deferral policy expired on 2026-11-15T00:00:00.000Z'),
       ),
     );
 

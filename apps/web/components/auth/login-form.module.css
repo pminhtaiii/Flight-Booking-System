@@ -1,0 +1,182 @@
+/* Wayfinder Enterprise Login Form Styles */
+.form {
+  --wf-primary: var(--dashboard-action-primary);
+  --wf-primary-container: var(--theme-match-bar-good);
+  --wf-secondary: var(--dashboard-accent);
+  --wf-secondary-container: var(--theme-text-match-good);
+  --wf-surface-solid: var(--theme-card);
+  --wf-on-surface: var(--theme-text-primary);
+  --wf-on-surface-variant: var(--theme-text-secondary);
+  --wf-text-muted: var(--theme-text-muted);
+  --wf-border-subtle: var(--theme-card-border);
+  --wf-error: var(--theme-text-cancelled);
+  --wf-error-bg: var(--theme-bg-cancelled);
+  --wf-error-border: var(--theme-danger-border);
+
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+}
+
+.errorAlert {
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  background-color: var(--wf-error-bg);
+  border: 1px solid var(--wf-error-border);
+  color: var(--wf-error);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--wf-on-surface-variant);
+}
+
+.inputWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.fieldIcon {
+  position: absolute;
+  left: 0.875rem;
+  width: 1.125rem;
+  height: 1.125rem;
+  color: var(--wf-text-muted);
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.input {
+  width: 100%;
+  padding: 0.625rem 2.75rem 0.625rem 2.625rem;
+  background-color: var(--wf-surface-solid);
+  color: var(--wf-on-surface);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--wf-border-subtle);
+  outline: none;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.input::placeholder {
+  color: var(--wf-text-muted);
+}
+
+.input:focus {
+  border-color: var(--wf-on-surface);
+  box-shadow: 0 0 0 3px var(--dashboard-focus-ring-glow);
+}
+
+.input:disabled {
+  background-color: var(--theme-background);
+  cursor: not-allowed;
+  opacity: 0.75;
+}
+
+.passwordInput {
+  letter-spacing: 0.15em;
+}
+
+.passwordToggle {
+  position: absolute;
+  right: 0.875rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--wf-text-muted);
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 0.25rem;
+  transition: color 0.15s ease-in-out;
+}
+
+.passwordToggle:hover {
+  color: var(--wf-on-surface-variant);
+}
+
+.passwordToggle:focus-visible {
+  outline: 2px solid var(--wf-on-surface);
+  outline-offset: 2px;
+}
+
+.toggleIcon {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.submitWrapper {
+  padding-top: 0.25rem;
+}
+
+.submit {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  background-color: var(--wf-on-surface);
+  color: var(--wf-surface-solid);
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 0.65rem 1rem;
+  border: none;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+  transition: background-color 0.15s ease-in-out, transform 0.15s ease-in-out;
+}
+
+.submit:hover:not(:disabled) {
+  background-color: var(--wf-on-surface-variant);
+}
+
+.submit:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.submit:focus-visible {
+  outline: 2px solid var(--wf-on-surface);
+  outline-offset: 2px;
+}
+
+.submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.securityNote {
+  padding-top: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--wf-text-muted);
+}
+
+.securityIcon {
+  width: 0.875rem;
+  height: 0.875rem;
+  color: var(--wf-text-muted);
+  flex-shrink: 0;
+}

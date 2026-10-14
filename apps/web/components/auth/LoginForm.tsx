@@ -3,7 +3,8 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import styles from './auth-form.module.css';
+import { Eye, EyeOff, Lock, Mail } from 'lucide-react';
+import styles from './login-form.module.css';
 
 type LockoutError = {
   code?: string;
@@ -11,15 +12,22 @@ type LockoutError = {
   retryAfterSeconds?: number;
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 function parseLockoutError(error: string): LockoutError | null {
   try {
     const parsed: unknown = JSON.parse(error);
-    if (
-      typeof parsed === 'object' &&
-      parsed !== null &&
-      (parsed as LockoutError).code === 'auth_locked'
-    ) {
-      return parsed as LockoutError;
+    if (isRecord(parsed) && parsed.code === 'auth_locked') {
+      const message = typeof parsed.message === 'string' ? parsed.message : undefined;
+      const retryAfterSeconds =
+        typeof parsed.retryAfterSeconds === 'number' ? parsed.retryAfterSeconds : undefined;
+      return {
+        code: 'auth_locked',
+        message,
+        retryAfterSeconds,
+      };
     }
   } catch {
     // Credential failures are normally a plain message.
@@ -32,6 +40,7 @@ export function LoginForm(): JSX.Element {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lockoutSeconds, setLockoutSeconds] = useState(0);
@@ -48,6 +57,7 @@ export function LoginForm(): JSX.Element {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
+    if (lockoutSeconds > 0) return;
     setError('');
     setIsSubmitting(true);
 
@@ -79,43 +89,81 @@ export function LoginForm(): JSX.Element {
   return (
     <form className={styles.form} onSubmit={handleSubmit} noValidate>
       {error ? (
-        <p className={styles.message} role="alert">
+        <div className={styles.errorAlert} role="alert">
           {error}
-        </p>
+        </div>
       ) : null}
-      <div className={styles.field}>
+
+      <div className={styles.fieldGroup}>
         <label className={styles.label} htmlFor="login-email">
-          Email address
+          Email Address
         </label>
-        <input
-          className={styles.input}
-          disabled={isLocked}
-          id="login-email"
-          name="email"
-          onChange={(event) => setEmail(event.target.value)}
-          required
-          type="email"
-          value={email}
-        />
+        <div className={styles.inputWrapper}>
+          <Mail className={styles.fieldIcon} aria-hidden="true" />
+          <input
+            className={styles.input}
+            disabled={isSubmitting || isLocked}
+            id="login-email"
+            name="email"
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="name@company.com"
+            required
+            type="email"
+            value={email}
+          />
+        </div>
       </div>
-      <div className={styles.field}>
+
+      <div className={styles.fieldGroup}>
         <label className={styles.label} htmlFor="login-password">
           Password
         </label>
-        <input
-          className={styles.input}
-          disabled={isLocked}
-          id="login-password"
-          name="password"
-          onChange={(event) => setPassword(event.target.value)}
-          required
-          type="password"
-          value={password}
-        />
+        <div className={styles.inputWrapper}>
+          <Lock className={styles.fieldIcon} aria-hidden="true" />
+          <input
+            className={`${styles.input} ${styles.passwordInput}`}
+            disabled={isSubmitting || isLocked}
+            id="login-password"
+            name="password"
+            onChange={(event) => setPassword(event.target.value)}
+            placeholder="••••••••••••"
+            required
+            type={showPassword ? 'text' : 'password'}
+            value={password}
+          />
+          <button
+            aria-label={showPassword ? 'Hide password' : 'Show password'}
+            className={styles.passwordToggle}
+            onClick={() => setShowPassword((prev) => !prev)}
+            type="button"
+          >
+            {showPassword ? (
+              <EyeOff className={styles.toggleIcon} aria-hidden="true" />
+            ) : (
+              <Eye className={styles.toggleIcon} aria-hidden="true" />
+            )}
+          </button>
+        </div>
       </div>
-      <button className={styles.submit} disabled={isSubmitting || isLocked} type="submit">
-        {isLocked ? `Try again in ${lockoutSeconds}s` : isSubmitting ? 'Signing in…' : 'Sign in'}
-      </button>
+
+      <div className={styles.submitWrapper}>
+        <button
+          className={styles.submit}
+          disabled={isSubmitting || isLocked}
+          type="submit"
+        >
+          {isLocked
+            ? `Try again in ${lockoutSeconds}s`
+            : isSubmitting
+            ? 'Signing in…'
+            : 'Sign in'}
+        </button>
+      </div>
+
+      <div className={styles.securityNote}>
+        <Lock className={styles.securityIcon} aria-hidden="true" />
+        <span>Secured with enterprise TLS encryption</span>
+      </div>
     </form>
   );
 }

@@ -61,6 +61,15 @@ The helper returned the expected task contexts for T006, T017, and T030; combine
 
 Combined agent-work CLI and CI contracts passed 43 tests (0 failures, 1 Windows file-link creation skip). An independent synthetic cleanup run removed only finished sessions and retained active and unknown entries plus the API runtime-lock sentinel. The safety review passed after correcting failed-lock cleanup. See the [validation log](../.agent-work/2026-10-09/01a11c82-8650-7bb1-8d96-86f886e984e4/validation.log). This tooling result does not change Feature 030 status.
 
+## Retro Wayfinder sign-in page slice checkpoint (2026-10-14)
+
+Implemented the Wayfinder Enterprise Sign-In page redesign:
+- Viewport responsiveness: flexible 100dvh viewport with natural scrolling fallback for short screens / mobile landscape to ensure form controls are never clipped.
+- Accessibility & input safety: removed keyboard-blocking tabIndex from password toggle; removed unhandled remember-device state and placeholder links.
+- Security badging: accurate enterprise TLS encryption badging.
+- Semantic design tokens: full adoption of shared repository design tokens across CSS modules and inline SVGs.
+This slice is isolated to `@web/frontend` and does not change Feature 030 task or recovery status.
+
 ---
 
 ## Handoff Origin Policy (Design Accepted; Implementation Pending)
