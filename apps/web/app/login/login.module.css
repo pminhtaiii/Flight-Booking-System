@@ -1,22 +1,22 @@
 /* Wayfinder Enterprise Flight Booking Login Page Styles */
 .page {
-  --wf-primary: var(--dashboard-action-primary, #0051d5);
-  --wf-primary-container: var(--theme-match-bar-good, #38bdf8);
-  --wf-secondary: var(--dashboard-accent, #2b628f);
-  --wf-secondary-container: var(--theme-text-match-good, #0284c7);
-  --wf-tertiary: var(--theme-text-match-strong, #009966);
-  --wf-bg: var(--theme-background, #faf8ff);
-  --wf-surface: var(--dashboard-glass, rgba(255, 255, 255, 0.95));
-  --wf-surface-subtle: var(--dashboard-glass-hover, rgba(255, 255, 255, 0.8));
-  --wf-surface-solid: var(--theme-card, #ffffff);
-  --wf-on-surface: var(--theme-text-primary, #0f172a);
-  --wf-on-surface-variant: var(--theme-text-secondary, #334155);
-  --wf-text-muted: var(--theme-text-muted, #64748b);
-  --wf-border-glass: var(--dashboard-glass-border, rgba(255, 255, 255, 0.88));
-  --wf-border-subtle: var(--theme-card-border, rgba(203, 213, 225, 0.5));
-  --wf-cyan-glow: var(--dashboard-accent-glow, rgba(0, 191, 255, 0.35));
-  --wf-cyan-glow-subtle: rgba(0, 191, 255, 0.2);
-  --wf-sky-glow: rgba(56, 189, 248, 0.25);
+  --wf-primary: var(--dashboard-action-primary);
+  --wf-primary-container: var(--theme-match-bar-good);
+  --wf-secondary: var(--dashboard-accent);
+  --wf-secondary-container: var(--theme-text-match-good);
+  --wf-tertiary: var(--theme-text-match-strong);
+  --wf-bg: var(--theme-background);
+  --wf-surface: var(--dashboard-glass);
+  --wf-surface-subtle: var(--dashboard-glass-hover);
+  --wf-surface-solid: var(--theme-card);
+  --wf-on-surface: var(--theme-text-primary);
+  --wf-on-surface-variant: var(--theme-text-secondary);
+  --wf-text-muted: var(--theme-text-muted);
+  --wf-border-glass: var(--dashboard-glass-border);
+  --wf-border-subtle: var(--theme-card-border);
+  --wf-cyan-glow: var(--dashboard-accent-glow);
+  --wf-cyan-glow-subtle: var(--dashboard-accent-glow);
+  --wf-sky-glow: var(--dashboard-action-primary-bg);
 
   position: relative;
   min-height: 100vh;
@@ -104,10 +104,10 @@
   width: 2.25rem;
   height: 2.25rem;
   border-radius: 0.75rem;
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--wf-surface-subtle);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.8);
+  border: 1px solid var(--wf-border-subtle);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   display: flex;
   align-items: center;
@@ -151,7 +151,6 @@
   font-size: 1.25rem;
   letter-spacing: -0.025em;
   color: var(--wf-on-surface);
-  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
 }
 
 .brandDot {
@@ -167,10 +166,10 @@
   gap: 0.75rem;
   padding: 0.375rem 0.875rem;
   border-radius: 9999px;
-  background: rgba(241, 245, 249, 0.8);
+  background: var(--wf-surface-subtle);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(226, 232, 240, 0.9);
+  border: 1px solid var(--wf-border-subtle);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   font-size: 0.75rem;
   font-family: var(--font-mono, 'JetBrains Mono', monospace);
@@ -238,18 +237,18 @@
 .headerLinkHome {
   padding: 0.375rem 0.75rem;
   border-radius: 0.5rem;
-  background: rgba(255, 255, 255, 0.7);
+  background: var(--wf-surface-subtle);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  color: var(--wf-on-surface-variant);
+  border: 1px solid var(--wf-border-subtle);
+  color: var(--wf-on-surface);
   text-decoration: none;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out;
 }
 
 .headerLinkHome:hover {
-  background: var(--wf-surface-solid);
+  background: var(--wf-surface);
   color: var(--wf-on-surface);
 }
 
@@ -273,8 +272,8 @@
   -webkit-backdrop-filter: blur(28px) saturate(180%);
   border-radius: 1rem;
   padding: clamp(1.25rem, 3vh, 1.875rem) clamp(1.5rem, 3vw, 2.25rem);
-  border: 1px solid rgba(255, 255, 255, 0.85);
-  box-shadow: 0 20px 50px -10px rgba(12, 74, 110, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.9) inset;
+  border: 1px solid var(--wf-border-glass);
+  box-shadow: 0 20px 50px -10px rgba(12, 74, 110, 0.2), 0 0 0 1px var(--wf-border-glass) inset;
   transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
 }
 
@@ -313,7 +312,7 @@
 .cardFooter {
   margin-top: 1.25rem;
   padding-top: 1rem;
-  border-top: 1px solid rgba(226, 232, 240, 0.8);
+  border-top: 1px solid var(--wf-border-subtle);
   text-align: center;
 }
 

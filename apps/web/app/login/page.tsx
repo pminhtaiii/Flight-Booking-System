@@ -66,7 +66,7 @@ export default function LoginPage(): JSX.Element {
                 </linearGradient>
               </defs>
               <g transform="translate(4, 4)">
-                <circle cx="20" cy="20" r="18" stroke="url(#cardWfRing)" strokeWidth="2.5" fill="rgba(255,255,255,0.7)" />
+                <circle cx="20" cy="20" r="18" stroke="url(#cardWfRing)" strokeWidth="2.5" fill="var(--wf-surface-subtle)" />
                 <path d="M20 5 L24 18 L34 20 L24 22 L20 35 L16 22 L6 20 L16 18 Z" fill="url(#cardWfGrad)" />
                 <circle cx="20" cy="20" r="3" fill="var(--wf-surface-solid)" />
                 <circle cx="20" cy="20" r="1.5" fill="var(--wf-primary-container)" />

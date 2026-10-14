@@ -1,17 +1,17 @@
 /* Wayfinder Enterprise Login Form Styles */
 .form {
-  --wf-primary: var(--dashboard-action-primary, #0051d5);
-  --wf-primary-container: var(--theme-match-bar-good, #38bdf8);
-  --wf-secondary: var(--dashboard-accent, #2b628f);
-  --wf-secondary-container: var(--theme-text-match-good, #0284c7);
-  --wf-surface-solid: var(--theme-card, #ffffff);
-  --wf-on-surface: var(--theme-text-primary, #0f172a);
-  --wf-on-surface-variant: var(--theme-text-secondary, #334155);
-  --wf-text-muted: var(--theme-text-muted, #64748b);
-  --wf-border-subtle: var(--theme-card-border, #cbd5e1);
-  --wf-error: var(--theme-text-cancelled, #dc2626);
-  --wf-error-bg: var(--theme-bg-cancelled, #fef2f2);
-  --wf-error-border: var(--theme-danger-border, #fecaca);
+  --wf-primary: var(--dashboard-action-primary);
+  --wf-primary-container: var(--theme-match-bar-good);
+  --wf-secondary: var(--dashboard-accent);
+  --wf-secondary-container: var(--theme-text-match-good);
+  --wf-surface-solid: var(--theme-card);
+  --wf-on-surface: var(--theme-text-primary);
+  --wf-on-surface-variant: var(--theme-text-secondary);
+  --wf-text-muted: var(--theme-text-muted);
+  --wf-border-subtle: var(--theme-card-border);
+  --wf-error: var(--theme-text-cancelled);
+  --wf-error-bg: var(--theme-bg-cancelled);
+  --wf-error-border: var(--theme-danger-border);
 
   display: flex;
   flex-direction: column;
@@ -82,11 +82,11 @@
 
 .input:focus {
   border-color: var(--wf-on-surface);
-  box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.1);
+  box-shadow: 0 0 0 3px var(--dashboard-focus-ring-glow);
 }
 
 .input:disabled {
-  background-color: rgba(248, 250, 252, 0.8);
+  background-color: var(--theme-background);
   cursor: not-allowed;
   opacity: 0.75;
 }
