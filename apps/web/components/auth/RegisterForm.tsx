@@ -14,8 +14,18 @@ async function extractErrorMessage(response: Response): Promise<string> {
   const defaultMessage = 'We could not create your account. Please try again.';
   try {
     const rawData: unknown = await response.json();
-    if (isRecord(rawData) && typeof rawData.message === 'string' && rawData.message.trim().length > 0) {
-      return rawData.message;
+    if (isRecord(rawData)) {
+      if (typeof rawData.message === 'string' && rawData.message.trim().length > 0) {
+        return rawData.message;
+      }
+      if (Array.isArray(rawData.message)) {
+        const messages = rawData.message.filter(
+          (item): item is string => typeof item === 'string' && item.trim().length > 0,
+        );
+        if (messages.length > 0) {
+          return messages.join('. ');
+        }
+      }
     }
   } catch {
     // Fall back to default error message if response is non-JSON or cannot be read

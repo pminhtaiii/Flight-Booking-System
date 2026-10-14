@@ -5,13 +5,11 @@ import styles from './register.module.css';
 export default function RegisterPage(): JSX.Element {
   return (
     <div className={styles.page}>
-      {/* Background Pure CSS Atmospheric Viewport */}
       <div className={styles.backgroundViewport} aria-hidden="true">
         <div className={styles.glowTopRight} />
         <div className={styles.glowBottomLeft} />
       </div>
 
-      {/* Top Global Bar */}
       <header className={styles.header}>
         <Link href="/" className={styles.brandLink}>
           <div className={styles.brandIconBox}>
@@ -27,7 +25,6 @@ export default function RegisterPage(): JSX.Element {
           </div>
         </Link>
 
-        {/* Top Telemetry Status Chip */}
         <div className={styles.telemetryChip}>
           <span className={styles.telemetryLive}>
             <span className={styles.pulseDot}>
@@ -42,7 +39,6 @@ export default function RegisterPage(): JSX.Element {
           <span className={styles.telemetryAccuracy}>99.8% GDS ACCURACY</span>
         </div>
 
-        {/* Navigation Actions */}
         <div className={styles.headerActions}>
           <Link href="/" className={styles.headerLinkHome}>
             Home
@@ -50,7 +46,6 @@ export default function RegisterPage(): JSX.Element {
         </div>
       </header>
 
-      {/* Central Floating Glassmorphism Authentication Card */}
       <main className={styles.main}>
         <section className={styles.card} aria-labelledby="register-title">
           <div className={styles.cardHeader}>
@@ -97,7 +92,6 @@ export default function RegisterPage(): JSX.Element {
         </section>
       </main>
 
-      {/* Bottom Page Footer */}
       <footer className={styles.footer}>
         <div className={styles.footerTelemetry}>
           <span>© 2026 Wayfinder Aero Intelligence Inc.</span>
