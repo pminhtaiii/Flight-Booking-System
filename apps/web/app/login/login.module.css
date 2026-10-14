@@ -1,20 +1,20 @@
 /* Wayfinder Enterprise Flight Booking Login Page Styles */
 .page {
-  --wf-primary: #00668a;
-  --wf-primary-container: #00bfff;
-  --wf-secondary: #006591;
-  --wf-secondary-container: #0284c7;
-  --wf-tertiary: #047857;
-  --wf-bg: #faf8ff;
-  --wf-surface: rgba(255, 255, 255, 0.95);
-  --wf-surface-subtle: rgba(255, 255, 255, 0.8);
-  --wf-surface-solid: #ffffff;
-  --wf-on-surface: #0f172a;
-  --wf-on-surface-variant: #334155;
-  --wf-text-muted: #64748b;
-  --wf-border-glass: rgba(255, 255, 255, 0.88);
-  --wf-border-subtle: rgba(203, 213, 225, 0.5);
-  --wf-cyan-glow: rgba(0, 191, 255, 0.35);
+  --wf-primary: var(--dashboard-action-primary, #0051d5);
+  --wf-primary-container: var(--theme-match-bar-good, #38bdf8);
+  --wf-secondary: var(--dashboard-accent, #2b628f);
+  --wf-secondary-container: var(--theme-text-match-good, #0284c7);
+  --wf-tertiary: var(--theme-text-match-strong, #009966);
+  --wf-bg: var(--theme-background, #faf8ff);
+  --wf-surface: var(--dashboard-glass, rgba(255, 255, 255, 0.95));
+  --wf-surface-subtle: var(--dashboard-glass-hover, rgba(255, 255, 255, 0.8));
+  --wf-surface-solid: var(--theme-card, #ffffff);
+  --wf-on-surface: var(--theme-text-primary, #0f172a);
+  --wf-on-surface-variant: var(--theme-text-secondary, #334155);
+  --wf-text-muted: var(--theme-text-muted, #64748b);
+  --wf-border-glass: var(--dashboard-glass-border, rgba(255, 255, 255, 0.88));
+  --wf-border-subtle: var(--theme-card-border, rgba(203, 213, 225, 0.5));
+  --wf-cyan-glow: var(--dashboard-accent-glow, rgba(0, 191, 255, 0.35));
   --wf-cyan-glow-subtle: rgba(0, 191, 255, 0.2);
   --wf-sky-glow: rgba(56, 189, 248, 0.25);
 

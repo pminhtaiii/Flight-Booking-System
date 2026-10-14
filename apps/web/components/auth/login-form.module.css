@@ -1,17 +1,17 @@
 /* Wayfinder Enterprise Login Form Styles */
 .form {
-  --wf-primary: #00668a;
-  --wf-primary-container: #00bfff;
-  --wf-secondary: #006591;
-  --wf-secondary-container: #0284c7;
-  --wf-surface-solid: #ffffff;
-  --wf-on-surface: #0f172a;
-  --wf-on-surface-variant: #334155;
-  --wf-text-muted: #64748b;
-  --wf-border-subtle: #cbd5e1;
-  --wf-error: #dc2626;
-  --wf-error-bg: #fef2f2;
-  --wf-error-border: #fecaca;
+  --wf-primary: var(--dashboard-action-primary, #0051d5);
+  --wf-primary-container: var(--theme-match-bar-good, #38bdf8);
+  --wf-secondary: var(--dashboard-accent, #2b628f);
+  --wf-secondary-container: var(--theme-text-match-good, #0284c7);
+  --wf-surface-solid: var(--theme-card, #ffffff);
+  --wf-on-surface: var(--theme-text-primary, #0f172a);
+  --wf-on-surface-variant: var(--theme-text-secondary, #334155);
+  --wf-text-muted: var(--theme-text-muted, #64748b);
+  --wf-border-subtle: var(--theme-card-border, #cbd5e1);
+  --wf-error: var(--theme-text-cancelled, #dc2626);
+  --wf-error-bg: var(--theme-bg-cancelled, #fef2f2);
+  --wf-error-border: var(--theme-danger-border, #fecaca);
 
   display: flex;
   flex-direction: column;
