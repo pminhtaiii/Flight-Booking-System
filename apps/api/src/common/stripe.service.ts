@@ -1,6 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import Stripe from 'stripe';
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
 @Injectable()
 export class StripeService {
   private readonly stripe: Stripe;
@@ -98,6 +106,10 @@ export class StripeService {
     amount?: number,
     idempotencyKey?: string,
   ): Promise<Stripe.PaymentIntent> {
+    if (!paymentIntentId || typeof paymentIntentId !== 'string' || paymentIntentId.trim() === '') {
+      throw new Error('PaymentIntent ID is required');
+    }
+
     const params: Stripe.PaymentIntentCaptureParams = {};
     if (amount !== undefined) {
       params.amount_to_capture = amount;
@@ -124,6 +136,10 @@ export class StripeService {
     paymentIntentId: string,
     idempotencyKey?: string,
   ): Promise<Stripe.PaymentIntent> {
+    if (!paymentIntentId || typeof paymentIntentId !== 'string' || paymentIntentId.trim() === '') {
+      throw new Error('PaymentIntent ID is required');
+    }
+
     const options: Stripe.RequestOptions = {};
     if (idempotencyKey) {
       options.idempotencyKey = idempotencyKey;
@@ -168,9 +184,13 @@ export class StripeService {
   }
 
   async retrievePaymentIntent(paymentIntentId: string): Promise<Stripe.PaymentIntent> {
+    if (!paymentIntentId || typeof paymentIntentId !== 'string' || paymentIntentId.trim() === '') {
+      throw new Error('PaymentIntent ID is required');
+    }
+
     try {
       return await this.stripe.paymentIntents.retrieve(paymentIntentId, {
-        expand: ['payment_method'],
+        expand: ['payment_method', 'latest_charge'],
       });
     } catch (error) {
       const err = error as Error;
@@ -188,6 +208,10 @@ export class StripeService {
     reason?: string,
     idempotencyKey?: string,
   ): Promise<Stripe.Refund> {
+    if (!paymentIntentId || typeof paymentIntentId !== 'string' || paymentIntentId.trim() === '') {
+      throw new Error('PaymentIntent ID is required');
+    }
+
     const params: Stripe.RefundCreateParams = {
       payment_intent: paymentIntentId,
     };
@@ -215,7 +239,39 @@ export class StripeService {
     }
   }
 
+  async retrieveRefund(refundId: string): Promise<Stripe.Refund> {
+    if (!refundId || typeof refundId !== 'string' || refundId.trim() === '') {
+      throw new Error('Refund ID is required');
+    }
+
+    try {
+      return await this.stripe.refunds.retrieve(refundId);
+    } catch (error) {
+      const err = toError(error);
+      this.logger.error(`Failed to retrieve Refund ${refundId}: ${err.message}`, err.stack);
+      throw error;
+    }
+  }
+
+  async retrieveCharge(chargeId: string): Promise<Stripe.Charge> {
+    if (!chargeId || typeof chargeId !== 'string' || chargeId.trim() === '') {
+      throw new Error('Charge ID is required');
+    }
+
+    try {
+      return await this.stripe.charges.retrieve(chargeId);
+    } catch (error) {
+      const err = toError(error);
+      this.logger.error(`Failed to retrieve Charge ${chargeId}: ${err.message}`, err.stack);
+      throw error;
+    }
+  }
+
   async detachPaymentMethod(paymentMethodId: string): Promise<Stripe.PaymentMethod> {
+    if (!paymentMethodId || typeof paymentMethodId !== 'string' || paymentMethodId.trim() === '') {
+      throw new Error('PaymentMethod ID is required');
+    }
+
     try {
       return await this.stripe.paymentMethods.detach(paymentMethodId);
     } catch (error) {
@@ -236,5 +292,85 @@ export class StripeService {
       this.logger.error(`Webhook signature verification failed: ${err.message}`, err.stack);
       throw error;
     }
+  }
+
+  extractAuthorizationExpiry(paymentIntent: unknown): Date | null {
+    if (!isRecord(paymentIntent)) {
+      return null;
+    }
+
+    const latestCharge = paymentIntent['latest_charge'];
+    if (isRecord(latestCharge)) {
+      const pmd = latestCharge['payment_method_details'];
+      if (isRecord(pmd)) {
+        const card = pmd['card'];
+        if (
+          isRecord(card) &&
+          typeof card['capture_before'] === 'number' &&
+          Number.isFinite(card['capture_before']) &&
+          card['capture_before'] > 0
+        ) {
+          const expiry = new Date(card['capture_before'] * 1000);
+          return Number.isFinite(expiry.getTime()) ? expiry : null;
+        }
+        const cardPresent = pmd['card_present'];
+        if (
+          isRecord(cardPresent) &&
+          typeof cardPresent['capture_before'] === 'number' &&
+          Number.isFinite(cardPresent['capture_before']) &&
+          cardPresent['capture_before'] > 0
+        ) {
+          const expiry = new Date(cardPresent['capture_before'] * 1000);
+          return Number.isFinite(expiry.getTime()) ? expiry : null;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  normalizeCapture(paymentIntent: unknown): {
+    succeeded: boolean;
+    status: string;
+    capturedAmount: number;
+    currency?: string;
+  } {
+    if (!isRecord(paymentIntent)) {
+      return {
+        succeeded: false,
+        status: 'unknown',
+        capturedAmount: 0,
+      };
+    }
+
+    const rawStatus =
+      typeof paymentIntent['status'] === 'string' ? paymentIntent['status'] : 'unknown';
+    const rawCurrency =
+      typeof paymentIntent['currency'] === 'string' &&
+      /^[A-Za-z]{3}$/.test(paymentIntent['currency'])
+        ? paymentIntent['currency'].toLowerCase()
+        : undefined;
+    const amount =
+      typeof paymentIntent['amount'] === 'number' &&
+      Number.isSafeInteger(paymentIntent['amount']) &&
+      paymentIntent['amount'] > 0
+        ? paymentIntent['amount']
+        : 0;
+    const amountReceived =
+      typeof paymentIntent['amount_received'] === 'number' &&
+      Number.isSafeInteger(paymentIntent['amount_received']) &&
+      paymentIntent['amount_received'] > 0
+        ? paymentIntent['amount_received']
+        : 0;
+
+    const isFullCapture = amount > 0 && amountReceived === amount;
+    const succeeded = rawStatus === 'succeeded' && isFullCapture && rawCurrency !== undefined;
+
+    return {
+      succeeded,
+      status: rawStatus,
+      capturedAmount: amountReceived,
+      currency: rawCurrency,
+    };
   }
 }
