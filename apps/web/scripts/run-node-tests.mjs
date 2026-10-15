@@ -7,13 +7,22 @@ import { fileURLToPath } from 'node:url';
 const webRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
 const tsxCli = require.resolve('tsx/cli');
-const category = process.argv[2] ?? 'all';
-const testFiles = [];
 
-if (!['all', 'unit', 'routes'].includes(category)) {
+const rawCategory = process.argv[2] ?? 'all';
+const rawFilter = process.argv[3];
+const validCategories = ['all', 'unit', 'routes'];
+const isCustomPath =
+  !validCategories.includes(rawCategory) &&
+  (rawCategory.includes('/') || rawCategory.includes('\\') || rawCategory.endsWith('.ts'));
+
+if (!validCategories.includes(rawCategory) && !isCustomPath) {
   process.stderr.write('Choose a Node test category: all, unit, or routes.\n');
   process.exit(2);
 }
+
+const category = isCustomPath ? 'all' : rawCategory;
+const filter = isCustomPath ? rawCategory : rawFilter;
+const testFiles = [];
 
 function collectNodeTests(directory) {
   for (const entry of readdirSync(directory)) {
@@ -26,9 +35,12 @@ function collectNodeTests(directory) {
     }
 
     if (/\.(?:ts|mts)$/.test(entry) && readFileSync(entryPath, 'utf8').includes('node:test')) {
-      const isRouteTest = path.relative(webRoot, entryPath).split(path.sep)[0] === 'app';
+      const rel = path.relative(webRoot, entryPath);
+      const isRouteTest = rel.split(path.sep)[0] === 'app';
       if (category === 'all' || (category === 'routes') === isRouteTest) {
-        testFiles.push(path.relative(webRoot, entryPath));
+        if (!filter || rel.includes(filter)) {
+          testFiles.push(rel);
+        }
       }
     }
   }
@@ -42,7 +54,9 @@ if (testFiles.length === 0) {
   process.exit(1);
 }
 
-const result = spawnSync(process.execPath, [tsxCli, '--test', ...testFiles], {
+const cliTestFiles = testFiles.map((file) => file.replace(/\[/g, '[[]'));
+
+const result = spawnSync(process.execPath, [tsxCli, '--test', ...cliTestFiles], {
   cwd: webRoot,
   env: process.env,
   stdio: 'inherit',
