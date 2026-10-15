@@ -19,7 +19,7 @@ const resolveModulePath = (specifier: string): string => {
   } catch {
     return require.resolve(specifier, {
       paths: [
-        path.resolve(__dirname, '../../../../node_modules'),
+        path.resolve(__dirname, '../node_modules'),
         path.resolve(process.cwd(), 'node_modules'),
       ],
     });
@@ -66,12 +66,12 @@ afterEach(() => {
   mockGetServerSession.mock.resetCalls();
 });
 
-let createPaymentAction: typeof import('./actions').createPaymentAction;
-let confirmPaymentAction: typeof import('./actions').confirmPaymentAction;
-let getPaymentStatusAction: typeof import('./actions').getPaymentStatusAction;
+let createPaymentAction: typeof import('../app/checkout/[intentId]/payment/actions').createPaymentAction;
+let confirmPaymentAction: typeof import('../app/checkout/[intentId]/payment/actions').confirmPaymentAction;
+let getPaymentStatusAction: typeof import('../app/checkout/[intentId]/payment/actions').getPaymentStatusAction;
 
 before(async () => {
-  const actionsModule = await import('./actions');
+  const actionsModule = await import('../app/checkout/[intentId]/payment/actions');
   createPaymentAction = actionsModule.createPaymentAction;
   confirmPaymentAction = actionsModule.confirmPaymentAction;
   getPaymentStatusAction = actionsModule.getPaymentStatusAction;
@@ -83,6 +83,7 @@ describe('Payment Server Actions', () => {
       currentSession = null;
       const result = await createPaymentAction({
         bookingIntentId: 'intent_123',
+        idempotencyKey: 'idemp_key_auth_001',
       });
       assert.equal(result.ok, false);
       if (!result.ok) {
@@ -95,12 +96,136 @@ describe('Payment Server Actions', () => {
       currentSession = { accessToken: 'valid_jwt_token' };
       const result = await createPaymentAction({
         bookingIntentId: '   ',
+        idempotencyKey: 'idemp_key_valid_123',
       });
       assert.equal(result.ok, false);
       if (!result.ok) {
         assert.equal(result.reason, 'INVALID_COMMAND');
         assert.equal(result.retryable, false);
       }
+    });
+
+    it('requires caller-owned stable idempotencyKey, rejecting missing or blank before fetch with zero dispatch, and preserving key across retries', async () => {
+      currentSession = { accessToken: 'valid_jwt_token' };
+
+      let fetchCallCount = 0;
+      const dispatchedHeaders: Array<Record<string, string>> = [];
+      globalThis.fetch = mock.fn(
+        async (_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+          fetchCallCount++;
+          const headersRecord: Record<string, string> = {};
+          if (init?.headers) {
+            const h = new Headers(init.headers);
+            h.forEach((val, key) => {
+              headersRecord[key.toLowerCase()] = val;
+            });
+          }
+          dispatchedHeaders.push(headersRecord);
+          return new Response(
+            JSON.stringify({
+              paymentId: 'pay_123',
+              clientSecret: 'secret_123',
+              status: 'REQUIRES_PAYMENT_METHOD',
+            }),
+            { status: 201, headers: { 'Content-Type': 'application/json' } },
+          );
+        },
+      );
+
+      // 1. Missing idempotencyKey rejects before fetch with zero network dispatch
+      const resMissingUntyped = await Reflect.apply(createPaymentAction, undefined, [
+        { bookingIntentId: 'intent_123' },
+      ]);
+      const resMissing =
+        typeof resMissingUntyped === 'object' && resMissingUntyped !== null
+          ? resMissingUntyped
+          : { ok: false, reason: 'INVALID_COMMAND', retryable: false };
+      assert.equal(Reflect.get(resMissing, 'ok'), false);
+      assert.equal(Reflect.get(resMissing, 'reason'), 'INVALID_COMMAND');
+      assert.equal(Reflect.get(resMissing, 'retryable'), false);
+      assert.equal(fetchCallCount, 0, 'Zero fetch calls dispatched on missing idempotencyKey');
+
+      // 2. Blank whitespace idempotencyKey rejects before fetch with zero network dispatch
+      const resBlank = await createPaymentAction({
+        bookingIntentId: 'intent_123',
+        idempotencyKey: '   ',
+      });
+      assert.equal(resBlank.ok, false);
+      if (!resBlank.ok) {
+        assert.equal(resBlank.reason, 'INVALID_COMMAND');
+        assert.equal(resBlank.retryable, false);
+      }
+      assert.equal(fetchCallCount, 0, 'Zero fetch calls dispatched on blank idempotencyKey');
+
+      // 3. Retry with same caller-owned key sends exact same header even after lost response
+      const stableKey = 'caller-stable-create-key-001';
+
+      // First attempt: network failure / lost response
+      globalThis.fetch = mock.fn(
+        async (_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+          fetchCallCount++;
+          const headersRecord: Record<string, string> = {};
+          if (init?.headers) {
+            const h = new Headers(init.headers);
+            h.forEach((val, key) => {
+              headersRecord[key.toLowerCase()] = val;
+            });
+          }
+          dispatchedHeaders.push(headersRecord);
+          const err = new Error('Network dropped connection');
+          err.name = 'TimeoutError';
+          throw err;
+        },
+      );
+
+      const resLost = await createPaymentAction({
+        bookingIntentId: 'intent_123',
+        idempotencyKey: stableKey,
+      });
+      assert.equal(resLost.ok, false);
+      assert.equal(dispatchedHeaders.length, 1);
+      assert.equal(dispatchedHeaders[0]['idempotency-key'], stableKey);
+
+      // Second attempt (retry of lost response) with identical input: sends same caller-owned key
+      globalThis.fetch = mock.fn(
+        async (_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+          fetchCallCount++;
+          const headersRecord: Record<string, string> = {};
+          if (init?.headers) {
+            const h = new Headers(init.headers);
+            h.forEach((val, key) => {
+              headersRecord[key.toLowerCase()] = val;
+            });
+          }
+          dispatchedHeaders.push(headersRecord);
+          return new Response(
+            JSON.stringify({
+              paymentId: 'pay_retry_success',
+              clientSecret: 'secret_retry_success',
+              status: 'READY',
+            }),
+            { status: 201, headers: { 'Content-Type': 'application/json' } },
+          );
+        },
+      );
+
+      const resRetry = await createPaymentAction({
+        bookingIntentId: 'intent_123',
+        idempotencyKey: stableKey,
+      });
+      assert.equal(resRetry.ok, true);
+      assert.equal(dispatchedHeaders.length, 2);
+      assert.equal(dispatchedHeaders[1]['idempotency-key'], stableKey);
+
+      // 4. Distinct deliberate keys stay distinct
+      const distinctKey = 'caller-second-distinct-key-002';
+      const resDistinct = await createPaymentAction({
+        bookingIntentId: 'intent_123',
+        idempotencyKey: distinctKey,
+      });
+      assert.equal(resDistinct.ok, true);
+      assert.equal(dispatchedHeaders.length, 3);
+      assert.equal(dispatchedHeaders[2]['idempotency-key'], distinctKey);
     });
 
     it('successfully creates payment, sets authorization and idempotency headers, and returns safe secret payload without leaking token', async () => {
@@ -196,7 +321,10 @@ describe('Payment Server Actions', () => {
             { status: 201, headers: { 'Content-Type': 'application/json' } },
           ),
       );
-      const resReserved = await createPaymentAction({ bookingIntentId: 'intent_res_101' });
+      const resReserved = await createPaymentAction({
+        bookingIntentId: 'intent_res_101',
+        idempotencyKey: 'idemp_key_res_101',
+      });
       assert.equal(resReserved.ok, true);
       if (resReserved.ok) {
         assert.equal(resReserved.data.status, 'PENDING');
@@ -217,7 +345,10 @@ describe('Payment Server Actions', () => {
             { status: 201, headers: { 'Content-Type': 'application/json' } },
           ),
       );
-      const resPending = await createPaymentAction({ bookingIntentId: 'intent_pen_202' });
+      const resPending = await createPaymentAction({
+        bookingIntentId: 'intent_pen_202',
+        idempotencyKey: 'idemp_key_pen_202',
+      });
       assert.equal(resPending.ok, true);
       if (resPending.ok) {
         assert.equal(resPending.data.status, 'PENDING');
@@ -261,7 +392,10 @@ describe('Payment Server Actions', () => {
           ),
       );
 
-      const resEmptySecretPending = await createPaymentAction({ bookingIntentId });
+      const resEmptySecretPending = await createPaymentAction({
+        bookingIntentId,
+        idempotencyKey: 'idemp_key_empty_secret',
+      });
       assert.equal(resEmptySecretPending.ok, true);
       if (resEmptySecretPending.ok) {
         assert.equal(resEmptySecretPending.data.status, 'PENDING');
@@ -284,7 +418,10 @@ describe('Payment Server Actions', () => {
           ),
       );
 
-      const resMalformedReady = await createPaymentAction({ bookingIntentId });
+      const resMalformedReady = await createPaymentAction({
+        bookingIntentId,
+        idempotencyKey: 'idemp_key_malformed_ready',
+      });
       assert.equal(resMalformedReady.ok, false);
       if (!resMalformedReady.ok) {
         assert.equal(resMalformedReady.reason, 'UPSTREAM_UNAVAILABLE');
@@ -302,7 +439,10 @@ describe('Payment Server Actions', () => {
           headers: { 'Content-Type': 'application/json' },
         });
       });
-      const res404 = await createPaymentAction({ bookingIntentId: 'intent_nonexistent' });
+      const res404 = await createPaymentAction({
+        bookingIntentId: 'intent_nonexistent',
+        idempotencyKey: 'idemp_key_404',
+      });
       assert.equal(res404.ok, false);
       if (!res404.ok) {
         assert.equal(res404.reason, 'NOT_FOUND');
@@ -316,7 +456,10 @@ describe('Payment Server Actions', () => {
           headers: { 'Content-Type': 'application/json' },
         });
       });
-      const res403 = await createPaymentAction({ bookingIntentId: 'intent_other_user' });
+      const res403 = await createPaymentAction({
+        bookingIntentId: 'intent_other_user',
+        idempotencyKey: 'idemp_key_403',
+      });
       assert.equal(res403.ok, false);
       if (!res403.ok) {
         assert.equal(res403.reason, 'FORBIDDEN');
@@ -330,7 +473,10 @@ describe('Payment Server Actions', () => {
           headers: { 'Content-Type': 'application/json' },
         });
       });
-      const res500 = await createPaymentAction({ bookingIntentId: 'intent_error' });
+      const res500 = await createPaymentAction({
+        bookingIntentId: 'intent_error',
+        idempotencyKey: 'idemp_key_500',
+      });
       assert.equal(res500.ok, false);
       if (!res500.ok) {
         assert.equal(res500.reason, 'UPSTREAM_UNAVAILABLE');
@@ -350,7 +496,10 @@ describe('Payment Server Actions', () => {
         });
       });
 
-      const resCreate = await createPaymentAction({ bookingIntentId: 'intent_123' });
+      const resCreate = await createPaymentAction({
+        bookingIntentId: 'intent_123',
+        idempotencyKey: 'idemp_key_marker_test',
+      });
       assert.equal(resCreate.ok, false);
       if (!resCreate.ok) {
         assert.equal(resCreate.reason, 'INVALID_COMMAND');
@@ -742,6 +891,174 @@ describe('Payment Server Actions', () => {
       }
     });
 
+    it('maps proven legacy saga failure body to neutral FAILED outcome while preserving unknown, PENDING precedence, and identity guards', async () => {
+      currentSession = { accessToken: 'valid_jwt_token' };
+      const bookingId = '26aaee91-cd85-4c22-80dc-cb16ec265721';
+      const paymentId = 'a2183d69-bf15-4847-a089-33792587e5b2';
+
+      // 1. Literal real HTTP 502 saga first-attempt booking failure:
+      // payment-fulfillment.saga.ts lines 680-748:
+      // { success: false, error: 'Duffel booking failed: ... Payment hold released.', bookingStatus: 'AWAITING_PAYMENT' }
+      globalThis.fetch = mock.fn(async (): Promise<Response> => {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'Duffel booking failed: Airline inventory exhausted. Payment hold released.',
+            bookingStatus: 'AWAITING_PAYMENT',
+          }),
+          { status: 502, headers: { 'Content-Type': 'application/json' } },
+        );
+      });
+
+      const resSaga502 = await confirmPaymentAction({ bookingId, paymentId });
+      assert.equal(resSaga502.ok, true);
+      if (resSaga502.ok) {
+        assert.equal(resSaga502.data.status, 'FAILED');
+        assert.equal(resSaga502.data.paymentId, paymentId);
+        assert.equal(resSaga502.data.message, 'Payment confirmation failed.');
+        assert.equal(resSaga502.data.message?.includes('Payment hold released'), false);
+        assert.equal(resSaga502.data.message?.includes('Duffel booking failed'), false);
+      }
+
+      // 2. Real HTTP 502 passenger validation failure with code and AWAITING_PAYMENT:
+      globalThis.fetch = mock.fn(async (): Promise<Response> => {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'Passenger validation failed: Passport required. Payment hold released.',
+            code: 'PASSENGER_VALIDATION_ERROR',
+            bookingStatus: 'AWAITING_PAYMENT',
+          }),
+          { status: 502, headers: { 'Content-Type': 'application/json' } },
+        );
+      });
+
+      const resPassenger502 = await confirmPaymentAction({ bookingId, paymentId });
+      assert.equal(resPassenger502.ok, true);
+      if (resPassenger502.ok) {
+        assert.equal(resPassenger502.data.status, 'FAILED');
+        assert.equal(resPassenger502.data.paymentId, paymentId);
+        assert.equal(resPassenger502.data.message, 'Payment confirmation failed.');
+      }
+
+      // 3. AWAITING_PAYMENT alone is NOT failure evidence (missing success:false and nonempty error)
+      globalThis.fetch = mock.fn(async (): Promise<Response> => {
+        return new Response(
+          JSON.stringify({
+            bookingStatus: 'AWAITING_PAYMENT',
+          }),
+          { status: 502, headers: { 'Content-Type': 'application/json' } },
+        );
+      });
+
+      const resAwaitingAlone = await confirmPaymentAction({ bookingId, paymentId });
+      assert.equal(resAwaitingAlone.ok, false);
+      if (!resAwaitingAlone.ok) {
+        assert.equal(resAwaitingAlone.reason, 'UPSTREAM_UNAVAILABLE');
+        assert.equal(resAwaitingAlone.retryable, true);
+      }
+
+      // 4. Malformed success or error fields do not project to FAILED
+      for (const malformedBody of [
+        { success: 'false', error: 'booking failed', bookingStatus: 'AWAITING_PAYMENT' },
+        { success: false, error: '   ', bookingStatus: 'AWAITING_PAYMENT' },
+        { success: false, error: 12345, bookingStatus: 'AWAITING_PAYMENT' },
+        { success: false, bookingStatus: 'AWAITING_PAYMENT' },
+      ]) {
+        globalThis.fetch = mock.fn(async (): Promise<Response> => {
+          return new Response(JSON.stringify(malformedBody), {
+            status: 502,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        });
+
+        const resMalformed = await confirmPaymentAction({ bookingId, paymentId });
+        assert.equal(resMalformed.ok, false);
+        if (!resMalformed.ok) {
+          assert.equal(resMalformed.reason, 'UPSTREAM_UNAVAILABLE');
+          assert.equal(resMalformed.retryable, true);
+        }
+      }
+
+      // 5. Explicit unresolved/PENDING precedence over legacy failure body
+      globalThis.fetch = mock.fn(async (): Promise<Response> => {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'Temporary saga delay',
+            bookingStatus: 'PENDING',
+          }),
+          { status: 502, headers: { 'Content-Type': 'application/json' } },
+        );
+      });
+
+      const resPendingPrecedence = await confirmPaymentAction({ bookingId, paymentId });
+      assert.equal(resPendingPrecedence.ok, true);
+      if (resPendingPrecedence.ok) {
+        assert.equal(resPendingPrecedence.data.status, 'PENDING');
+        assert.equal(resPendingPrecedence.data.paymentId, paymentId);
+      }
+
+      // 6. Contradictory outcome: status claims CONFIRMED but success:false & bookingStatus:AWAITING_PAYMENT
+      globalThis.fetch = mock.fn(async (): Promise<Response> => {
+        return new Response(
+          JSON.stringify({
+            status: 'CONFIRMED',
+            success: false,
+            error: 'Contradictory status',
+            bookingStatus: 'AWAITING_PAYMENT',
+          }),
+          { status: 502, headers: { 'Content-Type': 'application/json' } },
+        );
+      });
+
+      const resContradictory = await confirmPaymentAction({ bookingId, paymentId });
+      assert.equal(resContradictory.ok, false);
+      if (!resContradictory.ok) {
+        assert.equal(resContradictory.reason, 'UPSTREAM_UNAVAILABLE');
+      }
+
+      // 7. Identity guard takes precedence over legacy failure body on HTTP error
+      globalThis.fetch = mock.fn(async (): Promise<Response> => {
+        return new Response(
+          JSON.stringify({
+            paymentId: 'different_payment_id_999',
+            success: false,
+            error: 'Duffel booking failed. Payment hold released.',
+            bookingStatus: 'AWAITING_PAYMENT',
+          }),
+          { status: 502, headers: { 'Content-Type': 'application/json' } },
+        );
+      });
+
+      const resMismatchedId = await confirmPaymentAction({ bookingId, paymentId });
+      assert.equal(resMismatchedId.ok, false);
+      if (!resMismatchedId.ok) {
+        assert.equal(resMismatchedId.reason, 'UPSTREAM_UNAVAILABLE');
+      }
+
+      // 8. Legacy failure payload on HTTP 200 also safely projects to FAILED
+      globalThis.fetch = mock.fn(async (): Promise<Response> => {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'Booking failed on supplier side. Payment hold released.',
+            bookingStatus: 'AWAITING_PAYMENT',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      });
+
+      const res200Legacy = await confirmPaymentAction({ bookingId, paymentId });
+      assert.equal(res200Legacy.ok, true);
+      if (res200Legacy.ok) {
+        assert.equal(res200Legacy.data.status, 'FAILED');
+        assert.equal(res200Legacy.data.paymentId, paymentId);
+        assert.equal(res200Legacy.data.message, 'Payment confirmation failed.');
+        assert.equal(res200Legacy.data.message?.includes('Payment hold released'), false);
+      }
+    });
+
     it('supports approved authoritative workflow variants (CONFIRMED, DEFINITIVE_FAILURE, COMPENSATED_FAILURE, REJECTED) with consistent discriminated results and safe messages', async () => {
       currentSession = { accessToken: 'valid_jwt_token' };
       const bookingId = '26aaee91-cd85-4c22-80dc-cb16ec265721';
@@ -1046,7 +1363,7 @@ describe('Payment Server Actions', () => {
       }
 
       // 2. Next.js server actions validation: module must NOT export arrays/objects at runtime
-      const actionsModule = await import('./actions');
+      const actionsModule = await import('../app/checkout/[intentId]/payment/actions');
       const actionValidatePath = resolveModulePath(
         'next/dist/build/webpack/loaders/next-flight-loader/action-validate.js',
       );

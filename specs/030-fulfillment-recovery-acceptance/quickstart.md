@@ -8,7 +8,7 @@ Read [acceptance matrix](acceptance-matrix.md), [harness contract](contracts/con
 
 Use PowerShell and the repository's installed tools. These commands already exist; they do not prove recovery acceptance. Start PowerShell in your repository root, initialize $repositoryRoot once, and reuse it for the later snippets in the same session:
 
-~~~powershell
+```powershell
 $repositoryRoot = (Get-Location).Path
 Set-Location -LiteralPath $repositoryRoot
 pnpm --filter @api/backend run test:unit
@@ -16,15 +16,15 @@ pnpm --filter @api/backend run test:integration
 pnpm --filter @web/frontend run test:unit
 pnpm --filter @web/frontend run test:route-contracts
 pnpm --filter @web/frontend run test:system
-~~~
+```
 
 Backend integration requires the configured isolated PostgreSQL/Redis environment and migration prerequisites; consult context/testing.md. Existing web test:system invokes the T093 chat real-flow runner, not a fulfillment recovery suite. Existing ancillary configuration starts only Next.js and is insufficient. .github/workflows/ci.yml has backend PostgreSQL/Redis integration coverage, but no implied fulfillment recovery gate. Do not repair or replace pnpm as part of this feature; direct installed CLI invocation is available when needed.
 
 Before applying migrations, create and positively identify a disposable run database/schema and set DATABASE_URL to it. Never run migrate/reset against the development or production database. Existing migration command, after that prerequisite:
 
-~~~powershell
+```powershell
 pnpm --filter @api/backend exec prisma migrate deploy
-~~~
+```
 
 Feature migration/legacy fixtures are planned and must preserve source rows. Credentials must be supplied by an isolated runner configuration; never dump .env or environment objects.
 
@@ -32,10 +32,10 @@ Feature migration/legacy fixtures are planned and must preserve source rows. Cre
 
 The Phase 2 harness now includes apps/web/tests/playwright.fulfillment.config.ts, the isolated backend bootstrap/driver, and a real Next/Nest startup smoke. The customer acceptance spec apps/web/tests/fulfillment-recovery.spec.ts and production payment/recovery flow remain planned under T017 and later. Once that spec exists, the intended direct browser command is:
 
-~~~powershell
+```powershell
 Set-Location -LiteralPath (Join-Path $repositoryRoot 'apps\web')
 node node_modules\@playwright\test\cli.js test tests\fulfillment-recovery.spec.ts --config=tests\playwright.fulfillment.config.ts
-~~~
+```
 
 The Phase 2 launcher owns startup and cleanup of the real Next/Nest processes, allocated database schema and Redis namespace, and provider simulators; it checks service readiness and target isolation before navigation. The remaining customer-flow cases must enable recovery only inside the disposable run, use generated run secrets, keep application provider credentials away from driver routes, and retain the guarded egress boundary.
 
@@ -56,7 +56,6 @@ Verify authentic payment authorization/retrieve/capture behavior, supplier autho
 
 Missing credentials mark this separate suite skipped with reason. Deterministic CI remains mandatory and sandbox-skipped must never be reported as sandbox-passed. Exploratory browser agents can provide non-authoritative QA observations; they cannot move money, create orders or resolve production cases.
 
-
 ## Planned lane partition and clock rules
 
 PLANNED apps/api/test/jest-fulfillment-sandbox.json selects only fulfillment-provider-contract.e2e-spec.ts. Generic apps/api/jest-integration.json excludes that file. The production guard executes before any effect; missing credentials report the separate run skipped.
@@ -64,13 +63,14 @@ PLANNED apps/api/test/jest-fulfillment-sandbox.json selects only fulfillment-pro
 PLANNED apps/api/test/jest-fulfillment-timeout.json selects fulfillment-provider-timeout.e2e-spec.ts and excludes it from ordinary integration discovery. Configure testTimeout >=180000 ms and matching runner/service budget. A20 exercises the actual >=130-second threshold and is required by feature CI; existing 30-second defaults do not suffice.
 
 Planned direct commands after those files exist:
-~~~powershell
+
+```powershell
 Set-Location -LiteralPath (Join-Path $repositoryRoot 'apps\api')
 node node_modules\jest\bin\jest.js --config=test\jest-fulfillment-sandbox.json --runInBand
 node node_modules\jest\bin\jest.js --config=test\jest-fulfillment-timeout.json --runInBand
-~~~
+```
 
-App-directory actions.spec.ts runs through existing web test:route-contracts, not test:unit. Wire that lane into changed-web gates.
+Action suite relocated to apps/web/tests/payment-actions.unit.ts and runs through existing web test:unit.
 
 Virtual time advances due jobs/escalation only. A11 uses a short configurable lease and actual PostgreSQL-time expiry with barriers; never substitute app-time lease predicates.
 

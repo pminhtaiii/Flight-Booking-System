@@ -5,10 +5,12 @@
 **Format**: Sequential task ID, optional [P] only for independent files, [USn] on every story task, concrete target paths. New paths are planned deliverables.
 
 ## Phase 1: Setup
-- [X] T001 [P] Add default-off/invalid-configuration tests in apps/api/src/payment-fulfillment/fulfillment-recovery.config.spec.ts.
-- [X] T002 Implement recovery enrollment/configuration and validated lease/expiry policy in apps/api/src/payment-fulfillment/fulfillment-recovery.config.ts and apps/api/src/app.module.ts.
+
+- [x] T001 [P] Add default-off/invalid-configuration tests in apps/api/src/payment-fulfillment/fulfillment-recovery.config.spec.ts.
+- [x] T002 Implement recovery enrollment/configuration and validated lease/expiry policy in apps/api/src/payment-fulfillment/fulfillment-recovery.config.ts and apps/api/src/app.module.ts.
 
 ## Phase 2: Foundation and Controlled Harness
+
 - [x] T003 [P] Add clean/legacy migration and Payment reservation reader tests in apps/api/test/fulfillment-recovery-migration.e2e-spec.ts.
 - [x] T004 [P] Add acquire/renew/fence/takeover race tests using actual DB time in apps/api/src/payment-fulfillment/fulfillment-workflow.repository.spec.ts.
 - [x] T005 [P] Add stable-operation/distinct-attempt/immutable-evidence tests in apps/api/src/payment-fulfillment/provider-operation.service.spec.ts.
@@ -20,13 +22,14 @@
 - [x] T011 Implement stateful transport simulators with realistic verified provider capabilities in apps/api/test/fulfillment-harness/stripe-server.ts and apps/api/test/fulfillment-harness/supplier-server.ts.
 - [x] T012 [P] Add protected driver, cross-run isolation, production exclusion, redaction and teardown tests in apps/api/test/fulfillment-harness/driver.spec.ts.
 - [x] T013 Implement explicit signed event release, held responses, disposable DB/Redis bootstrap, restart barriers and cleanup in apps/api/test/fulfillment-harness/driver.ts and apps/api/test/fulfillment-harness/bootstrap.ts.
-- [X] T014 Implement a test-only external Stripe browser client seam without replacing application UI in apps/web/tests/fixtures/fulfillment-stripe-client.ts.
-- [X] T015 Implement virtual recovery scheduling (not DB lease time), finite fault scenarios and expected-variant manifest in apps/api/test/fulfillment-harness/scheduler.ts and apps/api/test/fulfillment-harness/scenarios.ts.
+- [x] T014 Implement a test-only external Stripe browser client seam without replacing application UI in apps/web/tests/fixtures/fulfillment-stripe-client.ts.
+- [x] T015 Implement virtual recovery scheduling (not DB lease time), finite fault scenarios and expected-variant manifest in apps/api/test/fulfillment-harness/scheduler.ts and apps/api/test/fulfillment-harness/scenarios.ts.
 - [x] T016 Configure isolated real Next/Nest/provider startup and failure-on-missing-services in apps/web/tests/playwright.fulfillment.config.ts and apps/api/test/fulfillment-harness/server.ts.
 
 Foundation checkpoint: journal, one DB claim, provider transport fidelity and isolated driver exist. No external call is held inside a database transaction.
 
 ## Phase 3: US1 - Complete or Safely Hold a Booking (P1)
+
 - [ ] T017 [P] [US1] Add confirmed/definite/unknown create/capture and compensated-failure tests in apps/api/src/payment-fulfillment/payment-fulfillment.saga.spec.ts.
 - [ ] T018 [P] [US1] Add fresh supplier total/currency and Balance mapping tests in apps/api/src/supplier/order/duffel-fulfillment.adapter.spec.ts and apps/api/src/supplier/order/duffel-order.adapter.spec.ts.
 - [ ] T019 [P] [US1] Add actual authorization-expiry and capture normalization tests in apps/api/src/common/stripe.service.spec.ts.
@@ -37,7 +40,7 @@ Foundation checkpoint: journal, one DB claim, provider transport fidelity and is
 - [ ] T024 [US1] Implement fresh supplier-priced Balance request, verified create results, supported candidate discovery and authoritative order/payment/cancellation observations with >=130-second transport timeout; never use snapshot fallback as current provider truth in apps/api/src/supplier/order/duffel-fulfillment.adapter.ts and apps/api/src/supplier/order/duffel-order.adapter.ts.
 - [ ] T025 [US1] Adopt durable operations and fenced transitions, reconcile-before-compensate policy, expired-authorization handling and distinct compensated-failure result in apps/api/src/payment-fulfillment/payment-fulfillment.saga.ts.
 - [ ] T026 [P] [US1] Add tokenized form/pending/reload/single-submit tests in apps/web/tests/fulfillment-payment-form.unit.ts.
-- [ ] T027 [P] [US1] Add authenticated create/confirm/status server-action tests in apps/web/app/checkout/[intentId]/payment/actions.spec.ts and wire apps/web/scripts/run-node-tests.mjs route-contract discovery.
+- [ ] T027 [P] [US1] Add authenticated create/confirm/status server-action tests in apps/web/tests/payment-actions.unit.ts and verify unit runner discovery.
 - [ ] T028 [US1] Implement caller-owned payment actions with safe secrets/status handling in apps/web/app/checkout/[intentId]/payment/actions.ts.
 - [ ] T029 [US1] Implement Stripe Elements form and pending/resume UI using official browser SDK tokenization in apps/web/components/checkout/PaymentFormClient.tsx (record any required client dependency in context/library-docs.md).
 - [ ] T030 [US1] Replace the disabled payment placeholder with working form and truthful confirmation/failure states in apps/web/app/checkout/[intentId]/payment/page.tsx.
@@ -47,6 +50,7 @@ Foundation checkpoint: journal, one DB claim, provider transport fidelity and is
 Independent US1 test: demonstrate A01, A02, A05 confirmed/definite outcomes, A08 pre-create check and A21 reservation/creation portions. Assert truthful pending for unresolved variants. Complete automatic/event recovery and operator portions are explicit US2 dependencies, not falsely counted as independently delivered.
 
 ## Phase 4: US2 - Reconcile and Escalate With Evidence (P1)
+
 - [ ] T033 [P] [US2] Add immediate/backoff/15-minute/early-expiry/restart/stale-response tests in apps/api/src/payment-fulfillment/fulfillment-reconciliation.service.spec.ts.
 - [ ] T034 [US2] Implement continued reconciliation, immutable first uncertainty and separate escalation projection in apps/api/src/payment-fulfillment/fulfillment-reconciliation.service.ts and apps/api/src/payment-fulfillment/fulfillment-reconciliation.cron.ts.
 - [ ] T035 [P] [US2] Add queue RBAC/no-force/evidence/audit/resolved-no-op tests in apps/api/src/payment/admin-reconciliation.controller.spec.ts.
@@ -61,6 +65,7 @@ Independent US1 test: demonstrate A01, A02, A05 confirmed/definite outcomes, A08
 Independent US2 test: A10-A15 plus US2 portions of A09/A18/A21 after US1. Use virtual scheduling for escalation and real DB-time short leases for takeover.
 
 ## Phase 5: US3 - Safe Migration, Rollout and Required Gates (P2)
+
 - [ ] T043 [P] [US3] Add verified/incomplete/contradictory legacy dry-run/backfill checks in apps/api/src/payment-fulfillment/fulfillment-recovery-backfill.service.spec.ts.
 - [ ] T044 [US3] Implement traceable backfill and quiescence/enrollment reports in apps/api/src/payment-fulfillment/fulfillment-recovery-backfill.service.ts.
 - [ ] T045 [P] [US3] Add off-mode/rollback/held-response/late-webhook/retry routing and wire replay checks in apps/api/test/fulfillment-recovery-rollout.e2e-spec.ts.
@@ -75,10 +80,12 @@ Independent US2 test: A10-A15 plus US2 portions of A09/A18/A21 after US1. Use vi
 Independent US3 test: A16/A17 legacy and rollback fixtures, A18 gate failure modes, A19 sandbox contract with explicit prerequisites and A20 actual transport threshold. Sandbox-skipped is not passed; required controlled checks remain independent of provider secrets.
 
 ## Phase 6: Polish
+
 - [ ] T053 Update context/architecture.md, context/progress-checker.md, context/active-feature.md and context/library-docs.md with implemented and verified behavior.
 - [ ] T054 Run focused API/web/route-contract checks and every required scenario manifest; record actual results and rollout gates in specs/030-fulfillment-recovery-acceptance/quickstart.md.
 
 ## Dependency Graph
+
 T001 -> T002 -> T003-T005 -> T006-T009.
 Harness T010-T016 follows core contract definition and blocks composed tests T031/T032/T041/T042.
 US1 T017-T032 follows foundation. US2 T033-T042 follows US1 semantics.
@@ -88,13 +95,14 @@ T053-T054 close verification. No live activation before US1 + US2 + US3 gates pa
 [P] marks separate files without unmet prerequisites; it never authorizes simultaneous edits of the same file. Parallel examples: T003/T004/T005; T017/T018/T019/T020; T026/T027; T033/T035/T037/T039; T043/T045/T047/T049/T051 after their dependencies. Implementation shared-file tasks are sequential.
 
 ## Requirement-to-Task Traceability
-| Requirements | Tasks | Acceptance |
-| --- | --- | --- |
-| FR-001-FR-004 | T017-T025,T028-T032 | A01,A02,A08,A19,A20,A21 |
-| FR-005-FR-007 | T017,T021,T025,T033-T034,T039-T042 | A03-A07,A09-A10 |
-| FR-008-FR-011,FR-019 | T004-T009,T020-T025,T033-T042,T046 | A09-A12,A21 |
-| FR-012-FR-015 | T033-T042 | A11-A15 |
-| FR-016-FR-017 | T003,T006,T027,T039-T052 | A09,A16-A19,A21 |
-| FR-018 | T010-T016,T047-T052 | A18-A20 |
+
+| Requirements         | Tasks                              | Acceptance              |
+| -------------------- | ---------------------------------- | ----------------------- |
+| FR-001-FR-004        | T017-T025,T028-T032                | A01,A02,A08,A19,A20,A21 |
+| FR-005-FR-007        | T017,T021,T025,T033-T034,T039-T042 | A03-A07,A09-A10         |
+| FR-008-FR-011,FR-019 | T004-T009,T020-T025,T033-T042,T046 | A09-A12,A21             |
+| FR-012-FR-015        | T033-T042                          | A11-A15                 |
+| FR-016-FR-017        | T003,T006,T027,T039-T052           | A09,A16-A19,A21         |
+| FR-018               | T010-T016,T047-T052                | A18-A20                 |
 
 MVP: deliver foundation and independently testable US1 while disabled. Automatic recovery/operator ownership and full rollout are US2/US3 prerequisites to production enablement. The separate uncommitted Balance fix is not assumed merged; T018/T024 implement and verify its required mapping on this baseline. Browser exploratory verifier-agent ecosystem is a future follow-up without production financial authority.

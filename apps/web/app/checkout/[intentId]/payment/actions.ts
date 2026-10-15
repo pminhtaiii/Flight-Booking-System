@@ -20,7 +20,7 @@ export type CreatePaymentInput = {
   ancillarySelectionVersion?: number;
   paymentMethodId?: string;
   saveCard?: boolean;
-  idempotencyKey?: string;
+  idempotencyKey: string;
 };
 
 export type CreatePaymentReadyResult = {
@@ -77,7 +77,7 @@ const CreatePaymentInputSchema = z
     ancillarySelectionVersion: z.number().int().min(1).optional(),
     paymentMethodId: z.string().trim().min(1).optional(),
     saveCard: z.boolean().optional(),
-    idempotencyKey: z.string().trim().min(1).optional(),
+    idempotencyKey: z.string().trim().min(1),
   })
   .strict();
 
@@ -164,7 +164,7 @@ export async function createPaymentAction(
   if (!parsedInput.success) {
     return outcomeFailure(
       'INVALID_COMMAND',
-      'Valid booking intent ID is required to initiate payment.',
+      'Valid booking intent ID and idempotency key are required to initiate payment.',
       false,
     );
   }
@@ -177,8 +177,6 @@ export async function createPaymentAction(
     saveCard,
     idempotencyKey,
   } = parsedInput.data;
-
-  const resolvedIdempotencyKey = idempotencyKey ?? generateIdempotencyKey();
 
   const requestBody: {
     bookingIntentId: string;
@@ -201,7 +199,7 @@ export async function createPaymentAction(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Idempotency-Key': resolvedIdempotencyKey,
+        'Idempotency-Key': idempotencyKey,
       },
       body: JSON.stringify(requestBody),
     },
@@ -394,6 +392,31 @@ export async function confirmPaymentAction(
           },
         };
       }
+
+      // Narrow legacy saga failure projection:
+      // payment-fulfillment.saga.ts catches booking/passenger failure, sets bookingStatus: 'AWAITING_PAYMENT' or 'CANCELLED',
+      // success: false, and nonempty error message.
+      // Requires: boolean success strictly false, nonempty string error, valid legacy booking status,
+      // and errStatus undefined or non-contradictory.
+      const errSuccess = Reflect.get(result.body, 'success');
+      const errError = Reflect.get(result.body, 'error');
+      const isProvenLegacyFailure =
+        errSuccess === false &&
+        typeof errError === 'string' &&
+        errError.trim().length > 0 &&
+        (errBookingStatus === 'AWAITING_PAYMENT' || errBookingStatus === 'CANCELLED') &&
+        (errStatus === undefined || errStatus === 'CANCELLED' || errStatus === 'FAILED');
+
+      if (isProvenLegacyFailure) {
+        return {
+          ok: true,
+          data: {
+            status: 'FAILED',
+            paymentId,
+            message: 'Payment confirmation failed.',
+          },
+        };
+      }
     }
 
     return outcomeFailure(
@@ -529,10 +552,18 @@ export async function confirmPaymentAction(
   }
 
   // 8. Handle explicit legacy saga failure or cancelled/failed status
-  const isFailed =
+  const isExplicitFailed =
     rawBookingStatus === 'CANCELLED' || rawStatus === 'CANCELLED' || rawStatus === 'FAILED';
 
-  if (isFailed) {
+  const rawError = typeof raw.error === 'string' ? raw.error : undefined;
+  const isProvenLegacyFailure =
+    rawSuccess === false &&
+    rawError !== undefined &&
+    rawError.trim().length > 0 &&
+    (rawBookingStatus === 'AWAITING_PAYMENT' || rawBookingStatus === 'CANCELLED') &&
+    (rawStatus === undefined || rawStatus === 'CANCELLED' || rawStatus === 'FAILED');
+
+  if (isExplicitFailed || isProvenLegacyFailure) {
     return {
       ok: true,
       data: {
