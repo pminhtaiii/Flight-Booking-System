@@ -24,10 +24,26 @@ type FixtureOffer = {
   readonly stops: number;
 };
 
-const SEARCH_BODY = {
+export function computeFutureUtcDate(
+  daysAhead: number = 30,
+  baseDate: Date = new Date(),
+): string {
+  const future = new Date(
+    Date.UTC(
+      baseDate.getUTCFullYear(),
+      baseDate.getUTCMonth(),
+      baseDate.getUTCDate() + daysAhead,
+    ),
+  );
+  return future.toISOString().slice(0, 10);
+}
+
+export const FIXTURE_DEPARTURE_DATE = computeFutureUtcDate(30);
+
+export const SEARCH_BODY = {
   origin: 'HAN',
   destination: 'SGN',
-  departureDate: '2026-10-15',
+  departureDate: FIXTURE_DEPARTURE_DATE,
   adults: 1,
   cabinClass: 'economy',
 };
@@ -83,14 +99,14 @@ function createOffer(fixture: FixtureOffer): DuffelOffer {
       : [
           {
             ...directSegment,
-            arriving_at: '2026-10-15T11:00:00',
+            arriving_at: `${FIXTURE_DEPARTURE_DATE}T11:00:00`,
             destination: airport('DAD'),
             duration: 'PT1H20M',
           },
           {
             ...directSegment,
             id: `${fixture.id}_segment_2`,
-            departing_at: '2026-10-15T12:00:00',
+            departing_at: `${FIXTURE_DEPARTURE_DATE}T12:00:00`,
             origin: airport('DAD'),
             duration: 'PT1H30M',
           },
@@ -114,7 +130,7 @@ function createOffer(fixture: FixtureOffer): DuffelOffer {
   };
 }
 
-function createParityOfferRequest(): DuffelOfferRequest {
+export function createParityOfferRequest(): DuffelOfferRequest {
   const offers = [
     // Offer 1: VN direct, best departure & arrival time -> highest match
     createOffer({
@@ -123,8 +139,8 @@ function createParityOfferRequest(): DuffelOfferRequest {
       carrierName: 'Vietnam Airlines',
       flightNumber: '101',
       price: '100.00',
-      departureAt: '2026-10-15T08:00:00',
-      arrivalAt: '2026-10-15T10:10:00',
+      departureAt: `${FIXTURE_DEPARTURE_DATE}T08:00:00`,
+      arrivalAt: `${FIXTURE_DEPARTURE_DATE}T10:10:00`,
       duration: 'PT2H10M',
       stops: 0,
     }),
@@ -135,8 +151,8 @@ function createParityOfferRequest(): DuffelOfferRequest {
       carrierName: 'Vietnam Airlines',
       flightNumber: '103',
       price: '120.00',
-      departureAt: '2026-10-15T09:00:00',
-      arrivalAt: '2026-10-15T11:10:00',
+      departureAt: `${FIXTURE_DEPARTURE_DATE}T09:00:00`,
+      arrivalAt: `${FIXTURE_DEPARTURE_DATE}T11:10:00`,
       duration: 'PT2H10M',
       stops: 0,
     }),
@@ -147,8 +163,8 @@ function createParityOfferRequest(): DuffelOfferRequest {
       carrierName: 'Singapore Airlines',
       flightNumber: '201',
       price: '160.00',
-      departureAt: '2026-10-15T08:30:00',
-      arrivalAt: '2026-10-15T14:30:00',
+      departureAt: `${FIXTURE_DEPARTURE_DATE}T08:30:00`,
+      arrivalAt: `${FIXTURE_DEPARTURE_DATE}T14:30:00`,
       duration: 'PT4H30M',
       stops: 1,
     }),
@@ -159,8 +175,8 @@ function createParityOfferRequest(): DuffelOfferRequest {
       carrierName: 'British Airways',
       flightNumber: '301',
       price: '130.00',
-      departureAt: '2026-10-15T13:00:00',
-      arrivalAt: '2026-10-15T15:15:00',
+      departureAt: `${FIXTURE_DEPARTURE_DATE}T13:00:00`,
+      arrivalAt: `${FIXTURE_DEPARTURE_DATE}T15:15:00`,
       duration: 'PT2H15M',
       stops: 0,
     }),
@@ -171,8 +187,8 @@ function createParityOfferRequest(): DuffelOfferRequest {
       carrierName: 'Singapore Airlines',
       flightNumber: '205',
       price: '180.00',
-      departureAt: '2026-10-15T07:30:00',
-      arrivalAt: '2026-10-15T15:00:00',
+      departureAt: `${FIXTURE_DEPARTURE_DATE}T07:30:00`,
+      arrivalAt: `${FIXTURE_DEPARTURE_DATE}T15:00:00`,
       duration: 'PT5H00M',
       stops: 1,
     }),
@@ -183,8 +199,8 @@ function createParityOfferRequest(): DuffelOfferRequest {
       carrierName: 'British Airways',
       flightNumber: '305',
       price: '220.00',
-      departureAt: '2026-10-15T14:00:00',
-      arrivalAt: '2026-10-15T19:30:00',
+      departureAt: `${FIXTURE_DEPARTURE_DATE}T14:00:00`,
+      arrivalAt: `${FIXTURE_DEPARTURE_DATE}T19:30:00`,
       duration: 'PT5H30M',
       stops: 1,
     }),
@@ -195,8 +211,8 @@ function createParityOfferRequest(): DuffelOfferRequest {
       carrierName: 'Vietnam Airlines',
       flightNumber: '109',
       price: '250.00',
-      departureAt: '2026-10-15T18:00:00',
-      arrivalAt: '2026-10-15T23:30:00',
+      departureAt: `${FIXTURE_DEPARTURE_DATE}T18:00:00`,
+      arrivalAt: `${FIXTURE_DEPARTURE_DATE}T23:30:00`,
       duration: 'PT5H30M',
       stops: 1,
     }),
@@ -661,7 +677,7 @@ describe('Agent Flight Match Parity (E2E)', () => {
         .query({
           origin: 'HAN',
           destination: 'SGN',
-          date: '2026-10-15',
+          date: FIXTURE_DEPARTURE_DATE,
           adults: 1,
         })
         .expect(200);
